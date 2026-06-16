@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: qlab-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./data/qlab.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+    healthCheckPath: /health
+    disk:
+      name: qlab-data
+      mountPath: /app/data
+      sizeGB: 10
+
+  - type: web
+    name: qlab-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: starter
+    envVars:
+      - key: QLAB_API_URL
+        fromService:
+          name: qlab-backend
+          type: web
+          property: host
+          transform: "https://{value}"

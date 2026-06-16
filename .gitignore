@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# SQLite databases (runtime data — not committed)
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Logs
+*.log
+*.err
+backend.log
+backend.err
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# Node
+node_modules/
+
+# Env files with secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Docker volumes
+docker-volumes/

@@ -1,0 +1,16 @@
+[qlab]
+api_url = "http://127.0.0.1:8000"
+api_key = ""
+project = "my-research-project"
+tags = ["local", "qiskit"]
+mask_keys = ["api_token", "secret_angle", "proprietary_parameter"]
+include_pip_freeze = false
+timeout = 3.0
+queue_path = ""
+
+# Zero-Knowledge Circuit Obfuscation.
+# When enabled, Q-Lab uploads resource/noise metadata and salted hashes, but
+# does not upload raw QASM. This protects proprietary circuit IP while keeping
+# depth, gate-count, and noise analysis available.
+zk_qco = false
+zk_qco_salt = ""

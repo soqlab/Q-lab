@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+sqlalchemy
+alembic
+python-jose[cryptography]
+bcrypt
+httpx
+anthropic>=0.30
+qiskit[visualization]
+qiskit-ibm-runtime
+matplotlib
+pylatexenc
+# Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)

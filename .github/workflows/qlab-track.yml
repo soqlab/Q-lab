@@ -1,0 +1,75 @@
+name: Q-Lab Experiment Tracking
+
+# This workflow tracks Qiskit experiments in CI automatically.
+# It runs after your tests and submits results to your Q-Lab instance.
+#
+# Required secrets (set in GitHub repo Settings → Secrets → Actions):
+#   QLAB_API_URL  - your Q-Lab backend URL, e.g. https://qlab.yourcompany.com
+#   QLAB_API_KEY  - your Q-Lab API key (create one in Settings → API Keys)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quantum-experiments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install qiskit qiskit-aer
+          # Install Q-Lab SDK from local source (or replace with: pip install qlab-sdk once published to PyPI)
+          pip install ./qlab_sdk
+
+      - name: Run quantum experiments
+        env:
+          QLAB_API_URL: ${{ secrets.QLAB_API_URL }}
+          QLAB_API_KEY: ${{ secrets.QLAB_API_KEY }}
+          QLAB_PROJECT: ${{ github.repository }}/${{ github.ref_name }}
+        run: |
+          python - <<'EOF'
+          import os, qlab
+          from qiskit import QuantumCircuit, transpile
+          from qiskit_aer import AerSimulator
+
+          qlab.init(
+              api_url=os.environ["QLAB_API_URL"],
+              api_key=os.environ["QLAB_API_KEY"],
+              project=os.environ.get("QLAB_PROJECT", "ci"),
+          )
+
+          # --- Your circuit(s) here ---
+          qc = QuantumCircuit(3, 3)
+          qc.h(0)
+          qc.cx(0, 1)
+          qc.cx(1, 2)
+          qc.measure_all()
+
+          backend = AerSimulator()
+          qc_t = transpile(qc, backend)
+          job = backend.run(qc_t, shots=4096)
+          result = job.result()
+
+          # Q-Lab captures the run automatically
+          print("Counts:", result.get_counts())
+          EOF
+
+      - name: Upload Q-Lab run link
+        if: always()
+        run: |
+          echo "Q-Lab dashboard: ${{ secrets.QLAB_API_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "Project: ${{ github.repository }}/${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY

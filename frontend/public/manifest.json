@@ -1,0 +1,21 @@
+{
+  "name": "Q-Lab — Quantum Experiment Tracker",
+  "short_name": "Q-Lab",
+  "description": "Professional quantum experiment tracking for research teams",
+  "start_url": "/runs",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [],
+  "categories": ["science", "productivity"],
+  "shortcuts": [
+    { "name": "Recent Runs", "url": "/runs", "description": "View recent experiment runs" },
+    { "name": "Live Monitor", "url": "/live-monitor", "description": "Monitor backend status" },
+    { "name": "Submit Job", "url": "/jobs", "description": "Submit a quantum job" }
+  ]
+}
