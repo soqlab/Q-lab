@@ -1,0 +1,77 @@
+{
+  "name": "qlab-vscode",
+  "displayName": "Q-Lab Quantum Experiment Tracker",
+  "description": "Track quantum experiments from VS Code. Browse runs, submit circuits, view live calibration.",
+  "version": "0.1.0",
+  "publisher": "qlab",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Data Science"],
+  "keywords": ["quantum", "qiskit", "experiment-tracking", "ibm-quantum"],
+  "activationEvents": ["onLanguage:python", "onView:qlab-runs"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "qlab.showRuns", "title": "Q-Lab: Show Recent Runs" },
+      { "command": "qlab.submitCircuit", "title": "Q-Lab: Submit Current File" },
+      { "command": "qlab.openDashboard", "title": "Q-Lab: Open Dashboard" },
+      { "command": "qlab.showCalibration", "title": "Q-Lab: Show Backend Calibration" },
+      { "command": "qlab.copyRunId", "title": "Q-Lab: Copy Run ID" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "qlab-sidebar", "title": "Q-Lab", "icon": "$(circuit-board)" }
+      ]
+    },
+    "views": {
+      "qlab-sidebar": [
+        { "id": "qlab-runs", "name": "Recent Runs" },
+        { "id": "qlab-backends", "name": "Backend Status" }
+      ]
+    },
+    "configuration": {
+      "title": "Q-Lab",
+      "properties": {
+        "qlab.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Q-Lab backend URL"
+        },
+        "qlab.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Q-Lab API key (from Settings > API Keys)"
+        },
+        "qlab.autoTrack": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically track runs when Python files are executed"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "qasm",
+        "aliases": ["QASM", "OpenQASM"],
+        "extensions": [".qasm"],
+        "configuration": "./qasm-language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "qasm",
+        "scopeName": "source.qasm",
+        "path": "./syntaxes/qasm.tmGrammar.json"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

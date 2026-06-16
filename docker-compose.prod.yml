@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------------
+  # PostgreSQL database
+  # ----------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qlab
+      POSTGRES_USER: qlab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qlab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------
+  # Q-Lab Backend (FastAPI)
+  # ----------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://qlab:${POSTGRES_PASSWORD}@db:5432/qlab
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      ENVIRONMENT: production
+      ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      QLAB_INSIGHT_MODEL: ${QLAB_INSIGHT_MODEL:-claude-haiku-4-5-20251001}
+    expose:
+      - "8000"
+    volumes:
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ----------------------------------------------------------------
+  # Q-Lab Frontend (Next.js)
+  # ----------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-http://localhost}
+    expose:
+      - "3000"
+
+  # ----------------------------------------------------------------
+  # Nginx reverse proxy
+  # ----------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pg_data:
+  backend_data:

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Q-Lab Dashboard</title>
+  <link rel="stylesheet" href="/ui/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">Q</div>
+        <div>
+          <strong>Q-Lab</strong>
+          <span>Research runs</span>
+        </div>
+      </div>
+      <nav>
+        <a href="#runs">Run History</a>
+        <a href="#compare">Compare Runs</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="header">
+        <div>
+          <h1>Quantum Experiment Observatory</h1>
+          <p>Track, compare, and reproduce quantum circuit runs.</p>
+        </div>
+        <button id="refresh">Refresh</button>
+      </header>
+
+      <section id="runs" class="section">
+        <div class="toolbar">
+          <input id="backend" placeholder="Backend" />
+          <input id="status" placeholder="Status" />
+          <input id="project" placeholder="Project" />
+          <button id="filter">Apply</button>
+          <a class="button secondary" id="export-csv" href="/api/v1/exports/runs.csv">CSV</a>
+          <a class="button secondary" id="export-jsonl" href="/api/v1/exports/runs.jsonl">JSONL</a>
+          <a class="button secondary" id="export-report" href="/api/v1/reports/runs.md">Report</a>
+        </div>
+
+        <div class="metrics">
+          <div><span>Runs</span><strong id="metric-runs">0</strong></div>
+          <div><span>Max Depth</span><strong id="metric-depth">0</strong></div>
+          <div><span>Max Qubits</span><strong id="metric-qubits">0</strong></div>
+          <div><span>Projects</span><strong id="metric-projects">0</strong></div>
+          <div><span>Completion</span><strong id="metric-completion">0%</strong></div>
+          <div><span>Results</span><strong id="metric-results">0%</strong></div>
+          <div><span>Failures</span><strong id="metric-failures">0%</strong></div>
+          <div><span>Avg Success</span><strong id="metric-success">n/a</strong></div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Status Mix</h2>
+            </div>
+            <div id="status-mix" class="bars"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Backend Usage</h2>
+            </div>
+            <div id="backend-mix" class="bars"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Gate Counts</h2>
+            </div>
+            <div id="gate-mix" class="bars"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Run History</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>Project</th>
+                  <th>Backend</th>
+                  <th>Job</th>
+                  <th>Status</th>
+                  <th>Qubits</th>
+                  <th>Depth</th>
+                  <th>Non-Clifford</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="runs-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="detail" class="section hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 id="detail-title">Run Detail</h2>
+            <div class="actions" id="detail-actions"></div>
+          </div>
+          <div id="detail-body"></div>
+        </div>
+      </section>
+
+      <section id="compare" class="section">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Compare Runs</h2>
+          </div>
+          <div class="toolbar">
+            <select id="left-run"></select>
+            <select id="right-run"></select>
+            <button id="compare-button">Compare</button>
+          </div>
+          <div id="compare-output"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/ui/app.js"></script>
+</body>
+</html>

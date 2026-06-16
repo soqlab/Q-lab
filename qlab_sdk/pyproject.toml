@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qlab-sdk"
+version = "0.2.0"
+description = "Passive experiment tracker for Qiskit workflows"
+readme = "README.md"
+license = {text = "MIT"}
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Q-Lab", email = "contact@soqlab.com" }]
+keywords = ["qiskit", "quantum", "experiment-tracking", "quantum-computing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["httpx>=0.24"]
+
+[project.optional-dependencies]
+qiskit = ["qiskit>=1.0"]
+jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
+all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
+dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]
+
+[project.urls]
+Homepage   = "https://github.com/yasseennandally/q-lab"
+Repository = "https://github.com/yasseennandally/q-lab"
+
+[project.scripts]
+qlab = "qlab.cli:main"
+
+[tool.setuptools.packages.find]
+where   = ["."]
+include = ["qlab*"]
+
+[tool.setuptools.package-data]
+qlab = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]

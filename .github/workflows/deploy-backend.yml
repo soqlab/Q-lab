@@ -1,0 +1,19 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**']
+
+jobs:
+  deploy-railway:
+    if: ${{ vars.RAILWAY_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy
+        run: railway up --service qlab-backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
