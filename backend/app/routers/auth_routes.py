@@ -1,3 +1,4 @@
+import os
 import secrets
 import time
 from typing import Optional
@@ -147,7 +148,8 @@ def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db
     if user:
         token = secrets.token_urlsafe(32)
         _RESET_TOKENS[token] = (user.email, now + _RESET_TTL_SECONDS)
-        reset_url = f"http://localhost:3000/reset-password?token={token}"
+        app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+        reset_url = f"{app_url}/reset-password?token={token}"
         try:
             send_password_reset_email(to_email=user.email, reset_url=reset_url)
         except Exception:

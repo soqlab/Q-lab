@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Download, Trash2, Shield, AlertTriangle, FileText, CheckCircle,
+  Download, Trash2, Shield, AlertTriangle, FileText, CheckCircle, Activity,
   Clock, Database, Lock, Users, ChevronDown, ChevronUp,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuth } from "../../../lib/auth";
 
 const API_PREFIX = "/qlab-api";
@@ -647,12 +648,12 @@ export default function GDPRPage() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-                {[
+                {([
                   ["Total Users", compliance.total_users, Users],
                   ["Total Runs", compliance.total_runs, Activity],
                   ["Pending Deletions", compliance.pending_deletion_requests, Clock],
                   ["Active Policies", compliance.retention_policies_active, Shield],
-                ].map(([label, value, Icon]) => (
+                ] satisfies [string, number, LucideIcon][]).map(([label, value, Icon]) => (
                   <div
                     key={String(label)}
                     style={{
@@ -663,7 +664,6 @@ export default function GDPRPage() {
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                      {/* @ts-expect-error icon type */}
                       <Icon size={13} style={{ color: "#64748b" }} />
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{String(label)}</span>
                     </div>

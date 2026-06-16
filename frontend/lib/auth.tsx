@@ -63,18 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => setLoading(false));
       return;
     }
-    // Auto-login with demo account so the dashboard is immediately accessible
-    fetch("/qlab-api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@qlab.app", password: "admin123" }),
-    })
-      .then((r) => r.ok ? r.json() : Promise.reject(r))
-      .then((data) => {
-        if (data.access_token && data.user) setSession(data.access_token, data.user);
+    if (process.env.NODE_ENV === "development") {
+      // Dev-only: auto-login with demo account so the dashboard is immediately accessible
+      fetch("/qlab-api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "admin@qlab.app", password: "admin123" }),
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+        .then((r) => r.ok ? r.json() : Promise.reject(r))
+        .then((data) => {
+          if (data.access_token && data.user) setSession(data.access_token, data.user);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
