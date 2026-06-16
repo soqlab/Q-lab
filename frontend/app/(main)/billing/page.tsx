@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -258,9 +258,12 @@ function PlanCard({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function BillingPage() {
+function BillingPageInner() {
   const { token } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paymentSuccess = searchParams.get("success") === "true";
+  const paymentCanceled = searchParams.get("canceled") === "true";
 
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [plansData, setPlansData] = useState<PlansResponse | null>(null);
@@ -268,8 +271,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
-  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
-  const [upgradeErr, setUpgradeErr] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(paymentSuccess ? "Payment successful! Your plan has been upgraded." : null);
+  const [upgradeErr, setUpgradeErr] = useState<string | null>(paymentCanceled ? "Payment canceled — your plan was not changed." : null);
 
   useEffect(() => {
     if (token === undefined) return;
@@ -313,25 +316,45 @@ export default function BillingPage() {
     setUpgradeMsg(null);
     setUpgradeErr(null);
     try {
+      // If Stripe is configured → create checkout session and redirect
+      if (stripeConfigured) {
+        const res = await fetch("/qlab-api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ plan: planSlug }),
+        });
+        const data = await res.json() as { checkout_url?: string; detail?: string };
+        if (!res.ok) { setUpgradeErr(data.detail ?? "Checkout failed"); return; }
+        if (data.checkout_url) { window.location.href = data.checkout_url; return; }
+      }
+      // Fallback: simulate (no Stripe key)
       const res = await fetch("/qlab-api/billing/subscription", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ plan: planSlug }),
       });
       const data = await res.json() as { message?: string; detail?: string };
-      if (!res.ok) {
-        setUpgradeErr(data.detail ?? "Upgrade failed");
-      } else {
-        setUpgradeMsg(data.message ?? `Switched to ${planSlug} plan.`);
-        await load();
-      }
+      if (!res.ok) { setUpgradeErr(data.detail ?? "Upgrade failed"); return; }
+      setUpgradeMsg(data.message ?? `Switched to ${planSlug} plan.`);
+      await load();
     } catch {
       setUpgradeErr("Network error during upgrade");
     } finally {
       setUpgrading(false);
+    }
+  }
+
+  async function handleManageSubscription() {
+    if (!token) return;
+    try {
+      const res = await fetch("/qlab-api/billing/portal", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json() as { portal_url?: string; detail?: string };
+      if (!res.ok) { setUpgradeErr(data.detail ?? "Could not open portal"); return; }
+      if (data.portal_url) window.location.href = data.portal_url;
+    } catch {
+      setUpgradeErr("Could not open Stripe portal");
     }
   }
 
@@ -353,19 +376,18 @@ export default function BillingPage() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Billing &amp; Usage</h1>
-        {usage && (
-          <div
-            style={{
-              fontSize: 13,
-              color: "#5f6f80",
-              background: "var(--panel-2, #f7f8fa)",
-              padding: "4px 12px",
-              borderRadius: 999,
-            }}
-          >
-            {formatMonth(usage.month)}
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {usage && (
+            <div style={{ fontSize: 13, color: "#5f6f80", background: "var(--panel-2, #f7f8fa)", padding: "4px 12px", borderRadius: 999 }}>
+              {formatMonth(usage.month)}
+            </div>
+          )}
+          {stripeConfigured && currentPlan !== "free" && (
+            <button className="button secondary" style={{ fontSize: 13, padding: "6px 14px" }} onClick={handleManageSubscription}>
+              Manage Subscription
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tracking-only banner */}
@@ -705,5 +727,13 @@ export default function BillingPage() {
         </section>
       )}
     </main>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense>
+      <BillingPageInner />
+    </Suspense>
   );
 }

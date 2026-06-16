@@ -8,6 +8,7 @@ python-jose[cryptography]
 bcrypt
 httpx
 anthropic>=0.30
+stripe>=8.0
 qiskit[visualization]
 qiskit-ibm-runtime
 matplotlib

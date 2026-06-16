@@ -22,6 +22,16 @@ services:
         sync: false
       - key: QLAB_APP_URL
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_ENTERPRISE_PRICE_ID
+        sync: false
+      - key: QLAB_BILLING_ENABLED
+        value: "false"
     healthCheckPath: /health
     disk:
       name: qlab-data

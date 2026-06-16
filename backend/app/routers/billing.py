@@ -243,6 +243,10 @@ class SubscriptionUpdate(BaseModel):
     plan: str = Field(..., pattern="^(free|pro|enterprise)$")
 
 
+class CheckoutRequest(BaseModel):
+    plan: str = Field(..., pattern="^(pro|enterprise)$")
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -436,6 +440,92 @@ def list_invoices(
     }
 
 
+@router.post("/checkout")
+def create_checkout_session(
+    body: CheckoutRequest,
+    identity: Identity = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Create a Stripe Checkout Session and return the hosted payment URL."""
+    if not _stripe_configured():
+        raise HTTPException(status_code=503, detail="Stripe is not configured. Set STRIPE_SECRET_KEY.")
+
+    try:
+        import stripe as stripe_lib  # type: ignore[import]
+    except ImportError:
+        raise HTTPException(status_code=503, detail="stripe package not installed.")
+
+    stripe_lib.api_key = os.getenv("STRIPE_SECRET_KEY")
+    uid = identity.user_id or 0
+
+    # Map plan → Stripe Price ID (set these in Render env vars)
+    price_ids: dict[str, str] = {
+        "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
+        "enterprise": os.getenv("STRIPE_ENTERPRISE_PRICE_ID", ""),
+    }
+    price_id = price_ids.get(body.plan, "")
+    if not price_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No Stripe price configured for '{body.plan}'. Set STRIPE_PRO_PRICE_ID env var.",
+        )
+
+    # Get or create Stripe Customer so payment methods are remembered
+    sub = _get_or_create_subscription(db, uid)
+    customer_id: str | None = sub.get("stripe_customer_id")
+    if not customer_id:
+        email = identity.user.email if identity.user else None
+        customer = stripe_lib.Customer.create(
+            email=email,
+            metadata={"qlab_user_id": str(uid)},
+        )
+        customer_id = customer.id
+        sub["stripe_customer_id"] = customer_id
+        store_put(db, _NS_SUBSCRIPTION, _sub_key(uid), sub)
+
+    app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+    session = stripe_lib.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        line_items=[{"price": price_id, "quantity": 1}],
+        mode="subscription",
+        success_url=f"{app_url}/billing?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{app_url}/billing?canceled=true",
+        metadata={"qlab_user_id": str(uid), "plan": body.plan},
+    )
+    return {"checkout_url": session.url}
+
+
+@router.get("/portal")
+def create_portal_session(
+    identity: Identity = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Create a Stripe Customer Portal session so users can manage/cancel their subscription."""
+    if not _stripe_configured():
+        raise HTTPException(status_code=503, detail="Stripe is not configured.")
+
+    try:
+        import stripe as stripe_lib  # type: ignore[import]
+    except ImportError:
+        raise HTTPException(status_code=503, detail="stripe package not installed.")
+
+    stripe_lib.api_key = os.getenv("STRIPE_SECRET_KEY")
+    uid = identity.user_id or 0
+    sub = _get_or_create_subscription(db, uid)
+    customer_id: str | None = sub.get("stripe_customer_id")
+
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer found. Upgrade first to create a subscription.")
+
+    app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+    portal = stripe_lib.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{app_url}/billing",
+    )
+    return {"portal_url": portal.url}
+
+
 @router.post("/stripe/webhook")
 async def stripe_webhook(
     request: Request,
@@ -483,7 +573,22 @@ async def stripe_webhook(
     event_data = event.get("data", {}).get("object", {})
 
     # Handle common subscription events
-    if event_type == "customer.subscription.updated":
+    if event_type == "checkout.session.completed":
+        # Payment succeeded — activate the subscription immediately
+        customer_id = event_data.get("customer")
+        metadata = event_data.get("metadata", {})
+        plan = metadata.get("plan", "pro")
+        uid = metadata.get("qlab_user_id")
+        if uid:
+            sub = _get_or_create_subscription(db, uid)
+            sub["plan"] = plan
+            sub["status"] = "active"
+            sub["stripe_customer_id"] = customer_id
+            sub["stripe_subscription_id"] = event_data.get("subscription")
+            sub["updated_at"] = datetime.now(timezone.utc).isoformat()
+            store_put(db, _NS_SUBSCRIPTION, _sub_key(uid), sub)
+
+    elif event_type == "customer.subscription.updated":
         customer_id = event_data.get("customer")
         status = event_data.get("status", "active")
         plan_id = ""
