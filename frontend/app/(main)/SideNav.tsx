@@ -2,192 +2,321 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, Coins, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, Coins, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 
-const links = [
-  { href: "/runs", icon: History, label: "Run History" },
-  { href: "/analytics", icon: LineChart, label: "Analytics" },
-  { href: "/projects", icon: Folder, label: "Projects" },
-  { href: "/compare", icon: GitCompare, label: "Compare Runs" },
-  { href: "/compare/matrix", icon: Grid, label: "Matrix Compare" },
-  { href: "/timeline", icon: Clock, label: "Timeline" },
-  { href: "/sweep", icon: ScatterChart, label: "Param Sweep" },
-  { href: "/calibration", icon: Radio, label: "Calibration" },
-  { href: "/benchmarks", icon: BarChart2, label: "Benchmarks" },
-  { href: "/team", icon: Users, label: "Team" },
-  { href: "/webhooks", icon: Zap, label: "Webhooks" },
-  { href: "/settings", icon: Settings, label: "Settings" },
-  { href: "/settings/policy", icon: Shield, label: "Policy Gates" },
-  { href: "/hardware", icon: Cpu, label: "Hardware Rec" },
-  { href: "/compare/stats", icon: BarChart2, label: "Stats Compare" },
-  { href: "/campaigns", icon: FlaskConical, label: "Campaigns" },
-  { href: "/backends", icon: Cpu, label: "Backends" },
-  { href: "/search/circuits", icon: ScatterChart, label: "Circuit Search" },
-  { href: "/search/natural", icon: MessageSquare, label: "NLQ Search" },
-  { href: "/dispatch", icon: Send, label: "Dispatch Queue" },
-  { href: "/network", icon: Globe, label: "Cal Network" },
-  { href: "/ask", icon: MessageSquare, label: "AI Research" },
-  { href: "/settings/alerts", icon: Bell, label: "Alerts" },
-  { href: "/design", icon: FlaskRound, label: "Exp Design" },
-  { href: "/causal", icon: Share2, label: "Causal Analysis" },
-  { href: "/jobs", icon: Play, label: "Job Executor" },
-  { href: "/ingest", icon: Download, label: "Ingest" },
-  { href: "/variational", icon: Atom, label: "Variational" },
-  { href: "/costs", icon: DollarSign, label: "Costs" },
-  { href: "/cicd", icon: GitBranch, label: "CI/CD" },
-  { href: "/circuits/versions", icon: GitCommit, label: "Circuits" },
-  { href: "/settings/rbac", icon: Lock, label: "RBAC" },
-  { href: "/settings/audit", icon: ScrollText, label: "Audit Log" },
-  { href: "/credentials", icon: Key, label: "Credentials" },
-  { href: "/settings/notifications", icon: BellRing, label: "Notifications" },
-  { href: "/qv", icon: Layers, label: "Quantum Volume" },
-  { href: "/gates", icon: Sliders, label: "Gate Char" },
-  { href: "/templates", icon: BookOpen, label: "Templates" },
-  { href: "/compare/backends", icon: GitCompare, label: "Backend Compare" },
-  { href: "/queue", icon: Server, label: "Queue Intel" },
-  { href: "/settings/decoherence", icon: AlertTriangle, label: "Decoherence" },
-  { href: "/evolve", icon: Dna, label: "Circuit Evolver" },
-  { href: "/health/forecast", icon: HeartPulse, label: "Health Forecast" },
-  { href: "/advantage", icon: Zap, label: "Advantage Detector" },
-  { href: "/analyze", icon: Search, label: "Circuit Analyzer" },
-  { href: "/chaos", icon: AlertOctagon, label: "Chaos Engineering" },
-  { href: "/qrng", icon: Shuffle, label: "Quantum RNG" },
-  { href: "/reproducibility", icon: RefreshCw, label: "Reproducibility" },
-  { href: "/transpile", icon: ArrowRightLeft, label: "Transpiler" },
-  { href: "/recommend", icon: Lightbulb, label: "Recommender" },
-  { href: "/dna", icon: Fingerprint, label: "Circuit DNA" },
-  { href: "/statetomo", icon: Atom, label: "State Tomography" },
-  { href: "/qec", icon: Shield, label: "QEC Synthesizer" },
-  { href: "/landscape", icon: TrendingDown, label: "VQE Landscape" },
-  { href: "/entanglement", icon: GitBranch, label: "Entanglement Map" },
-  { href: "/cliffordt", icon: Layers, label: "Clifford+T Counter" },
-  { href: "/ensemble", icon: GitMerge, label: "Backend Ensemble" },
-  { href: "/semantic-search", icon: Search, label: "Circuit Sim. Search" },
-  { href: "/noiserouter", icon: Navigation, label: "Noise Router" },
-  { href: "/nl2qasm", icon: Terminal, label: "NL → QASM" },
-  { href: "/qvbench", icon: Award, label: "QV Benchmarker" },
-  { href: "/error-mitigate", icon: Filter, label: "Error Mitigation" },
-  { href: "/unitary-synth", icon: Wand2, label: "Unitary Synth" },
-  { href: "/rb-suite", icon: BarChart3, label: "RB Suite" },
-  { href: "/optimizer-hub", icon: Trophy, label: "Optimizer Hub" },
-  { href: "/quantum-chem", icon: FlaskConical, label: "Quantum Chem" },
-  { href: "/clifford-sim", icon: Network, label: "Clifford Sim" },
-  { href: "/syndrome-decoder", icon: ShieldCheck, label: "Syndrome Decoder" },
-  { href: "/tensor-network", icon: Workflow, label: "Tensor Network" },
-  { href: "/speedup", icon: Rocket, label: "Speedup Certifier" },
-  { href: "/complexity", icon: TrendingUp, label: "Complexity Analyzer" },
-  { href: "/qml", icon: Brain, label: "QML Workbench" },
-  { href: "/hamiltonian", icon: Calculator, label: "Hamiltonian Studio" },
-  { href: "/figure-gen", icon: FileImage, label: "Figure Generator" },
-  { href: "/hypothesis", icon: BarChart3, label: "Hypothesis Engine" },
-  { href: "/protocol-sim", icon: ShieldCheck, label: "QKD Simulator" },
-  { href: "/quantum-network", icon: Wifi, label: "Quantum Network" },
-  { href: "/arxiv", icon: BookMarked, label: "arXiv Search" },
-  { href: "/advantage-timeline", icon: Timer, label: "Advantage Timeline" },
-  { href: "/gate-tomo", icon: Scan, label: "Gate Tomography" },
-  { href: "/notebook", icon: FileCode, label: "Notebooks" },
-  { href: "/circuit-debugger", icon: Bug, label: "Circuit Debugger" },
-  { href: "/hardware-jobs", icon: Server, label: "Hardware Jobs" },
-  { href: "/resource-estimator", icon: Award, label: "Resource Estimator" },
-  { href: "/trotter", icon: Activity, label: "Trotter Evolution" },
-  { href: "/code-export", icon: Download, label: "Code Exporter" },
-  { href: "/xeb", icon: Target, label: "XEB Fidelity" },
-  { href: "/quantum-finance", icon: DollarSign, label: "Quantum Finance" },
-  { href: "/mirror-circuit", icon: Shuffle, label: "Mirror Circuit" },
-  { href: "/channel-capacity", icon: Radio, label: "Channel Capacity" },
-  { href: "/arxiv-feed", icon: BookOpen, label: "arXiv Feed" },
-  { href: "/circuit-knitting", icon: Scissors, label: "Circuit Knitting" },
-  { href: "/noise-model", icon: Sliders, label: "Noise Model" },
-  { href: "/qaoa", icon: Network, label: "QAOA Solver" },
-  { href: "/quantum-sensing", icon: Navigation, label: "Quantum Sensing" },
-  { href: "/bloch-animator", icon: Globe, label: "Bloch Animator" },
-  { href: "/providers", icon: Server, label: "Multi-Provider" },
-  { href: "/environment", icon: Layers, label: "Env Snapshots" },
-  { href: "/hypotheses", icon: Lightbulb, label: "Hypotheses" },
-  { href: "/circuit-ancestry", icon: GitCommit, label: "Circuit Ancestry" },
-  { href: "/methods-gen", icon: ScrollText, label: "Methods Gen" },
-  { href: "/cost-oracle", icon: DollarSign, label: "Cost Oracle" },
-  { href: "/calibration-monitor", icon: HeartPulse, label: "Cal Monitor" },
-  { href: "/registry", icon: BookMarked, label: "Exp Registry" },
-  { href: "/cross-bench", icon: BarChart3, label: "Cross-Bench" },
-  { href: "/noise-marketplace", icon: ShieldCheck, label: "Noise Market" },
-  { href: "/bayes-opt", icon: TrendingDown, label: "Bayes Opt" },
-  { href: "/research-graph", icon: Network, label: "Research Graph" },
-  { href: "/challenges", icon: Trophy, label: "Challenges" },
-  { href: "/copilot", icon: MessageSquare, label: "Q-Lab Copilot" },
-  { href: "/stats-engine", icon: Calculator, label: "Stats Engine" },
-  { href: "/autopilot", icon: Rocket, label: "Autopilot" },
-  { href: "/tomography", icon: Scan, label: "Tomography" },
-  { href: "/zne-pec", icon: Filter, label: "ZNE / PEC" },
-  { href: "/error-budget", icon: BarChart3, label: "Error Budget" },
-  { href: "/dd-optimizer", icon: Wand2, label: "DD Optimizer" },
-  { href: "/peer-review", icon: FileCode, label: "Peer Review" },
-  { href: "/replication", icon: RefreshCw, label: "Replication Mkt" },
-  { href: "/collab", icon: Users, label: "Collab Rooms" },
-  { href: "/cal-forecast", icon: HeartPulse, label: "Cal Forecast" },
-  { href: "/backend-emulator", icon: Cpu, label: "Backend Emulator" },
-  { href: "/job-scheduler", icon: Timer, label: "Job Scheduler" },
-  { href: "/paper-draft", icon: ScrollText, label: "Paper Draft" },
-  { href: "/arxiv-radar", icon: Radio, label: "arXiv Radar" },
-  { href: "/qfm", icon: Brain, label: "QFM AI" },
-  { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation" },
-  { href: "/anomaly-physics", icon: AlertOctagon, label: "Physics Checker" },
-  { href: "/circuit-ai", icon: Bug, label: "Circuit AI" },
-  { href: "/global-cal", icon: Globe, label: "Global Cal DB" },
-  { href: "/benchmark-leaderboard", icon: Trophy, label: "Live Leaderboard" },
-  { href: "/social", icon: Share2, label: "Social Graph" },
-  { href: "/paper-replication", icon: RefreshCw, label: "Paper Replication" },
-  { href: "/bayes-uncertainty", icon: BarChart3, label: "Bayes Uncertainty" },
-  { href: "/multi-comparisons", icon: Calculator, label: "Multi-Comparisons" },
-  { href: "/fair-data", icon: ShieldCheck, label: "FAIR Data" },
-  { href: "/causal-inference", icon: GitMerge, label: "Causal Inference" },
-  { href: "/research-pipeline", icon: Workflow, label: "Research Pipeline" },
-  { href: "/grant-proposal", icon: ScrollText, label: "Grant Proposals" },
-  { href: "/rb-gst", icon: BarChart2, label: "RB / GST / SPAM" },
-  { href: "/transpiler-hub", icon: ArrowRightLeft, label: "Transpiler Hub" },
-  { href: "/hpc-bridge", icon: Server, label: "HPC Bridge" },
-  { href: "/circuit-marketplace", icon: ShoppingCart, label: "Circuit Market" },
-  { href: "/institute", icon: Building2, label: "Institute Dashboard" },
-  { href: "/offline-export", icon: Download, label: "Offline Export" },
-  { href: "/pulse-control", icon: Waves, label: "Pulse Control" },
-  { href: "/blind-analysis", icon: Eye, label: "Blind Analysis" },
-  { href: "/oed", icon: Microscope, label: "Optimal Exp Design" },
-  { href: "/meta-analysis", icon: BookText, label: "Meta-Analysis" },
-  { href: "/dataset-publish", icon: Database, label: "Dataset Publisher" },
-  { href: "/rl-optimizer", icon: Bot, label: "RL Optimizer" },
-  { href: "/synthetic-data", icon: Beaker, label: "Synthetic Data" },
-  { href: "/live-monitor", icon: MonitorDot, label: "Live Monitor" },
-  { href: "/cost-arbitrage", icon: Coins, label: "Cost Arbitrage" },
-  { href: "/process-tomo", icon: Scan, label: "Process Tomo" },
-  { href: "/conference", icon: FileImage, label: "Conference Builder" },
-  { href: "/learn", icon: GraduationCap, label: "Learning Paths" },
-  { href: "/talent", icon: Briefcase, label: "Talent Board" },
-  { href: "/github-ci", icon: GitPullRequest, label: "GitHub CI" },
-  { href: "/certify", icon: BadgeCheck, label: "Advantage Certifier" },
-  { href: "/spectral-noise", icon: Waves, label: "Spectral Noise" },
-  { href: "/lab-inventory", icon: Wrench, label: "Lab Inventory" },
-  { href: "/qml-datasets", icon: Boxes, label: "QML Datasets" },
-  { href: "/quantum-internet", icon: Globe2, label: "Quantum Internet" },
-  { href: "/federated", icon: Globe2, label: "Fed. Registry" },
-  { href: "/collab-notebook", icon: FileCode, label: "Collab Notebooks" },
-  { href: "/plugins", icon: Package, label: "Plugins" },
-  { href: "/doi", icon: BookMarked, label: "DOI / ORCID" },
-  { href: "/grants", icon: Award, label: "Grant Reports" },
-  { href: "/preregister", icon: Lock, label: "Pre-register" },
-  { href: "/circuit-designer", icon: Wand2, label: "Circuit Designer" },
-  { href: "/hardware-drift", icon: Activity, label: "HW Drift Alerts" },
-  { href: "/assistant", icon: Bot, label: "Lab Assistant" },
-  { href: "/predict", icon: Brain, label: "Predict / Timing" },
-  { href: "/integrations", icon: GitPullRequest, label: "Integrations" },
-  { href: "/fair", icon: ShieldCheck, label: "FAIR Compliance" },
-  { href: "/carbon", icon: Beaker, label: "Carbon Footprint" },
-  { href: "/researchers", icon: GraduationCap, label: "Researchers" },
-  { href: "/gdpr", icon: Lock, label: "GDPR Tools" },
-  { href: "/billing", icon: Coins, label: "Usage & Billing" },
-  { href: "/onboarding", icon: Rocket, label: "Quick Start" },
-  { href: "/departments", icon: Building2, label: "Departments" },
+type NavItem = { href: string; icon: React.ElementType; label: string };
+
+const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
+  {
+    label: "Core",
+    defaultOpen: true,
+    items: [
+      { href: "/runs", icon: History, label: "Run History" },
+      { href: "/analytics", icon: LineChart, label: "Analytics" },
+      { href: "/projects", icon: Folder, label: "Projects" },
+      { href: "/timeline", icon: Clock, label: "Timeline" },
+      { href: "/assistant", icon: Bot, label: "Lab Assistant" },
+      { href: "/onboarding", icon: Rocket, label: "Quick Start" },
+    ],
+  },
+  {
+    label: "Experiments",
+    defaultOpen: true,
+    items: [
+      { href: "/campaigns", icon: FlaskConical, label: "Campaigns" },
+      { href: "/sweep", icon: ScatterChart, label: "Param Sweep" },
+      { href: "/benchmarks", icon: BarChart2, label: "Benchmarks" },
+      { href: "/compare", icon: GitCompare, label: "Compare Runs" },
+      { href: "/compare/matrix", icon: Grid, label: "Matrix Compare" },
+      { href: "/compare/stats", icon: BarChart2, label: "Stats Compare" },
+      { href: "/predict", icon: Brain, label: "Predict / Timing" },
+      { href: "/templates", icon: BookOpen, label: "Templates" },
+      { href: "/design", icon: FlaskRound, label: "Exp Design" },
+      { href: "/preregister", icon: Lock, label: "Pre-register" },
+    ],
+  },
+  {
+    label: "Circuits",
+    defaultOpen: false,
+    items: [
+      { href: "/circuit-designer", icon: Wand2, label: "Circuit Designer" },
+      { href: "/nl2qasm", icon: Terminal, label: "NL → QASM" },
+      { href: "/search/circuits", icon: ScatterChart, label: "Circuit Search" },
+      { href: "/circuits/versions", icon: GitCommit, label: "Circuit Versions" },
+      { href: "/analyze", icon: Search, label: "Circuit Analyzer" },
+      { href: "/evolve", icon: Dna, label: "Circuit Evolver" },
+      { href: "/dna", icon: Fingerprint, label: "Circuit DNA" },
+      { href: "/circuit-debugger", icon: Bug, label: "Circuit Debugger" },
+      { href: "/circuit-ancestry", icon: GitCommit, label: "Circuit Ancestry" },
+      { href: "/circuit-knitting", icon: Scissors, label: "Circuit Knitting" },
+      { href: "/mirror-circuit", icon: Shuffle, label: "Mirror Circuit" },
+      { href: "/circuit-marketplace", icon: ShoppingCart, label: "Circuit Market" },
+      { href: "/bloch-animator", icon: Globe, label: "Bloch Animator" },
+      { href: "/figure-gen", icon: FileImage, label: "Figure Generator" },
+      { href: "/code-export", icon: Download, label: "Code Exporter" },
+    ],
+  },
+  {
+    label: "Hardware",
+    defaultOpen: false,
+    items: [
+      { href: "/hardware", icon: Cpu, label: "Hardware Rec" },
+      { href: "/calibration", icon: Radio, label: "Calibration" },
+      { href: "/backends", icon: Cpu, label: "Backends" },
+      { href: "/hardware-drift", icon: Activity, label: "HW Drift Alerts" },
+      { href: "/calibration-monitor", icon: HeartPulse, label: "Cal Monitor" },
+      { href: "/network", icon: Globe, label: "Cal Network" },
+      { href: "/cal-forecast", icon: HeartPulse, label: "Cal Forecast" },
+      { href: "/compare/backends", icon: GitCompare, label: "Backend Compare" },
+      { href: "/backend-emulator", icon: Cpu, label: "Backend Emulator" },
+      { href: "/settings/decoherence", icon: AlertTriangle, label: "Decoherence" },
+      { href: "/hardware-jobs", icon: Server, label: "Hardware Jobs" },
+      { href: "/global-cal", icon: Globe, label: "Global Cal DB" },
+      { href: "/providers", icon: Server, label: "Multi-Provider" },
+      { href: "/costs", icon: DollarSign, label: "QPU Costs" },
+      { href: "/cost-arbitrage", icon: Coins, label: "Cost Arbitrage" },
+      { href: "/cost-oracle", icon: DollarSign, label: "Cost Oracle" },
+    ],
+  },
+  {
+    label: "AI & Analysis",
+    defaultOpen: false,
+    items: [
+      { href: "/ask", icon: MessageSquare, label: "AI Research" },
+      { href: "/search/natural", icon: MessageSquare, label: "NLQ Search" },
+      { href: "/recommend", icon: Lightbulb, label: "Recommender" },
+      { href: "/autopilot", icon: Rocket, label: "Autopilot" },
+      { href: "/qfm", icon: Brain, label: "QFM AI" },
+      { href: "/hypothesis", icon: BarChart3, label: "Hypothesis Engine" },
+      { href: "/hypotheses", icon: Lightbulb, label: "Hypotheses" },
+      { href: "/bayes-opt", icon: TrendingDown, label: "Bayes Opt" },
+      { href: "/bayes-uncertainty", icon: BarChart3, label: "Bayes Uncertainty" },
+      { href: "/causal", icon: Share2, label: "Causal Analysis" },
+      { href: "/causal-inference", icon: GitMerge, label: "Causal Inference" },
+      { href: "/anomaly-physics", icon: AlertOctagon, label: "Physics Checker" },
+      { href: "/stats-engine", icon: Calculator, label: "Stats Engine" },
+      { href: "/multi-comparisons", icon: Calculator, label: "Multi-Comparisons" },
+      { href: "/rl-optimizer", icon: Bot, label: "RL Optimizer" },
+      { href: "/synthetic-data", icon: Beaker, label: "Synthetic Data" },
+    ],
+  },
+  {
+    label: "Quantum Tools",
+    defaultOpen: false,
+    items: [
+      { href: "/qec", icon: Shield, label: "QEC Synthesizer" },
+      { href: "/statetomo", icon: Atom, label: "State Tomography" },
+      { href: "/tomography", icon: Scan, label: "Tomography" },
+      { href: "/gate-tomo", icon: Scan, label: "Gate Tomography" },
+      { href: "/process-tomo", icon: Scan, label: "Process Tomography" },
+      { href: "/qv", icon: Layers, label: "Quantum Volume" },
+      { href: "/qvbench", icon: Award, label: "QV Benchmarker" },
+      { href: "/rb-suite", icon: BarChart3, label: "RB Suite" },
+      { href: "/rb-gst", icon: BarChart2, label: "RB / GST / SPAM" },
+      { href: "/xeb", icon: Target, label: "XEB Fidelity" },
+      { href: "/zne-pec", icon: Filter, label: "ZNE / PEC" },
+      { href: "/error-mitigate", icon: Filter, label: "Error Mitigation" },
+      { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation" },
+      { href: "/error-budget", icon: BarChart3, label: "Error Budget" },
+      { href: "/dd-optimizer", icon: Wand2, label: "DD Optimizer" },
+      { href: "/syndrome-decoder", icon: ShieldCheck, label: "Syndrome Decoder" },
+      { href: "/cliffordt", icon: Layers, label: "Clifford+T Counter" },
+      { href: "/clifford-sim", icon: Network, label: "Clifford Sim" },
+      { href: "/tensor-network", icon: Workflow, label: "Tensor Network" },
+      { href: "/entanglement", icon: GitBranch, label: "Entanglement Map" },
+      { href: "/trotter", icon: Activity, label: "Trotter Evolution" },
+      { href: "/landscape", icon: TrendingDown, label: "VQE Landscape" },
+      { href: "/variational", icon: Atom, label: "Variational" },
+      { href: "/hamiltonian", icon: Calculator, label: "Hamiltonian Studio" },
+      { href: "/qaoa", icon: Network, label: "QAOA Solver" },
+      { href: "/qml", icon: Brain, label: "QML Workbench" },
+      { href: "/qml-datasets", icon: Boxes, label: "QML Datasets" },
+      { href: "/quantum-chem", icon: FlaskConical, label: "Quantum Chem" },
+      { href: "/quantum-sensing", icon: Navigation, label: "Quantum Sensing" },
+      { href: "/quantum-finance", icon: DollarSign, label: "Quantum Finance" },
+      { href: "/quantum-network", icon: Wifi, label: "Quantum Network" },
+      { href: "/quantum-internet", icon: Globe2, label: "Quantum Internet" },
+      { href: "/protocol-sim", icon: ShieldCheck, label: "QKD Simulator" },
+      { href: "/channel-capacity", icon: Radio, label: "Channel Capacity" },
+      { href: "/noise-model", icon: Sliders, label: "Noise Model" },
+      { href: "/noise-marketplace", icon: ShieldCheck, label: "Noise Market" },
+      { href: "/noiserouter", icon: Navigation, label: "Noise Router" },
+      { href: "/spectral-noise", icon: Waves, label: "Spectral Noise" },
+      { href: "/pulse-control", icon: Waves, label: "Pulse Control" },
+      { href: "/unitary-synth", icon: Wand2, label: "Unitary Synth" },
+      { href: "/transpile", icon: ArrowRightLeft, label: "Transpiler" },
+      { href: "/transpiler-hub", icon: ArrowRightLeft, label: "Transpiler Hub" },
+      { href: "/gates", icon: Sliders, label: "Gate Char" },
+      { href: "/ensemble", icon: GitMerge, label: "Backend Ensemble" },
+      { href: "/semantic-search", icon: Search, label: "Circuit Sim. Search" },
+      { href: "/chaos", icon: AlertOctagon, label: "Chaos Engineering" },
+      { href: "/qrng", icon: Shuffle, label: "Quantum RNG" },
+      { href: "/speedup", icon: Rocket, label: "Speedup Certifier" },
+      { href: "/complexity", icon: TrendingUp, label: "Complexity Analyzer" },
+      { href: "/advantage", icon: Zap, label: "Advantage Detector" },
+      { href: "/advantage-timeline", icon: Timer, label: "Advantage Timeline" },
+      { href: "/certify", icon: BadgeCheck, label: "Advantage Certifier" },
+      { href: "/resource-estimator", icon: Award, label: "Resource Estimator" },
+      { href: "/optimizer-hub", icon: Trophy, label: "Optimizer Hub" },
+      { href: "/hpc-bridge", icon: Server, label: "HPC Bridge" },
+    ],
+  },
+  {
+    label: "Publishing",
+    defaultOpen: false,
+    items: [
+      { href: "/doi", icon: BookMarked, label: "DOI / ORCID" },
+      { href: "/peer-review", icon: FileCode, label: "Peer Review" },
+      { href: "/fair", icon: ShieldCheck, label: "FAIR Compliance" },
+      { href: "/grants", icon: Award, label: "Grant Reports" },
+      { href: "/carbon", icon: Beaker, label: "Carbon Footprint" },
+      { href: "/reproducibility", icon: RefreshCw, label: "Reproducibility" },
+      { href: "/federated", icon: Globe2, label: "Fed. Registry" },
+      { href: "/arxiv", icon: BookMarked, label: "arXiv Search" },
+      { href: "/arxiv-feed", icon: BookOpen, label: "arXiv Feed" },
+      { href: "/arxiv-radar", icon: Radio, label: "arXiv Radar" },
+      { href: "/paper-draft", icon: ScrollText, label: "Paper Draft" },
+      { href: "/methods-gen", icon: ScrollText, label: "Methods Gen" },
+      { href: "/grant-proposal", icon: ScrollText, label: "Grant Proposals" },
+      { href: "/dataset-publish", icon: Database, label: "Dataset Publisher" },
+      { href: "/conference", icon: FileImage, label: "Conference Builder" },
+      { href: "/meta-analysis", icon: BookText, label: "Meta-Analysis" },
+      { href: "/research-graph", icon: Network, label: "Research Graph" },
+      { href: "/research-pipeline", icon: Workflow, label: "Research Pipeline" },
+      { href: "/replication", icon: RefreshCw, label: "Replication Mkt" },
+      { href: "/paper-replication", icon: RefreshCw, label: "Paper Replication" },
+      { href: "/blind-analysis", icon: Eye, label: "Blind Analysis" },
+      { href: "/oed", icon: Microscope, label: "Optimal Exp Design" },
+    ],
+  },
+  {
+    label: "Integrations",
+    defaultOpen: false,
+    items: [
+      { href: "/integrations", icon: GitPullRequest, label: "GitHub + Slack" },
+      { href: "/github-ci", icon: GitPullRequest, label: "GitHub CI" },
+      { href: "/webhooks", icon: Zap, label: "Webhooks" },
+      { href: "/cicd", icon: GitBranch, label: "CI/CD" },
+      { href: "/dispatch", icon: Send, label: "Dispatch Queue" },
+      { href: "/jobs", icon: Play, label: "Job Executor" },
+      { href: "/job-scheduler", icon: Timer, label: "Job Scheduler" },
+      { href: "/queue", icon: Server, label: "Queue Intel" },
+      { href: "/live-monitor", icon: MonitorDot, label: "Live Monitor" },
+      { href: "/ingest", icon: Download, label: "Ingest" },
+      { href: "/offline-export", icon: Download, label: "Offline Export" },
+      { href: "/environment", icon: Layers, label: "Env Snapshots" },
+      { href: "/plugins", icon: Package, label: "Plugins" },
+      { href: "/collab-notebook", icon: FileCode, label: "Collab Notebooks" },
+      { href: "/notebook", icon: FileCode, label: "Notebooks" },
+    ],
+  },
+  {
+    label: "Team & Community",
+    defaultOpen: false,
+    items: [
+      { href: "/team", icon: Users, label: "Team" },
+      { href: "/departments", icon: Building2, label: "Departments" },
+      { href: "/researchers", icon: GraduationCap, label: "Researchers" },
+      { href: "/institute", icon: Building2, label: "Institute Dashboard" },
+      { href: "/collab", icon: Users, label: "Collab Rooms" },
+      { href: "/social", icon: Share2, label: "Social Graph" },
+      { href: "/challenges", icon: Trophy, label: "Challenges" },
+      { href: "/benchmark-leaderboard", icon: Trophy, label: "Live Leaderboard" },
+      { href: "/learn", icon: GraduationCap, label: "Learning Paths" },
+      { href: "/talent", icon: Briefcase, label: "Talent Board" },
+      { href: "/registry", icon: BookMarked, label: "Exp Registry" },
+      { href: "/cross-bench", icon: BarChart3, label: "Cross-Bench" },
+      { href: "/copilot", icon: MessageSquare, label: "Q-Lab Copilot" },
+      { href: "/lab-inventory", icon: Wrench, label: "Lab Inventory" },
+    ],
+  },
+  {
+    label: "Settings",
+    defaultOpen: false,
+    items: [
+      { href: "/settings", icon: Settings, label: "Settings" },
+      { href: "/settings/policy", icon: Shield, label: "Policy Gates" },
+      { href: "/settings/rbac", icon: Lock, label: "RBAC" },
+      { href: "/settings/audit", icon: ScrollText, label: "Audit Log" },
+      { href: "/settings/alerts", icon: Bell, label: "Alerts" },
+      { href: "/settings/notifications", icon: BellRing, label: "Notifications" },
+      { href: "/credentials", icon: Key, label: "Credentials" },
+      { href: "/gdpr", icon: Lock, label: "GDPR Tools" },
+      { href: "/billing", icon: Coins, label: "Usage & Billing" },
+    ],
+  },
 ];
+
+function NavGroup({
+  label,
+  defaultOpen,
+  items,
+  pathname,
+}: {
+  label: string;
+  defaultOpen: boolean;
+  items: NavItem[];
+  pathname: string;
+}) {
+  const storageKey = `qlab_nav_${label}`;
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved !== null) setOpen(saved === "1");
+  }, [storageKey]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    localStorage.setItem(storageKey, next ? "1" : "0");
+  }
+
+  const hasActive = items.some((i) => i.href === pathname);
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <button
+        onClick={toggle}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "6px 12px",
+          background: hasActive ? "var(--nav-active-bg, rgba(99,102,241,0.08))" : "transparent",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+          color: "var(--color-muted, #5f6f80)",
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.07em",
+        }}
+      >
+        <span>{label}</span>
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+      </button>
+      {open && (
+        <div style={{ paddingLeft: 4 }}>
+          {items.map(({ href, icon: Icon, label: lbl }) => (
+            <Link
+              key={href}
+              className={`nav-link${pathname === href ? " active" : ""}`}
+              href={href}
+            >
+              <Icon size={18} aria-hidden="true" />
+              {lbl}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SideNav() {
   const pathname = usePathname();
@@ -195,15 +324,14 @@ export default function SideNav() {
 
   return (
     <nav className="nav" aria-label="Primary">
-      {links.map(({ href, icon: Icon, label }) => (
-        <Link
-          key={href}
-          className={`nav-link${pathname === href ? " active" : ""}`}
-          href={href}
-        >
-          <Icon size={18} aria-hidden="true" />
-          {label}
-        </Link>
+      {GROUPS.map((group) => (
+        <NavGroup
+          key={group.label}
+          label={group.label}
+          defaultOpen={group.defaultOpen}
+          items={group.items}
+          pathname={pathname}
+        />
       ))}
       {(user?.role === "owner" || user?.role === "admin") && (
         <Link
