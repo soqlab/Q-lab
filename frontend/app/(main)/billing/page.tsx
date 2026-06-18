@@ -223,13 +223,18 @@ function PlanCard({
             {upgrading ? "Processing…" : `Upgrade to ${plan.name}`}
           </button>
         ) : (
-          <a
-            href={`mailto:yasseennandally@gmail.com?subject=Q-Lab ${plan.name} Plan`}
-            className="button secondary"
-            style={{ display: "block", textAlign: "center", textDecoration: "none" }}
-          >
-            Contact us to upgrade
-          </a>
+          <div>
+            <a
+              href={`mailto:yasseennandally@gmail.com?subject=Interested in Q-Lab ${plan.name} Plan`}
+              className="button"
+              style={{ display: "block", textAlign: "center", textDecoration: "none", background: accentColor, borderColor: accentColor }}
+            >
+              Join the Waitlist
+            </a>
+            <p style={{ fontSize: 11, color: "#9aa8b6", textAlign: "center", margin: "8px 0 0" }}>
+              Premium plans coming soon — we&apos;ll be in touch.
+            </p>
+          </div>
         )
       )}
       {isCurrent && (
@@ -683,36 +688,14 @@ function BillingPageInner() {
           >
             <div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
-                Enable real billing with Stripe
+                Premium plans coming soon
               </div>
               <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4, maxWidth: 480 }}>
-                Set{" "}
-                <code
-                  style={{
-                    background: "rgba(255,255,255,0.1)",
-                    padding: "1px 6px",
-                    borderRadius: 3,
-                  }}
-                >
-                  STRIPE_SECRET_KEY
-                </code>{" "}
-                and{" "}
-                <code
-                  style={{
-                    background: "rgba(255,255,255,0.1)",
-                    padding: "1px 6px",
-                    borderRadius: 3,
-                  }}
-                >
-                  STRIPE_WEBHOOK_SECRET
-                </code>{" "}
-                to activate real Stripe subscriptions. Until then, plan changes are simulated.
+                We&apos;re working on Pro and Enterprise plans. Join the waitlist and we&apos;ll notify you when they launch.
               </div>
             </div>
             <a
-              href="https://dashboard.stripe.com"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:yasseennandally@gmail.com?subject=Q-Lab Premium Waitlist"
               className="button"
               style={{
                 background: "#6366f1",
@@ -721,7 +704,7 @@ function BillingPageInner() {
                 textDecoration: "none",
               }}
             >
-              Stripe Dashboard
+              Join Waitlist
             </a>
           </div>
         </section>
