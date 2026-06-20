@@ -83,6 +83,33 @@ def system_stats(
     }
 
 
+@router.get("/users")
+def list_users(
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    users = db.scalars(select(User).order_by(User.created_at.desc())).all()
+    user_run_counts = dict(
+        db.execute(
+            select(Run.created_by_user_id, func.count(Run.id))
+            .group_by(Run.created_by_user_id)
+        ).all()
+    )
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "org_id": u.org_id,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "run_count": user_run_counts.get(u.id, 0),
+        }
+        for u in users
+    ]
+
+
 @router.get("/organizations")
 def list_organizations(
     identity: Identity = Depends(require_role("owner")),
