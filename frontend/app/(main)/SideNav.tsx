@@ -333,15 +333,6 @@ export default function SideNav() {
           pathname={pathname}
         />
       ))}
-      {(user?.role === "owner" || user?.role === "admin") && (
-        <Link
-          className={`nav-link${pathname === "/admin" ? " active" : ""}`}
-          href="/admin"
-        >
-          <Activity size={18} aria-hidden="true" />
-          Admin
-        </Link>
-      )}
     </nav>
   );
 }
