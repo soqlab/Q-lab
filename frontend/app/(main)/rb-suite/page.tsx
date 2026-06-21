@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RBSuiteResult, runRBSuite } from "../../../lib/api";
 import { BarChart3, Play, Award, Zap } from "lucide-react";
 
@@ -43,6 +43,9 @@ export default function RBSuitePage() {
       setLoading(false);
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   function buildSVG(r: RBSuiteResult): React.ReactNode {
     const W = 560;

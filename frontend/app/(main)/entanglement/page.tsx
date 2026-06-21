@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { EntanglementMapResult, EntanglementLayer, mapEntanglement } from "../../../lib/api";
 import { GitBranch, Play } from "lucide-react";
 
@@ -83,6 +83,9 @@ export default function EntanglementPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem" }}>

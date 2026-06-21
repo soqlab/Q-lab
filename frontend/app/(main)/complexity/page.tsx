@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ComplexityResult, ComplexityFit, analyzeComplexity } from "../../../lib/api";
 import { BarChart3, Play, TrendingUp, Zap } from "lucide-react";
 
@@ -74,6 +74,9 @@ export default function ComplexityPage() {
       setLoading(false);
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleAnalyze(); }, []);
 
   const sortedFits: ComplexityFit[] = result
     ? [...result.all_fits].sort((a, b) => b.r_squared - a.r_squared)

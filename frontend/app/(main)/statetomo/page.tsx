@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TomoResult, BlochVector, analyzeStateTomography } from "../../../lib/api";
 import { Atom, ZapOff, Zap } from "lucide-react";
 
@@ -74,6 +74,9 @@ export default function StateTomographyPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem" }}>

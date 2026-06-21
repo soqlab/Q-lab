@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GateTomoResult, runGateTomography } from "../../../lib/api";
 import { Microscope, Play, Cpu, CheckCircle } from "lucide-react";
 
@@ -99,6 +99,9 @@ export default function GateTomoPage() {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const fidelityColor = result
     ? result.process_fidelity > 0.99 ? "#10b981" : result.process_fidelity > 0.95 ? "#f59e0b" : "#ef4444"
