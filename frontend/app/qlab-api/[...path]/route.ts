@@ -3,25 +3,37 @@ import { type NextRequest, NextResponse } from "next/server";
 const BACKEND = (process.env.QLAB_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 async function proxy(req: NextRequest, { params }: { params: { path: string[] } }) {
-  const url = new URL(req.url);
-  const target = `${BACKEND}/${params.path.join("/")}${url.search}`;
+  try {
+    const url = new URL(req.url);
+    const target = `${BACKEND}/${params.path.join("/")}${url.search}`;
 
-  const headers = new Headers();
-  req.headers.forEach((v, k) => {
-    if (k !== "host") headers.set(k, v);
-  });
+    const headers = new Headers();
+    req.headers.forEach((v, k) => {
+      if (k !== "host" && k !== "content-length") headers.set(k, v);
+    });
 
-  let body: ArrayBuffer | undefined;
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    body = await req.arrayBuffer();
+    let body: string | undefined;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      body = await req.text();
+    }
+
+    const res = await fetch(target, { method: req.method, headers, body });
+    const text = await res.text();
+
+    const resHeaders = new Headers();
+    res.headers.forEach((v, k) => {
+      if (k !== "content-encoding" && k !== "transfer-encoding") {
+        resHeaders.set(k, v);
+      }
+    });
+
+    return new NextResponse(text, { status: res.status, headers: resHeaders });
+  } catch (e) {
+    return NextResponse.json(
+      { error: "Proxy error", detail: String(e), backend: BACKEND },
+      { status: 502 }
+    );
   }
-
-  const res = await fetch(target, { method: req.method, headers, body });
-
-  const resHeaders = new Headers();
-  res.headers.forEach((v, k) => resHeaders.set(k, v));
-
-  return new NextResponse(res.body, { status: res.status, headers: resHeaders });
 }
 
 export const GET = proxy;
