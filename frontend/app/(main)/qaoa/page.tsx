@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { runQAOA, QAOAResult } from "@/lib/api";
 
 const PROBLEMS = ["maxcut", "vertex_cover", "mis"];
@@ -20,6 +20,9 @@ export default function QAOAPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   const W = 540, H = 140;
   function convChart(data: number[]) {

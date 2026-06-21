@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { analyzeChannelCapacity, ChannelCapacityResult } from "@/lib/api";
 
 const CHANNELS = ["depolarizing", "amplitude_damp", "phase_damp", "erasure", "pauli"];
@@ -19,6 +19,9 @@ export default function ChannelCapacityPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   return (
     <div style={{ display: "flex", gap: 24 }}>

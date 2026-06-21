@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { runXEB, XEBResult } from "@/lib/api";
 
 export default function XEBPage() {
@@ -17,6 +17,9 @@ export default function XEBPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   const W = 560, H = 120;
   function barChart(data: number[]) {

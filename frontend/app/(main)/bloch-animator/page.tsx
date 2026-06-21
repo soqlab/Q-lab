@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { animateBloch, BlochAnimResult, BlochFrame } from "@/lib/api";
 
 const PRESETS: Record<string, { gates: string[]; state: string }> = {
@@ -28,6 +28,9 @@ export default function BlochAnimatorPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   function applyPreset(name: string) {
     const p = PRESETS[name];

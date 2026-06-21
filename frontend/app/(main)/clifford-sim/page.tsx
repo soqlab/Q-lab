@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CliffordSimResult, runCliffordSim } from "../../../lib/api";
 import { Layers, Play, Cpu, AlertTriangle } from "lucide-react";
 
@@ -28,6 +28,9 @@ export default function CliffordSimPage() {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const stabChipColor = (s: string) => {
     if (s.startsWith("+")) return "#10b981";

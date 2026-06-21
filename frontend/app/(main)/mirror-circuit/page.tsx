@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { runMirrorCircuit, MirrorCircuitResult } from "@/lib/api";
 
 export default function MirrorCircuitPage() {
@@ -18,6 +18,9 @@ export default function MirrorCircuitPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   const gradeColor = (g: string) => ({ A: "#34d399", B: "#6366f1", C: "#fbbf24", D: "#f97316", F: "#f87171" })[g] ?? "#94a3b8";
 

@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { runTrotterEvolution, TrotterResult } from "@/lib/api";
 
 const HAMILTONIANS = ["ising_1d", "heisenberg_xxz", "transverse_field", "xy_model"];
@@ -24,6 +24,9 @@ export default function TrotterPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   const W = 540, H = 160;
   function lineChart(data: number[], color: string) {
