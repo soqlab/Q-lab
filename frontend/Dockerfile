@@ -7,6 +7,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ARG QLAB_API_URL=http://127.0.0.1:8000
+ENV QLAB_API_URL=$QLAB_API_URL
 RUN npm run build
 
 FROM node:20-alpine AS runner

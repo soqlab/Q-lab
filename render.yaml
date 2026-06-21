@@ -44,6 +44,9 @@ services:
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
     plan: starter
+    dockerBuildArgs:
+      - key: QLAB_API_URL
+        value: https://qlab-backend.onrender.com
     envVars:
       - key: QLAB_API_URL
-        sync: false
+        value: https://qlab-backend.onrender.com
