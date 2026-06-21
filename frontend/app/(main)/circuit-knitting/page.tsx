@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { runCircuitKnitting, CircuitKnittingResult } from "@/lib/api";
 
 export default function CircuitKnittingPage() {
@@ -20,6 +20,9 @@ export default function CircuitKnittingPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   return (
     <div style={{ display: "flex", gap: 24 }}>

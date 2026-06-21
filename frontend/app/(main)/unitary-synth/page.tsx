@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UnitarySynthResult, GateStep, synthesizeUnitary } from "../../../lib/api";
 import { Grid, Play, CheckCircle, Cpu } from "lucide-react";
 
@@ -59,6 +59,9 @@ export default function UnitarySynthPage() {
       setLoading(false);
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const textareaRows = nQubits === 1 ? 4 : nQubits === 2 ? 8 : 10;
 

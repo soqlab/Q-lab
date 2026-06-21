@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TensorNetworkResult, analyzeTensorNetwork } from "../../../lib/api";
 import { Network, Play, Zap, BarChart3 } from "lucide-react";
 
@@ -31,6 +31,9 @@ export default function TensorNetworkPage() {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const renderBondChart = (dims: number[]) => {
     if (!dims || dims.length === 0) return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SyndromeDecoderResult, decodeSyndrome } from "../../../lib/api";
 import { Shield, Play, AlertTriangle, CheckCircle } from "lucide-react";
 
@@ -32,6 +32,9 @@ export default function SyndromeDecoderPage() {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const activeCode = CODES.find(c => c.id === code);
 

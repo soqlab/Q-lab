@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { estimateResources, ResourceEstimateResult } from "@/lib/api";
 
 const ALGORITHMS = ["shor_2048", "shor_1024", "grover_n30", "chemistry_feo", "chemistry_h2o", "qpe_phase", "hhl_1000", "custom"];
@@ -17,6 +17,9 @@ export default function ResourceEstimatorPage() {
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); }, []);
 
   const milestone2030 = result?.milestones.find(m => m.year === 2030);
   const milestone2035 = result?.milestones.find(m => m.year === 2035);

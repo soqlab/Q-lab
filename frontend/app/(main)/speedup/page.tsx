@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SpeedupCertResult, certifySpeedup } from "../../../lib/api";
 import { Zap, Play, Award, AlertTriangle } from "lucide-react";
 
@@ -33,6 +33,9 @@ export default function SpeedupPage() {
       setLoading(false);
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void handleRun(); }, []);
 
   const selectedProblem = PROBLEMS.find((p) => p.id === problemType);
 
