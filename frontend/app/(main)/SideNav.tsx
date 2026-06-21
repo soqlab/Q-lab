@@ -318,6 +318,43 @@ function NavGroup({
   );
 }
 
+function AIQuotaBar() {
+  const { token } = useAuth();
+  const [usage, setUsage] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/qlab-api/api/v1/ai-usage", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setUsage(d); })
+      .catch(() => {});
+  }, [token]);
+
+  if (!usage) return null;
+
+  const pct = Math.round((usage.used / usage.limit) * 100);
+  const color = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#6366f1";
+
+  return (
+    <div style={{ padding: "12px 16px", borderTop: "1px solid #1e293b", marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          AI Credits
+        </span>
+        <span style={{ fontSize: 11, color: pct >= 90 ? "#ef4444" : "#64748b", fontWeight: 600 }}>
+          {usage.remaining}/{usage.limit}
+        </span>
+      </div>
+      <div style={{ height: 4, background: "#1e293b", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 999, transition: "width 0.3s" }} />
+      </div>
+      {usage.remaining === 0 && (
+        <p style={{ margin: "5px 0 0", fontSize: 10, color: "#ef4444" }}>Limit reached — resets midnight UTC</p>
+      )}
+    </div>
+  );
+}
+
 export default function SideNav() {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -333,6 +370,7 @@ export default function SideNav() {
           pathname={pathname}
         />
       ))}
+      <AIQuotaBar />
     </nav>
   );
 }
