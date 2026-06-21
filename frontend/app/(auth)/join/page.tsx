@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle, LogIn, UserPlus } from "lucide-react";
 import { acceptInvite, validateInvite, type InviteInfo } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 
-export default function JoinPage() {
+function JoinInner() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("token") ?? "";
   const router = useRouter();
@@ -142,5 +142,13 @@ export default function JoinPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense>
+      <JoinInner />
+    </Suspense>
   );
 }
