@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
 from ..deps import get_identity, Identity
 from ..models import Run
@@ -152,6 +153,8 @@ def ask(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    if identity:
+        check_ai_limit(identity)
     runs = _fetch_runs(db, body, identity)
     if not runs:
         return {

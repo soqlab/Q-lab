@@ -1160,6 +1160,15 @@ def health_check(db: Session = Depends(get_db)):
 
 
 # ------------------------------------------------------------------
+# AI usage quota
+# ------------------------------------------------------------------
+@app.get("/api/v1/ai-usage")
+def ai_usage(identity=Depends(require_auth)):
+    from .ai_rate_limit import get_ai_usage
+    return get_ai_usage(identity.user_id)
+
+
+# ------------------------------------------------------------------
 # Contact form
 # ------------------------------------------------------------------
 from pydantic import BaseModel as _BaseModel
