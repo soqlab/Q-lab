@@ -64,9 +64,9 @@ export default function QLabAdminPage() {
     try {
       const h = { Authorization: `Bearer ${token}` };
       const [sRes, uRes, lRes] = await Promise.all([
-        fetch("/qlab-api/admin/stats", { headers: h }),
-        fetch("/qlab-api/admin/users", { headers: h }),
-        fetch("/qlab-api/admin/audit-logs?limit=50", { headers: h }),
+        fetch("/qlab-api/api/v1/admin/stats", { headers: h }),
+        fetch("/qlab-api/api/v1/admin/users", { headers: h }),
+        fetch("/qlab-api/api/v1/admin/audit-logs?limit=50", { headers: h }),
       ]);
       const [s, u, l] = await Promise.all([sRes.json(), uRes.json(), lRes.json()]);
       setStats(s);
