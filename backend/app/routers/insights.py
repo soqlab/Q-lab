@@ -18,7 +18,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
+from ..deps import Identity, require_auth
 from ..health_score import compute_health_score, health_breakdown
 from ..models import Run, RunMetric
 
@@ -463,8 +465,10 @@ def generate_insights(
     run_id: str,
     force: bool = Query(False, description="Re-generate even if cached"),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
 ):
     """Generate AI insights for a run. Cached after first generation."""
+    check_ai_limit(identity)
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
 
@@ -514,8 +518,9 @@ def get_insights(run_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{run_id}/insights/stream")
-def stream_insights(run_id: str, db: Session = Depends(get_db)):
+def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Stream insight generation as SSE for live display."""
+    check_ai_limit(identity)
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
 
@@ -534,8 +539,9 @@ def stream_insights(run_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{run_id}/insights/circuit")
-def circuit_insights(run_id: str, db: Session = Depends(get_db)):
+def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Deep gate-level circuit analysis — always re-runs, no cache. Returns structured JSON."""
+    check_ai_limit(identity)
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
 
