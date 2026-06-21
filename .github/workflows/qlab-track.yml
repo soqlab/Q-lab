@@ -42,13 +42,19 @@ jobs:
           QLAB_PROJECT: ${{ github.repository }}/${{ github.ref_name }}
         run: |
           python - <<'EOF'
-          import os, qlab
+          import os, sys, qlab
           from qiskit import QuantumCircuit, transpile
           from qiskit_aer import AerSimulator
 
+          api_url = os.environ.get("QLAB_API_URL")
+          api_key = os.environ.get("QLAB_API_KEY")
+          if not api_url or not api_key:
+              print("QLAB_API_URL / QLAB_API_KEY not configured — skipping Q-Lab tracking.")
+              sys.exit(0)
+
           qlab.init(
-              api_url=os.environ["QLAB_API_URL"],
-              api_key=os.environ["QLAB_API_KEY"],
+              api_url=api_url,
+              api_key=api_key,
               project=os.environ.get("QLAB_PROJECT", "ci"),
           )
 
