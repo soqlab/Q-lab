@@ -46,7 +46,4 @@ services:
     plan: starter
     envVars:
       - key: QLAB_API_URL
-        fromService:
-          name: qlab-backend
-          type: web
-          property: hostWithScheme
+        sync: false
