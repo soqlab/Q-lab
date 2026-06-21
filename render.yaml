@@ -21,7 +21,7 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: QLAB_APP_URL
-        sync: false
+        value: https://soqlab.com
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
