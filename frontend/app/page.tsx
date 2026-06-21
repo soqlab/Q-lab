@@ -627,10 +627,34 @@ export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactMsg, setContactMsg] = useState("");
+  const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  async function handleContactSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setContactStatus("sending");
+    try {
+      const res = await fetch("/qlab-api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: contactName, email: contactEmail, message: contactMsg }),
+      });
+      if (!res.ok) throw new Error();
+      setContactStatus("sent");
+      setContactName(""); setContactEmail(""); setContactMsg("");
+    } catch {
+      setContactStatus("error");
+    }
+  }
+
+  function openContact() { setContactOpen(true); setContactStatus("idle"); }
 
   // Authenticated users visiting "/" get a dashboard link, not a redirect,
   // so they can still read the landing page but have a clear path in.
@@ -652,7 +676,7 @@ export default function LandingPage() {
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-            <li><a href="mailto:yasseennandally@gmail.com">Contact</a></li>
+            <li><button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>Contact</button></li>
           </ul>
 
           <div className="lp-nav-actions">
@@ -876,9 +900,9 @@ export default function LandingPage() {
             <a href="https://github.com" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
-            <a href="mailto:yasseennandally@gmail.com">
+            <button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>
               Contact
-            </a>
+            </button>
             {!isAuthed && (
               <>
                 <Link href="/login">Sign In</Link>
@@ -888,6 +912,70 @@ export default function LandingPage() {
           </div>
         </footer>
       </div>
+
+      {/* ── Contact modal ───────────────────────────────────────────────── */}
+      {contactOpen && (
+        <div onClick={() => setContactOpen(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#111827", border: "1px solid #1e293b", borderRadius: 16,
+            padding: "36px 32px", width: "100%", maxWidth: 480,
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ color: "#f1f5f9", fontSize: 20, fontWeight: 700, margin: 0 }}>Get in touch</h2>
+              <button onClick={() => setContactOpen(false)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+
+            {contactStatus === "sent" ? (
+              <div style={{ textAlign: "center", padding: "24px 0" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+                <div style={{ color: "#10b981", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Message sent!</div>
+                <div style={{ color: "#94a3b8", fontSize: 14 }}>{"We'll get back to you as soon as possible."}</div>
+                <button onClick={() => setContactOpen(false)} style={{ marginTop: 20, padding: "10px 28px", background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Close</button>
+              </div>
+            ) : (
+              <form onSubmit={(e) => void handleContactSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Name</label>
+                  <input
+                    required value={contactName} onChange={(e) => setContactName(e.target.value)}
+                    placeholder="Your name"
+                    style={{ width: "100%", padding: "10px 14px", background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#f1f5f9", fontSize: 14, outline: "none" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>
+                  <input
+                    required type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    style={{ width: "100%", padding: "10px 14px", background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#f1f5f9", fontSize: 14, outline: "none" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Message</label>
+                  <textarea
+                    required rows={4} value={contactMsg} onChange={(e) => setContactMsg(e.target.value)}
+                    placeholder="Tell us about your research or ask anything…"
+                    style={{ width: "100%", padding: "10px 14px", background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#f1f5f9", fontSize: 14, outline: "none", resize: "vertical" }}
+                  />
+                </div>
+                {contactStatus === "error" && (
+                  <div style={{ color: "#f87171", fontSize: 13 }}>Something went wrong — please try again or email us directly.</div>
+                )}
+                <button
+                  type="submit" disabled={contactStatus === "sending"}
+                  style={{ padding: "12px", background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, cursor: contactStatus === "sending" ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 15, opacity: contactStatus === "sending" ? 0.7 : 1 }}
+                >
+                  {contactStatus === "sending" ? "Sending…" : "Send message"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

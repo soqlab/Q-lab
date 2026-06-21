@@ -877,3 +877,20 @@ def notify_run_event(
     except Exception as exc:
         logger.exception("notify_run_event failed for %s / %s: %s", user_email, event, exc)
         return False
+
+
+def send_contact_email(name: str, from_email: str, message: str) -> bool:
+    """Forward a contact-form submission to the platform owner."""
+    owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "yasseennandally@gmail.com")
+    subject = f"Q-Lab contact from {name}"
+    html = f"""
+    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
+                background:#111827;border-radius:12px;padding:32px;color:#e5e7eb;">
+      <h2 style="margin:0 0 16px;font-size:20px;color:#c7d2fe;">New contact message</h2>
+      <p style="margin:0 0 8px;font-size:14px;color:#9ca3af;"><strong style="color:#e5e7eb;">From:</strong> {name} &lt;{from_email}&gt;</p>
+      <div style="margin:16px 0;padding:16px;background:#1f2937;border-radius:8px;
+                  font-size:14px;color:#d1d5db;line-height:1.6;white-space:pre-wrap;">{message}</div>
+      <p style="margin:0;font-size:12px;color:#6b7280;">Sent via Q-Lab contact form</p>
+    </div>
+    """
+    return send_email(to=owner, subject=subject, html=html, from_addr=f"Q-Lab Contact <noreply@qlab.app>")
