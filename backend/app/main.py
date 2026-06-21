@@ -1160,6 +1160,23 @@ def health_check(db: Session = Depends(get_db)):
 
 
 # ------------------------------------------------------------------
+# Contact form
+# ------------------------------------------------------------------
+from pydantic import BaseModel as _BaseModel
+
+class _ContactPayload(_BaseModel):
+    name: str
+    email: str
+    message: str
+
+@app.post("/contact")
+def contact(payload: _ContactPayload):
+    from .email_service import send_contact_email
+    send_contact_email(name=payload.name, from_email=payload.email, message=payload.message)
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------
 # Real-time SSE feed
 # ------------------------------------------------------------------
 
