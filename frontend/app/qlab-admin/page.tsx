@@ -68,12 +68,27 @@ export default function QLabAdminPage() {
         fetch("/qlab-api/api/v1/admin/users", { headers: h }),
         fetch("/qlab-api/api/v1/admin/audit-logs?limit=50", { headers: h }),
       ]);
+      if (!sRes.ok) {
+        const txt = await sRes.text();
+        setErr(`Stats API error (${sRes.status}): ${txt}`);
+        return;
+      }
+      if (!uRes.ok) {
+        const txt = await uRes.text();
+        setErr(`Users API error (${uRes.status}): ${txt}`);
+        return;
+      }
+      if (!lRes.ok) {
+        const txt = await lRes.text();
+        setErr(`Logs API error (${lRes.status}): ${txt}`);
+        return;
+      }
       const [s, u, l] = await Promise.all([sRes.json(), uRes.json(), lRes.json()]);
       setStats(s);
-      setUsers(u);
-      setLogs(l.items ?? []);
-    } catch {
-      setErr("Failed to load admin data.");
+      setUsers(Array.isArray(u) ? u : []);
+      setLogs(l?.items ?? []);
+    } catch (e) {
+      setErr(`Failed to load admin data: ${String(e)}`);
     }
   }
 
@@ -122,12 +137,12 @@ export default function QLabAdminPage() {
         {stats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 28 }}>
             {[
-              { label: "Total Users", value: stats.users, color: "#6366f1" },
-              { label: "Total Runs", value: stats.runs.total, color: "#1d6f8f" },
-              { label: "Completed", value: stats.runs.completed, color: "#10b981" },
-              { label: "Failed", value: stats.runs.failed, color: "#e74c3c" },
-              { label: "Orgs", value: stats.organizations, color: "#f59e0b" },
-              { label: "Audit Events", value: stats.audit_events, color: "#8b5cf6" },
+              { label: "Total Users", value: stats.users ?? 0, color: "#6366f1" },
+              { label: "Total Runs", value: stats.runs?.total ?? 0, color: "#1d6f8f" },
+              { label: "Completed", value: stats.runs?.completed ?? 0, color: "#10b981" },
+              { label: "Failed", value: stats.runs?.failed ?? 0, color: "#e74c3c" },
+              { label: "Orgs", value: stats.organizations ?? 0, color: "#f59e0b" },
+              { label: "Audit Events", value: stats.audit_events ?? 0, color: "#8b5cf6" },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background: "#fff", borderRadius: 10, padding: "16px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9aa8b6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}</div>
@@ -150,10 +165,10 @@ export default function QLabAdminPage() {
             <div style={{ background: "#fff", borderRadius: 10, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Run Health</h3>
               {[
-                ["Completion rate", `${(stats.runs.completion_rate * 100).toFixed(1)}%`],
-                ["Failure rate", `${((stats.runs.failed / (stats.runs.total || 1)) * 100).toFixed(1)}%`],
-                ["Total benchmarks", stats.benchmarks],
-                ["Active webhooks", stats.webhooks],
+                ["Completion rate", `${((stats.runs?.completion_rate ?? 0) * 100).toFixed(1)}%`],
+                ["Failure rate", `${(((stats.runs?.failed ?? 0) / (stats.runs?.total || 1)) * 100).toFixed(1)}%`],
+                ["Total benchmarks", stats.benchmarks ?? 0],
+                ["Active webhooks", stats.webhooks ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f3f5", fontSize: 14 }}>
                   <span style={{ color: "#5f6f80" }}>{String(label)}</span>
