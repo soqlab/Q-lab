@@ -27,8 +27,7 @@ export default function JobDetailPage() {
 
   const startStream = () => {
     if (esRef.current) esRef.current.close();
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-    const es = new EventSource(`${apiBase}/api/v1/jobs/${jobId}/stream`);
+    const es = new EventSource(`/qlab-api/api/v1/jobs/${jobId}/stream`);
     esRef.current = es;
     setStreaming(true);
 
