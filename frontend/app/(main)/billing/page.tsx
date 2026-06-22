@@ -294,9 +294,9 @@ function BillingPageInner() {
         ? { Authorization: `Bearer ${token}` }
         : {};
       const [usageRes, plansRes, invoicesRes] = await Promise.all([
-        fetch("/qlab-api/billing/usage", { headers }),
-        fetch("/qlab-api/billing/plans", { headers }),
-        fetch("/qlab-api/billing/invoices", { headers }),
+        fetch("/qlab-api/api/v1/billing/usage", { headers }),
+        fetch("/qlab-api/api/v1/billing/plans", { headers }),
+        fetch("/qlab-api/api/v1/billing/invoices", { headers }),
       ]);
       if (!usageRes.ok) throw new Error(`Usage fetch failed: ${usageRes.status}`);
       if (!plansRes.ok) throw new Error(`Plans fetch failed: ${plansRes.status}`);
@@ -323,7 +323,7 @@ function BillingPageInner() {
     try {
       // If Stripe is configured → create checkout session and redirect
       if (stripeConfigured) {
-        const res = await fetch("/qlab-api/billing/checkout", {
+        const res = await fetch("/qlab-api/api/v1/billing/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ plan: planSlug }),
@@ -333,7 +333,7 @@ function BillingPageInner() {
         if (data.checkout_url) { window.location.href = data.checkout_url; return; }
       }
       // Fallback: simulate (no Stripe key)
-      const res = await fetch("/qlab-api/billing/subscription", {
+      const res = await fetch("/qlab-api/api/v1/billing/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ plan: planSlug }),
@@ -352,7 +352,7 @@ function BillingPageInner() {
   async function handleManageSubscription() {
     if (!token) return;
     try {
-      const res = await fetch("/qlab-api/billing/portal", {
+      const res = await fetch("/qlab-api/api/v1/billing/portal", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json() as { portal_url?: string; detail?: string };
@@ -395,38 +395,6 @@ function BillingPageInner() {
         </div>
       </div>
 
-      {/* Tracking-only banner */}
-      {!billingEnabled && !loading && (
-        <div
-          style={{
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: 8,
-            padding: "10px 16px",
-            fontSize: 13,
-            color: "#92400e",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <span style={{ fontSize: 16 }}>ℹ</span>
-          <span>
-            <strong>Usage tracking only</strong> — limits are not enforced. Set{" "}
-            <code
-              style={{
-                background: "#fef3c7",
-                padding: "1px 5px",
-                borderRadius: 3,
-                fontSize: 12,
-              }}
-            >
-              QLAB_BILLING_ENABLED=true
-            </code>{" "}
-            to activate plan enforcement.
-          </span>
-        </div>
-      )}
 
       {error && (
         <div
