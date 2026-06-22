@@ -306,7 +306,7 @@ export default function SettingsPage() {
 import qlab
 
 qlab.init(
-    api_url="http://localhost:8000",
+    api_url="https://soqlab.com",
     api_key="<your-qlab_xxx-key>",
 )
 # That's it — your Qiskit runs are now tracked automatically.`}</pre>

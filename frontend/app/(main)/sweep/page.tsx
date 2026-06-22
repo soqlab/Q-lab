@@ -206,7 +206,7 @@ export default function SweepPage() {
     fetchProjects().then(ps => {
       setProjects(ps);
       if (ps.length > 0) setProject(ps[0].slug);
-    }).catch(() => {});
+    }).catch(() => setProjects([]));
   }, []);
 
   // When project changes, load available params
@@ -216,7 +216,7 @@ export default function SweepPage() {
       setAvailableX(p.available_x_params);
       setAvailableY(p.available_y_metrics);
       if (p.available_x_params.length > 0) setXParam(p.available_x_params[0]);
-    }).catch(() => {});
+    }).catch(() => setError("Failed to load sweep parameters"));
   }, [project]);
 
   async function analyze() {

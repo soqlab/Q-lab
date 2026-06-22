@@ -62,7 +62,7 @@ function SortTh({
 function QuickStart() {
   const steps = [
     { icon: <Terminal size={20} />, title: "Install Q-Lab SDK", code: "pip install qlab-tracker" },
-    { icon: <Key size={20} />, title: "Get your API key", code: 'import qlab\nqlab.init(api_key="ql_…", url="http://localhost:8000")' },
+    { icon: <Key size={20} />, title: "Get your API key", code: 'import qlab\nqlab.init(api_key="ql_…", url="https://soqlab.com")' },
     {
       icon: <Zap size={20} />, title: "Track your first circuit",
       code: 'from qiskit import QuantumCircuit\nfrom qlab import track\n\nqc = QuantumCircuit(2)\nqc.h(0); qc.cx(0, 1)\n\nwith track(qc, backend="ibm_brisbane") as run:\n    job = sampler.run([qc])\n    result = job.result()\n    run.log_result(result)',

@@ -80,7 +80,7 @@ export default function BenchmarksPage() {
   useEffect(() => {
     void fetchBenchmarks()
       .then(setBenchmarks)
-      .catch(() => {})
+      .catch(() => setBenchmarks([]))
       .finally(() => setLoading(false));
   }, []);
 
