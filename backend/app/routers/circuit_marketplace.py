@@ -115,7 +115,7 @@ def browse_listings(category: Optional[str] = None, tags: Optional[str] = None,
         results = [l for l in results if l["price_usd"] <= max_price]
     key = sort if sort in ("rating", "price_usd", "downloads") else "rating"
     results.sort(key=lambda x: x.get(key, 0), reverse=True)
-    return {"count": len(results),
+    return {"total": len(results),
             "listings": [{k: v for k, v in l.items() if k != "reviews"} for l in results]}
 
 
@@ -127,7 +127,7 @@ def list_categories(db: Session = Depends(get_db)):
     ])
     all_listings = store_list(db, NS_LISTINGS)
     counts = {c: sum(1 for l in all_listings if l["category"] == c) for c in CATEGORIES}
-    return [{"category": c, "count": counts[c]} for c in CATEGORIES]
+    return {"categories": [{"name": c, "count": counts[c]} for c in CATEGORIES]}
 
 
 @router.get("/{listing_id}")
