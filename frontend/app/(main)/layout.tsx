@@ -16,7 +16,7 @@ function OnboardingGate() {
     if (localStorage.getItem(ONBOARDING_KEY) === "1") return;
 
     const token = localStorage.getItem(TOKEN_KEY);
-    fetch("/qlab-api/runs?limit=1", {
+    fetch("/qlab-api/api/v1/runs?limit=1", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => r.json())
@@ -24,9 +24,7 @@ function OnboardingGate() {
         const count = Array.isArray(data) ? data.length : (data?.total ?? data?.count ?? 0);
         if (count === 0) setShow(true);
       })
-      .catch(() => {
-        setShow(true);
-      });
+      .catch(() => {});
   }, []);
 
   if (!show) return null;
