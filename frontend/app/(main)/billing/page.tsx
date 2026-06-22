@@ -290,8 +290,9 @@ function BillingPageInner() {
     setLoading(true);
     setError(null);
     try {
-      const headers: Record<string, string> = tok
-        ? { Authorization: `Bearer ${tok}` }
+      const t = tok ?? localStorage.getItem("qlab_token");
+      const headers: Record<string, string> = t
+        ? { Authorization: `Bearer ${t}` }
         : {};
       const [usageRes, plansRes, invoicesRes] = await Promise.all([
         fetch("/qlab-api/api/v1/billing/usage", { headers }),
