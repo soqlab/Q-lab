@@ -33,7 +33,7 @@ type SuggestedQuestions = {
 // -----------------------------------------------------------------------
 
 function apiUrl(path: string): string {
-  return `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}${path}`;
+  return `/qlab-api${path}`;
 }
 
 function authHeaders(): Record<string, string> {
