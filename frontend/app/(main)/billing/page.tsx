@@ -264,7 +264,7 @@ function PlanCard({
 // ---------------------------------------------------------------------------
 
 function BillingPageInner() {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const paymentSuccess = searchParams.get("success") === "true";
@@ -280,18 +280,18 @@ function BillingPageInner() {
   const [upgradeErr, setUpgradeErr] = useState<string | null>(paymentCanceled ? "Payment canceled — your plan was not changed." : null);
 
   useEffect(() => {
-    if (token === undefined) return;
+    if (authLoading) return;
     if (!token) { router.push("/login"); return; }
-    void load();
+    void load(token);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, authLoading]);
 
-  async function load() {
+  async function load(tok = token) {
     setLoading(true);
     setError(null);
     try {
-      const headers: Record<string, string> = token
-        ? { Authorization: `Bearer ${token}` }
+      const headers: Record<string, string> = tok
+        ? { Authorization: `Bearer ${tok}` }
         : {};
       const [usageRes, plansRes, invoicesRes] = await Promise.all([
         fetch("/qlab-api/api/v1/billing/usage", { headers }),
