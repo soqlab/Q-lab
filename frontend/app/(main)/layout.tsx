@@ -60,6 +60,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <UserMenu />
         </header>
         {children}
+        <footer style={{ padding: "16px 24px", borderTop: "1px solid #1e293b", fontSize: 12, color: "#475569", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <span>© {new Date().getFullYear()} Q-Lab (soqlab.com)</span>
+          <a href="/terms" style={{ color: "#475569" }}>Terms</a>
+          <a href="/privacy" style={{ color: "#475569" }}>Privacy</a>
+        </footer>
       </div>
       <OnboardingGate />
     </div>
