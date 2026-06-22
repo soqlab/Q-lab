@@ -282,10 +282,14 @@ export default function ComparePage() {
 
   useEffect(() => {
     async function loadRuns() {
-      const loaded = await fetchRuns();
-      setRuns(loaded);
-      setLeftRunId(loaded[0]?.run_id || "");
-      setRightRunId(loaded[1]?.run_id || loaded[0]?.run_id || "");
+      try {
+        const loaded = await fetchRuns();
+        setRuns(loaded);
+        setLeftRunId(loaded[0]?.run_id || "");
+        setRightRunId(loaded[1]?.run_id || loaded[0]?.run_id || "");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load runs");
+      }
     }
     void loadRuns();
   }, []);

@@ -2228,15 +2228,25 @@ export type CalibrationForecastResult = {
 export async function fetchCalibrationForecast(
   backend: string,
   hours = 24,
-  metrics = "t1,t2,gate_error,readout"
 ): Promise<CalibrationForecastResult> {
-  const p = new URLSearchParams({ hours: String(hours), metrics });
-  const res = await fetch(apiUrl(`/api/v1/backends/${backend}/calibration-forecast?${p}`), {
-    cache: "no-store",
-    headers: authHeaders(),
+  const res = await fetch(apiUrl(`/api/v1/cal-forecast/forecast`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ backend, horizon_hours: hours }),
   });
   if (!res.ok) throw new Error("Failed to load calibration forecast");
-  return res.json();
+  const d = await res.json();
+  return {
+    backend: d.backend,
+    run_count: d.training_points ?? 0,
+    horizon_hours: d.forecast_horizon_hours ?? hours,
+    metrics: {
+      t1: { current: d.current_t1_us, trend: d.forecasts?.[0]?.t1_predicted_us },
+      t2: { current: d.current_t2_us, trend: d.forecasts?.[0]?.t2_predicted_us },
+      gate_error: { current: d.current_gate_error, trend: d.forecasts?.[0]?.gate_error_predicted },
+    },
+    generated_at: d.created_at,
+  };
 }
 
 // ------------------------------------------------------------------
