@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [org, setOrg] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -81,8 +82,23 @@ export default function RegisterPage() {
             autoComplete="new-password"
             minLength={8}
           />
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#94a3b8", cursor: "pointer", marginTop: 4 }}>
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={{ marginTop: 2, accentColor: "#7c3aed", flexShrink: 0 }}
+              required
+            />
+            <span>
+              I agree to the{" "}
+              <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "#38bdf8" }}>Terms of Service</a>
+              {" "}and{" "}
+              <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: "#38bdf8" }}>Privacy Policy</a>
+            </span>
+          </label>
           {error && <div className="auth-error">{error}</div>}
-          <button className="button" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
+          <button className="button" type="submit" disabled={loading || !agreed} style={{ width: "100%", justifyContent: "center", opacity: agreed ? 1 : 0.5 }}>
             {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
