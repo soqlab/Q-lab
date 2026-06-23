@@ -362,7 +362,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 export async function fetchMe(token?: string): Promise<AuthUser> {
   const res = await fetch(apiUrl("/auth/me"), { headers: authHeaders(token) });
-  if (!res.ok) throw new Error("Not authenticated");
+  if (!res.ok) throw new Error(String(res.status));
   return res.json();
 }
 
