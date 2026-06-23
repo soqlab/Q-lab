@@ -201,11 +201,8 @@ function PlanCard({
       <div style={{ fontSize: 18, fontWeight: 700, color: accentColor, marginBottom: 4 }}>
         {plan.name}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: "#0d1b2a", marginBottom: 14 }}>
-        {plan.price_usd === 0 ? "Free" : `$${plan.price_usd}`}
-        {plan.price_usd > 0 && (
-          <span style={{ fontSize: 14, fontWeight: 400, color: "#5f6f80" }}> / month</span>
-        )}
+      <div style={{ fontSize: 22, fontWeight: 800, color: "#0d1b2a", marginBottom: 14 }}>
+        {plan.price_usd === 0 ? "Free" : "Contact us"}
       </div>
       <ul style={{ margin: "0 0 18px", padding: "0 0 0 16px", fontSize: 13, color: "#374151", lineHeight: 1.8 }}>
         {plan.features.map((f) => (
@@ -552,11 +549,6 @@ function BillingPageInner() {
         <section className="panel">
           <div className="panel-header">
             <h2>Usage History</h2>
-            {!billingEnabled && (
-              <span style={{ fontSize: 12, color: "#9aa8b6" }}>
-                Cost shown as $0.00 while billing is disabled
-              </span>
-            )}
           </div>
           <div className="table-wrap">
             <table>
@@ -594,10 +586,10 @@ function BillingPageInner() {
                         textAlign: "right",
                         fontVariantNumeric: "tabular-nums",
                         fontWeight: 600,
-                        color: inv.amount_usd === 0 ? "#9aa8b6" : "#0d1b2a",
+                        color: "#9aa8b6",
                       }}
                     >
-                      ${inv.amount_usd.toFixed(2)}
+                      —
                     </td>
                     <td>
                       <span

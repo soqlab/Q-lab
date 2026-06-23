@@ -59,7 +59,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Verify token is still valid by hitting /auth/me
       fetchMe(t)
         .then((u) => setSession(t, u))
-        .catch(() => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); })
+        .catch((err) => {
+          // Only clear the session on a definitive 401 — not on network/server errors
+          if (err instanceof Error && err.message === "401") {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+          } else {
+            // Network error or server down: keep the stored token and let the user in
+            const stored = localStorage.getItem(USER_KEY);
+            const u = stored ? JSON.parse(stored) as AuthUser : null;
+            if (u) setSession(t, u);
+          }
+        })
         .finally(() => setLoading(false));
       return;
     }
