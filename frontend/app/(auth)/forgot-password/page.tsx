@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Microscope } from "lucide-react";
+import { Atom } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -34,9 +34,12 @@ export default function ForgotPasswordPage() {
       <div className="auth-card">
         <div className="auth-brand">
           <div className="brand-mark" style={{ width: 40, height: 40 }}>
-            <Microscope size={20} aria-hidden="true" />
+            <Atom size={20} aria-hidden="true" />
           </div>
-          <span>Q-Lab</span>
+          <div>
+            <span>Q-Lab</span>
+            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>Science of Quantum</div>
+          </div>
         </div>
         <h1 className="auth-title">Reset password</h1>
         <p className="auth-sub">We'll email you a reset link</p>
