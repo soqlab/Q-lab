@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Microscope } from "lucide-react";
+import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
 import OnboardingWizard from "../../components/OnboardingWizard";
@@ -43,11 +43,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <Microscope size={19} aria-hidden="true" />
+        <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="brand-mark">
+              <Atom size={19} aria-hidden="true" />
+            </div>
+            <span>Q-Lab</span>
           </div>
-          Q-Lab
+          <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>
+            Science of Quantum
+          </span>
         </div>
         <SideNav />
       </aside>

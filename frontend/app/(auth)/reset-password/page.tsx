@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Microscope } from "lucide-react";
+import { Atom } from "lucide-react";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -48,9 +48,12 @@ function ResetPasswordForm() {
       <div className="auth-card">
         <div className="auth-brand">
           <div className="brand-mark" style={{ width: 40, height: 40 }}>
-            <Microscope size={20} aria-hidden="true" />
+            <Atom size={20} aria-hidden="true" />
           </div>
-          <span>Q-Lab</span>
+          <div>
+            <span>Q-Lab</span>
+            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>Science of Quantum</div>
+          </div>
         </div>
         <h1 className="auth-title">New password</h1>
         <p className="auth-sub">Choose a strong password for your account</p>

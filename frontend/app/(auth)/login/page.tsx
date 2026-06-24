@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Microscope } from "lucide-react";
+import { Atom } from "lucide-react";
 import { login } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 
@@ -35,9 +35,12 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-brand">
           <div className="brand-mark" style={{ width: 40, height: 40 }}>
-            <Microscope size={20} aria-hidden="true" />
+            <Atom size={20} aria-hidden="true" />
           </div>
-          <span>Q-Lab</span>
+          <div>
+            <span>Q-Lab</span>
+            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>Science of Quantum</div>
+          </div>
         </div>
         <h1 className="auth-title">Sign in</h1>
         <p className="auth-sub">Quantum Experiment Observatory</p>
