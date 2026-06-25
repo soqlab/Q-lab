@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -126,3 +126,21 @@ def list_organizations(
         }
         for o in orgs
     ]
+
+
+@router.delete("/users/{user_id}")
+def remove_user(
+    user_id: int,
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == identity.user_id:
+        raise HTTPException(status_code=400, detail="You cannot remove your own account")
+    if user.role == "owner" and identity.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can remove other owners")
+    user.is_active = False
+    db.commit()
+    return {"message": f"User {user.email} has been deactivated"}
