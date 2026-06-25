@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Brain, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
-import { changePassword, checkInsightsAvailable, createAPIKey, deleteAPIKey, listAPIKeys, type APIKeyInfo } from "../../../lib/api";
+import { changePassword, checkInsightsAvailable, createAPIKey, deleteAPIKey, listAPIKeys, deleteAccount, type APIKeyInfo } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 
 function KeyRow({ k, onRevoke }: { k: APIKeyInfo; onRevoke: (id: number) => void }) {
@@ -311,6 +311,67 @@ qlab.init(
 )
 # That's it — your Qiskit runs are now tracked automatically.`}</pre>
       </section>
+
+      {/* Danger zone */}
+      <DangerZone />
     </main>
+  );
+}
+
+function DangerZone() {
+  const { token, clearSession } = useAuth();
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleDelete = async () => {
+    if (!token) return;
+    setDeleting(true);
+    try {
+      await deleteAccount(token);
+      clearSession();
+      router.push("/login");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to delete account");
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <section className="panel" style={{ border: "1px solid var(--danger)" }}>
+      <div className="panel-header" style={{ borderBottom: "1px solid var(--danger)" }}>
+        <h2 style={{ color: "var(--danger)" }}>Danger Zone</h2>
+      </div>
+      <div style={{ padding: "16px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>Delete Account</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>
+              Permanently deactivate your account. Your runs and data will be preserved for the organisation.
+            </div>
+          </div>
+          {!confirming ? (
+            <button className="btn btn-danger" onClick={() => setConfirming(true)}>
+              Delete Account
+            </button>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+              <div style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600 }}>
+                Are you sure? This cannot be undone.
+              </div>
+              {err && <div style={{ fontSize: 12, color: "var(--danger)" }}>{err}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn" onClick={() => { setConfirming(false); setErr(""); }}>Cancel</button>
+                <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? "Deleting…" : "Yes, delete my account"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

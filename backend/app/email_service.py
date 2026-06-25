@@ -879,9 +879,71 @@ def notify_run_event(
         return False
 
 
+def send_verification_email(to_email: str, verify_url: str) -> bool:
+    """Send an email address verification link."""
+    subject = "Verify your Q-Lab email address"
+    body = f"""
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
+        Confirm your email
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        Thanks for signing up for Q-Lab. Click the button below to verify your
+        email address and activate your account.
+        This link expires in <strong style="color:#c7d2fe;">24 hours</strong>.
+      </p>
+
+      <table cellpadding="0" cellspacing="0" style="margin:28px 0;">
+        <tr>
+          <td align="center"
+              style="background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                     border-radius:8px;padding:14px 32px;">
+            <a href="{verify_url}"
+               style="font-size:15px;font-weight:600;color:#ffffff;
+                      text-decoration:none;letter-spacing:0.3px;">
+              Verify Email Address &rarr;
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:0 0 8px;font-size:13px;color:#6b7280;line-height:1.6;">
+        Or copy this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;font-size:12px;word-break:break-all;
+                color:#818cf8;background:#111827;border-radius:6px;
+                padding:10px 14px;font-family:monospace;">
+        {verify_url}
+      </p>
+
+      <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
+        If you did not create a Q-Lab account, you can safely ignore this email.
+      </p>
+    """
+    return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))
+
+
+def send_account_deleted_email(to_email: str, user_name: str) -> bool:
+    """Notify a user that their account has been deleted."""
+    subject = "Your Q-Lab account has been deleted"
+    body = f"""
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
+        Account deleted
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        Hi {user_name}, your Q-Lab account and associated data have been permanently deleted
+        as requested. You will no longer be able to log in with this email address.
+      </p>
+      <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
+        If you did not request this, please contact us immediately at
+        <a href="mailto:stateofquantumlab@gmail.com">stateofquantumlab@gmail.com</a>.
+      </p>
+    """
+    return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))
+
+
 def send_contact_email(name: str, from_email: str, message: str) -> bool:
     """Forward a contact-form submission to the platform owner."""
-    owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "contact@soqlab.com")
+    owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "stateofquantumlab@gmail.com")
     subject = f"Q-Lab contact from {name}"
     html = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
