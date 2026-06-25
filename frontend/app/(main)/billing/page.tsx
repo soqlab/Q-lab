@@ -175,83 +175,88 @@ function PlanCard({
     <div
       className="panel"
       style={{
-        padding: "20px 22px",
-        border: isCurrent ? `2px solid ${accentColor}` : undefined,
+        padding: "24px 22px",
+        border: `2px solid ${isCurrent ? accentColor : "var(--line)"}`,
         position: "relative",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {isCurrent && (
-        <div
-          style={{
-            position: "absolute",
-            top: -1,
-            right: 14,
-            background: accentColor,
-            color: "#fff",
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 10px",
-            borderRadius: "0 0 6px 6px",
-            letterSpacing: "0.05em",
-          }}
-        >
+        <div style={{
+          position: "absolute", top: -1, right: 14,
+          background: accentColor, color: "#fff",
+          fontSize: 11, fontWeight: 700,
+          padding: "3px 10px", borderRadius: "0 0 6px 6px",
+          letterSpacing: "0.05em",
+        }}>
           CURRENT
         </div>
       )}
-      <div style={{ fontSize: 18, fontWeight: 700, color: accentColor, marginBottom: 4 }}>
+
+      {/* Plan name */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
         {plan.name}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "#0d1b2a", marginBottom: 14 }}>
+
+      {/* Price */}
+      <div style={{ fontSize: 26, fontWeight: 800, color: "var(--text)", marginBottom: 6 }}>
         {plan.price_usd === 0 ? "Free" : "Contact us"}
       </div>
-      <ul style={{ margin: "0 0 18px", padding: "0 0 0 16px", fontSize: 13, color: "#374151", lineHeight: 1.8 }}>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 18 }}>
+        {plan.price_usd === 0 ? "Always free" : "Custom pricing"}
+      </div>
+
+      {/* Divider */}
+      <hr className="divider" style={{ marginBottom: 16 }} />
+
+      {/* Features — flex:1 pushes button to bottom */}
+      <ul style={{ margin: "0 0 0", padding: "0 0 0 16px", fontSize: 13, color: "var(--text)", lineHeight: 2, flex: 1 }}>
         {plan.features.map((f) => (
-          <li key={f}>{f}</li>
+          <li key={f} style={{ color: "var(--muted)" }}>
+            <span style={{ color: "var(--text)" }}>{f}</span>
+          </li>
         ))}
       </ul>
-      {!isCurrent && !isDowngrade && (
-        stripeConfigured ? (
-          <button
-            className="button"
-            style={{ background: accentColor, borderColor: accentColor, width: "100%" }}
-            onClick={() => onUpgrade(plan.slug)}
-            disabled={upgrading}
-          >
-            {upgrading ? "Processing…" : `Upgrade to ${plan.name}`}
-          </button>
-        ) : (
-          <div>
-            <a
-              href={`mailto:stateofquantumlab@gmail.com?subject=Interested in Q-Lab ${plan.name} Plan`}
-              className="button"
-              style={{ display: "block", textAlign: "center", textDecoration: "none", background: accentColor, borderColor: accentColor }}
+
+      {/* CTA — always at bottom */}
+      <div style={{ marginTop: 20 }}>
+        {!isCurrent && !isDowngrade && (
+          stripeConfigured ? (
+            <button
+              className="btn btn-primary"
+              style={{ background: accentColor, borderColor: accentColor, width: "100%" }}
+              onClick={() => onUpgrade(plan.slug)}
+              disabled={upgrading}
             >
-              Join the Waitlist
-            </a>
-            <p style={{ fontSize: 11, color: "#9aa8b6", textAlign: "center", margin: "8px 0 0" }}>
-              Premium plans coming soon — we&apos;ll be in touch.
-            </p>
+              {upgrading ? "Processing…" : `Upgrade to ${plan.name}`}
+            </button>
+          ) : (
+            <>
+              <a
+                href={`mailto:stateofquantumlab@gmail.com?subject=Interested in Q-Lab ${plan.name} Plan`}
+                className="btn"
+                style={{ display: "flex", justifyContent: "center", textDecoration: "none", background: accentColor, borderColor: accentColor, color: "#fff", width: "100%", boxSizing: "border-box" }}
+              >
+                Join the Waitlist
+              </a>
+              <p style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", margin: "8px 0 0" }}>
+                Premium plans coming soon — we&apos;ll be in touch.
+              </p>
+            </>
+          )
+        )}
+        {isCurrent && (
+          <div style={{ fontSize: 13, color: accentColor, fontWeight: 600, textAlign: "center", padding: "8px 0", border: `1px solid ${accentColor}22`, borderRadius: 6, background: `${accentColor}0d` }}>
+            ✓ Your current plan
           </div>
-        )
-      )}
-      {isCurrent && (
-        <div
-          style={{
-            fontSize: 13,
-            color: accentColor,
-            fontWeight: 600,
-            textAlign: "center",
-            padding: "8px 0",
-          }}
-        >
-          Your current plan
-        </div>
-      )}
-      {isDowngrade && !isCurrent && (
-        <div style={{ fontSize: 12, color: "#9aa8b6", textAlign: "center" }}>
-          Contact support to downgrade
-        </div>
-      )}
+        )}
+        {isDowngrade && !isCurrent && (
+          <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center" }}>
+            Contact support to downgrade
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -527,6 +532,7 @@ function BillingPageInner() {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
               gap: 16,
+              alignItems: "stretch",
             }}
           >
             {Object.values(plansData.plans).map((plan) => (
