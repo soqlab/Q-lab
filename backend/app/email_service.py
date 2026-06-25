@@ -173,9 +173,14 @@ def _send_via_smtp(
         smtp_user = os.getenv("SMTP_USER", "")
         smtp_pass = os.getenv("SMTP_PASS", "")
 
+        # Gmail requires the envelope sender to match the authenticated account.
+        # Use smtp_user as the actual sender; keep a friendly display name.
+        envelope_from = smtp_user if smtp_user else from_addr
+        display_from = f"Q-Lab <{smtp_user}>" if smtp_user else from_addr
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = from_addr
+        msg["From"] = display_from
         msg["To"] = to
         msg.attach(MIMEText(html, "html", "utf-8"))
 
@@ -185,7 +190,7 @@ def _send_via_smtp(
             server.ehlo()
             if smtp_user:
                 server.login(smtp_user, smtp_pass)
-            server.sendmail(from_addr, [to], msg.as_string())
+            server.sendmail(envelope_from, [to], msg.as_string())
 
         logger.info("Email sent via SMTP to %s (subject=%r)", to, subject)
         return True
