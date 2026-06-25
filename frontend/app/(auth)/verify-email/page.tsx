@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Atom } from "lucide-react";
+import { useAuth } from "../../../lib/auth";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
+  const router = useRouter();
+  const { refreshUser } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
 
@@ -23,6 +25,10 @@ function VerifyEmailContent() {
         if (res.ok) {
           setStatus("success");
           setMessage(data.message ?? "Email verified successfully.");
+          // Refresh the auth context so the banner disappears immediately
+          await refreshUser();
+          // Auto-redirect after a short moment
+          setTimeout(() => router.push("/runs"), 2000);
         } else {
           setStatus("error");
           setMessage(data.detail ?? "Verification failed. The link may have expired.");
@@ -32,6 +38,7 @@ function VerifyEmailContent() {
         setStatus("error");
         setMessage("Something went wrong. Please try again.");
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   return (
@@ -58,10 +65,8 @@ function VerifyEmailContent() {
             <>
               <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
               <h1 className="auth-title">Email verified!</h1>
-              <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 24 }}>{message}</p>
-              <Link href="/runs" className="button" style={{ display: "inline-flex" }}>
-                Go to Q-Lab
-              </Link>
+              <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 8 }}>{message}</p>
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>Redirecting you back…</p>
             </>
           )}
           {status === "error" && (
@@ -69,9 +74,12 @@ function VerifyEmailContent() {
               <div style={{ fontSize: 40, marginBottom: 16 }}>❌</div>
               <h1 className="auth-title">Verification failed</h1>
               <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 24 }}>{message}</p>
-              <Link href="/runs" style={{ color: "var(--strong)", fontSize: 14 }}>
+              <button
+                className="button"
+                onClick={() => router.push("/runs")}
+              >
                 Back to Q-Lab
-              </Link>
+              </button>
             </>
           )}
         </div>

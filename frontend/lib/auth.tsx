@@ -9,6 +9,7 @@ type AuthCtx = {
   loading: boolean;
   setSession: (token: string, user: AuthUser) => void;
   clearSession: () => void;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthCtx>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthCtx>({
   loading: true,
   setSession: () => {},
   clearSession: () => {},
+  refreshUser: async () => {},
 });
 
 const TOKEN_KEY = "qlab_token";
@@ -51,6 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     setToken(null);
     setUser(null);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (!t) return;
+    try {
+      const u = await fetchMe(t);
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setUser(u);
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -93,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, setSession, clearSession }}>
+    <AuthContext.Provider value={{ token, user, loading, setSession, clearSession, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
