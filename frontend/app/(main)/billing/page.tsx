@@ -201,10 +201,10 @@ function PlanCard({
 
       {/* Price */}
       <div style={{ fontSize: 26, fontWeight: 800, color: "var(--text)", marginBottom: 6 }}>
-        {plan.price_usd === 0 ? "Free" : "Contact us"}
+        {plan.price_usd === 0 ? "Free" : "Early Access"}
       </div>
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 18 }}>
-        {plan.price_usd === 0 ? "Always free" : "Custom pricing"}
+        {plan.price_usd === 0 ? "Always free" : "Be among the first"}
       </div>
 
       {/* Divider */}
