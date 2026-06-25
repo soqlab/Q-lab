@@ -52,7 +52,7 @@ function ResetPasswordForm() {
           </div>
           <div>
             <span>Q-Lab</span>
-            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>Science of Quantum</div>
+            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>State of Quantum</div>
           </div>
         </div>
         <h1 className="auth-title">New password</h1>
