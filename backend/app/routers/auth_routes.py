@@ -11,16 +11,24 @@ from sqlalchemy.orm import Session
 from ..auth import create_access_token, hash_password, verify_password
 from ..database import get_db
 from ..deps import Identity, log_audit, require_auth
-from ..email_service import send_password_reset_email, send_welcome_email
+from ..email_service import (
+    send_password_reset_email,
+    send_welcome_email,
+    send_verification_email,
+    send_account_deleted_email,
+)
 from ..models import Organization, User
 from ..rate_limit import auth_limiter
 
 # ---------------------------------------------------------------------------
-# In-memory store for password reset tokens
+# In-memory token stores
 # {token: (email, expires_timestamp)}
 # ---------------------------------------------------------------------------
 _RESET_TOKENS: dict[str, tuple[str, float]] = {}
-_RESET_TTL_SECONDS = 15 * 60  # 15 minutes
+_RESET_TTL_SECONDS = 15 * 60       # 15 minutes
+
+_VERIFY_TOKENS: dict[str, tuple[str, float]] = {}
+_VERIFY_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -56,6 +64,7 @@ def _user_response(user: User, token: str) -> dict:
             "name": user.name,
             "role": user.role,
             "org_id": user.org_id,
+            "email_verified": getattr(user, "email_verified", False),
         },
     }
 
@@ -93,9 +102,13 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.register", "user", str(user.id), request=request)
 
-    # Send welcome email — fire-and-forget, never block registration
+    # Send verification email — fire-and-forget
     try:
-        send_welcome_email(to_email=user.email, user_name=user.name)
+        verify_token = secrets.token_urlsafe(32)
+        _VERIFY_TOKENS[verify_token] = (user.email, time.time() + _VERIFY_TTL_SECONDS)
+        app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+        verify_url = f"{app_url}/verify-email?token={verify_token}"
+        send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception:
         pass
 
@@ -188,3 +201,77 @@ def reset_password(payload: ResetPasswordPayload, db: Session = Depends(get_db))
     _RESET_TOKENS.pop(payload.token, None)
 
     return {"message": "Password updated successfully. You can now log in."}
+
+
+# ---------------------------------------------------------------------------
+# Email Verification
+# ---------------------------------------------------------------------------
+
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """Confirm an email address using the token sent during registration."""
+    entry = _VERIFY_TOKENS.get(token)
+    if not entry:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification link")
+
+    email, expires_ts = entry
+    if time.time() > expires_ts:
+        _VERIFY_TOKENS.pop(token, None)
+        raise HTTPException(status_code=400, detail="Verification link has expired. Please request a new one.")
+
+    user = db.scalar(select(User).where(User.email == email))
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    user.email_verified = True
+    db.commit()
+    _VERIFY_TOKENS.pop(token, None)
+
+    return {"message": "Email verified successfully. You can now use all features."}
+
+
+@router.post("/resend-verification", dependencies=[Depends(auth_limiter)])
+def resend_verification(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """Resend the email verification link to the logged-in user."""
+    user = db.scalar(select(User).where(User.id == identity.user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.email_verified:
+        return {"message": "Email is already verified"}
+
+    try:
+        verify_token = secrets.token_urlsafe(32)
+        _VERIFY_TOKENS[verify_token] = (user.email, time.time() + _VERIFY_TTL_SECONDS)
+        app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+        verify_url = f"{app_url}/verify-email?token={verify_token}"
+        send_verification_email(to_email=user.email, verify_url=verify_url)
+    except Exception:
+        pass
+
+    return {"message": "Verification email sent"}
+
+
+# ---------------------------------------------------------------------------
+# Delete Account
+# ---------------------------------------------------------------------------
+
+@router.delete("/me")
+def delete_account(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """Permanently deactivate the logged-in user's account."""
+    user = db.scalar(select(User).where(User.id == identity.user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_email = user.email
+    user_name = user.name
+
+    # Deactivate rather than hard-delete to preserve run history integrity
+    user.is_active = False
+    db.commit()
+
+    try:
+        send_account_deleted_email(to_email=user_email, user_name=user_name)
+    except Exception:
+        pass
+
+    return {"message": "Account deleted successfully"}
