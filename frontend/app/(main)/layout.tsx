@@ -51,7 +51,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <span>Q-Lab</span>
           </div>
           <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>
-            Science of Quantum
+            State of Quantum
           </span>
         </div>
         <SideNav />
