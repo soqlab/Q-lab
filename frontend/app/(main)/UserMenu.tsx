@@ -49,7 +49,7 @@ export default function UserMenu() {
             {user.name.charAt(0).toUpperCase()}
           </div>
           <span style={{ color: "var(--text)", fontWeight: 500 }}>{user.name}</span>
-          <span style={{ color: "var(--muted)", fontSize: 12 }}>({user.role})</span>
+
           <button
             className="button secondary"
             onClick={logout}
