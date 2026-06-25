@@ -85,6 +85,8 @@ from .routers import costs as costs_router
 from .routers import ci_regression as ci_regression_router
 from .routers import feedback as feedback_router
 from .routers import job_executor as job_executor_router
+from .routers import job_router as job_router_router
+from .routers import circuit_compiler as circuit_compiler_router
 from .routers import provider_ingest as provider_ingest_router
 from .routers import state_tomo as state_tomo_router
 from .routers import vqe_tracker as vqe_tracker_router
@@ -327,6 +329,8 @@ app.include_router(costs_router.router)
 app.include_router(ci_regression_router.router)
 app.include_router(feedback_router.router)
 app.include_router(job_executor_router.router)
+app.include_router(job_router_router.router)
+app.include_router(circuit_compiler_router.router)
 app.include_router(provider_ingest_router.router)
 app.include_router(state_tomo_router.router)
 app.include_router(vqe_tracker_router.router)
