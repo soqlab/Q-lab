@@ -50,6 +50,13 @@ def _ensure_compat_columns() -> None:
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
 
+    # Add email_verified to users if missing (added after initial deploy)
+    if "users" in tables:
+        user_cols = {c["name"] for c in inspector.get_columns("users")}
+        if "email_verified" not in user_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"))
+
     if "runs" not in tables:
         return
 
