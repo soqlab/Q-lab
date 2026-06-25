@@ -48,17 +48,15 @@ export default function QLabAdminPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "activity">("overview");
   const [err, setErr] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
     if (loading) return;
     if (!token) { router.push("/login"); return; }
-    if (user && user.role !== "owner" && user.role !== "admin") {
-      router.push("/runs");
-      return;
-    }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, loading]);
+  }, [token, loading]);
 
   async function load() {
     try {
@@ -89,6 +87,27 @@ export default function QLabAdminPage() {
       setLogs(l?.items ?? []);
     } catch (e) {
       setErr(`Failed to load admin data: ${String(e)}`);
+    }
+  }
+
+  async function removeUser(userId: number) {
+    setRemovingId(userId);
+    try {
+      const res = await fetch(`/qlab-api/api/v1/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.detail ?? "Failed to remove user");
+      } else {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: false } : u));
+        setConfirmId(null);
+      }
+    } catch {
+      setErr("Failed to remove user");
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -205,7 +224,7 @@ export default function QLabAdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f8f9fb" }}>
-                    {["Name", "Email", "Role", "Runs", "Signed Up", "Status"].map((h) => (
+                    {["Name", "Email", "Role", "Runs", "Signed Up", "Status", ""].map((h) => (
                       <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5f6f80", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -228,6 +247,34 @@ export default function QLabAdminPage() {
                         <span style={{ color: u.is_active ? "#10b981" : "#e74c3c", fontWeight: 600, fontSize: 12 }}>
                           {u.is_active ? "Active" : "Disabled"}
                         </span>
+                      </td>
+                      <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                        {u.is_active && u.id !== user?.id && (
+                          confirmId === u.id ? (
+                            <span style={{ display: "flex", gap: 6 }}>
+                              <button
+                                onClick={() => removeUser(u.id)}
+                                disabled={removingId === u.id}
+                                style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                              >
+                                {removingId === u.id ? "…" : "Confirm"}
+                              </button>
+                              <button
+                                onClick={() => setConfirmId(null)}
+                                style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#5f6f80" }}
+                              >
+                                Cancel
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmId(u.id)}
+                              style={{ background: "transparent", border: "1px solid #fecaca", color: "#e74c3c", borderRadius: 5, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                            >
+                              Remove
+                            </button>
+                          )
+                        )}
                       </td>
                     </tr>
                   ))}
