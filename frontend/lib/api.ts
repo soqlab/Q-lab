@@ -181,6 +181,7 @@ export type AuthUser = {
   name: string;
   role: string;
   org_id: number | null;
+  email_verified?: boolean;
 };
 
 export type AuthResponse = {
@@ -358,6 +359,22 @@ export async function login(email: string, password: string): Promise<AuthRespon
     throw new Error((err as { detail?: string }).detail || "Login failed");
   }
   return res.json();
+}
+
+export async function resendVerification(token: string): Promise<void> {
+  const res = await fetch(apiUrl("/auth/resend-verification"), {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to resend verification email");
+}
+
+export async function deleteAccount(token: string): Promise<void> {
+  const res = await fetch(apiUrl("/auth/me"), {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to delete account");
 }
 
 export async function fetchMe(token?: string): Promise<AuthUser> {
