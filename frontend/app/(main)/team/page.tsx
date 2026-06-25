@@ -222,7 +222,7 @@ export default function TeamPage() {
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
-                  <th>Role</th>
+                  {canManage && <th>Role</th>}
                   <th>Joined</th>
                   {canManage && <th style={{ width: 160 }}>Actions</th>}
                 </tr>
@@ -237,20 +237,20 @@ export default function TeamPage() {
                       )}
                     </td>
                     <td style={{ color: "#5f6f80", fontSize: 13 }}>{m.email}</td>
-                    <td>
-                      {canManage && m.id !== user?.id ? (
-                        <select
-                          className="input"
-                          value={m.role}
-                          onChange={e => void handleRoleChange(m.id, e.target.value)}
-                          style={{ height: 30, fontSize: 12, padding: "0 8px", minWidth: 110 }}
-                        >
-                          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      ) : (
-                        <RoleBadge role={m.role} />
-                      )}
-                    </td>
+                    {canManage && (
+                      <td>
+                        {m.id !== user?.id ? (
+                          <select
+                            className="input"
+                            value={m.role}
+                            onChange={e => void handleRoleChange(m.id, e.target.value)}
+                            style={{ height: 30, fontSize: 12, padding: "0 8px", minWidth: 110 }}
+                          >
+                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        ) : null}
+                      </td>
+                    )}
                     <td style={{ fontSize: 12, color: "#9aa8b6" }}>{new Date(m.created_at).toLocaleDateString()}</td>
                     {canManage && (
                       <td>
@@ -282,7 +282,6 @@ export default function TeamPage() {
               <thead>
                 <tr>
                   <th>Email</th>
-                  <th>Role</th>
                   <th>Status</th>
                   <th>Expires</th>
                   <th>Invite link</th>
@@ -293,7 +292,6 @@ export default function TeamPage() {
                 {invites.map(inv => (
                   <tr key={inv.id}>
                     <td style={{ fontWeight: 500 }}>{inv.email}</td>
-                    <td><RoleBadge role={inv.role} /></td>
                     <td>
                       {inv.accepted_at ? (
                         <span style={{ fontSize: 12, color: "#27ae60", fontWeight: 600 }}>Accepted</span>
