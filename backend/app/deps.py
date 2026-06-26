@@ -49,6 +49,7 @@ class Identity:
             "name": self.user.name,
             "role": self.user.role,
             "org_id": self.user.org_id,
+            "email_verified": getattr(self.user, "email_verified", True),
         }
 
 
