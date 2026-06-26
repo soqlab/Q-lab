@@ -62,6 +62,11 @@ def _ensure_compat_columns() -> None:
                 conn.execute(text("ALTER TABLE users ADD COLUMN verify_token VARCHAR(128)"))
             if "verify_token_expires" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN verify_token_expires REAL"))
+            # Any user without a pending verify token was created before the
+            # verification feature — mark them as already verified.
+            conn.execute(text(
+                "UPDATE users SET email_verified = 1 WHERE verify_token IS NULL AND email_verified = 0"
+            ))
 
     if "runs" not in tables:
         return
