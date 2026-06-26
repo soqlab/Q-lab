@@ -27,7 +27,6 @@ from ..rate_limit import auth_limiter
 _RESET_TOKENS: dict[str, tuple[str, float]] = {}
 _RESET_TTL_SECONDS = 15 * 60       # 15 minutes
 
-_VERIFY_TOKENS: dict[str, tuple[str, float]] = {}
 _VERIFY_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -102,10 +101,12 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.register", "user", str(user.id), request=request)
 
-    # Send verification email — fire-and-forget
+    # Send verification email — token stored in DB so it survives redeploys
     try:
         verify_token = secrets.token_urlsafe(32)
-        _VERIFY_TOKENS[verify_token] = (user.email, time.time() + _VERIFY_TTL_SECONDS)
+        user.verify_token = verify_token
+        user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
+        db.commit()
         app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
@@ -210,22 +211,16 @@ def reset_password(payload: ResetPasswordPayload, db: Session = Depends(get_db))
 @router.get("/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
     """Confirm an email address using the token sent during registration."""
-    entry = _VERIFY_TOKENS.get(token)
-    if not entry:
+    user = db.scalar(select(User).where(User.verify_token == token))
+    if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired verification link")
-
-    email, expires_ts = entry
-    if time.time() > expires_ts:
-        _VERIFY_TOKENS.pop(token, None)
+    if not user.verify_token_expires or time.time() > user.verify_token_expires:
         raise HTTPException(status_code=400, detail="Verification link has expired. Please request a new one.")
 
-    user = db.scalar(select(User).where(User.email == email))
-    if not user:
-        raise HTTPException(status_code=404, detail="Account not found")
-
     user.email_verified = True
+    user.verify_token = None
+    user.verify_token_expires = None
     db.commit()
-    _VERIFY_TOKENS.pop(token, None)
 
     return {"message": "Email verified successfully. You can now use all features."}
 
@@ -241,12 +236,14 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
 
     try:
         verify_token = secrets.token_urlsafe(32)
-        _VERIFY_TOKENS[verify_token] = (user.email, time.time() + _VERIFY_TTL_SECONDS)
+        user.verify_token = verify_token
+        user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
+        db.commit()
         app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
-    except Exception:
-        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {e}")
 
     return {"message": "Verification email sent"}
 
