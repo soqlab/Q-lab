@@ -50,6 +50,8 @@ export default function QLabAdminPage() {
   const [err, setErr] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [purgeConfirmId, setPurgeConfirmId] = useState<number | null>(null);
+  const [purgingId, setPurgingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -108,6 +110,27 @@ export default function QLabAdminPage() {
       setErr("Failed to remove user");
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function purgeUser(userId: number) {
+    setPurgingId(userId);
+    try {
+      const res = await fetch(`/qlab-api/api/v1/admin/users/${userId}/purge`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.detail ?? "Failed to purge user");
+      } else {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        setPurgeConfirmId(null);
+      }
+    } catch {
+      setErr("Failed to purge user");
+    } finally {
+      setPurgingId(null);
     }
   }
 
@@ -249,31 +272,47 @@ export default function QLabAdminPage() {
                         </span>
                       </td>
                       <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
-                        {u.is_active && u.id !== user?.id && (
-                          confirmId === u.id ? (
-                            <span style={{ display: "flex", gap: 6 }}>
-                              <button
-                                onClick={() => removeUser(u.id)}
-                                disabled={removingId === u.id}
-                                style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-                              >
-                                {removingId === u.id ? "…" : "Confirm"}
+                        {u.id !== user?.id && (
+                          <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {/* Deactivate (soft delete) */}
+                            {u.is_active && (
+                              confirmId === u.id ? (
+                                <>
+                                  <button onClick={() => removeUser(u.id)} disabled={removingId === u.id}
+                                    style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                                    {removingId === u.id ? "…" : "Confirm"}
+                                  </button>
+                                  <button onClick={() => setConfirmId(null)}
+                                    style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#5f6f80" }}>
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <button onClick={() => { setConfirmId(u.id); setPurgeConfirmId(null); }}
+                                  style={{ background: "transparent", border: "1px solid #fecaca", color: "#e74c3c", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                                  Disable
+                                </button>
+                              )
+                            )}
+                            {/* Purge (hard delete) */}
+                            {purgeConfirmId === u.id ? (
+                              <>
+                                <button onClick={() => purgeUser(u.id)} disabled={purgingId === u.id}
+                                  style={{ background: "#7f1d1d", color: "#fca5a5", border: "1px solid #991b1b", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+                                  {purgingId === u.id ? "…" : "Yes, delete"}
+                                </button>
+                                <button onClick={() => setPurgeConfirmId(null)}
+                                  style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#5f6f80" }}>
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button onClick={() => { setPurgeConfirmId(u.id); setConfirmId(null); }}
+                                style={{ background: "#7f1d1d", color: "#fca5a5", border: "1px solid #991b1b", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+                                Purge
                               </button>
-                              <button
-                                onClick={() => setConfirmId(null)}
-                                style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#5f6f80" }}
-                              >
-                                Cancel
-                              </button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmId(u.id)}
-                              style={{ background: "transparent", border: "1px solid #fecaca", color: "#e74c3c", borderRadius: 5, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-                            >
-                              Remove
-                            </button>
-                          )
+                            )}
+                          </span>
                         )}
                       </td>
                     </tr>
