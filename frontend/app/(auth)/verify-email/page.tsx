@@ -9,7 +9,7 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { clearSession } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
 
@@ -23,10 +23,10 @@ function VerifyEmailContent() {
       .then(async res => {
         const data = await res.json();
         if (res.ok) {
+          // Clear any existing session — user must sign in fresh after verifying
+          clearSession();
           setStatus("success");
           setMessage(data.message ?? "Email verified successfully.");
-          await refreshUser();
-          setTimeout(() => router.push("/login"), 2500);
         } else {
           setStatus("error");
           setMessage(data.detail ?? "Verification failed. The link may have expired.");
@@ -63,8 +63,14 @@ function VerifyEmailContent() {
             <>
               <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
               <h1 className="auth-title">Email verified!</h1>
-              <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 8 }}>{message}</p>
-              <p style={{ fontSize: 13, color: "var(--muted)" }}>Redirecting to sign in…</p>
+              <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 24 }}>{message}</p>
+              <button
+                className="button"
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => router.push("/login")}
+              >
+                Sign in to Q-Lab
+              </button>
             </>
           )}
           {status === "error" && (
@@ -74,9 +80,9 @@ function VerifyEmailContent() {
               <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 24 }}>{message}</p>
               <button
                 className="button"
-                onClick={() => router.push("/runs")}
+                onClick={() => router.push("/login")}
               >
-                Back to Q-Lab
+                Back to sign in
               </button>
             </>
           )}
