@@ -25,10 +25,8 @@ function VerifyEmailContent() {
         if (res.ok) {
           setStatus("success");
           setMessage(data.message ?? "Email verified successfully.");
-          // Refresh the auth context so the banner disappears immediately
           await refreshUser();
-          // Auto-redirect after a short moment
-          setTimeout(() => router.push("/runs"), 2000);
+          setTimeout(() => router.push("/login"), 2500);
         } else {
           setStatus("error");
           setMessage(data.detail ?? "Verification failed. The link may have expired.");
@@ -66,7 +64,7 @@ function VerifyEmailContent() {
               <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
               <h1 className="auth-title">Email verified!</h1>
               <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 8 }}>{message}</p>
-              <p style={{ fontSize: 13, color: "var(--muted)" }}>Redirecting you back…</p>
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>Redirecting to sign in…</p>
             </>
           )}
           {status === "error" && (
