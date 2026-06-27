@@ -5,6 +5,13 @@ import Link from "next/link";
 import { Atom, Eye, EyeOff } from "lucide-react";
 import { register } from "../../../lib/api";
 
+const pwRules = [
+  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number", test: (p: string) => /[0-9]/.test(p) },
+];
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,12 +26,15 @@ export default function RegisterPage() {
   const [registered, setRegistered] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [pwFocused, setPwFocused] = useState(false);
+
+  const pwValid = pwRules.every(r => r.test(password));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!pwValid) { setError("Password does not meet all requirements"); return; }
     if (password !== confirm) { setError("Passwords do not match"); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
     setLoading(true);
     try {
       await register(email, name, password, org || undefined);
@@ -126,11 +136,24 @@ export default function RegisterPage() {
           <input className="input" type="text" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="e.g. MIT Quantum Lab" />
           <label className="auth-label">Password</label>
           <div style={{ position: "relative" }}>
-            <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={8} style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
+            <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onFocus={() => setPwFocused(true)} required autoComplete="new-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
             <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          {(pwFocused || password) && (
+            <ul style={{ margin: "-2px 0 4px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
+              {pwRules.map(r => {
+                const ok = r.test(password);
+                return (
+                  <li key={r.label} style={{ fontSize: 12, color: ok ? "#10b981" : "#94a3b8", display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ fontSize: 10 }}>{ok ? "✓" : "○"}</span>
+                    {r.label}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <label className="auth-label">Confirm password</label>
           <div style={{ position: "relative" }}>
             <input className="input" type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box", borderColor: confirm && confirm !== password ? "var(--danger)" : undefined }} />
@@ -151,7 +174,7 @@ export default function RegisterPage() {
             </span>
           </label>
           {error && <div className="auth-error">{error}</div>}
-          <button className="button" type="submit" disabled={loading || !agreed} style={{ width: "100%", justifyContent: "center", opacity: agreed ? 1 : 0.5 }}>
+          <button className="button" type="submit" disabled={loading || !agreed || !pwValid} style={{ width: "100%", justifyContent: "center", opacity: agreed && pwValid ? 1 : 0.5 }}>
             {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
