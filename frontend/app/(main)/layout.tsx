@@ -1,44 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
-import OnboardingWizard from "../../components/OnboardingWizard";
-import { useAuth } from "../../lib/auth";
-
-const ONBOARDING_KEY = "qlab_onboarding_done";
-const TOKEN_KEY = "qlab_token";
-
-function OnboardingGate() {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    if (localStorage.getItem(ONBOARDING_KEY) === "1") return;
-
-    const token = localStorage.getItem(TOKEN_KEY);
-    fetch("/qlab-api/api/v1/runs?limit=1", {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const count = Array.isArray(data) ? data.length : (data?.total ?? data?.count ?? 0);
-        if (count === 0) setShow(true);
-      })
-      .catch(() => {});
-  }, []);
-
-  if (!show) return null;
-
-  return (
-    <OnboardingWizard
-      onDismiss={() => {
-        localStorage.setItem(ONBOARDING_KEY, "1");
-        setShow(false);
-      }}
-    />
-  );
-}
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -72,7 +36,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <a href="/privacy" style={{ color: "#475569" }}>Privacy</a>
         </footer>
       </div>
-      <OnboardingGate />
     </div>
   );
 }
