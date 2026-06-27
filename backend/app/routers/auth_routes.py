@@ -20,11 +20,6 @@ from ..email_service import (
 from ..models import Organization, User
 from ..rate_limit import auth_limiter
 
-# ---------------------------------------------------------------------------
-# In-memory token stores
-# {token: (email, expires_timestamp)}
-# ---------------------------------------------------------------------------
-_RESET_TOKENS: dict[str, tuple[str, float]] = {}
 _RESET_TTL_SECONDS = 15 * 60       # 15 minutes
 
 _VERIFY_TTL_SECONDS = 24 * 60 * 60  # 24 hours
@@ -150,59 +145,32 @@ def refresh_token(identity: Identity = Depends(require_auth)):
 
 @router.post("/forgot-password", dependencies=[Depends(auth_limiter)])
 def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db)):
-    """
-    Generate a password-reset token and email the link.
-    Always returns 200 so callers cannot enumerate registered email addresses.
-    """
-    # Purge stale tokens opportunistically (simple housekeeping)
-    now = time.time()
-    expired_keys = [t for t, (_, exp) in _RESET_TOKENS.items() if exp < now]
-    for k in expired_keys:
-        _RESET_TOKENS.pop(k, None)
-
     user = db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
     if user:
         token = secrets.token_urlsafe(32)
-        _RESET_TOKENS[token] = (user.email, now + _RESET_TTL_SECONDS)
+        user.reset_token = token
+        user.reset_token_expires = time.time() + _RESET_TTL_SECONDS
+        db.commit()
         app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
         reset_url = f"{app_url}/reset-password?token={token}"
         try:
             send_password_reset_email(to_email=user.email, reset_url=reset_url)
         except Exception:
-            pass  # email is best-effort; token is stored regardless
-
-    # Always return the same response to prevent email enumeration
+            pass
     return {"message": "If that email is registered, a reset link has been sent."}
 
 
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordPayload, db: Session = Depends(get_db)):
-    """
-    Validate a reset token and update the user's password.
-    """
-    entry = _RESET_TOKENS.get(payload.token)
-    if not entry:
+    user = db.scalar(select(User).where(User.reset_token == payload.token))
+    if not user or not user.reset_token_expires or time.time() > user.reset_token_expires:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-
-    email, expires_ts = entry
-    if time.time() > expires_ts:
-        _RESET_TOKENS.pop(payload.token, None)
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-
     if not payload.new_password or len(payload.new_password) < 8:
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
-
-    user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
-    if not user:
-        _RESET_TOKENS.pop(payload.token, None)
-        raise HTTPException(status_code=404, detail="User not found")
-
     user.password_hash = hash_password(payload.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
     db.commit()
-
-    # Consume the token — single use only
-    _RESET_TOKENS.pop(payload.token, None)
-
     return {"message": "Password updated successfully. You can now log in."}
 
 
