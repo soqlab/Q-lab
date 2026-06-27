@@ -259,8 +259,6 @@ from .tasks import deliver_webhooks
 # Run DB init at import time — avoids the lifespan merging stack-depth issue
 # that occurs when 200+ routers are included with a lifespan= parameter set.
 init_db()
-with SessionLocal() as _db:
-    _migrate_legacy_runs(_db)
 
 app = FastAPI(
     title="Q-Lab API",
@@ -520,6 +518,8 @@ if FRONTEND_STATIC_DIR.exists():
 async def _wire_event_loop() -> None:
     import asyncio
     set_event_loop(asyncio.get_event_loop())
+    with SessionLocal() as _db:
+        _migrate_legacy_runs(_db)
 
 
 # ------------------------------------------------------------------
