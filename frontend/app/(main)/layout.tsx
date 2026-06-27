@@ -12,17 +12,19 @@ function EmailVerificationBanner() {
   const { user, token } = useAuth();
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
 
   if (!user || user.email_verified !== false) return null;
 
   const handleResend = async () => {
     if (!token || sending) return;
     setSending(true);
+    setError(false);
     try {
       await resendVerification(token);
       setSent(true);
     } catch {
-      setSent(false);
+      setError(true);
     } finally {
       setSending(false);
     }
@@ -34,9 +36,13 @@ function EmailVerificationBanner() {
       padding: "10px 24px", fontSize: 13,
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
     }}>
-      <span>⚠ Please verify your email address to unlock all features.</span>
+      <span>
+        ✉ A verification email was sent to <strong>{user.email}</strong> — check your inbox and click the link to verify your account.
+      </span>
       {sent ? (
-        <span style={{ color: "#86efac", fontWeight: 600 }}>Verification email sent ✓</span>
+        <span style={{ color: "#86efac", fontWeight: 600 }}>Email resent ✓ — check your inbox</span>
+      ) : error ? (
+        <span style={{ color: "#fca5a5", fontWeight: 600 }}>Failed to send — check server email config</span>
       ) : (
         <button
           onClick={handleResend}
@@ -44,10 +50,10 @@ function EmailVerificationBanner() {
           style={{
             background: "transparent", border: "1px solid #fef3c7", color: "#fef3c7",
             borderRadius: 5, padding: "2px 12px", fontSize: 12, cursor: "pointer",
-            opacity: sending ? 0.6 : 1,
+            opacity: sending ? 0.6 : 1, whiteSpace: "nowrap",
           }}
         >
-          {sending ? "Sending…" : "Resend email"}
+          {sending ? "Sending…" : "Resend"}
         </button>
       )}
     </div>
