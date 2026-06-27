@@ -56,8 +56,8 @@ def _ensure_compat_columns() -> None:
         user_cols = {c["name"] for c in inspector.get_columns("users")}
         with engine.begin() as conn:
             if "email_verified" not in user_cols:
-                conn.execute(text("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"))
-                conn.execute(text("UPDATE users SET email_verified = 1"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("UPDATE users SET email_verified = TRUE"))
             if "verify_token" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN verify_token VARCHAR(128)"))
             if "verify_token_expires" not in user_cols:
@@ -65,7 +65,7 @@ def _ensure_compat_columns() -> None:
             # Any user without a pending verify token was created before the
             # verification feature — mark them as already verified.
             conn.execute(text(
-                "UPDATE users SET email_verified = 1 WHERE verify_token IS NULL AND email_verified = 0"
+                "UPDATE users SET email_verified = TRUE WHERE verify_token IS NULL AND email_verified = FALSE"
             ))
 
     if "runs" not in tables:
