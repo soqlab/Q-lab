@@ -1,3 +1,6 @@
+import sys
+sys.setrecursionlimit(20000)
+
 import hashlib
 import html
 import io
@@ -10,7 +13,6 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -254,54 +256,16 @@ from .routers import billing as billing_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
-
-@asynccontextmanager
-async def _lifespan(app: FastAPI):
-    import asyncio
-    from sqlalchemy import text
-    set_event_loop(asyncio.get_event_loop())
-    init_db()
-    from .database import engine, DATABASE_URL
-    _is_pg = not DATABASE_URL.startswith("sqlite")
-    _stmts_sqlite = [
-        "ALTER TABLE runs ADD COLUMN share_token VARCHAR(64)",
-        """CREATE TABLE IF NOT EXISTS run_notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_id VARCHAR(64) NOT NULL,
-            user_id INTEGER REFERENCES users(id),
-            content TEXT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )""",
-        "CREATE INDEX IF NOT EXISTS ix_run_notes_run_id ON run_notes(run_id)",
-        """CREATE TABLE IF NOT EXISTS run_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_id VARCHAR(64) NOT NULL,
-            name VARCHAR(200) NOT NULL,
-            value REAL NOT NULL,
-            step INTEGER,
-            logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )""",
-        "CREATE INDEX IF NOT EXISTS ix_run_metrics_run_id ON run_metrics(run_id)",
-        "CREATE INDEX IF NOT EXISTS ix_run_metrics_name ON run_metrics(name)",
-    ]
-    if not _is_pg:
-        for stmt in _stmts_sqlite:
-            try:
-                with engine.begin() as conn:
-                    conn.execute(text(stmt))
-            except Exception:
-                pass
-    with SessionLocal() as db:
-        _migrate_legacy_runs(db)
-    yield
-
+# Run DB init at import time — avoids the lifespan merging stack-depth issue
+# that occurs when 200+ routers are included with a lifespan= parameter set.
+init_db()
+with SessionLocal() as _db:
+    _migrate_legacy_runs(_db)
 
 app = FastAPI(
     title="Q-Lab API",
     version="1.0.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
-    lifespan=_lifespan,
 )
 
 # ------------------------------------------------------------------
@@ -550,6 +514,12 @@ if BACKEND_STATIC_DIR.exists():
 
 if FRONTEND_STATIC_DIR.exists():
     app.mount("/ui", StaticFiles(directory=FRONTEND_STATIC_DIR, html=True), name="ui")
+
+
+@app.on_event("startup")
+async def _wire_event_loop() -> None:
+    import asyncio
+    set_event_loop(asyncio.get_event_loop())
 
 
 # ------------------------------------------------------------------
