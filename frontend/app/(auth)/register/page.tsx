@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Atom } from "lucide-react";
+import { Atom, Eye, EyeOff } from "lucide-react";
 import { register } from "../../../lib/api";
 
 export default function RegisterPage() {
@@ -10,6 +10,9 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [org, setOrg] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,6 +23,8 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password !== confirm) { setError("Passwords do not match"); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
     setLoading(true);
     try {
       await register(email, name, password, org || undefined);
@@ -120,7 +125,22 @@ export default function RegisterPage() {
           <label className="auth-label">Organization name <span style={{ color: "#aaa", fontWeight: 400 }}>(optional)</span></label>
           <input className="input" type="text" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="e.g. MIT Quantum Lab" />
           <label className="auth-label">Password</label>
-          <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={8} />
+          <div style={{ position: "relative" }}>
+            <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={8} style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
+            <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <label className="auth-label">Confirm password</label>
+          <div style={{ position: "relative" }}>
+            <input className="input" type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box", borderColor: confirm && confirm !== password ? "var(--danger)" : undefined }} />
+            <button type="button" onClick={() => setShowConfirm(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
+              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {confirm && confirm !== password && (
+            <p style={{ fontSize: 12, color: "var(--danger)", margin: "-4px 0 0" }}>Passwords do not match</p>
+          )}
           <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#94a3b8", cursor: "pointer", marginTop: 4 }}>
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2, accentColor: "#7c3aed", flexShrink: 0 }} required />
             <span>

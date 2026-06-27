@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Atom } from "lucide-react";
+import { Atom, Eye, EyeOff } from "lucide-react";
 import { login } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [unverified, setUnverified] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,7 +95,12 @@ export default function LoginPage() {
             <label className="auth-label">Email</label>
             <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
             <label className="auth-label">Password</label>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+            <div style={{ position: "relative" }}>
+              <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
+              <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {error && <div className="auth-error">{error}</div>}
             <button className="button" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
               {loading ? "Signing in…" : "Sign in"}
