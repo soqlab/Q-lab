@@ -1,6 +1,3 @@
-import sys
-sys.setrecursionlimit(10000)
-
 import hashlib
 import html
 import io
@@ -13,6 +10,7 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -256,10 +254,54 @@ from .routers import billing as billing_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    import asyncio
+    from sqlalchemy import text
+    set_event_loop(asyncio.get_event_loop())
+    init_db()
+    from .database import engine, DATABASE_URL
+    _is_pg = not DATABASE_URL.startswith("sqlite")
+    _stmts_sqlite = [
+        "ALTER TABLE runs ADD COLUMN share_token VARCHAR(64)",
+        """CREATE TABLE IF NOT EXISTS run_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id VARCHAR(64) NOT NULL,
+            user_id INTEGER REFERENCES users(id),
+            content TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_run_notes_run_id ON run_notes(run_id)",
+        """CREATE TABLE IF NOT EXISTS run_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id VARCHAR(64) NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            value REAL NOT NULL,
+            step INTEGER,
+            logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_run_metrics_run_id ON run_metrics(run_id)",
+        "CREATE INDEX IF NOT EXISTS ix_run_metrics_name ON run_metrics(name)",
+    ]
+    if not _is_pg:
+        for stmt in _stmts_sqlite:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(stmt))
+            except Exception:
+                pass
+    with SessionLocal() as db:
+        _migrate_legacy_runs(db)
+    yield
+
+
 app = FastAPI(
     title="Q-Lab API",
     version="1.0.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
+    lifespan=_lifespan,
 )
 
 # ------------------------------------------------------------------
@@ -508,425 +550,6 @@ if BACKEND_STATIC_DIR.exists():
 
 if FRONTEND_STATIC_DIR.exists():
     app.mount("/ui", StaticFiles(directory=FRONTEND_STATIC_DIR, html=True), name="ui")
-
-
-# ------------------------------------------------------------------
-# Startup
-# ------------------------------------------------------------------
-
-@app.on_event("startup")
-async def startup() -> None:
-    import asyncio
-    from sqlalchemy import text
-    set_event_loop(asyncio.get_event_loop())
-    # Run: alembic upgrade head (for production). init_db() used for development/testing.
-    init_db()
-    # Add new columns that may not exist in existing databases
-    from .database import engine, DATABASE_URL
-    _is_pg = not DATABASE_URL.startswith("sqlite")
-    _stmts = [
-            "ALTER TABLE runs ADD COLUMN share_token VARCHAR(64)",
-            """CREATE TABLE IF NOT EXISTS run_notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id VARCHAR(64) NOT NULL,
-                user_id INTEGER REFERENCES users(id),
-                content TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_run_notes_run_id ON run_notes(run_id)",
-            """CREATE TABLE IF NOT EXISTS run_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id VARCHAR(64) NOT NULL,
-                name VARCHAR(200) NOT NULL,
-                value REAL NOT NULL,
-                step INTEGER,
-                logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_run_metrics_run_id ON run_metrics(run_id)",
-            "CREATE INDEX IF NOT EXISTS ix_run_metrics_name ON run_metrics(name)",
-            """CREATE TABLE IF NOT EXISTS run_assertions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id VARCHAR(64) NOT NULL,
-                label VARCHAR(200),
-                assertion_type VARCHAR(64) NOT NULL DEFAULT 'min_prob',
-                state VARCHAR(200),
-                expected_min REAL,
-                expected_max REAL,
-                actual_value REAL,
-                passed BOOLEAN,
-                message VARCHAR(500),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_run_assertions_run_id ON run_assertions(run_id)",
-            "ALTER TABLE runs ADD COLUMN shadow_results JSON",
-            """CREATE TABLE IF NOT EXISTS run_citations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id VARCHAR(64) NOT NULL,
-                arxiv_id VARCHAR(32),
-                doi VARCHAR(256),
-                title TEXT,
-                authors TEXT,
-                journal VARCHAR(256),
-                year INTEGER,
-                note TEXT,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_run_citations_run_id ON run_citations(run_id)",
-            "CREATE INDEX IF NOT EXISTS ix_run_citations_arxiv ON run_citations(arxiv_id)",
-            """CREATE TABLE IF NOT EXISTS qlab_policies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(64) NOT NULL DEFAULT 'default',
-                description TEXT,
-                rules JSON NOT NULL DEFAULT '{}',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS campaigns (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                campaign_id VARCHAR(64) NOT NULL UNIQUE,
-                name VARCHAR(255) NOT NULL,
-                description TEXT,
-                project_slug VARCHAR(120),
-                org_id INTEGER REFERENCES organizations(id),
-                created_by_user_id INTEGER REFERENCES users(id),
-                grid_spec JSON NOT NULL DEFAULT '{}',
-                tags JSON NOT NULL DEFAULT '[]',
-                status VARCHAR(32) NOT NULL DEFAULT 'running',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_campaigns_campaign_id ON campaigns(campaign_id)",
-            "CREATE INDEX IF NOT EXISTS ix_campaigns_project ON campaigns(project_slug)",
-            "CREATE INDEX IF NOT EXISTS ix_campaigns_status ON campaigns(status)",
-            """CREATE TABLE IF NOT EXISTS job_submissions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_id VARCHAR(64) NOT NULL UNIQUE,
-                provider VARCHAR(32) NOT NULL,
-                provider_job_id VARCHAR(256),
-                run_id VARCHAR(64),
-                qasm TEXT,
-                backend VARCHAR(255) NOT NULL,
-                shots INTEGER NOT NULL DEFAULT 1024,
-                status VARCHAR(32) NOT NULL DEFAULT 'queued',
-                created_by_user_id INTEGER REFERENCES users(id),
-                org_id INTEGER REFERENCES organizations(id),
-                provider_metadata JSON NOT NULL DEFAULT '{}',
-                result JSON,
-                error_message TEXT,
-                cost_credits REAL,
-                circuit_name VARCHAR(255),
-                project_slug VARCHAR(120),
-                submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_job_submissions_job_id ON job_submissions(job_id)",
-            "CREATE INDEX IF NOT EXISTS ix_job_submissions_status ON job_submissions(status)",
-            "CREATE INDEX IF NOT EXISTS ix_job_submissions_provider ON job_submissions(provider)",
-            """CREATE TABLE IF NOT EXISTS circuit_versions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                version_id VARCHAR(64) NOT NULL UNIQUE,
-                circuit_family VARCHAR(255) NOT NULL,
-                version_num INTEGER NOT NULL DEFAULT 1,
-                qasm TEXT NOT NULL,
-                parent_version_id VARCHAR(64),
-                diff_stats JSON NOT NULL DEFAULT '{}',
-                commit_message VARCHAR(500),
-                tags JSON NOT NULL DEFAULT '[]',
-                project_slug VARCHAR(120),
-                created_by_user_id INTEGER REFERENCES users(id),
-                org_id INTEGER REFERENCES organizations(id),
-                run_ids JSON NOT NULL DEFAULT '[]',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_circuit_versions_family ON circuit_versions(circuit_family)",
-            """CREATE TABLE IF NOT EXISTS budget_alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                alert_id VARCHAR(64) NOT NULL UNIQUE,
-                org_id INTEGER REFERENCES organizations(id),
-                name VARCHAR(200) NOT NULL,
-                budget_type VARCHAR(32) NOT NULL DEFAULT 'monthly',
-                project_slug VARCHAR(120),
-                provider VARCHAR(32),
-                threshold_credits REAL NOT NULL DEFAULT 100.0,
-                alert_at_pct REAL NOT NULL DEFAULT 0.8,
-                triggered BOOLEAN NOT NULL DEFAULT 0,
-                last_checked_at DATETIME,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS variational_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vrun_id VARCHAR(64) NOT NULL UNIQUE,
-                algorithm VARCHAR(32) NOT NULL,
-                run_id VARCHAR(64),
-                project_slug VARCHAR(120),
-                ansatz_type VARCHAR(120),
-                n_parameters INTEGER NOT NULL DEFAULT 0,
-                n_qubits INTEGER NOT NULL DEFAULT 0,
-                hamiltonian_type VARCHAR(120),
-                iterations JSON NOT NULL DEFAULT '[]',
-                optimal_energy REAL,
-                optimal_params JSON NOT NULL DEFAULT '[]',
-                convergence_status VARCHAR(32) NOT NULL DEFAULT 'running',
-                org_id INTEGER REFERENCES organizations(id),
-                created_by_user_id INTEGER REFERENCES users(id),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_variational_runs_vrun_id ON variational_runs(vrun_id)",
-            """CREATE TABLE IF NOT EXISTS cicd_integrations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                integration_id VARCHAR(64) NOT NULL UNIQUE,
-                org_id INTEGER REFERENCES organizations(id),
-                name VARCHAR(200) NOT NULL,
-                provider VARCHAR(32) NOT NULL DEFAULT 'github',
-                repo_url VARCHAR(500) NOT NULL,
-                webhook_secret VARCHAR(256) NOT NULL,
-                project_slug VARCHAR(120),
-                baseline_run_id VARCHAR(64),
-                auto_fail_threshold REAL NOT NULL DEFAULT 10.0,
-                checks JSON NOT NULL DEFAULT '[]',
-                is_active BOOLEAN NOT NULL DEFAULT 1,
-                last_triggered_at DATETIME,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS cicd_checks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                check_id VARCHAR(64) NOT NULL UNIQUE,
-                integration_id VARCHAR(64) NOT NULL,
-                commit_sha VARCHAR(64) NOT NULL,
-                branch VARCHAR(255),
-                status VARCHAR(32) NOT NULL DEFAULT 'pending',
-                results JSON NOT NULL DEFAULT '{}',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_cicd_checks_integration ON cicd_checks(integration_id)",
-            """CREATE TABLE IF NOT EXISTS tomography_jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tomo_id VARCHAR(64) NOT NULL UNIQUE,
-                run_id VARCHAR(64) NOT NULL,
-                n_qubits INTEGER NOT NULL,
-                basis_measurements JSON NOT NULL DEFAULT '{}',
-                density_matrix_re JSON NOT NULL DEFAULT '[]',
-                density_matrix_im JSON NOT NULL DEFAULT '[]',
-                purity REAL,
-                fidelity_to_ideal REAL,
-                ideal_state VARCHAR(64),
-                pauli_expectations JSON NOT NULL DEFAULT '{}',
-                status VARCHAR(32) NOT NULL DEFAULT 'complete',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_tomography_jobs_run_id ON tomography_jobs(run_id)",
-            """CREATE TABLE IF NOT EXISTS api_credentials (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                cred_id VARCHAR(64) NOT NULL UNIQUE,
-                org_id INTEGER REFERENCES organizations(id),
-                created_by_user_id INTEGER REFERENCES users(id),
-                provider VARCHAR(32) NOT NULL,
-                label VARCHAR(200) NOT NULL,
-                encrypted_key TEXT NOT NULL,
-                key_hint VARCHAR(12) NOT NULL DEFAULT '',
-                is_active BOOLEAN NOT NULL DEFAULT 1,
-                last_used_at DATETIME,
-                expires_at DATETIME,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_api_credentials_provider ON api_credentials(provider)",
-            """CREATE TABLE IF NOT EXISTS notification_channels (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                channel_id VARCHAR(64) NOT NULL UNIQUE,
-                org_id INTEGER REFERENCES organizations(id),
-                name VARCHAR(200) NOT NULL,
-                channel_type VARCHAR(32) NOT NULL,
-                config JSON NOT NULL DEFAULT '{}',
-                events JSON NOT NULL DEFAULT '[]',
-                is_active BOOLEAN NOT NULL DEFAULT 1,
-                last_triggered_at DATETIME,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS notification_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                channel_id VARCHAR(64) NOT NULL,
-                event VARCHAR(120) NOT NULL,
-                payload JSON NOT NULL DEFAULT '{}',
-                status VARCHAR(32) NOT NULL DEFAULT 'sent',
-                error TEXT,
-                sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_notification_logs_channel ON notification_logs(channel_id)",
-            """CREATE TABLE IF NOT EXISTS qv_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                qv_id VARCHAR(64) NOT NULL UNIQUE,
-                backend VARCHAR(255) NOT NULL,
-                qv_achieved INTEGER NOT NULL,
-                n_qubits_tested INTEGER NOT NULL,
-                n_trials INTEGER NOT NULL DEFAULT 100,
-                heavy_output_prob REAL NOT NULL,
-                pass_threshold REAL NOT NULL DEFAULT 0.6667,
-                trial_results JSON NOT NULL DEFAULT '[]',
-                job_id VARCHAR(64),
-                run_id VARCHAR(64),
-                org_id INTEGER REFERENCES organizations(id),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_qv_results_backend ON qv_results(backend)",
-            """CREATE TABLE IF NOT EXISTS gate_char_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                char_id VARCHAR(64) NOT NULL UNIQUE,
-                backend VARCHAR(255) NOT NULL,
-                char_type VARCHAR(32) NOT NULL,
-                qubit INTEGER,
-                qubit_pair JSON,
-                gate VARCHAR(64),
-                curve_data JSON NOT NULL DEFAULT '[]',
-                fit_params JSON NOT NULL DEFAULT '{}',
-                metric_value REAL,
-                metric_unit VARCHAR(32),
-                run_id VARCHAR(64),
-                org_id INTEGER REFERENCES organizations(id),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_gate_char_backend ON gate_char_results(backend)",
-            "CREATE INDEX IF NOT EXISTS ix_gate_char_type ON gate_char_results(char_type)",
-            """CREATE TABLE IF NOT EXISTS circuit_templates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                template_id VARCHAR(64) NOT NULL UNIQUE,
-                name VARCHAR(200) NOT NULL,
-                category VARCHAR(64) NOT NULL,
-                description TEXT NOT NULL DEFAULT '',
-                qasm TEXT NOT NULL,
-                n_qubits INTEGER NOT NULL,
-                parameters JSON NOT NULL DEFAULT '[]',
-                tags JSON NOT NULL DEFAULT '[]',
-                is_builtin BOOLEAN NOT NULL DEFAULT 0,
-                org_id INTEGER REFERENCES organizations(id),
-                created_by_user_id INTEGER REFERENCES users(id),
-                use_count INTEGER NOT NULL DEFAULT 0,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_circuit_templates_category ON circuit_templates(category)",
-            """CREATE TABLE IF NOT EXISTS decoherence_alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                alert_id VARCHAR(64) NOT NULL UNIQUE,
-                org_id INTEGER REFERENCES organizations(id),
-                backend VARCHAR(255) NOT NULL,
-                metric VARCHAR(32) NOT NULL,
-                qubit INTEGER,
-                threshold REAL NOT NULL,
-                condition VARCHAR(16) NOT NULL DEFAULT 'below',
-                triggered BOOLEAN NOT NULL DEFAULT 0,
-                triggered_at DATETIME,
-                last_checked_at DATETIME,
-                last_value REAL,
-                notification_channel_id VARCHAR(64),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_decoherence_alerts_backend ON decoherence_alerts(backend)",
-            """CREATE TABLE IF NOT EXISTS evolution_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id VARCHAR(64) NOT NULL UNIQUE,
-                circuit_name VARCHAR(200) NOT NULL DEFAULT '',
-                original_qasm TEXT NOT NULL,
-                evolved_qasm TEXT NOT NULL,
-                best_fitness REAL NOT NULL,
-                improvement REAL NOT NULL DEFAULT 0,
-                n_generations INTEGER NOT NULL,
-                population_size INTEGER NOT NULL,
-                fitness_history JSON NOT NULL DEFAULT '[]',
-                config JSON NOT NULL DEFAULT '{}',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS health_forecasts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                forecast_id VARCHAR(64) NOT NULL UNIQUE,
-                backend VARCHAR(255) NOT NULL,
-                metric VARCHAR(32) NOT NULL,
-                current_value REAL,
-                forecast_24h REAL,
-                forecast_48h REAL,
-                forecast_72h REAL,
-                trend_slope REAL,
-                risk_level VARCHAR(16) NOT NULL DEFAULT 'unknown',
-                data_points INTEGER NOT NULL DEFAULT 0,
-                series JSON NOT NULL DEFAULT '[]',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_health_forecasts_backend ON health_forecasts(backend)",
-            """CREATE TABLE IF NOT EXISTS advantage_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                result_id VARCHAR(64) NOT NULL UNIQUE,
-                problem_type VARCHAR(64) NOT NULL,
-                n_qubits INTEGER NOT NULL,
-                quantum_score REAL NOT NULL,
-                classical_score REAL NOT NULL,
-                advantage_ratio REAL NOT NULL,
-                quantum_time_ms REAL NOT NULL,
-                classical_time_ms REAL NOT NULL,
-                verdict VARCHAR(32) NOT NULL,
-                details JSON NOT NULL DEFAULT '{}',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS fault_injection_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                result_id VARCHAR(64) NOT NULL UNIQUE,
-                circuit_name VARCHAR(200) NOT NULL DEFAULT '',
-                fault_type VARCHAR(32) NOT NULL,
-                fault_rate REAL NOT NULL,
-                n_trials INTEGER NOT NULL,
-                mean_fidelity REAL NOT NULL,
-                min_fidelity REAL NOT NULL,
-                resilience_score REAL NOT NULL,
-                grade VARCHAR(2) NOT NULL,
-                trial_results JSON NOT NULL DEFAULT '[]',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS reproducibility_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                result_id VARCHAR(64) NOT NULL UNIQUE,
-                original_run_id VARCHAR(64) NOT NULL,
-                n_reruns INTEGER NOT NULL,
-                mean_tvd REAL NOT NULL,
-                std_tvd REAL NOT NULL,
-                reproducibility_score REAL NOT NULL,
-                grade VARCHAR(2) NOT NULL,
-                trial_tvds JSON NOT NULL DEFAULT '[]',
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_repro_results_run_id ON reproducibility_results(original_run_id)",
-            """CREATE TABLE IF NOT EXISTS circuit_dna (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                dna_id VARCHAR(64) NOT NULL UNIQUE,
-                dna_hash VARCHAR(64) NOT NULL,
-                circuit_name VARCHAR(200) NOT NULL DEFAULT '',
-                qasm TEXT NOT NULL,
-                distribution_signature JSON NOT NULL DEFAULT '[]',
-                n_qubits INTEGER NOT NULL,
-                n_gates INTEGER NOT NULL,
-                run_id VARCHAR(64),
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-            "CREATE INDEX IF NOT EXISTS ix_circuit_dna_hash ON circuit_dna(dna_hash)",
-            """CREATE TABLE IF NOT EXISTS qrng_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                result_id VARCHAR(64) NOT NULL UNIQUE,
-                n_bits INTEGER NOT NULL,
-                hex_output TEXT NOT NULL,
-                chsh_value REAL NOT NULL,
-                is_quantum_certified BOOLEAN NOT NULL DEFAULT 0,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )""",
-        ]
-    # On PostgreSQL, skip SQLite-specific DDL (tables are created by create_all).
-    # Run each statement in its own transaction so a failure doesn't abort the rest.
-    if not _is_pg:
-        for stmt in _stmts:
-            try:
-                with engine.begin() as conn:
-                    conn.execute(text(stmt))
-            except Exception:
-                pass
-    with SessionLocal() as db:
-        _migrate_legacy_runs(db)
 
 
 # ------------------------------------------------------------------
