@@ -21,6 +21,25 @@ const nextConfig = {
       },
     ];
   },
+
+  async headers() {
+    return [
+      {
+        // HTML pages — never cache so users always get the latest deploy
+        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        // Hashed static assets — cache forever (filename changes on each build)
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
