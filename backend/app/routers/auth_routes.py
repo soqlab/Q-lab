@@ -123,6 +123,8 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
+    if not getattr(user, "email_verified", True):
+        raise HTTPException(status_code=403, detail="email_not_verified")
 
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.login", "user", str(user.id), request=request)
@@ -223,6 +225,29 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Email verified successfully. You can now use all features."}
+
+
+class ResendByEmailPayload(BaseModel):
+    email: str
+
+
+@router.post("/resend-verification-email", dependencies=[Depends(auth_limiter)])
+def resend_verification_by_email(payload: ResendByEmailPayload, db: Session = Depends(get_db)):
+    """Send a new verification email given just an email address (no auth required)."""
+    user = db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
+    if not user or getattr(user, "email_verified", True):
+        return {"message": "If that email exists and is unverified, a link has been sent."}
+    try:
+        verify_token = secrets.token_urlsafe(32)
+        user.verify_token = verify_token
+        user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
+        db.commit()
+        app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+        verify_url = f"{app_url}/verify-email?token={verify_token}"
+        send_verification_email(to_email=user.email, verify_url=verify_url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+    return {"message": "Verification email sent"}
 
 
 @router.post("/resend-verification", dependencies=[Depends(auth_limiter)])
