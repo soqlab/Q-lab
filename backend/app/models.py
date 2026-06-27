@@ -47,6 +47,8 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     verify_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     verify_token_expires: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reset_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reset_token_expires: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     org: Mapped["Organization | None"] = relationship(back_populates="users")
