@@ -1,3 +1,6 @@
+import sys
+sys.setrecursionlimit(10000)
+
 import hashlib
 import html
 import io
@@ -519,9 +522,9 @@ async def startup() -> None:
     # Run: alembic upgrade head (for production). init_db() used for development/testing.
     init_db()
     # Add new columns that may not exist in existing databases
-    from .database import engine
-    with engine.connect() as conn:
-        for stmt in [
+    from .database import engine, DATABASE_URL
+    _is_pg = not DATABASE_URL.startswith("sqlite")
+    _stmts = [
             "ALTER TABLE runs ADD COLUMN share_token VARCHAR(64)",
             """CREATE TABLE IF NOT EXISTS run_notes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -912,12 +915,16 @@ async def startup() -> None:
                 is_quantum_certified BOOLEAN NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )""",
-        ]:
+        ]
+    # On PostgreSQL, skip SQLite-specific DDL (tables are created by create_all).
+    # Run each statement in its own transaction so a failure doesn't abort the rest.
+    if not _is_pg:
+        for stmt in _stmts:
             try:
-                conn.execute(text(stmt))
-                conn.commit()
+                with engine.begin() as conn:
+                    conn.execute(text(stmt))
             except Exception:
-                pass  # column already exists
+                pass
     with SessionLocal() as db:
         _migrate_legacy_runs(db)
 
