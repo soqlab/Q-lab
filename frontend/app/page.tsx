@@ -726,14 +726,9 @@ export default function LandingPage() {
                     Go to Dashboard →
                   </Link>
                 ) : (
-                  <>
-                    <Link href="/register" className="lp-btn lp-btn-primary lp-btn-large">
-                      Get Started Free →
-                    </Link>
-                    <Link href="/login" className="lp-btn-outline-large">
-                      View Demo →
-                    </Link>
-                  </>
+                  <Link href="/register" className="lp-btn lp-btn-primary lp-btn-large">
+                    Get Started Free →
+                  </Link>
                 )}
               </div>
             </div>
