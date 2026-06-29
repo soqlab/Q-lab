@@ -427,7 +427,7 @@ export default function PluginsPage() {
                 overflowX: "auto",
                 marginBottom: 20,
               }}
-            >{`pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"
+            >{`pip install qlab-sdk
 qlab plugins publish \\
   --name "My Plugin" \\
   --slug "my-plugin" \\
