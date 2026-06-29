@@ -301,7 +301,7 @@ export default function SettingsPage() {
       {/* SDK usage */}
       <section className="panel">
         <div className="panel-header"><h2>SDK Setup</h2></div>
-        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"
+        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install qlab-sdk
 
 from qlab import QLabTracker
 
