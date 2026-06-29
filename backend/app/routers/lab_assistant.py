@@ -185,8 +185,90 @@ def _get_aggregate_stats(db: Session) -> dict:
     }
 
 
-def _call_claude(system: str, messages: list) -> str:
-    """Call the Anthropic Claude API with conversation history."""
+_TOOLS = [
+    {
+        "name": "estimate_cost",
+        "description": "Estimate the cost of running a quantum circuit across cloud providers (IBM, IonQ, Rigetti, Azure). Use when the user asks about cost, pricing, budget, or which provider is cheapest.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "n_qubits":      {"type": "integer", "description": "Number of qubits in the circuit"},
+                "circuit_depth": {"type": "integer", "description": "Circuit depth (number of gate layers)"},
+                "n_shots":       {"type": "integer", "description": "Number of measurement shots"},
+                "n_circuits":    {"type": "integer", "description": "Number of circuits to run", "default": 1},
+            },
+            "required": ["n_qubits", "circuit_depth", "n_shots"],
+        },
+    },
+    {
+        "name": "search_runs",
+        "description": "Search experiment run history by circuit name, backend, status, or tags. Use when the user asks about specific past experiments.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query":   {"type": "string",  "description": "Search terms (circuit name, backend, tags, project)"},
+                "limit":   {"type": "integer", "description": "Max results to return", "default": 10},
+            },
+            "required": ["query"],
+        },
+    },
+]
+
+
+def _execute_tool(name: str, inputs: dict, db: Session) -> str:
+    """Execute a tool call and return a string result for the model."""
+    if name == "estimate_cost":
+        from .cost_oracle import PRICING, _ibm_seconds_estimate, _hqc_estimate
+        n_qubits      = int(inputs.get("n_qubits", 5))
+        circuit_depth = int(inputs.get("circuit_depth", 20))
+        n_shots       = int(inputs.get("n_shots", 1024))
+        n_circuits    = int(inputs.get("n_circuits", 1))
+        lines = [f"Cost estimate for {n_qubits} qubits, depth {circuit_depth}, {n_shots} shots, {n_circuits} circuit(s):\n"]
+        results = []
+        for pid, p in PRICING.items():
+            try:
+                if pid == "ibm_quantum_free":
+                    cost = 0.0 if n_shots <= 10_000_000 else None
+                elif pid == "ibm_quantum_premium":
+                    cost = _ibm_seconds_estimate(n_qubits, circuit_depth, n_shots) * n_circuits
+                elif pid in ("aws_braket_sv1",):
+                    cost = p.get("cost_per_task", 0.075) * n_circuits
+                elif pid == "aws_braket_ionq":
+                    cost = (p["cost_per_task"] + n_shots * p["cost_per_shot"]) * n_circuits
+                elif pid == "aws_braket_rigetti":
+                    cost = (p["cost_per_task"] + n_shots * p["cost_per_shot"]) * n_circuits
+                elif pid == "azure_ionq":
+                    cost = n_shots * p["cost_per_shot"] * n_circuits
+                elif pid == "azure_quantinuum":
+                    cost = _hqc_estimate(n_qubits, circuit_depth, n_shots) * n_circuits
+                elif pid == "iqm_resonance":
+                    cost = (p.get("cost_per_circuit", 0.05) + n_shots * p.get("cost_per_shot", 0.0005)) * n_circuits
+                else:
+                    continue
+                results.append((cost if cost is not None else 999999, p["name"], cost))
+            except Exception:
+                continue
+        results.sort()
+        for _, name_p, cost in results:
+            cost_str = "FREE" if cost == 0 else (f"${cost:.4f}" if cost is not None else "N/A")
+            lines.append(f"  • {name_p}: {cost_str}")
+        cheapest = next((n for _, n, c in results if c is not None), "unknown")
+        lines.append(f"\nCheapest paid option: {cheapest}")
+        return "\n".join(lines)
+
+    if name == "search_runs":
+        query = inputs.get("query", "")
+        limit = int(inputs.get("limit", 10))
+        runs = _search_runs(db, query, None, limit)
+        if not runs:
+            return "No matching runs found."
+        return "\n".join(_run_to_context(r) for r in runs)
+
+    return f"Unknown tool: {name}"
+
+
+def _call_claude(system: str, messages: list, db: Session | None = None) -> str:
+    """Call Claude with tool use support. Executes tools and loops until a text answer."""
     try:
         import anthropic
     except ImportError:
@@ -197,13 +279,41 @@ def _call_claude(system: str, messages: list) -> str:
         raise HTTPException(503, "ANTHROPIC_API_KEY not configured. Set the environment variable to enable the Lab Assistant.")
 
     client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
-        model=_MODEL,
-        max_tokens=1200,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text.strip()
+    current_messages = list(messages)
+
+    for _ in range(5):  # max tool-use rounds
+        response = client.messages.create(
+            model=_MODEL,
+            max_tokens=1500,
+            system=system,
+            tools=_TOOLS,
+            messages=current_messages,
+        )
+
+        # Collect any text content
+        text_parts = [b.text for b in response.content if hasattr(b, "text")]
+
+        if response.stop_reason == "end_turn" or not any(b.type == "tool_use" for b in response.content):
+            return "\n".join(text_parts).strip() if text_parts else "I wasn't able to find a useful answer."
+
+        # Execute tool calls
+        tool_results = []
+        for block in response.content:
+            if block.type == "tool_use":
+                result_text = _execute_tool(block.name, block.input, db) if db else "Tool execution requires DB context."
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result_text,
+                })
+
+        # Append assistant turn + tool results and loop
+        current_messages = current_messages + [
+            {"role": "assistant", "content": response.content},
+            {"role": "user",      "content": tool_results},
+        ]
+
+    return "I ran into an issue processing your request after multiple attempts."
 
 
 # ------------------------------------------------------------------
@@ -226,12 +336,16 @@ def chat(body: ChatRequest, db: Session = Depends(get_db)):
     relevant_runs = _search_runs(db, body.message, body.backend_filter, limit=20)
 
     # Build system prompt
-    system = """You are Q-Lab's Lab Assistant — an expert quantum computing research assistant with access to this lab's complete experiment history.
-You help researchers understand their results, find patterns, compare experiments, and plan next steps.
+    system = """You are Q-Lab's Lab Assistant — an expert quantum computing research assistant with access to this lab's complete experiment history and live tools.
+
+You have two tools available:
+- estimate_cost: call this whenever the user asks about cost, pricing, budget, or which provider is cheapest for their circuit. Extract n_qubits, circuit_depth, and n_shots from context or ask.
+- search_runs: call this to find specific past experiments when the user references circuit names, backends, or project names.
+
 When citing specific runs, use the format [Run abc12345] (first 8 chars of run_id).
-Be specific with numbers. If asked about health scores, success rates, or other metrics, provide exact values from the data.
+Be specific with numbers. Provide exact values from the data.
 Keep responses concise but complete. Use bullet points for lists.
-If you don't have enough data to answer confidently, say so clearly."""
+If you don't have enough data, say so clearly and suggest what parameters would help."""
 
     # Build user prompt with context
     total_runs = stats["total_runs"]
@@ -261,8 +375,8 @@ User question: {body.message}"""
     history = conversation.messages[-10:]
     messages = list(history) + [{"role": "user", "content": user_prompt}]
 
-    # Call Claude
-    answer = _call_claude(system, messages)
+    # Call Claude (with tool use)
+    answer = _call_claude(system, messages, db=db)
 
     # Extract cited run IDs
     cited_runs = _extract_cited_runs(answer)
