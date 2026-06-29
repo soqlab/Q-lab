@@ -937,7 +937,7 @@ export default function LandingPage() {
                 num: "1",
                 title: "Install the SDK",
                 desc: "One pip command, no system dependencies. Works alongside any Qiskit or PennyLane workflow you already have.",
-                code: "pip install qlab-sdk",
+                code: `pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"`,
               },
               {
                 num: "2",
