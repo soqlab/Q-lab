@@ -228,7 +228,7 @@ function Step1({ onNext, onDismiss }: { onNext: () => void; onDismiss: () => voi
 // ─── Step 2: Connect SDK ─────────────────────────────────────────────────────
 
 const CODE_SNIPPET = `# Install
-pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"
+pip install qlab-sdk
 
 # Add to your Qiskit code
 from qlab import QLabTracker
