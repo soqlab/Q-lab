@@ -301,15 +301,15 @@ export default function SettingsPage() {
       {/* SDK usage */}
       <section className="panel">
         <div className="panel-header"><h2>SDK Setup</h2></div>
-        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install qlab-sdk
+        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"
 
-import qlab
+from qlab import QLabTracker
 
-qlab.init(
-    api_url="https://soqlab.com",
-    api_key="<your-qlab_xxx-key>",
+tracker = QLabTracker(
+    api_key="qlab_YOUR_KEY",
+    url="https://soqlab.com",
 )
-# That's it — your Qiskit runs are now tracked automatically.`}</pre>
+# Use tracker.run() or tracker.log_run() to track experiments.`}</pre>
       </section>
 
       {/* Danger zone */}

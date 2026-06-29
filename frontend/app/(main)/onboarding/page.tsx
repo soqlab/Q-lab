@@ -88,7 +88,7 @@ export default function OnboardingPage() {
 
   const displayKey = newKey || "qlab_YOUR_API_KEY";
 
-  const installCode = `pip install qlab-sdk`;
+  const installCode = `pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"`;
 
   const basicCode = `from qlab import QLabTracker
 
@@ -184,7 +184,7 @@ with tracker.run("bell-circuit", project="my-project") as run:
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>No dependencies — works in any Python 3.9+ environment.</p>
         <CodeBlock code={installCode} lang="bash" />
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>
-          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install qlab-sdk qiskit qiskit-aer</code>
+          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk" qiskit qiskit-aer</code>
         </p>
       </Step>
 

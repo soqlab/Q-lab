@@ -228,11 +228,11 @@ function Step1({ onNext, onDismiss }: { onNext: () => void; onDismiss: () => voi
 // ─── Step 2: Connect SDK ─────────────────────────────────────────────────────
 
 const CODE_SNIPPET = `# Install
-pip install qlab-sdk
+pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk"
 
 # Add to your Qiskit code
-import qlab
-qlab.init(api_url="http://localhost:8000", api_key="YOUR_KEY")
+from qlab import QLabTracker
+tracker = QLabTracker(api_key="qlab_YOUR_KEY", url="https://soqlab.com")
 
 # That's it — Q-Lab captures everything automatically
 circuit = QuantumCircuit(2)
