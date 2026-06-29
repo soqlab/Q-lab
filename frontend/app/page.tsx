@@ -588,6 +588,79 @@ const STYLES = `
   }
 `;
 
+// ─── Cost Oracle widget ──────────────────────────────────────────────────────
+const PROVIDERS = [
+  { id: "ibm_free",   name: "IBM Quantum (Free)",    color: "#6929c4", calc: (_q: number, _d: number, shots: number) => shots <= 10000 ? 0 : null },
+  { id: "ionq",       name: "IonQ via AWS Braket",   color: "#0f62fe", calc: (_q: number, _d: number, shots: number) => 0.30 + shots * 0.00097 },
+  { id: "rigetti",    name: "Rigetti via AWS",        color: "#2b5ce6", calc: (_q: number, _d: number, shots: number) => 0.30 + shots * 0.00035 },
+  { id: "azure_ionq", name: "Azure Quantum (IonQ)",  color: "#0078d4", calc: (_q: number, _d: number, shots: number) => shots * 0.000975 },
+  { id: "simulator",  name: "Aer Simulator (local)", color: "#10b981", calc: () => 0 },
+];
+
+function CostOracleWidget() {
+  const [qubits, setQubits] = useState(2);
+  const [depth, setDepth] = useState(5);
+  const [shots, setShots] = useState(1024);
+
+  const estimates = PROVIDERS.map(p => {
+    const cost = p.calc(qubits, depth, shots);
+    return { ...p, cost };
+  }).sort((a, b) => {
+    if (a.cost === null) return 1;
+    if (b.cost === null) return -1;
+    return a.cost - b.cost;
+  });
+
+  const maxCost = Math.max(...estimates.filter(e => e.cost !== null && e.cost > 0).map(e => e.cost as number), 0.01);
+
+  return (
+    <div style={{ background: "#0d1117", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 16, padding: 28, maxWidth: 540 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 18 }}>
+        Live Cost Estimate
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Qubits", val: qubits, set: setQubits, min: 1, max: 50 },
+          { label: "Depth", val: depth, set: setDepth, min: 1, max: 200 },
+          { label: "Shots", val: shots, set: setShots, min: 100, max: 20000 },
+        ].map(({ label, val, set, min, max }) => (
+          <div key={label}>
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
+            <input
+              type="range" min={min} max={max} value={val}
+              onChange={e => set(Number(e.target.value))}
+              style={{ width: "100%", accentColor: "#6366f1" }}
+            />
+            <div style={{ fontSize: 13, color: "#94a3b8", textAlign: "center", marginTop: 2, fontWeight: 600 }}>{val.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {estimates.map((p, i) => (
+          <div key={p.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {i === 0 && p.cost === 0 && <span style={{ fontSize: 10, background: "#052e16", color: "#4ade80", border: "1px solid #16a34a", borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>FREE</span>}
+                {i === 0 && p.cost !== null && p.cost > 0 && <span style={{ fontSize: 10, background: "#1e1b4b", color: "#818cf8", border: "1px solid #3730a3", borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>CHEAPEST</span>}
+                <span style={{ fontSize: 13, color: "#e2e8f0" }}>{p.name}</span>
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: p.cost === 0 ? "#4ade80" : "#f1f5f9", fontFamily: "monospace" }}>
+                {p.cost === null ? "N/A" : p.cost === 0 ? "$0.00" : `$${p.cost.toFixed(3)}`}
+              </span>
+            </div>
+            <div style={{ height: 4, background: "#1e293b", borderRadius: 999 }}>
+              <div style={{ height: "100%", borderRadius: 999, background: p.color, width: p.cost === null ? "100%" : p.cost === 0 ? "2%" : `${Math.min(100, (p.cost / maxCost) * 100)}%`, transition: "width 0.3s", opacity: p.cost === null ? 0.2 : 1 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 16, fontSize: 11, color: "#334155" }}>
+        Cost per single circuit run. <a href="/register" style={{ color: "#6366f1" }}>Sign up</a> to compare any circuit with full detail.
+      </div>
+    </div>
+  );
+}
+
 // ─── Feature card data ────────────────────────────────────────────────────────
 const FEATURES = [
   {
@@ -793,6 +866,33 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <hr className="lp-divider" />
+
+        {/* ── Cost Oracle ────────────────────────────────────────────────────── */}
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "100px 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center" }}>
+          <div>
+            <div className="lp-section-label">Cost Oracle</div>
+            <h2 className="lp-section-title">Know the cost before you run</h2>
+            <p className="lp-section-sub">
+              Enterprises are terrified of runaway QPU bills. Q-Lab tells you exactly what your circuit will cost across every provider — before you submit a single shot.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+              {[
+                "Real pricing across IBM, IonQ, Rigetti, Azure, and more",
+                "Adjust qubits, depth, and shots — costs update instantly",
+                "Routes to the cheapest provider that meets your fidelity target",
+              ].map(f => (
+                <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#94a3b8" }}>
+                  <span style={{ color: "#6366f1", marginTop: 1, flexShrink: 0 }}>✓</span>
+                  {f}
+                </div>
+              ))}
+            </div>
+            <a href="/register" className="lp-btn lp-btn-primary">Try Cost Oracle Free →</a>
+          </div>
+          <CostOracleWidget />
         </div>
 
         <hr className="lp-divider" />

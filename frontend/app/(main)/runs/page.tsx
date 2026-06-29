@@ -57,44 +57,56 @@ function SortTh({
 }
 
 // ------------------------------------------------------------------
-// Quick Start (empty state)
+// Welcome workflow picker (empty state)
 // ------------------------------------------------------------------
 function QuickStart() {
-  const steps = [
-    { icon: <Terminal size={20} />, title: "Install Q-Lab SDK", code: "pip install qlab-tracker" },
-    { icon: <Key size={20} />, title: "Get your API key", code: 'import qlab\nqlab.init(api_key="ql_…", url="https://soqlab.com")' },
+  const workflows = [
     {
-      icon: <Zap size={20} />, title: "Track your first circuit",
-      code: 'from qiskit import QuantumCircuit\nfrom qlab import track\n\nqc = QuantumCircuit(2)\nqc.h(0); qc.cx(0, 1)\n\nwith track(qc, backend="ibm_brisbane") as run:\n    job = sampler.run([qc])\n    result = job.result()\n    run.log_result(result)',
+      emoji: "⚗️",
+      title: "Track my experiments",
+      desc: "Install the SDK, connect your API key, and every Qiskit circuit you run is captured automatically.",
+      cta: "Set up the SDK",
+      href: "/onboarding",
+      accent: "#6366f1",
+    },
+    {
+      emoji: "💰",
+      title: "Find the cheapest QPU",
+      desc: "Enter your circuit parameters and get an instant cost comparison across IBM, IonQ, Rigetti, and more.",
+      cta: "Open Cost Oracle",
+      href: "/cost-oracle",
+      accent: "#10b981",
+    },
+    {
+      emoji: "🤖",
+      title: "Ask the Lab Assistant",
+      desc: "Ask questions in plain English. The AI reads your experiment history and can execute cost estimates and searches for you.",
+      cta: "Open Lab Assistant",
+      href: "/assistant",
+      accent: "#f59e0b",
     },
   ];
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>Quick Start — Track your first experiment</h2>
+        <h2>Welcome to Q-Lab — what would you like to do?</h2>
         <span style={{ fontSize: 13, color: "var(--muted)" }}>Your experiments will appear here once submitted</span>
       </div>
-      <div style={{ padding: "24px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-        {steps.map((step, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--info-bg)", display: "grid", placeItems: "center", color: "var(--strong)" }}>
-                {step.icon}
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Step {i + 1}</div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>{step.title}</div>
-              </div>
+      <div style={{ padding: "24px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+        {workflows.map((w) => (
+          <a key={w.href} href={w.href} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, background: "var(--surface)", border: `1px solid ${w.accent}30`, borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s, transform 0.15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = w.accent; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = `${w.accent}30`; (e.currentTarget as HTMLElement).style.transform = ""; }}>
+            <div style={{ fontSize: 32 }}>{w.emoji}</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 6 }}>{w.title}</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{w.desc}</div>
             </div>
-            <pre style={{ margin: 0, fontSize: 12, lineHeight: 1.6, background: "var(--code-bg)", color: "var(--code-text)", padding: "12px 14px", borderRadius: 6, overflowX: "auto", fontFamily: '"Cascadia Code", Consolas, monospace' }}>
-              {step.code}
-            </pre>
-          </div>
+            <div style={{ marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: w.accent }}>
+              {w.cta} →
+            </div>
+          </a>
         ))}
-      </div>
-      <div style={{ padding: "0 20px 20px", display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <a className="button" href="/settings" style={{ fontSize: 13, height: 34 }}>Manage API Keys</a>
-        <a className="button secondary" href="/analytics" style={{ fontSize: 13, height: 34 }}>View Analytics</a>
       </div>
     </section>
   );
