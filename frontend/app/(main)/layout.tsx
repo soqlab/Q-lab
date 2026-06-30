@@ -3,10 +3,75 @@
 import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
+import { useEffect, useState } from "react";
+
+function WarmupBanner() {
+  const [visible, setVisible] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 2500);
+    const start = Date.now();
+
+    fetch("/qlab-api/health", { signal: AbortSignal.timeout(45000) })
+      .then(() => {
+        clearTimeout(timer);
+        if (Date.now() - start > 2500) {
+          setDone(true);
+          setTimeout(() => setVisible(false), 2000);
+        } else {
+          setVisible(false);
+        }
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        setVisible(false);
+      });
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+      zIndex: 9999, background: "#0f172a", border: "1px solid #334155",
+      borderRadius: 12, padding: "12px 20px", display: "flex", alignItems: "center",
+      gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", minWidth: 320,
+      animation: "fadeSlideIn 0.3s ease",
+    }}>
+      <style>{`
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+      {done ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5"
+          style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
+          <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke="#6366f1"/>
+        </svg>
+      )}
+      <div>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: done ? "#10b981" : "#e2e8f0" }}>
+          {done ? "Q-Lab is ready" : "Warming up…"}
+        </p>
+        {!done && (
+          <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>
+            Backend is starting up — takes ~30s on first visit
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
+      <WarmupBanner />
       <aside className="sidebar">
         <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
