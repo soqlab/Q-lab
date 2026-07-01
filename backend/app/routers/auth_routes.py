@@ -69,9 +69,8 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    # First user becomes owner
-    user_count = db.scalar(select(func.count()).select_from(User)) or 0
-    role = "owner" if user_count == 0 else "researcher"
+    _OWNER_EMAIL = "stateofquantumlab@gmail.com"
+    role = "owner" if payload.email.lower() == _OWNER_EMAIL else "researcher"
 
     org: Organization | None = None
     if payload.org_name:
