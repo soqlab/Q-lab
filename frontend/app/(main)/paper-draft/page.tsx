@@ -50,117 +50,128 @@ export default function PaperDraftPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Paper Draft Generator</h1>
-      <p className="text-gray-400">Generate a full research paper draft — abstract, introduction, results, methods, LaTeX source, and BibTeX — from your Q-Lab experiment data.</p>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Paper Draft Generator</h1>
+      <p style={{ color: "var(--muted)" }}>Generate a full research paper draft — abstract, introduction, results, methods, LaTeX source, and BibTeX — from your Q-Lab experiment data.</p>
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className="text-sm text-gray-400">Paper Title</label>
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={{ gridColumn: "span 2" }}>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Paper Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Algorithm / Experiment Type</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Algorithm / Experiment Type</label>
             <input value={algorithm} onChange={e => setAlgorithm(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Backend</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Backend</label>
             <input value={backend} onChange={e => setBackend(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Qubits</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Qubits</label>
             <input type="number" value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Target Journal</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Target Journal</label>
             <select value={journal} onChange={e => setJournal(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }}>
               {["Physical Review Letters", "Nature Physics", "npj Quantum Information", "PRX Quantum", "Quantum", "arXiv"].map(j => <option key={j} value={j}>{j}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Key Metric</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Key Metric</label>
             <select value={keyMetric} onChange={e => setKeyMetric(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              className="input" style={{ display: "block", width: "100%", marginTop: 4 }}>
               {["fidelity", "energy", "approximation_ratio", "error_rate"].map(m => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Key Value</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Key Value</label>
             <input type="number" step="any" value={keyValue} onChange={e => setKeyValue(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4, fontFamily: "ui-monospace,monospace" }} />
           </div>
-          <div className="col-span-2">
-            <label className="text-sm text-gray-400">Run IDs (comma-separated, optional)</label>
+          <div style={{ gridColumn: "span 2" }}>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Run IDs (comma-separated, optional)</label>
             <input value={runIds} onChange={e => setRunIds(e.target.value)} placeholder="run-abc123, run-def456"
-              className="w-full mt-1 bg-gray-800 text-white font-mono text-sm px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ display: "block", width: "100%", marginTop: 4, fontFamily: "ui-monospace,monospace", fontSize: 13 }} />
           </div>
         </div>
-        <button onClick={draft} disabled={loading || !title}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+        <button onClick={draft} disabled={loading || !title} className="button"
+          style={{ opacity: (loading || !title) ? 0.5 : 1, cursor: (loading || !title) ? "not-allowed" : "pointer" }}>
           {loading ? "Drafting paper..." : "Generate Full Draft"}
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             {([
-              ["Word Count", result.word_count.toLocaleString(), "text-white"],
-              ["Est. Pages", `~${result.estimated_pages}`, "text-gray-300"],
-              ["Figures", String(result.figures.length), "text-purple-400"],
-              ["Novelty", `${(result.novelty_score * 100).toFixed(0)}%`, "text-indigo-400"],
+              ["Word Count", result.word_count.toLocaleString(), "var(--text)"],
+              ["Est. Pages", `~${result.estimated_pages}`, "var(--text)"],
+              ["Figures", String((result.figures ?? []).length), "#a78bfa"],
+              ["Novelty", `${(result.novelty_score * 100).toFixed(0)}%`, "var(--strong)"],
             ] as [string, string, string][]).map(([l, v, c]) => (
-              <div key={l} className="bg-gray-900 rounded-lg p-3 text-center">
-                <div className="text-xs text-gray-500 mb-1">{l}</div>
-                <div className={`text-xl font-mono font-bold ${c}`}>{v}</div>
+              <div key={l} style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center" }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{l}</div>
+                <div style={{ fontSize: 20, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: c }}>{v}</div>
               </div>
             ))}
           </div>
 
           {result.suggested_journals && result.suggested_journals.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 flex gap-3 items-center">
-              <span className="text-sm text-gray-400">Suggested journals:</span>
-              {result.suggested_journals.map(j => <span key={j} className="text-sm text-indigo-300 bg-indigo-900/30 px-2 py-0.5 rounded">{j}</span>)}
-              <span className="ml-auto text-sm text-gray-400">{result.impact_estimate}</span>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Suggested journals:</span>
+              {(result.suggested_journals ?? []).map(j => (
+                <span key={j} style={{ fontSize: 13, color: "var(--strong)", background: "rgba(99,102,241,0.15)", padding: "2px 8px", borderRadius: 6 }}>{j}</span>
+              ))}
+              <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--muted)" }}>{result.impact_estimate}</span>
             </div>
           )}
 
           {result.checklist && result.checklist.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4">
-              <h2 className="font-semibold text-sm mb-3">Submission Checklist</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {result.checklist.map((c, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
-                    <span className={c.done ? "text-green-400" : "text-gray-500"}>{c.done ? "✓" : "○"}</span>
-                    <span className={c.done ? "text-gray-300" : "text-gray-500"}>{c.item}</span>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+              <h2 style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Submission Checklist</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {(result.checklist ?? []).map((c, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <span style={{ color: c.done ? "var(--ok)" : "var(--muted)" }}>{c.done ? "✓" : "○"}</span>
+                    <span style={{ color: c.done ? "var(--text)" : "var(--muted)" }}>{c.item}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
-            <div className="flex border-b border-gray-700">
+          <div style={{ background: "var(--surface)", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
               {TABS.map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className={`px-4 py-2.5 text-sm capitalize transition-colors ${tab === t ? "bg-gray-800 text-white border-b-2 border-indigo-500" : "text-gray-400 hover:text-gray-200"}`}>
+                  style={{
+                    padding: "10px 16px",
+                    fontSize: 13,
+                    textTransform: "capitalize",
+                    background: tab === t ? "var(--line)" : "transparent",
+                    color: tab === t ? "var(--text)" : "var(--muted)",
+                    border: "none",
+                    borderBottom: tab === t ? "2px solid var(--strong)" : "2px solid transparent",
+                    cursor: "pointer",
+                  }}>
                   {t}
                 </button>
               ))}
-              <div className="flex-1" />
-              <button onClick={copy} className="px-4 py-2 text-xs text-gray-400 hover:text-white">
+              <div style={{ flex: 1 }} />
+              <button onClick={copy} style={{ padding: "8px 16px", fontSize: 12, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer" }}>
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <pre className="p-5 text-sm text-gray-200 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto font-mono">
+            <pre style={{ padding: 20, fontSize: 13, color: "var(--text)", whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: 384, overflowY: "auto", fontFamily: "ui-monospace,monospace" }}>
               {getContent(tab)}
             </pre>
           </div>

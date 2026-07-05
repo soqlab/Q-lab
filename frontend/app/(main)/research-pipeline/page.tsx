@@ -22,9 +22,9 @@ const STAGE_ORDER = [
 ];
 
 function stageIcon(status: string): { icon: string; color: string } {
-  if (status === "completed") return { icon: "✓", color: "text-emerald-400" };
-  if (status === "active") return { icon: "▶", color: "text-indigo-400" };
-  return { icon: "○", color: "text-slate-500" };
+  if (status === "completed") return { icon: "✓", color: "var(--ok)" };
+  if (status === "active") return { icon: "▶", color: "var(--strong)" };
+  return { icon: "○", color: "var(--muted)" };
 }
 
 function StageStepper({
@@ -35,69 +35,144 @@ function StageStepper({
   currentStage: string;
 }) {
   return (
-    <div className="space-y-0">
-      {stages.map((stage, i) => {
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {(stages ?? []).map((stage, i) => {
         const { icon, color } = stageIcon(stage.status);
         const isActive = stage.name === currentStage;
+
+        const circleStyle = isActive
+          ? {
+              border: "2px solid var(--strong)",
+              background: "rgba(30,27,75,0.9)",
+              color: "var(--strong)",
+            }
+          : stage.status === "completed"
+          ? {
+              border: "2px solid var(--ok)",
+              background: "rgba(16,185,129,0.1)",
+              color: "var(--ok)",
+            }
+          : {
+              border: "2px solid var(--line)",
+              background: "var(--surface)",
+              color: "var(--muted)",
+            };
+
         return (
-          <div key={i} className="flex gap-4">
+          <div key={i} style={{ display: "flex", gap: 16 }}>
             {/* Line + icon column */}
-            <div className="flex flex-col items-center">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
               <div
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
-                  isActive
-                    ? "border-indigo-500 bg-indigo-950 text-indigo-400"
-                    : stage.status === "completed"
-                    ? "border-emerald-600 bg-emerald-950/40 text-emerald-400"
-                    : "border-slate-600 bg-slate-800 text-slate-500"
-                }`}
+                style={{
+                  display: "flex",
+                  height: 32,
+                  width: 32,
+                  flexShrink: 0,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 999,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  ...circleStyle,
+                }}
               >
-                <span className={color}>{icon}</span>
+                <span style={{ color }}>{icon}</span>
               </div>
               {i < stages.length - 1 && (
                 <div
-                  className={`my-1 w-0.5 flex-1 ${
-                    stage.status === "completed" ? "bg-emerald-800" : "bg-slate-700"
-                  }`}
-                  style={{ minHeight: "24px" }}
+                  style={{
+                    margin: "4px 0",
+                    width: 2,
+                    flex: 1,
+                    minHeight: 24,
+                    background:
+                      stage.status === "completed"
+                        ? "rgba(16,185,129,0.3)"
+                        : "var(--line)",
+                  }}
                 />
               )}
             </div>
 
             {/* Content */}
-            <div className={`pb-4 flex-1 ${i === stages.length - 1 ? "pb-0" : ""}`}>
-              <div className="flex items-center gap-2 mb-1">
+            <div
+              style={{
+                paddingBottom: i === stages.length - 1 ? 0 : 16,
+                flex: 1,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 4,
+                }}
+              >
                 <span
-                  className={`text-sm font-semibold capitalize ${
-                    isActive ? "text-indigo-300" : "text-slate-300"
-                  }`}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textTransform: "capitalize",
+                    color: isActive ? "var(--strong)" : "var(--text)",
+                  }}
                 >
                   {stage.name.replace(/_/g, " ")}
                 </span>
                 {isActive && (
-                  <span className="rounded-full bg-indigo-900 px-2 py-0.5 text-xs text-indigo-300">
+                  <span
+                    style={{
+                      borderRadius: 999,
+                      background: "rgba(49,46,129,0.6)",
+                      padding: "2px 8px",
+                      fontSize: 12,
+                      color: "var(--strong)",
+                    }}
+                  >
                     Active
                   </span>
                 )}
               </div>
-              {stage.artifacts.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1">
-                  {stage.artifacts.map((a, j) => (
+              {(stage.artifacts ?? []).length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                    marginBottom: 4,
+                  }}
+                >
+                  {(stage.artifacts ?? []).map((a, j) => (
                     <span
                       key={j}
-                      className="rounded bg-slate-700 px-1.5 py-0.5 text-xs text-slate-300"
+                      style={{
+                        borderRadius: 6,
+                        background: "var(--line)",
+                        padding: "2px 6px",
+                        fontSize: 12,
+                        color: "var(--text)",
+                      }}
                     >
                       {a}
                     </span>
                   ))}
                 </div>
               )}
-              {stage.auto_checks.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {stage.auto_checks.map((c, j) => (
+              {(stage.auto_checks ?? []).length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(stage.auto_checks ?? []).map((c, j) => (
                     <span
                       key={j}
-                      className={`text-xs ${c.passed ? "text-emerald-400" : "text-red-400"}`}
+                      style={{
+                        fontSize: 12,
+                        color: c.passed ? "var(--ok)" : "var(--danger)",
+                      }}
                     >
                       {c.passed ? "✓" : "✗"} {c.check}
                     </span>
@@ -138,35 +213,84 @@ function PipelineDetail({
   const isComplete = pipeline.overall_completion_pct >= 100;
 
   return (
-    <div className="space-y-5">
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h2 className="text-xl font-bold text-white mb-1">{pipeline.title}</h2>
-        <p className="text-sm text-slate-400 italic">{pipeline.hypothesis}</p>
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: "var(--text)",
+            marginBottom: 4,
+          }}
+        >
+          {pipeline.title}
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
+          {pipeline.hypothesis}
+        </p>
       </div>
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs text-slate-400 mb-1">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 12,
+            color: "var(--muted)",
+            marginBottom: 4,
+          }}
+        >
           <span>Overall Progress</span>
           <span>{pipeline.overall_completion_pct}%</span>
         </div>
-        <div className="h-2 rounded-full bg-slate-700">
+        <div
+          style={{ height: 8, borderRadius: 999, background: "var(--line)" }}
+        >
           <div
-            className="h-2 rounded-full bg-indigo-500 transition-all duration-500"
-            style={{ width: `${pipeline.overall_completion_pct}%` }}
+            style={{
+              height: 8,
+              borderRadius: 999,
+              background: "var(--strong)",
+              width: `${pipeline.overall_completion_pct}%`,
+            }}
           />
         </div>
       </div>
 
       {/* Meta */}
-      <div className="flex flex-wrap gap-3 text-xs">
-        <span className="rounded-full border border-indigo-700 bg-indigo-950 px-3 py-1 text-indigo-300">
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
+        <span
+          style={{
+            borderRadius: 999,
+            border: "1px solid var(--strong)",
+            background: "rgba(30,27,75,0.8)",
+            padding: "4px 12px",
+            color: "var(--strong)",
+          }}
+        >
           {pipeline.current_stage.replace(/_/g, " ")}
         </span>
-        <span className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 text-slate-300">
+        <span
+          style={{
+            borderRadius: 999,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            padding: "4px 12px",
+            color: "var(--text)",
+          }}
+        >
           {pipeline.algorithm}
         </span>
-        <span className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 text-slate-300">
+        <span
+          style={{
+            borderRadius: 999,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            padding: "4px 12px",
+            color: "var(--text)",
+          }}
+        >
           {pipeline.backend}
         </span>
       </div>
@@ -178,21 +302,53 @@ function PipelineDetail({
       {!isComplete && (
         <div>
           {advanceError && (
-            <div className="mb-2 rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            <div
+              style={{
+                marginBottom: 8,
+                borderRadius: 8,
+                border: "1px solid var(--danger)",
+                background: "rgba(239,68,68,0.1)",
+                padding: "12px 16px",
+                fontSize: 13,
+                color: "var(--danger)",
+              }}
+            >
               {advanceError}
             </div>
           )}
           <button
             onClick={handleAdvance}
             disabled={advancing}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            style={{
+              width: "100%",
+              borderRadius: 8,
+              background: "var(--strong)",
+              padding: "10px 0",
+              fontWeight: 600,
+              color: "var(--text)",
+              border: "none",
+              cursor: advancing ? "not-allowed" : "pointer",
+              opacity: advancing ? 0.5 : 1,
+              fontSize: 14,
+            }}
           >
             {advancing ? "Advancing..." : "Advance to Next Stage"}
           </button>
         </div>
       )}
       {isComplete && (
-        <div className="rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-center text-sm text-emerald-300 font-semibold">
+        <div
+          style={{
+            borderRadius: 8,
+            border: "1px solid var(--ok)",
+            background: "rgba(16,185,129,0.1)",
+            padding: "12px 16px",
+            textAlign: "center",
+            fontSize: 13,
+            color: "var(--ok)",
+            fontWeight: 600,
+          }}
+        >
           Pipeline Complete
         </div>
       )}
@@ -268,11 +424,42 @@ export default function ResearchPipelinePage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-white">
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "var(--surface)",
+        color: "var(--text)",
+      }}
+    >
       {/* Left sidebar: pipeline list */}
-      <aside className="w-72 shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900 p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
+      <aside
+        style={{
+          width: 288,
+          flexShrink: 0,
+          overflowY: "auto",
+          borderRight: "1px solid var(--line)",
+          background: "var(--surface)",
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "var(--muted)",
+            }}
+          >
             Pipelines
           </h2>
           <button
@@ -280,44 +467,104 @@ export default function ResearchPipelinePage() {
               setShowCreate(true);
               setSelectedId(null);
             }}
-            className="rounded-lg bg-indigo-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-600 transition-colors"
+            style={{
+              borderRadius: 8,
+              background: "var(--strong)",
+              padding: "4px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text)",
+              border: "none",
+              cursor: "pointer",
+            }}
           >
             + New
           </button>
         </div>
 
         {listLoading ? (
-          <p className="text-slate-500 text-sm">Loading...</p>
-        ) : pipelines.length === 0 ? (
-          <p className="text-slate-500 text-sm">No pipelines yet.</p>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading...</p>
+        ) : (pipelines ?? []).length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>No pipelines yet.</p>
         ) : (
-          <div className="space-y-2">
-            {pipelines.map((p) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {(pipelines ?? []).map((p) => (
               <button
                 key={p.pipeline_id}
                 onClick={() => {
                   setSelectedId(p.pipeline_id);
                   setShowCreate(false);
                 }}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  selectedId === p.pipeline_id
-                    ? "border-indigo-600 bg-indigo-950/60"
-                    : "border-slate-700 bg-slate-800 hover:border-slate-600"
-                }`}
+                style={{
+                  width: "100%",
+                  borderRadius: 8,
+                  border:
+                    selectedId === p.pipeline_id
+                      ? "1px solid var(--strong)"
+                      : "1px solid var(--line)",
+                  background:
+                    selectedId === p.pipeline_id
+                      ? "rgba(49,46,129,0.4)"
+                      : "var(--surface)",
+                  padding: 12,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  color: "var(--text)",
+                }}
               >
-                <p className="text-sm font-medium text-white line-clamp-1">{p.title}</p>
-                <span className="inline-block mt-1 rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300 capitalize">
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "var(--text)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.title}
+                </p>
+                <span
+                  style={{
+                    display: "inline-block",
+                    marginTop: 4,
+                    borderRadius: 999,
+                    background: "var(--line)",
+                    padding: "2px 8px",
+                    fontSize: 12,
+                    color: "var(--text)",
+                    textTransform: "capitalize",
+                  }}
+                >
                   {p.current_stage.replace(/_/g, " ")}
                 </span>
-                <div className="mt-2">
-                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                <div style={{ marginTop: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                      color: "var(--muted)",
+                      marginBottom: 4,
+                    }}
+                  >
                     <span>Progress</span>
                     <span>{p.overall_completion_pct}%</span>
                   </div>
-                  <div className="h-1 rounded-full bg-slate-700">
+                  <div
+                    style={{
+                      height: 4,
+                      borderRadius: 999,
+                      background: "var(--line)",
+                    }}
+                  >
                     <div
-                      className="h-1 rounded-full bg-indigo-500"
-                      style={{ width: `${p.overall_completion_pct}%` }}
+                      style={{
+                        height: 4,
+                        borderRadius: 999,
+                        background: "var(--strong)",
+                        width: `${p.overall_completion_pct}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -328,36 +575,76 @@ export default function ResearchPipelinePage() {
       </aside>
 
       {/* Right: detail or create form */}
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <h1 className="mb-1 text-3xl font-black tracking-tight text-white">
+      <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        <h1
+          style={{
+            marginBottom: 4,
+            fontSize: 30,
+            fontWeight: 900,
+            letterSpacing: "-0.02em",
+            color: "var(--text)",
+          }}
+        >
           Research Pipeline
         </h1>
-        <p className="mb-8 text-slate-400">
+        <p style={{ marginBottom: 32, color: "var(--muted)" }}>
           Full hypothesis-to-submission lifecycle tracker.
         </p>
 
         {showCreate && (
           <form
             onSubmit={handleCreate}
-            className="space-y-5 rounded-xl border border-slate-700 bg-slate-800/60 p-6 max-w-2xl"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+              borderRadius: 12,
+              border: "1px solid var(--line)",
+              background: "var(--surface)",
+              padding: 24,
+              maxWidth: 672,
+            }}
           >
-            <h2 className="text-lg font-bold text-white">Create New Pipeline</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+              Create New Pipeline
+            </h2>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 4,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--muted)",
+                }}
+              >
                 Title *
               </label>
               <input
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="VQE Hydrogen Molecule Study"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 4,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--muted)",
+                }}
+              >
                 Hypothesis *
               </label>
               <textarea
@@ -365,40 +652,79 @@ export default function ResearchPipelinePage() {
                 rows={3}
                 value={hypothesis}
                 onChange={(e) => setHypothesis(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="We hypothesize that error mitigation will improve fidelity by ≥15%..."
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    color: "var(--muted)",
+                  }}
+                >
                   Algorithm *
                 </label>
                 <input
                   required
                   value={algorithm}
                   onChange={(e) => setAlgorithm(e.target.value)}
-                  className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  className="input"
+                  style={{ width: "100%" }}
                   placeholder="VQE"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    color: "var(--muted)",
+                  }}
+                >
                   Backend *
                 </label>
                 <input
                   required
                   value={backend}
                   onChange={(e) => setBackend(e.target.value)}
-                  className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  className="input"
+                  style={{ width: "100%" }}
                   placeholder="ibm_brisbane"
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 4,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--muted)",
+                }}
+              >
                 Success Criteria *
               </label>
               <textarea
@@ -406,29 +732,58 @@ export default function ResearchPipelinePage() {
                 rows={2}
                 value={successCriteria}
                 onChange={(e) => setSuccessCriteria(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="Achieve fidelity ≥ 0.95 and publish results..."
               />
             </div>
 
             {createError && (
-              <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+              <div
+                style={{
+                  borderRadius: 8,
+                  border: "1px solid var(--danger)",
+                  background: "rgba(239,68,68,0.1)",
+                  padding: "12px 16px",
+                  fontSize: 13,
+                  color: "var(--danger)",
+                }}
+              >
                 {createError}
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div style={{ display: "flex", gap: 12 }}>
               <button
                 type="submit"
                 disabled={creating}
-                className="flex-1 rounded-lg bg-indigo-600 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                style={{
+                  flex: 1,
+                  borderRadius: 8,
+                  background: "var(--strong)",
+                  padding: "10px 0",
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  border: "none",
+                  cursor: creating ? "not-allowed" : "pointer",
+                  opacity: creating ? 0.5 : 1,
+                  fontSize: 14,
+                }}
               >
                 {creating ? "Creating..." : "Create Pipeline"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="rounded-lg border border-slate-600 px-4 py-2.5 text-slate-300 hover:border-slate-500 hover:text-white transition-colors"
+                style={{
+                  borderRadius: 8,
+                  border: "1px solid var(--line)",
+                  padding: "10px 16px",
+                  color: "var(--text)",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
               >
                 Cancel
               </button>
@@ -444,11 +799,33 @@ export default function ResearchPipelinePage() {
         )}
 
         {!showCreate && !selectedPipeline && (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 py-20 text-center">
-            <p className="text-slate-400 mb-4">Select a pipeline or create a new one.</p>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 12,
+              border: "1px dashed var(--line)",
+              padding: "80px 0",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "var(--muted)", marginBottom: 16 }}>
+              Select a pipeline or create a new one.
+            </p>
             <button
               onClick={() => setShowCreate(true)}
-              className="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-500 transition-colors"
+              style={{
+                borderRadius: 8,
+                background: "var(--strong)",
+                padding: "10px 20px",
+                fontWeight: 600,
+                color: "var(--text)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
             >
               + New Pipeline
             </button>

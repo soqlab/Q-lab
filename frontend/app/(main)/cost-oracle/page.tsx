@@ -29,12 +29,12 @@ export default function CostOraclePage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Cost Oracle</h1>
-      <p className="text-gray-400">Estimate and compare quantum cloud execution costs across providers before submitting jobs.</p>
+    <div style={{ padding: 24, maxWidth: 896, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Cost Oracle</h1>
+      <p style={{ color: "var(--muted)" }}>Estimate and compare quantum cloud execution costs across providers before submitting jobs.</p>
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {([
             ["Qubits", nQubits, setNQubits, 1, 500, 1],
             ["Circuit Depth", depth, setDepth, 1, 10000, 1],
@@ -42,69 +42,68 @@ export default function CostOraclePage() {
             ["# Circuits", nCircuits, setNCircuits, 1, 1000, 1],
           ] as [string, number, (n: number) => void, number, number, number][]).map(([label, val, set, min, max, step]) => (
             <div key={label}>
-              <label className="text-sm text-gray-400">{label}</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>{label}</label>
               <input type="number" min={min} max={max} step={step} value={val}
                 onChange={e => set(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                className="input" style={{ width: "100%", marginTop: 4 }} />
             </div>
           ))}
         </div>
-        <div className="flex gap-3">
+        <div style={{ display: "flex", gap: 12 }}>
           <button onClick={estimate} disabled={loading}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+            className="button" style={{ opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
             {loading ? "Estimating..." : "Estimate Cost"}
           </button>
-          <button onClick={loadHistory}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">
+          <button onClick={loadHistory} className="button secondary">
             View Spend History
           </button>
         </div>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-green-900/30 rounded-lg p-4 border border-green-700">
-              <div className="text-xs text-green-400 uppercase mb-1">Cheapest Option</div>
-              <div className="text-xl font-bold text-green-300">{result.cheapest_provider}</div>
-              <div className="text-2xl font-mono text-green-400">${result.cheapest_cost_usd.toFixed(4)}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ background: "rgba(16,185,129,0.1)", borderRadius: 8, padding: 16, border: "1px solid var(--ok)" }}>
+              <div style={{ fontSize: 12, color: "var(--ok)", textTransform: "uppercase", marginBottom: 4 }}>Cheapest Option</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ok)" }}>{result.cheapest_provider}</div>
+              <div style={{ fontSize: 24, fontFamily: "ui-monospace,monospace", color: "var(--ok)" }}>${result.cheapest_cost_usd.toFixed(4)}</div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-4">
-              <div className="text-xs text-gray-400 uppercase mb-1">All Providers Total</div>
-              <div className="text-2xl font-mono text-white">${result.total_if_all_providers_usd.toFixed(2)}</div>
-              <div className="text-xs text-gray-500 mt-1">{result.n_shots.toLocaleString()} shots × {result.n_circuits} circuits</div>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>All Providers Total</div>
+              <div style={{ fontSize: 24, fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>${result.total_if_all_providers_usd.toFixed(2)}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{result.n_shots.toLocaleString()} shots × {result.n_circuits} circuits</div>
             </div>
           </div>
 
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div style={{ background: "var(--surface)", borderRadius: 8, overflow: "hidden" }}>
+            <table style={{ width: "100%", fontSize: 13 }}>
               <thead>
-                <tr className="border-b border-gray-700 text-gray-400 text-xs uppercase">
+                <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", fontSize: 12, textTransform: "uppercase" }}>
                   {["Provider", "Cost/Circuit", "Total", "Queue (min)", "Free Tier"].map(h => (
-                    <th key={h} className="text-left py-3 px-4">{h}</th>
+                    <th key={h} style={{ textAlign: "left", padding: "12px 16px" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {result.providers.map((p, i) => (
-                  <tr key={p.provider_id} className={`border-b border-gray-800 ${i === 0 ? "bg-green-900/10" : ""}`}>
-                    <td className="py-2 px-4 font-medium">{p.provider_name}</td>
-                    <td className="py-2 px-4 font-mono">${p.cost_per_circuit_usd.toFixed(5)}</td>
-                    <td className="py-2 px-4 font-mono font-semibold">${p.cost_total_usd.toFixed(4)}</td>
-                    <td className="py-2 px-4 text-gray-400">{p.estimated_queue_min}</td>
-                    <td className="py-2 px-4">{p.free_tier ? <span className="text-green-400">Yes</span> : <span className="text-gray-600">No</span>}</td>
+                {(result.providers ?? []).map((p, i) => (
+                  <tr key={p.provider_id} style={{ borderBottom: "1px solid var(--line)", background: i === 0 ? "rgba(16,185,129,0.1)" : undefined }}>
+                    <td style={{ padding: "8px 16px", fontWeight: 500 }}>{p.provider_name}</td>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace" }}>${p.cost_per_circuit_usd.toFixed(5)}</td>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", fontWeight: 600 }}>${p.cost_total_usd.toFixed(4)}</td>
+                    <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{p.estimated_queue_min}</td>
+                    <td style={{ padding: "8px 16px" }}>{p.free_tier ? <span style={{ color: "var(--ok)" }}>Yes</span> : <span style={{ color: "var(--muted)" }}>No</span>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {result.recommendations.length > 0 && (
-            <div className="bg-yellow-900/20 rounded-lg p-4 space-y-1">
-              {result.recommendations.map((r, i) => (
-                <div key={i} className="text-yellow-300 text-sm">• {r}</div>
+          {(result.recommendations ?? []).length > 0 && (
+            <div style={{ background: "rgba(245,158,11,0.1)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+              {(result.recommendations ?? []).map((r, i) => (
+                <div key={i} style={{ color: "#f59e0b", fontSize: 13 }}>• {r}</div>
               ))}
             </div>
           )}
@@ -112,17 +111,17 @@ export default function CostOraclePage() {
       )}
 
       {history && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-3">
-          <h2 className="font-semibold">Spend History</h2>
-          <div className="text-2xl font-mono text-indigo-400">${history.total_usd.toFixed(4)} total</div>
-          <div className="space-y-2">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <h2 style={{ fontWeight: 600 }}>Spend History</h2>
+          <div style={{ fontSize: 24, fontFamily: "ui-monospace,monospace", color: "var(--strong)" }}>${history.total_usd.toFixed(4)} total</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Object.entries(history.by_provider).map(([provider, cost]) => (
-              <div key={provider} className="flex items-center gap-3">
-                <span className="text-sm text-gray-400 w-32">{provider}</span>
-                <div className="flex-1 bg-gray-700 rounded-full h-2">
-                  <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${(cost / Math.max(history.total_usd, 0.0001)) * 100}%` }} />
+              <div key={provider} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 13, color: "var(--muted)", width: 128, flexShrink: 0 }}>{provider}</span>
+                <div style={{ flex: 1, background: "var(--line)", borderRadius: 999, height: 8 }}>
+                  <div style={{ background: "var(--strong)", height: 8, borderRadius: 999, width: `${(cost / Math.max(history.total_usd, 0.0001)) * 100}%` }} />
                 </div>
-                <span className="font-mono text-sm">${(cost as number).toFixed(4)}</span>
+                <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 13 }}>${(cost as number).toFixed(4)}</span>
               </div>
             ))}
           </div>

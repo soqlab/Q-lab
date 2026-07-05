@@ -67,8 +67,8 @@ function PSDChart({ psd }: { psd: NoisePSD }) {
   for (let v = Math.ceil(minY); v <= Math.floor(maxY); v += 2) yTicks.push(v);
 
   return (
-    <div className="overflow-x-auto">
-      <svg width={W} height={H} className="block">
+    <div style={{ overflowX: "auto" }}>
+      <svg width={W} height={H} style={{ display: "block" }}>
         {/* Background */}
         <rect x={PAD.left} y={PAD.top} width={innerW} height={innerH} fill="#111827" rx={4} />
 
@@ -254,25 +254,26 @@ export default function SpectralNoisePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-8">
+    <div style={{ minHeight: "100vh", background: "var(--surface)", color: "var(--text)", padding: 24, display: "flex", flexDirection: "column", gap: 32 }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Spectral Noise Analyzer</h1>
-        <p className="text-gray-400 mt-1 text-sm">1/f noise characterization and TLS defect detection for quantum backends</p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Spectral Noise Analyzer</h1>
+        <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 13 }}>1/f noise characterization and TLS defect detection for quantum backends</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
         {/* Analysis Form */}
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-indigo-400">Run Spectral Analysis</h2>
+        <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Run Spectral Analysis</h2>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <select
                 value={backend}
                 onChange={(e) => setBackend(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {BACKENDS.map((b) => (
                   <option key={b} value={b}>{b}</option>
@@ -281,23 +282,25 @@ export default function SpectralNoisePage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Qubit (0–9)</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Qubit (0–9)</label>
               <input
                 type="number"
                 min={0}
                 max={9}
                 value={qubit}
                 onChange={(e) => setQubit(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Metric</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Metric</label>
               <select
                 value={metric}
                 onChange={(e) => setMetric(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {METRICS.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -306,7 +309,7 @@ export default function SpectralNoisePage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Duration (sec)</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Duration (sec)</label>
               <input
                 type="number"
                 min={600}
@@ -314,7 +317,8 @@ export default function SpectralNoisePage() {
                 step={600}
                 value={durationSec}
                 onChange={(e) => setDurationSec(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
           </div>
@@ -322,27 +326,29 @@ export default function SpectralNoisePage() {
           <button
             onClick={handleAnalyze}
             disabled={analyzing}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg py-2 text-sm font-medium transition-colors"
+            className="button"
+            style={{ width: "100%", opacity: analyzing ? 0.5 : 1, cursor: analyzing ? "not-allowed" : "pointer" }}
           >
             {analyzing ? "Analyzing…" : "Analyze"}
           </button>
 
           {analyzeError && (
-            <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{analyzeError}</div>
+            <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>{analyzeError}</div>
           )}
         </div>
 
         {/* TLS Detection Panel */}
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-indigo-400">TLS Defect Detection</h2>
+        <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>TLS Defect Detection</h2>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <select
                 value={tlsBackend}
                 onChange={(e) => setTlsBackend(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {BACKENDS.map((b) => (
                   <option key={b} value={b}>{b}</option>
@@ -351,14 +357,15 @@ export default function SpectralNoisePage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Qubit (0–9)</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Qubit (0–9)</label>
               <input
                 type="number"
                 min={0}
                 max={9}
                 value={tlsQubit}
                 onChange={(e) => setTlsQubit(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
           </div>
@@ -366,45 +373,51 @@ export default function SpectralNoisePage() {
           <button
             onClick={handleDetectTLS}
             disabled={detectingTLS}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg py-2 text-sm font-medium transition-colors"
+            className="button"
+            style={{ width: "100%", opacity: detectingTLS ? 0.5 : 1, cursor: detectingTLS ? "not-allowed" : "pointer" }}
           >
             {detectingTLS ? "Detecting…" : "Detect TLS"}
           </button>
 
           {tlsError && (
-            <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{tlsError}</div>
+            <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>{tlsError}</div>
           )}
 
           {tlsReport && (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400">TLS Detected:</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tlsReport.n_tls_detected > 0 ? "bg-red-900/40 text-red-400 border border-red-800" : "bg-green-900/40 text-green-400 border border-green-800"}`}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>TLS Detected:</span>
+                <span style={{
+                  fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                  ...(tlsReport.n_tls_detected > 0
+                    ? { background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid var(--danger)" }
+                    : { background: "rgba(16,185,129,0.1)", color: "var(--ok)", border: "1px solid var(--ok)" })
+                }}>
                   {tlsReport.n_tls_detected}
                 </span>
               </div>
 
-              {tlsReport.tls_list.length > 0 && (
+              {(tlsReport.tls_list ?? []).length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-2">TLS Defects</p>
-                  <div className="space-y-1">
-                    {tlsReport.tls_list.map((tls, i) => (
-                      <div key={i} className="bg-gray-800 rounded-lg px-3 py-2 text-xs grid grid-cols-3 gap-2">
-                        <span><span className="text-gray-400">Freq:</span> {tls.frequency_ghz.toFixed(3)} GHz</span>
-                        <span><span className="text-gray-400">Coupling:</span> {tls.coupling_strength.toExponential(2)}</span>
-                        <span><span className="text-gray-400">T:</span> {tls.coherence_time_us.toFixed(1)} µs</span>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>TLS Defects</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {(tlsReport.tls_list ?? []).map((tls, i) => (
+                      <div key={i} style={{ background: "var(--line)", borderRadius: 8, padding: "8px 12px", fontSize: 12, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                        <span><span style={{ color: "var(--muted)" }}>Freq:</span> {tls.frequency_ghz.toFixed(3)} GHz</span>
+                        <span><span style={{ color: "var(--muted)" }}>Coupling:</span> {tls.coupling_strength.toExponential(2)}</span>
+                        <span><span style={{ color: "var(--muted)" }}>T:</span> {tls.coherence_time_us.toFixed(1)} µs</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {tlsReport.mitigation_suggestions.length > 0 && (
+              {(tlsReport.mitigation_suggestions ?? []).length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Mitigation Suggestions</p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {tlsReport.mitigation_suggestions.map((s, i) => (
-                      <li key={i} className="text-xs text-gray-300">{s}</li>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Mitigation Suggestions</p>
+                  <ul style={{ display: "flex", flexDirection: "column", gap: 2, listStyleType: "disc", paddingLeft: 20 }}>
+                    {(tlsReport.mitigation_suggestions ?? []).map((s, i) => (
+                      <li key={i} style={{ fontSize: 12, color: "var(--text)" }}>{s}</li>
                     ))}
                   </ul>
                 </div>
@@ -416,28 +429,33 @@ export default function SpectralNoisePage() {
 
       {/* PSD Result */}
       {currentPSD && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-indigo-400">Power Spectral Density</h2>
-            <span className="text-xs text-gray-500">{currentPSD.backend} · Q{currentPSD.qubit} · {currentPSD.metric}</span>
+        <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Power Spectral Density</h2>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>{currentPSD.backend} · Q{currentPSD.qubit} · {currentPSD.metric}</span>
           </div>
 
           {/* Key metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12 }}>
             {[
               { label: "Noise Floor", value: currentPSD.noise_floor.toExponential(3) },
               { label: "1/f Coefficient", value: currentPSD.one_over_f_coefficient.toExponential(3) },
               { label: "1/f Exponent", value: currentPSD.one_over_f_exponent.toFixed(3) },
               { label: "White Noise", value: currentPSD.white_noise_level.toExponential(3) },
             ].map(({ label, value }) => (
-              <div key={label} className="bg-gray-800 rounded-lg px-3 py-3 text-center">
-                <p className="text-xs text-gray-400 mb-1">{label}</p>
-                <p className="text-sm font-mono font-semibold text-gray-100">{value}</p>
+              <div key={label} style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center" }}>
+                <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{label}</p>
+                <p style={{ fontSize: 13, fontFamily: "ui-monospace,monospace", fontWeight: 600, color: "var(--text)" }}>{value}</p>
               </div>
             ))}
-            <div className="bg-gray-800 rounded-lg px-3 py-3 text-center flex flex-col items-center justify-center gap-1">
-              <p className="text-xs text-gray-400">TLS Detected</p>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${currentPSD.tls_detected ? "bg-red-900/40 text-red-400 border border-red-800" : "bg-green-900/40 text-green-400 border border-green-800"}`}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              <p style={{ fontSize: 12, color: "var(--muted)" }}>TLS Detected</p>
+              <span style={{
+                fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                ...(currentPSD.tls_detected
+                  ? { background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid var(--danger)" }
+                  : { background: "rgba(16,185,129,0.1)", color: "var(--ok)", border: "1px solid var(--ok)" })
+              }}>
                 {currentPSD.tls_detected ? "YES" : "NO"}
               </span>
             </div>
@@ -449,45 +467,50 @@ export default function SpectralNoisePage() {
       )}
 
       {/* Analyses Table */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
-        <h2 className="text-base font-semibold text-indigo-400">Previous Analyses</h2>
+      <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Previous Analyses</h2>
 
         {loadingAnalyses ? (
-          <div className="text-sm text-gray-400 animate-pulse">Loading analyses…</div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading analyses…</div>
         ) : analysesError ? (
-          <div className="text-red-400 text-sm">{analysesError}</div>
+          <div style={{ color: "var(--danger)", fontSize: 13 }}>{analysesError}</div>
         ) : analyses.length === 0 ? (
-          <div className="text-sm text-gray-500">No analyses found.</div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>No analyses found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
               <thead>
-                <tr className="text-left text-xs text-gray-400 border-b border-gray-800">
-                  <th className="pb-2 font-medium">Backend</th>
-                  <th className="pb-2 font-medium">Qubit</th>
-                  <th className="pb-2 font-medium">Metric</th>
-                  <th className="pb-2 font-medium">TLS</th>
-                  <th className="pb-2 font-medium">Noise Floor</th>
-                  <th className="pb-2 font-medium">Created</th>
+                <tr style={{ textAlign: "left", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Backend</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Qubit</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Metric</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>TLS</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Noise Floor</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Created</th>
                 </tr>
               </thead>
               <tbody>
-                {analyses.map((a) => (
+                {(analyses ?? []).map((a) => (
                   <tr
                     key={a.analysis_id}
                     onClick={() => handleSelectAnalysis(a.analysis_id)}
-                    className="border-b border-gray-800/50 hover:bg-gray-800/50 cursor-pointer transition-colors"
+                    style={{ borderBottom: "1px solid var(--line)", cursor: "pointer" }}
                   >
-                    <td className="py-2 pr-4 font-mono text-xs">{a.backend}</td>
-                    <td className="py-2 pr-4">{a.qubit}</td>
-                    <td className="py-2 pr-4 text-xs">{a.metric}</td>
-                    <td className="py-2 pr-4">
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${a.tls_detected ? "bg-red-900/40 text-red-400 border border-red-800" : "bg-green-900/40 text-green-400 border border-green-800"}`}>
+                    <td style={{ padding: "8px 16px 8px 0", fontFamily: "ui-monospace,monospace", fontSize: 12 }}>{a.backend}</td>
+                    <td style={{ padding: "8px 16px 8px 0" }}>{a.qubit}</td>
+                    <td style={{ padding: "8px 16px 8px 0", fontSize: 12 }}>{a.metric}</td>
+                    <td style={{ padding: "8px 16px 8px 0" }}>
+                      <span style={{
+                        fontSize: 12, padding: "2px 6px", borderRadius: 999, fontWeight: 500,
+                        ...(a.tls_detected
+                          ? { background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid var(--danger)" }
+                          : { background: "rgba(16,185,129,0.1)", color: "var(--ok)", border: "1px solid var(--ok)" })
+                      }}>
                         {a.tls_detected ? "YES" : "NO"}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 font-mono text-xs">{a.noise_floor.toExponential(3)}</td>
-                    <td className="py-2 text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString()}</td>
+                    <td style={{ padding: "8px 16px 8px 0", fontFamily: "ui-monospace,monospace", fontSize: 12 }}>{a.noise_floor.toExponential(3)}</td>
+                    <td style={{ padding: "8px 0", fontSize: 12, color: "var(--muted)" }}>{new Date(a.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>

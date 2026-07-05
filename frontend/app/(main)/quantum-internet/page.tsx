@@ -33,12 +33,19 @@ type LinkDraft = {
   fidelity: number;
 };
 
-const topologyBadge: Record<string, string> = {
-  star: "bg-yellow-900/40 text-yellow-400 border border-yellow-800",
-  chain: "bg-blue-900/40 text-blue-400 border border-blue-800",
-  mesh: "bg-purple-900/40 text-purple-400 border border-purple-800",
-  ring: "bg-teal-900/40 text-teal-400 border border-teal-800",
+type BadgeStyle = { background: string; color: string; border: string };
+
+const topologyBadgeStyle: Record<string, BadgeStyle> = {
+  star: { background: "rgba(245,158,11,0.15)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.4)" },
+  chain: { background: "rgba(59,130,246,0.15)", color: "var(--info-text)", border: "1px solid rgba(59,130,246,0.4)" },
+  mesh: { background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.4)" },
+  ring: { background: "rgba(20,184,166,0.15)", color: "#2dd4bf", border: "1px solid rgba(20,184,166,0.4)" },
 };
+
+const defaultBadgeStyle: BadgeStyle = { background: "var(--line)", color: "var(--muted)", border: "1px solid var(--line)" };
+
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 };
+const errorBoxStyle: React.CSSProperties = { color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" };
 
 export default function QuantumInternetPage() {
   const [networks, setNetworks] = useState<QNetwork[]>([]);
@@ -191,16 +198,16 @@ export default function QuantumInternetPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-6">
+    <div className="page" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Quantum Internet Simulator</h1>
-          <p className="text-gray-400 mt-1 text-sm">Multi-node entanglement distribution and network topology modeling</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Quantum Internet Simulator</h1>
+          <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 13 }}>Multi-node entanglement distribution and network topology modeling</p>
         </div>
         <button
           onClick={() => setShowCreate((v) => !v)}
-          className="bg-indigo-600 hover:bg-indigo-500 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+          className="button"
         >
           {showCreate ? "Cancel" : "Create Network"}
         </button>
@@ -208,17 +215,17 @@ export default function QuantumInternetPage() {
 
       {/* Create Network Form */}
       {showCreate && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5">
-          <h2 className="text-sm font-semibold text-indigo-400">New Quantum Network</h2>
+        <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--strong)" }}>New Quantum Network</h2>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Network Name</label>
-              <input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={labelStyle}>Network Name</label>
+              <input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Topology</label>
-              <select value={createTopology} onChange={(e) => setCreateTopology(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+              <label style={labelStyle}>Topology</label>
+              <select value={createTopology} onChange={(e) => setCreateTopology(e.target.value)} className="input" style={{ width: "100%" }}>
                 {TOPOLOGIES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -226,41 +233,41 @@ export default function QuantumInternetPage() {
 
           {/* Nodes Builder */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-gray-300">Nodes</p>
-              <button onClick={addNodeDraft} className="text-xs text-indigo-400 hover:text-indigo-300">+ Add Node</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>Nodes</p>
+              <button onClick={addNodeDraft} style={{ fontSize: 12, color: "var(--strong)", background: "none", border: "none", cursor: "pointer" }}>+ Add Node</button>
             </div>
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {nodeDrafts.map((node, i) => (
-                <div key={i} className="bg-gray-800 rounded-lg p-3 grid grid-cols-3 md:grid-cols-6 gap-2 items-end">
+                <div key={i} style={{ background: "var(--surface)", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 8, alignItems: "flex-end" }}>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Name</label>
-                    <input type="text" value={node.name} onChange={(e) => updateNodeDraft(i, "name", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Name</label>
+                    <input type="text" value={node.name} onChange={(e) => updateNodeDraft(i, "name", e.target.value)} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Type</label>
-                    <select value={node.type} onChange={(e) => updateNodeDraft(i, "type", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none">
+                    <label style={labelStyle}>Type</label>
+                    <select value={node.type} onChange={(e) => updateNodeDraft(i, "type", e.target.value)} className="input" style={{ width: "100%", fontSize: 12 }}>
                       {NODE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Location</label>
-                    <input type="text" value={node.location} onChange={(e) => updateNodeDraft(i, "location", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Location</label>
+                    <input type="text" value={node.location} onChange={(e) => updateNodeDraft(i, "location", e.target.value)} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Qubits</label>
-                    <input type="number" min={1} value={node.qubit_count} onChange={(e) => updateNodeDraft(i, "qubit_count", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Qubits</label>
+                    <input type="number" min={1} value={node.qubit_count} onChange={(e) => updateNodeDraft(i, "qubit_count", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Coh. (µs)</label>
-                    <input type="number" min={1} value={node.coherence_time_us} onChange={(e) => updateNodeDraft(i, "coherence_time_us", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Coh. (µs)</label>
+                    <input type="number" min={1} value={node.coherence_time_us} onChange={(e) => updateNodeDraft(i, "coherence_time_us", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
-                  <div className="flex gap-1 items-end">
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-400 mb-1">Fidelity</label>
-                      <input type="number" min={0} max={1} step={0.001} value={node.gate_fidelity} onChange={(e) => updateNodeDraft(i, "gate_fidelity", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                  <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Fidelity</label>
+                      <input type="number" min={0} max={1} step={0.001} value={node.gate_fidelity} onChange={(e) => updateNodeDraft(i, "gate_fidelity", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                     </div>
-                    <button onClick={() => removeNodeDraft(i)} className="text-xs text-red-400 hover:text-red-300 pb-1 px-1">x</button>
+                    <button onClick={() => removeNodeDraft(i)} style={{ fontSize: 12, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", paddingBottom: 4, paddingLeft: 4, paddingRight: 4 }}>x</button>
                   </div>
                 </div>
               ))}
@@ -269,47 +276,47 @@ export default function QuantumInternetPage() {
 
           {/* Links Builder */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-gray-300">Links</p>
-              <button onClick={addLinkDraft} className="text-xs text-indigo-400 hover:text-indigo-300">+ Add Link</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>Links</p>
+              <button onClick={addLinkDraft} style={{ fontSize: 12, color: "var(--strong)", background: "none", border: "none", cursor: "pointer" }}>+ Add Link</button>
             </div>
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {linkDrafts.map((link, i) => (
-                <div key={i} className="bg-gray-800 rounded-lg p-3 grid grid-cols-3 md:grid-cols-6 gap-2 items-end">
+                <div key={i} style={{ background: "var(--surface)", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 8, alignItems: "flex-end" }}>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Node A</label>
-                    <input type="text" value={link.node_a} onChange={(e) => updateLinkDraft(i, "node_a", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Node A</label>
+                    <input type="text" value={link.node_a} onChange={(e) => updateLinkDraft(i, "node_a", e.target.value)} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Node B</label>
-                    <input type="text" value={link.node_b} onChange={(e) => updateLinkDraft(i, "node_b", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Node B</label>
+                    <input type="text" value={link.node_b} onChange={(e) => updateLinkDraft(i, "node_b", e.target.value)} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Distance (km)</label>
-                    <input type="number" min={0} value={link.distance_km} onChange={(e) => updateLinkDraft(i, "distance_km", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Distance (km)</label>
+                    <input type="number" min={0} value={link.distance_km} onChange={(e) => updateLinkDraft(i, "distance_km", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Loss (dB/km)</label>
-                    <input type="number" min={0} step={0.01} value={link.loss_db_per_km} onChange={(e) => updateLinkDraft(i, "loss_db_per_km", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Loss (dB/km)</label>
+                    <input type="number" min={0} step={0.01} value={link.loss_db_per_km} onChange={(e) => updateLinkDraft(i, "loss_db_per_km", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Ent. Rate (Hz)</label>
-                    <input type="number" min={0} value={link.entanglement_rate_hz} onChange={(e) => updateLinkDraft(i, "entanglement_rate_hz", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                    <label style={labelStyle}>Ent. Rate (Hz)</label>
+                    <input type="number" min={0} value={link.entanglement_rate_hz} onChange={(e) => updateLinkDraft(i, "entanglement_rate_hz", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                   </div>
-                  <div className="flex gap-1 items-end">
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-400 mb-1">Fidelity</label>
-                      <input type="number" min={0} max={1} step={0.001} value={link.fidelity} onChange={(e) => updateLinkDraft(i, "fidelity", Number(e.target.value))} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none" />
+                  <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Fidelity</label>
+                      <input type="number" min={0} max={1} step={0.001} value={link.fidelity} onChange={(e) => updateLinkDraft(i, "fidelity", Number(e.target.value))} className="input" style={{ width: "100%", fontSize: 12 }} />
                     </div>
-                    <button onClick={() => removeLinkDraft(i)} className="text-xs text-red-400 hover:text-red-300 pb-1 px-1">x</button>
+                    <button onClick={() => removeLinkDraft(i)} style={{ fontSize: 12, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", paddingBottom: 4, paddingLeft: 4, paddingRight: 4 }}>x</button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {createError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{createError}</div>}
-          <button onClick={handleCreateNetwork} disabled={creating || !createName} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+          {createError && <div style={errorBoxStyle}>{createError}</div>}
+          <button onClick={handleCreateNetwork} disabled={creating || !createName} className="button" style={{ opacity: creating || !createName ? 0.5 : 1, cursor: creating || !createName ? "not-allowed" : "pointer" }}>
             {creating ? "Creating…" : "Create Network"}
           </button>
         </div>
@@ -317,28 +324,36 @@ export default function QuantumInternetPage() {
 
       {/* Networks List */}
       {loadingNetworks ? (
-        <div className="text-sm text-gray-400 animate-pulse">Loading networks…</div>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading networks…</div>
       ) : networksError ? (
-        <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{networksError}</div>
+        <div style={errorBoxStyle}>{networksError}</div>
       ) : networks.length === 0 ? (
-        <div className="text-sm text-gray-500">No networks found.</div>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>No networks found.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {networks.map((net) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
+          {(networks ?? []).map((net) => (
             <div
               key={net.network_id}
               onClick={() => handleSelectNetwork(net.network_id)}
-              className={`bg-gray-900 border rounded-xl p-4 cursor-pointer transition-colors space-y-2 ${selectedNetwork?.network_id === net.network_id ? "border-indigo-600" : "border-gray-800 hover:border-gray-600"}`}
+              className="panel"
+              style={{
+                padding: 16,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                border: selectedNetwork?.network_id === net.network_id ? "1px solid var(--strong)" : "1px solid var(--line)",
+              }}
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold text-sm">{net.name}</p>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${topologyBadge[net.topology] ?? "bg-gray-700 text-gray-400"}`}>{net.topology}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <p style={{ fontWeight: 600, fontSize: 13 }}>{net.name}</p>
+                <span style={{ fontSize: 12, padding: "2px 6px", borderRadius: 999, ...(topologyBadgeStyle[net.topology] ?? defaultBadgeStyle) }}>{net.topology}</span>
               </div>
-              <div className="text-xs text-gray-400 flex gap-4">
-                <span>{net.nodes.length} nodes</span>
-                <span>{net.links.length} links</span>
+              <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", gap: 16 }}>
+                <span>{(net.nodes ?? []).length} nodes</span>
+                <span>{(net.links ?? []).length} links</span>
               </div>
-              <p className="text-xs text-gray-500">{new Date(net.created_at).toLocaleDateString()}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)" }}>{new Date(net.created_at).toLocaleDateString()}</p>
             </div>
           ))}
         </div>
@@ -346,34 +361,34 @@ export default function QuantumInternetPage() {
 
       {/* Selected Network Detail */}
       {loadingNetwork ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-sm text-gray-400 animate-pulse">Loading network details…</div>
+        <div className="panel" style={{ padding: 24, fontSize: 13, color: "var(--muted)" }}>Loading network details…</div>
       ) : selectedNetwork && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 24 }}>
           {/* Topology Summary */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-            <h2 className="text-base font-semibold text-indigo-400">Network: {selectedNetwork.name}</h2>
+          <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Network: {selectedNetwork.name}</h2>
 
             <div>
-              <p className="text-xs font-medium text-gray-400 mb-2">Nodes</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>Nodes</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-800">
-                      <th className="pb-1.5 font-medium">Name</th>
-                      <th className="pb-1.5 font-medium">Type</th>
-                      <th className="pb-1.5 font-medium">Location</th>
-                      <th className="pb-1.5 font-medium">Qubits</th>
-                      <th className="pb-1.5 font-medium">Fidelity</th>
+                    <tr>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Name</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Type</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Location</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Qubits</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Fidelity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedNetwork.nodes.map((n) => (
-                      <tr key={n.node_id} className="border-b border-gray-800/50">
-                        <td className="py-1.5 pr-3 font-medium">{n.name}</td>
-                        <td className="py-1.5 pr-3">{n.type}</td>
-                        <td className="py-1.5 pr-3">{n.location}</td>
-                        <td className="py-1.5 pr-3">{n.qubit_count}</td>
-                        <td className="py-1.5">{(n.gate_fidelity * 100).toFixed(2)}%</td>
+                    {(selectedNetwork.nodes ?? []).map((n) => (
+                      <tr key={n.node_id} style={{ borderBottom: "1px solid var(--line)" }}>
+                        <td style={{ padding: "6px 12px 6px 0", fontWeight: 500 }}>{n.name}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{n.type}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{n.location}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{n.qubit_count}</td>
+                        <td style={{ padding: "6px 0" }}>{(n.gate_fidelity * 100).toFixed(2)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -382,26 +397,26 @@ export default function QuantumInternetPage() {
             </div>
 
             <div>
-              <p className="text-xs font-medium text-gray-400 mb-2">Links</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>Links</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-800">
-                      <th className="pb-1.5 font-medium">A</th>
-                      <th className="pb-1.5 font-medium">B</th>
-                      <th className="pb-1.5 font-medium">Dist (km)</th>
-                      <th className="pb-1.5 font-medium">Rate (Hz)</th>
-                      <th className="pb-1.5 font-medium">Fidelity</th>
+                    <tr>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>A</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>B</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Dist (km)</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Rate (Hz)</th>
+                      <th style={{ paddingBottom: 6, fontWeight: 500, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Fidelity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedNetwork.links.map((l) => (
-                      <tr key={l.link_id} className="border-b border-gray-800/50">
-                        <td className="py-1.5 pr-3">{l.node_a}</td>
-                        <td className="py-1.5 pr-3">{l.node_b}</td>
-                        <td className="py-1.5 pr-3">{l.distance_km}</td>
-                        <td className="py-1.5 pr-3">{l.entanglement_rate_hz}</td>
-                        <td className="py-1.5">{(l.fidelity * 100).toFixed(2)}%</td>
+                    {(selectedNetwork.links ?? []).map((l) => (
+                      <tr key={l.link_id} style={{ borderBottom: "1px solid var(--line)" }}>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{l.node_a}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{l.node_b}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{l.distance_km}</td>
+                        <td style={{ padding: "6px 12px 6px 0" }}>{l.entanglement_rate_hz}</td>
+                        <td style={{ padding: "6px 0" }}>{(l.fidelity * 100).toFixed(2)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -411,68 +426,68 @@ export default function QuantumInternetPage() {
           </div>
 
           {/* Simulation + Optimization */}
-          <div className="space-y-4">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Simulation Panel */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-              <h2 className="text-base font-semibold text-indigo-400">Entanglement Simulation</h2>
+            <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Entanglement Simulation</h2>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Source Node</label>
-                  <select value={simSource} onChange={(e) => setSimSource(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
-                    {selectedNetwork.nodes.map((n) => <option key={n.node_id} value={n.name}>{n.name}</option>)}
+                  <label style={labelStyle}>Source Node</label>
+                  <select value={simSource} onChange={(e) => setSimSource(e.target.value)} className="input" style={{ width: "100%" }}>
+                    {(selectedNetwork.nodes ?? []).map((n) => <option key={n.node_id} value={n.name}>{n.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Destination Node</label>
-                  <select value={simDest} onChange={(e) => setSimDest(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
-                    {selectedNetwork.nodes.map((n) => <option key={n.node_id} value={n.name}>{n.name}</option>)}
+                  <label style={labelStyle}>Destination Node</label>
+                  <select value={simDest} onChange={(e) => setSimDest(e.target.value)} className="input" style={{ width: "100%" }}>
+                    {(selectedNetwork.nodes ?? []).map((n) => <option key={n.node_id} value={n.name}>{n.name}</option>)}
                   </select>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-gray-400 mb-1">Runs: {simNRuns.toLocaleString()}</label>
-                  <input type="range" min={100} max={10000} step={100} value={simNRuns} onChange={(e) => setSimNRuns(Number(e.target.value))} className="w-full accent-indigo-500" />
+                <div style={{ gridColumn: "span 2" }}>
+                  <label style={labelStyle}>Runs: {simNRuns.toLocaleString()}</label>
+                  <input type="range" min={100} max={10000} step={100} value={simNRuns} onChange={(e) => setSimNRuns(Number(e.target.value))} style={{ width: "100%", accentColor: "var(--strong)" }} />
                 </div>
               </div>
 
-              <button onClick={handleSimulate} disabled={simulating || !simSource || !simDest} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg py-2 text-sm font-medium transition-colors">
+              <button onClick={handleSimulate} disabled={simulating || !simSource || !simDest} className="button" style={{ width: "100%", opacity: simulating || !simSource || !simDest ? 0.5 : 1, cursor: simulating || !simSource || !simDest ? "not-allowed" : "pointer" }}>
                 {simulating ? "Simulating…" : "Simulate"}
               </button>
 
-              {simError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{simError}</div>}
+              {simError && <div style={errorBoxStyle}>{simError}</div>}
 
               {simResult && (
-                <div className="space-y-3 pt-1">
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
                   {/* Path */}
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Path ({simResult.n_hops} hop{simResult.n_hops !== 1 ? "s" : ""})</p>
-                    <div className="flex items-center flex-wrap gap-1 text-sm">
-                      {simResult.path.map((node, i) => (
-                        <span key={i} className="flex items-center gap-1">
-                          <span className="bg-gray-800 border border-gray-700 rounded px-2 py-0.5 text-xs font-medium">{node}</span>
-                          {i < simResult.path.length - 1 && <span className="text-gray-500 text-xs">→</span>}
+                    <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Path ({simResult.n_hops} hop{simResult.n_hops !== 1 ? "s" : ""})</p>
+                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4, fontSize: 13 }}>
+                      {(simResult.path ?? []).map((node, i) => (
+                        <span key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 500 }}>{node}</span>
+                          {i < simResult.path.length - 1 && <span style={{ color: "var(--muted)", fontSize: 12 }}>→</span>}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     {[
                       { label: "End-to-End Fidelity", value: `${(simResult.end_to_end_fidelity * 100).toFixed(2)}%`, green: true },
                       { label: "Entanglement Rate", value: `${simResult.entanglement_rate_hz.toFixed(1)} Hz`, green: false },
                       { label: "Success Probability", value: `${(simResult.success_probability * 100).toFixed(2)}%`, green: true },
                       { label: "Latency", value: `${simResult.latency_ms.toFixed(2)} ms`, green: false },
                     ].map(({ label, value, green }) => (
-                      <div key={label} className="bg-gray-800 rounded-lg px-3 py-2 text-center">
-                        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-                        <p className={`text-sm font-semibold ${green ? "text-green-400" : "text-indigo-300"}`}>{value}</p>
+                      <div key={label} style={{ background: "var(--surface)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                        <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>{label}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: green ? "var(--ok)" : "var(--strong)" }}>{value}</p>
                       </div>
                     ))}
                   </div>
 
                   {simResult.bottleneck_link && (
-                    <div className="bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
-                      <p className="text-xs text-red-400">Bottleneck Link: <span className="font-medium text-red-300">{simResult.bottleneck_link}</span></p>
+                    <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>
+                      <p style={{ fontSize: 12, color: "var(--danger)" }}>Bottleneck Link: <span style={{ fontWeight: 500, color: "var(--danger)" }}>{simResult.bottleneck_link}</span></p>
                     </div>
                   )}
                 </div>
@@ -480,49 +495,49 @@ export default function QuantumInternetPage() {
             </div>
 
             {/* Repeater Optimizer */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-              <h2 className="text-base font-semibold text-indigo-400">Repeater Optimizer</h2>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Repeater Optimizer</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Repeaters: {optNRepeaters}</label>
-                  <input type="range" min={1} max={10} value={optNRepeaters} onChange={(e) => setOptNRepeaters(Number(e.target.value))} className="w-full accent-indigo-500" />
+                  <label style={labelStyle}>Repeaters: {optNRepeaters}</label>
+                  <input type="range" min={1} max={10} value={optNRepeaters} onChange={(e) => setOptNRepeaters(Number(e.target.value))} style={{ width: "100%", accentColor: "var(--strong)" }} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Budget (USD, optional)</label>
-                  <input type="number" min={0} value={optBudget} onChange={(e) => setOptBudget(e.target.value)} placeholder="No limit" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+                  <label style={labelStyle}>Budget (USD, optional)</label>
+                  <input type="number" min={0} value={optBudget} onChange={(e) => setOptBudget(e.target.value)} placeholder="No limit" className="input" style={{ width: "100%" }} />
                 </div>
               </div>
-              <button onClick={handleOptimize} disabled={optimizing} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg py-2 text-sm font-medium transition-colors">
+              <button onClick={handleOptimize} disabled={optimizing} className="button" style={{ width: "100%", opacity: optimizing ? 0.5 : 1, cursor: optimizing ? "not-allowed" : "pointer" }}>
                 {optimizing ? "Optimizing…" : "Optimize Repeaters"}
               </button>
-              {optError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{optError}</div>}
+              {optError && <div style={errorBoxStyle}>{optError}</div>}
               {optResult && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-800 rounded-lg px-3 py-2 text-center">
-                      <p className="text-xs text-gray-400 mb-0.5">Fidelity</p>
-                      <p className="text-sm font-semibold">
-                        <span className="text-gray-400">{(optResult.fidelity_before * 100).toFixed(2)}%</span>
-                        <span className="text-gray-500 mx-1">→</span>
-                        <span className="text-green-400">{(optResult.fidelity_after * 100).toFixed(2)}%</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div style={{ background: "var(--surface)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>Fidelity</p>
+                      <p style={{ fontSize: 13, fontWeight: 600 }}>
+                        <span style={{ color: "var(--muted)" }}>{(optResult.fidelity_before * 100).toFixed(2)}%</span>
+                        <span style={{ color: "var(--muted)", margin: "0 4px" }}>→</span>
+                        <span style={{ color: "var(--ok)" }}>{(optResult.fidelity_after * 100).toFixed(2)}%</span>
                       </p>
                     </div>
-                    <div className="bg-gray-800 rounded-lg px-3 py-2 text-center">
-                      <p className="text-xs text-gray-400 mb-0.5">Rate (Hz)</p>
-                      <p className="text-sm font-semibold">
-                        <span className="text-gray-400">{optResult.rate_before.toFixed(1)}</span>
-                        <span className="text-gray-500 mx-1">→</span>
-                        <span className="text-green-400">{optResult.rate_after.toFixed(1)}</span>
+                    <div style={{ background: "var(--surface)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>Rate (Hz)</p>
+                      <p style={{ fontSize: 13, fontWeight: 600 }}>
+                        <span style={{ color: "var(--muted)" }}>{optResult.rate_before.toFixed(1)}</span>
+                        <span style={{ color: "var(--muted)", margin: "0 4px" }}>→</span>
+                        <span style={{ color: "var(--ok)" }}>{optResult.rate_after.toFixed(1)}</span>
                       </p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-2">Placements</p>
-                    <div className="space-y-1">
-                      {optResult.placements.map((p, i) => (
-                        <div key={i} className="flex items-center justify-between bg-gray-800 rounded-lg px-3 py-1.5 text-xs">
-                          <span className="text-gray-200">{p.position}</span>
-                          <span className="text-green-400 font-medium">+{(p.improvement * 100).toFixed(1)}%</span>
+                    <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Placements</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {(optResult.placements ?? []).map((p, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--surface)", borderRadius: 8, padding: "6px 12px", fontSize: 12 }}>
+                          <span style={{ color: "var(--text)" }}>{p.position}</span>
+                          <span style={{ color: "var(--ok)", fontWeight: 500 }}>+{(p.improvement * 100).toFixed(1)}%</span>
                         </div>
                       ))}
                     </div>

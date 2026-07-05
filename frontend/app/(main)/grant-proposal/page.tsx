@@ -33,10 +33,20 @@ const SECTION_LABELS: Record<SectionKey, string> = {
 };
 
 function successColor(prob: number): string {
-  if (prob >= 70) return "text-emerald-400";
-  if (prob >= 40) return "text-yellow-400";
-  return "text-red-400";
+  if (prob >= 70) return "var(--ok)";
+  if (prob >= 40) return "#f59e0b";
+  return "var(--danger)";
 }
+
+const fieldLabelStyle = {
+  display: "block" as const,
+  marginBottom: 4,
+  fontSize: 12,
+  fontWeight: 600,
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.12em",
+  color: "var(--muted)",
+};
 
 function SectionTab({
   content,
@@ -54,16 +64,16 @@ function SectionTab({
   };
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-slate-300">{label}</h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{label}</h3>
         <button
           onClick={handleCopy}
-          className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600 transition-colors"
+          style={{ borderRadius: 6, background: "var(--line)", padding: "4px 8px", fontSize: 12, color: "var(--text)", cursor: "pointer", border: "none" }}
         >
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed">
+      <pre style={{ maxHeight: 320, overflowY: "auto", borderRadius: 8, background: "var(--surface)", padding: 16, fontSize: 12, color: "var(--text)", fontFamily: "ui-monospace,monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.6, border: "1px solid var(--line)" }}>
         {content}
       </pre>
     </div>
@@ -74,52 +84,48 @@ function ProposalResult({ proposal }: { proposal: GrantProposal }) {
   const [activeSection, setActiveSection] = useState<SectionKey>("specific_aims");
 
   return (
-    <div className="space-y-6 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 24 }}>
       {/* Success probability */}
-      <div className="text-center">
-        <p className="text-xs uppercase tracking-widest text-slate-400 mb-2">
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", marginBottom: 8 }}>
           Success Probability
         </p>
-        <p className={`text-6xl font-black ${successColor(proposal.success_probability)}`}>
+        <p style={{ fontSize: 60, fontWeight: 900, color: successColor(proposal.success_probability) }}>
           {proposal.success_probability.toFixed(1)}%
         </p>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-          <p className="text-xs text-slate-400 mb-1">Recommended Program</p>
-          <p className="text-sm font-semibold text-indigo-300">{proposal.recommended_program}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, textAlign: "center" }}>
+        <div style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 12 }}>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Recommended Program</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--strong)" }}>{proposal.recommended_program}</p>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-          <p className="text-xs text-slate-400 mb-1">Word Count</p>
-          <p className="text-xl font-bold text-white">{proposal.total_word_count.toLocaleString()}</p>
+        <div style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 12 }}>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Word Count</p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{proposal.total_word_count.toLocaleString()}</p>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-          <p className="text-xs text-slate-400 mb-1">Est. Pages</p>
-          <p className="text-xl font-bold text-white">{proposal.estimated_page_count}</p>
+        <div style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 12 }}>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Est. Pages</p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{proposal.estimated_page_count}</p>
         </div>
       </div>
 
       {/* Checklist */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+        <p style={{ marginBottom: 12, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>
           Checklist
         </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {proposal.checklist.map((item, i) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+          {(proposal.checklist ?? []).map((item, i) => (
             <div
               key={i}
-              className="flex items-start gap-2 rounded-lg bg-slate-700/50 px-3 py-2"
+              style={{ display: "flex", alignItems: "flex-start", gap: 8, borderRadius: 8, background: "rgba(255,255,255,0.05)", padding: "8px 12px" }}
             >
-              <span
-                className={`mt-0.5 ${item.done ? "text-emerald-400" : "text-slate-500"}`}
-              >
+              <span style={{ marginTop: 2, color: item.done ? "var(--ok)" : "var(--muted)" }}>
                 {item.done ? "✓" : "○"}
               </span>
-              <span
-                className={`text-sm ${item.done ? "text-slate-200" : "text-slate-400"}`}
-              >
+              <span style={{ fontSize: 13, color: item.done ? "var(--text)" : "var(--muted)" }}>
                 {item.item}
               </span>
             </div>
@@ -129,16 +135,21 @@ function ProposalResult({ proposal }: { proposal: GrantProposal }) {
 
       {/* Section tabs */}
       <div>
-        <div className="flex flex-wrap gap-1 border-b border-slate-700 mb-4">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 16 }}>
           {SECTION_KEYS.map((k) => (
             <button
               key={k}
               onClick={() => setActiveSection(k)}
-              className={`px-3 py-2 text-xs font-medium transition-colors ${
-                activeSection === k
-                  ? "border-b-2 border-indigo-500 text-indigo-400"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              style={{
+                padding: "8px 12px",
+                fontSize: 12,
+                fontWeight: 500,
+                background: "none",
+                border: "none",
+                borderBottom: activeSection === k ? "2px solid var(--strong)" : "2px solid transparent",
+                color: activeSection === k ? "var(--strong)" : "var(--muted)",
+                cursor: "pointer",
+              }}
             >
               {SECTION_LABELS[k]}
             </button>
@@ -228,43 +239,45 @@ export default function GrantProposalPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-white">
+    <div style={{ display: "flex", minHeight: "100vh", color: "var(--text)" }}>
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <h1 className="mb-1 text-3xl font-black tracking-tight text-white">
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        <h1 style={{ marginBottom: 4, fontSize: 30, fontWeight: 900, color: "var(--text)" }}>
           Grant Proposal Generator
         </h1>
-        <p className="mb-8 text-slate-400">
+        <p style={{ marginBottom: 32, color: "var(--muted)" }}>
           NSF / DOE / DARPA proposals generated from your experimental data.
         </p>
 
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-xl border border-slate-700 bg-slate-800/60 p-6 mb-8"
+          style={{ display: "flex", flexDirection: "column", gap: 20, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 24, marginBottom: 32 }}
         >
           {/* Title + Agency */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+            <div>
+              <label style={fieldLabelStyle}>
                 Proposal Title *
               </label>
               <input
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="Quantum Error Mitigation for Near-Term Devices"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Agency *
               </label>
               <select
                 value={agency}
                 onChange={(e) => setAgency(e.target.value as Agency)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {AGENCIES.map((a) => (
                   <option key={a} value={a}>
@@ -276,72 +289,77 @@ export default function GrantProposalPage() {
           </div>
 
           {/* PI + Institution + Program */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 PI Name *
               </label>
               <input
                 required
                 value={piName}
                 onChange={(e) => setPiName(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="Dr. Jane Smith"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Institution *
               </label>
               <input
                 required
                 value={institution}
                 onChange={(e) => setInstitution(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="MIT"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Program (optional)
               </label>
               <input
                 value={program}
                 onChange={(e) => setProgram(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="e.g. QISE"
               />
             </div>
           </div>
 
           {/* Algorithm + Backend + Qubits */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Algorithm *
               </label>
               <input
                 required
                 value={algorithm}
                 onChange={(e) => setAlgorithm(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="VQE"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Backend *
               </label>
               <input
                 required
                 value={backend}
                 onChange={(e) => setBackend(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="ibm_brisbane"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Qubits *
               </label>
               <input
@@ -351,15 +369,16 @@ export default function GrantProposalPage() {
                 required
                 value={nQubits}
                 onChange={(e) => setNQubits(parseInt(e.target.value) || 1)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
           </div>
 
           {/* Fidelity + Budget + Duration */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Fidelity (optional)
               </label>
               <input
@@ -369,12 +388,13 @@ export default function GrantProposalPage() {
                 max={1}
                 value={fidelity}
                 onChange={(e) => setFidelity(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="0.95"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Budget Total $ (optional)
               </label>
               <input
@@ -382,18 +402,20 @@ export default function GrantProposalPage() {
                 min={0}
                 value={budgetTotal}
                 onChange={(e) => setBudgetTotal(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="500000"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={fieldLabelStyle}>
                 Duration (years) *
               </label>
               <select
                 value={durationYears}
                 onChange={(e) => setDurationYears(parseInt(e.target.value))}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {DURATION_YEARS.map((y) => (
                   <option key={y} value={y}>
@@ -406,33 +428,34 @@ export default function GrantProposalPage() {
 
           {/* Key Results */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <label style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>
                 Key Results *
               </label>
               <button
                 type="button"
                 onClick={addKeyResult}
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                style={{ fontSize: 12, color: "var(--strong)", background: "none", border: "none", cursor: "pointer" }}
               >
                 + Add result
               </button>
             </div>
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {keyResults.map((kr, i) => (
-                <div key={i} className="flex gap-2">
+                <div key={i} style={{ display: "flex", gap: 8 }}>
                   <input
                     value={kr}
                     onChange={(e) => updateKeyResult(i, e.target.value)}
                     required={i === 0}
-                    className="flex-1 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                    className="input"
+                    style={{ flex: 1 }}
                     placeholder={`Key result ${i + 1}...`}
                   />
                   {keyResults.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeKeyResult(i)}
-                      className="rounded-lg border border-slate-600 px-3 py-2 text-slate-400 hover:border-red-700 hover:text-red-400 transition-colors"
+                      style={{ borderRadius: 8, border: "1px solid var(--line)", padding: "8px 12px", color: "var(--muted)", background: "none", cursor: "pointer" }}
                     >
                       ×
                     </button>
@@ -443,7 +466,7 @@ export default function GrantProposalPage() {
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            <div style={{ borderRadius: 8, border: "1px solid var(--danger)", background: "rgba(239,68,68,0.1)", padding: "12px 16px", fontSize: 13, color: "var(--danger)" }}>
               {error}
             </div>
           )}
@@ -451,7 +474,8 @@ export default function GrantProposalPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            className="button"
+            style={{ width: "100%", opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}
           >
             {loading ? "Generating Proposal..." : "Generate Grant Proposal"}
           </button>
@@ -461,31 +485,29 @@ export default function GrantProposalPage() {
       </div>
 
       {/* Sidebar */}
-      <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-slate-700 bg-slate-900 p-5 lg:block">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
+      <aside style={{ width: 288, flexShrink: 0, overflowY: "auto", borderLeft: "1px solid var(--line)", background: "var(--surface)", padding: 20 }}>
+        <h2 style={{ marginBottom: 16, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>
           Past Proposals
         </h2>
         {pastLoading ? (
-          <p className="text-slate-500 text-sm">Loading...</p>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading...</p>
         ) : pastProposals.length === 0 ? (
-          <p className="text-slate-500 text-sm">No proposals yet.</p>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>No proposals yet.</p>
         ) : (
-          <div className="space-y-3">
-            {pastProposals.map((p) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {(pastProposals ?? []).map((p) => (
               <div
                 key={p.proposal_id}
-                className="rounded-lg border border-slate-700 bg-slate-800 p-3"
+                style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 12 }}
               >
-                <p className="text-sm font-medium text-white line-clamp-2 mb-1">
+                <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", WebkitLineClamp: 2, display: "-webkit-box", WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: 4 }}>
                   {p.title}
                 </p>
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full border border-slate-600 bg-slate-700 px-2 py-0.5 text-xs text-slate-300">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ borderRadius: 999, border: "1px solid var(--line)", background: "var(--line)", padding: "2px 8px", fontSize: 12, color: "var(--text)" }}>
                     {p.agency}
                   </span>
-                  <span
-                    className={`text-sm font-bold ${successColor(p.success_probability)}`}
-                  >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: successColor(p.success_probability) }}>
                     {p.success_probability.toFixed(0)}%
                   </span>
                 </div>

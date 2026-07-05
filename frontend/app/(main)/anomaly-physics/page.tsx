@@ -40,24 +40,38 @@ function parseOptInt(v: string): number | undefined {
 
 function GaugeFill({ value }: { value: number }) {
   const pct = Math.round(value * 100);
-  const color =
+  const barColor =
     value >= 0.8
-      ? "bg-green-500"
+      ? "var(--ok)"
       : value >= 0.5
-      ? "bg-yellow-500"
-      : "bg-red-500";
+      ? "#f59e0b"
+      : "var(--danger)";
   return (
-    <div className="flex flex-col items-center">
-      <div className="text-4xl font-bold mb-2" style={{ color: "inherit" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ fontSize: 36, fontWeight: 700, marginBottom: 8, color: "inherit" }}>
         {pct}
       </div>
-      <div className="w-40 h-4 bg-gray-700 rounded-full overflow-hidden">
+      <div
+        style={{
+          width: 160,
+          height: 16,
+          background: "var(--line)",
+          borderRadius: 999,
+          overflow: "hidden",
+        }}
+      >
         <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
+          style={{
+            height: "100%",
+            borderRadius: 999,
+            width: `${pct}%`,
+            background: barColor,
+          }}
         />
       </div>
-      <div className="text-xs text-gray-400 mt-1">Physics Score</div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+        Physics Score
+      </div>
     </div>
   );
 }
@@ -134,24 +148,41 @@ export default function AnomalyPhysicsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-1">Anomaly Physics Engine</h1>
-      <p className="text-gray-400 text-sm mb-6">
+    <div className="page" style={{ padding: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
+        Anomaly Physics Engine
+      </h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
         Validate experimental results against known quantum physics constraints
         and published literature.
       </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-800 p-1 rounded-lg w-fit mb-6">
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          background: "var(--surface)",
+          padding: 4,
+          borderRadius: 8,
+          width: "fit-content",
+          marginBottom: 24,
+        }}
+      >
         {(["physics", "literature"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t
-                ? "bg-indigo-600 text-white"
-                : "text-gray-400 hover:text-white"
-            }`}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              border: "none",
+              background: tab === t ? "var(--strong)" : "transparent",
+              color: tab === t ? "var(--text)" : "var(--muted)",
+            }}
           >
             {t === "physics" ? "Physics Check" : "Literature Compare"}
           </button>
@@ -160,10 +191,19 @@ export default function AnomalyPhysicsPage() {
 
       {/* ── Physics Check Tab ── */}
       {tab === "physics" && (
-        <div className="flex gap-6">
-          <div className="w-72 shrink-0">
-            <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-              <p className="text-xs text-gray-400">
+        <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ width: 288, flexShrink: 0 }}>
+            <div
+              style={{
+                background: "var(--surface)",
+                borderRadius: 12,
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <p style={{ fontSize: 12, color: "var(--muted)" }}>
                 Leave fields blank to skip those constraints.
               </p>
 
@@ -178,13 +218,21 @@ export default function AnomalyPhysicsPage() {
                 ] as [string, keyof PhysicsForm][]
               ).map(([label, key]) => (
                 <div key={key}>
-                  <label className="block text-xs text-gray-400 mb-1">
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      color: "var(--muted)",
+                      marginBottom: 4,
+                    }}
+                  >
                     {label}
                   </label>
                   <input
                     type="number"
                     step="any"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="input"
+                    style={{ width: "100%" }}
                     placeholder="optional"
                     value={physForm[key]}
                     onChange={(e) =>
@@ -195,11 +243,19 @@ export default function AnomalyPhysicsPage() {
               ))}
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Backend
                 </label>
                 <select
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={physForm.backend}
                   onChange={(e) =>
                     setPhysForm((f) => ({ ...f, backend: e.target.value }))
@@ -215,19 +271,40 @@ export default function AnomalyPhysicsPage() {
               <button
                 onClick={handlePhysicsCheck}
                 disabled={physLoading}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                className="button"
+                style={{
+                  width: "100%",
+                  opacity: physLoading ? 0.5 : 1,
+                  cursor: physLoading ? "not-allowed" : "pointer",
+                }}
               >
                 {physLoading ? "Checking…" : "Check Physics"}
               </button>
               {physError && (
-                <p className="text-red-400 text-xs">{physError}</p>
+                <p style={{ color: "var(--danger)", fontSize: 12 }}>{physError}</p>
               )}
             </div>
           </div>
 
-          <div className="flex-1 space-y-4">
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
             {!physResult && !physLoading && (
-              <div className="flex items-center justify-center h-64 text-gray-600 text-sm">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: 256,
+                  color: "var(--muted)",
+                  fontSize: 13,
+                }}
+              >
                 Fill in values and click Check Physics.
               </div>
             )}
@@ -235,51 +312,119 @@ export default function AnomalyPhysicsPage() {
             {physResult && (
               <>
                 {/* Score gauge + overall_valid */}
-                <div className="bg-gray-800 rounded-xl p-6 flex items-center gap-8">
+                <div
+                  style={{
+                    background: "var(--surface)",
+                    borderRadius: 12,
+                    padding: 24,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 32,
+                  }}
+                >
                   <GaugeFill value={physResult.physics_score} />
-                  <div className="flex flex-col gap-2">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <span
-                      className={`text-sm font-semibold px-3 py-1 rounded-full w-fit ${
-                        physResult.overall_valid
-                          ? "bg-green-800 text-green-200"
-                          : "bg-red-800 text-red-200"
-                      }`}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        padding: "4px 12px",
+                        borderRadius: 999,
+                        width: "fit-content",
+                        background: physResult.overall_valid
+                          ? "rgba(16,185,129,0.1)"
+                          : "rgba(239,68,68,0.1)",
+                        color: physResult.overall_valid
+                          ? "var(--ok)"
+                          : "var(--danger)",
+                      }}
                     >
                       {physResult.overall_valid ? "Valid" : "Invalid"}
                     </span>
-                    <span className="text-xs text-gray-400">
-                      {physResult.violations.length} violation(s),{" "}
-                      {physResult.warnings.length} warning(s),{" "}
-                      {physResult.passed.length} passed
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                      {(physResult.violations ?? []).length} violation(s),{" "}
+                      {(physResult.warnings ?? []).length} warning(s),{" "}
+                      {(physResult.passed ?? []).length} passed
                     </span>
                   </div>
                 </div>
 
                 {/* Violations */}
-                {physResult.violations.length > 0 && (
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <h3 className="font-semibold text-red-400 mb-3">
+                {(physResult.violations ?? []).length > 0 && (
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      borderRadius: 12,
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--danger)",
+                        marginBottom: 12,
+                      }}
+                    >
                       Violations
                     </h3>
-                    <div className="space-y-3">
-                      {physResult.violations.map((v, i) => (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      {(physResult.violations ?? []).map((v, i) => (
                         <div
                           key={i}
-                          className="bg-gray-900 rounded-lg p-3 border-l-2 border-red-500"
+                          style={{
+                            background: "rgba(0,0,0,0.2)",
+                            borderRadius: 8,
+                            padding: 12,
+                            borderLeft: "2px solid var(--danger)",
+                          }}
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold bg-red-800 text-red-200 px-2 py-0.5 rounded">
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              marginBottom: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                background: "rgba(239,68,68,0.15)",
+                                color: "var(--danger)",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                              }}
+                            >
                               {v.rule}
                             </span>
-                            <span className="text-xs text-gray-400 uppercase">
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color: "var(--muted)",
+                                textTransform: "uppercase",
+                              }}
+                            >
                               {v.severity}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-300 mb-1">
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text)",
+                              marginBottom: 4,
+                            }}
+                          >
                             Observed: <strong>{v.observed}</strong> | Limit:{" "}
                             <strong>{v.limit}</strong>
                           </div>
-                          <div className="text-xs text-gray-400">
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
                             {v.explanation}
                           </div>
                         </div>
@@ -289,21 +434,47 @@ export default function AnomalyPhysicsPage() {
                 )}
 
                 {/* Warnings */}
-                {physResult.warnings.length > 0 && (
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <h3 className="font-semibold text-yellow-400 mb-3">
+                {(physResult.warnings ?? []).length > 0 && (
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      borderRadius: 12,
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontWeight: 600,
+                        color: "#f59e0b",
+                        marginBottom: 12,
+                      }}
+                    >
                       Warnings
                     </h3>
-                    <div className="space-y-2">
-                      {physResult.warnings.map((w, i) => (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {(physResult.warnings ?? []).map((w, i) => (
                         <div
                           key={i}
-                          className="bg-gray-900 rounded-lg p-3 border-l-2 border-yellow-500 text-sm"
+                          style={{
+                            background: "rgba(0,0,0,0.2)",
+                            borderRadius: 8,
+                            padding: 12,
+                            borderLeft: "2px solid #f59e0b",
+                            fontSize: 13,
+                          }}
                         >
-                          <span className="text-yellow-300 font-medium">
+                          <span style={{ color: "#f59e0b", fontWeight: 500 }}>
                             {w.rule}
                           </span>
-                          <span className="text-gray-300 ml-2">{w.message}</span>
+                          <span style={{ color: "var(--text)", marginLeft: 8 }}>
+                            {w.message}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -311,18 +482,45 @@ export default function AnomalyPhysicsPage() {
                 )}
 
                 {/* Passed */}
-                {physResult.passed.length > 0 && (
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <h3 className="font-semibold text-green-400 mb-3">
+                {(physResult.passed ?? []).length > 0 && (
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      borderRadius: 12,
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--ok)",
+                        marginBottom: 12,
+                      }}
+                    >
                       Passed Checks
                     </h3>
-                    <ul className="space-y-1">
-                      {physResult.passed.map((p, i) => (
+                    <ul
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        listStyle: "none",
+                        padding: 0,
+                        margin: 0,
+                      }}
+                    >
+                      {(physResult.passed ?? []).map((p, i) => (
                         <li
                           key={i}
-                          className="flex items-center gap-2 text-sm text-gray-300"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 13,
+                            color: "var(--text)",
+                          }}
                         >
-                          <span className="text-green-400">&#10003;</span>
+                          <span style={{ color: "var(--ok)" }}>&#10003;</span>
                           {p}
                         </li>
                       ))}
@@ -337,15 +535,32 @@ export default function AnomalyPhysicsPage() {
 
       {/* ── Literature Compare Tab ── */}
       {tab === "literature" && (
-        <div className="flex gap-6">
-          <div className="w-72 shrink-0">
-            <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+        <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ width: 288, flexShrink: 0 }}>
+            <div
+              style={{
+                background: "var(--surface)",
+                borderRadius: 12,
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Metric
                 </label>
                 <select
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={litForm.metric}
                   onChange={(e) =>
                     setLitForm((f) => ({ ...f, metric: e.target.value }))
@@ -358,13 +573,21 @@ export default function AnomalyPhysicsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Value
                 </label>
                 <input
                   type="number"
                   step="any"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={litForm.value}
                   onChange={(e) =>
                     setLitForm((f) => ({ ...f, value: e.target.value }))
@@ -373,11 +596,19 @@ export default function AnomalyPhysicsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Backend
                 </label>
                 <select
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={litForm.backend}
                   onChange={(e) =>
                     setLitForm((f) => ({ ...f, backend: e.target.value }))
@@ -391,12 +622,20 @@ export default function AnomalyPhysicsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Qubits
                 </label>
                 <input
                   type="number"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={litForm.n_qubits}
                   onChange={(e) =>
                     setLitForm((f) => ({ ...f, n_qubits: e.target.value }))
@@ -405,12 +644,20 @@ export default function AnomalyPhysicsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
                   Algorithm
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   placeholder="e.g. VQE, QAOA…"
                   value={litForm.algorithm}
                   onChange={(e) =>
@@ -427,19 +674,52 @@ export default function AnomalyPhysicsPage() {
                   !litForm.n_qubits ||
                   !litForm.algorithm
                 }
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                className="button"
+                style={{
+                  width: "100%",
+                  opacity:
+                    litLoading ||
+                    !litForm.value ||
+                    !litForm.n_qubits ||
+                    !litForm.algorithm
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    litLoading ||
+                    !litForm.value ||
+                    !litForm.n_qubits ||
+                    !litForm.algorithm
+                      ? "not-allowed"
+                      : "pointer",
+                }}
               >
                 {litLoading ? "Comparing…" : "Compare to Literature"}
               </button>
               {litError && (
-                <p className="text-red-400 text-xs">{litError}</p>
+                <p style={{ color: "var(--danger)", fontSize: 12 }}>{litError}</p>
               )}
             </div>
           </div>
 
-          <div className="flex-1 space-y-4">
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
             {!litResult && !litLoading && (
-              <div className="flex items-center justify-center h-64 text-gray-600 text-sm">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: 256,
+                  color: "var(--muted)",
+                  fontSize: 13,
+                }}
+              >
                 Fill in values and click Compare to Literature.
               </div>
             )}
@@ -447,32 +727,80 @@ export default function AnomalyPhysicsPage() {
             {litResult && (
               <>
                 {/* Percentile + record badge */}
-                <div className="bg-gray-800 rounded-xl p-6 flex items-center gap-8">
-                  <div className="text-center">
-                    <div className="text-6xl font-bold text-indigo-400">
+                <div
+                  style={{
+                    background: "var(--surface)",
+                    borderRadius: 12,
+                    padding: 24,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 32,
+                  }}
+                >
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 60,
+                        fontWeight: 700,
+                        color: "var(--strong)",
+                      }}
+                    >
                       {litResult.percentile}
-                      <span className="text-2xl align-super text-gray-400">
+                      <span
+                        style={{
+                          fontSize: 24,
+                          verticalAlign: "super",
+                          color: "var(--muted)",
+                        }}
+                      >
                         th
                       </span>
                     </div>
-                    <div className="text-sm text-gray-400 mt-1">
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "var(--muted)",
+                        marginTop: 4,
+                      }}
+                    >
                       Percentile Rank
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-gray-300 text-sm">{litResult.assessment}</p>
-                    <div className="flex gap-2 flex-wrap">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <p style={{ color: "var(--text)", fontSize: 13 }}>
+                      {litResult.assessment}
+                    </p>
+                    <div
+                      style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                    >
                       {litResult.is_record && (
-                        <span className="bg-yellow-700 text-yellow-200 text-xs font-bold px-3 py-1 rounded-full">
+                        <span
+                          style={{
+                            background: "rgba(245,158,11,0.2)",
+                            color: "#f59e0b",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            padding: "4px 12px",
+                            borderRadius: 999,
+                          }}
+                        >
                           New Record
                         </span>
                       )}
-                      <span className="bg-gray-700 text-gray-200 text-xs px-3 py-1 rounded-full">
+                      <span
+                        style={{
+                          background: "var(--line)",
+                          color: "var(--text)",
+                          fontSize: 12,
+                          padding: "4px 12px",
+                          borderRadius: 999,
+                        }}
+                      >
                         Better than {litResult.better_than_pct}% of papers
                       </span>
                     </div>
                     {litResult.record_holder && (
-                      <p className="text-xs text-gray-400">
+                      <p style={{ fontSize: 12, color: "var(--muted)" }}>
                         Current record: {litResult.record_holder}
                       </p>
                     )}
@@ -480,42 +808,103 @@ export default function AnomalyPhysicsPage() {
                 </div>
 
                 {/* Similar papers table */}
-                {litResult.similar_papers.length > 0 && (
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <h3 className="font-semibold text-gray-200 mb-3">
+                {(litResult.similar_papers ?? []).length > 0 && (
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      borderRadius: 12,
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--text)",
+                        marginBottom: 12,
+                      }}
+                    >
                       Similar Papers
                     </h3>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-gray-400 text-xs border-b border-gray-700">
-                          <th className="text-left pb-2">arXiv ID</th>
-                          <th className="text-left pb-2">Title</th>
-                          <th className="text-right pb-2">Value</th>
-                          <th className="text-right pb-2">Year</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {litResult.similar_papers.map((p, i) => (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                        <thead>
                           <tr
-                            key={i}
-                            className="border-b border-gray-700 last:border-0"
+                            style={{
+                              color: "var(--muted)",
+                              fontSize: 12,
+                              borderBottom: "1px solid var(--line)",
+                            }}
                           >
-                            <td className="py-2 text-indigo-300 font-mono text-xs">
-                              {p.arxiv_id}
-                            </td>
-                            <td className="py-2 text-gray-300 max-w-xs truncate">
-                              {p.title}
-                            </td>
-                            <td className="py-2 text-right text-white">
-                              {p.value}
-                            </td>
-                            <td className="py-2 text-right text-gray-400">
-                              {p.year}
-                            </td>
+                            <th style={{ textAlign: "left", paddingBottom: 8 }}>
+                              arXiv ID
+                            </th>
+                            <th style={{ textAlign: "left", paddingBottom: 8 }}>
+                              Title
+                            </th>
+                            <th style={{ textAlign: "right", paddingBottom: 8 }}>
+                              Value
+                            </th>
+                            <th style={{ textAlign: "right", paddingBottom: 8 }}>
+                              Year
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {(litResult.similar_papers ?? []).map((p, i) => (
+                            <tr
+                              key={i}
+                              style={{
+                                borderBottom:
+                                  i < (litResult.similar_papers ?? []).length - 1
+                                    ? "1px solid var(--line)"
+                                    : "none",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: "8px 0",
+                                  color: "var(--strong)",
+                                  fontFamily: "ui-monospace,monospace",
+                                  fontSize: 12,
+                                }}
+                              >
+                                {p.arxiv_id}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px 0",
+                                  color: "var(--text)",
+                                  maxWidth: 320,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {p.title}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px 0",
+                                  textAlign: "right",
+                                  color: "var(--text)",
+                                }}
+                              >
+                                {p.value}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px 0",
+                                  textAlign: "right",
+                                  color: "var(--muted)",
+                                }}
+                              >
+                                {p.year}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </>

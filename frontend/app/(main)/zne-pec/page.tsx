@@ -32,106 +32,115 @@ export default function ZnePecPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">ZNE / PEC Error Mitigation</h1>
-      <p className="text-gray-400">Apply Zero-Noise Extrapolation, Probabilistic Error Cancellation, or other advanced mitigation methods to recover near-ideal expectation values from noisy hardware.</p>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>ZNE / PEC Error Mitigation</h1>
+      <p style={{ color: "var(--muted)" }}>Apply Zero-Noise Extrapolation, Probabilistic Error Cancellation, or other advanced mitigation methods to recover near-ideal expectation values from noisy hardware.</p>
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-2 mb-2">
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           {METHODS.map(m => (
             <button key={m.value} onClick={() => setMethod(m.value)}
-              className={`p-3 rounded-lg border text-left text-sm transition-colors ${method === m.value ? "border-indigo-500 bg-indigo-900/30" : "border-gray-700 hover:border-gray-500"}`}>
-              <div className="font-medium">{m.label}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                border: method === m.value ? "1px solid var(--strong)" : "1px solid var(--line)",
+                background: method === m.value ? "rgba(99,102,241,0.3)" : "transparent",
+                textAlign: "left",
+                fontSize: 13,
+                cursor: "pointer",
+                color: "var(--text)",
+              }}>
+              <div style={{ fontWeight: 500 }}>{m.label}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{m.desc}</div>
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
           <div>
-            <label className="text-sm text-gray-400">Qubits</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Qubits</label>
             <input type="number" min={1} max={20} value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Circuit Depth</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Circuit Depth</label>
             <input type="number" min={1} value={depth} onChange={e => setDepth(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Noise Model (backend)</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Noise Model (backend)</label>
             <select value={noiseModel} onChange={e => setNoiseModel(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }}>
               {["depolarizing", "thermal_relaxation", "ibm_brisbane", "ionq_aria_1"].map(n => (
                 <option key={n} value={n}>{n.replace(/_/g, " ")}</option>
               ))}
             </select>
           </div>
-          <div className="col-span-3">
-            <label className="text-sm text-gray-400">Noise Scale Factors (comma-separated)</label>
+          <div style={{ gridColumn: "span 3" }}>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Noise Scale Factors (comma-separated)</label>
             <input value={noiseFactors} onChange={e => setNoiseFactors(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-gray-700" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", fontFamily: "ui-monospace,monospace", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
           </div>
         </div>
         <button onClick={run} disabled={loading}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+          style={{ padding: "8px 24px", background: "var(--strong)", borderRadius: 6, fontWeight: 500, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer", color: "var(--text)", border: "none" }}>
           {loading ? "Mitigating..." : "Run Mitigation"}
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
             {([
-              ["Noisy Value", result.noisy_value.toFixed(6), "text-red-400"],
-              ["Mitigated Value", result.mitigated_value.toFixed(6), "text-green-400"],
-              ["True Estimate", result.estimated_true_value.toFixed(6), "text-indigo-400"],
+              ["Noisy Value", result.noisy_value.toFixed(6), "var(--danger)"],
+              ["Mitigated Value", result.mitigated_value.toFixed(6), "var(--ok)"],
+              ["True Estimate", result.estimated_true_value.toFixed(6), "var(--strong)"],
             ] as [string, string, string][]).map(([l, v, c]) => (
-              <div key={l} className="bg-gray-900 rounded-lg p-4 text-center">
-                <div className="text-xs text-gray-500 mb-1">{l}</div>
-                <div className={`text-xl font-mono font-bold ${c}`}>{v}</div>
+              <div key={l} style={{ background: "var(--surface)", borderRadius: 8, padding: 16, textAlign: "center" }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{l}</div>
+                <div style={{ fontSize: 20, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: c }}>{v}</div>
               </div>
             ))}
           </div>
 
-          <div className="bg-gray-900 rounded-lg p-5">
-            <h2 className="font-semibold text-sm mb-4">Mitigation Performance</h2>
-            <div className="space-y-3">
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20 }}>
+            <h2 style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>Mitigation Performance</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   <span>Overhead factor</span>
-                  <span className="font-mono text-yellow-400">{result.mitigation_overhead.toFixed(2)}×</span>
+                  <span style={{ fontFamily: "ui-monospace,monospace", color: "#f59e0b" }}>{result.mitigation_overhead.toFixed(2)}×</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2.5">
-                  <div className="bg-yellow-500 h-2.5 rounded-full" style={{ width: `${Math.min(100, (result.mitigation_overhead - 1) * 20)}%` }} />
+                <div style={{ width: "100%", background: "var(--line)", borderRadius: 999, height: 10 }}>
+                  <div style={{ background: "#f59e0b", height: 10, borderRadius: 999, width: `${Math.min(100, (result.mitigation_overhead - 1) * 20)}%` }} />
                 </div>
               </div>
               {result.confidence_interval && result.confidence_interval.length === 2 && (
-                <div className="text-sm text-gray-400">
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>
                   95% CI: [{result.confidence_interval[0].toFixed(6)}, {result.confidence_interval[1].toFixed(6)}]
                 </div>
               )}
             </div>
 
             {result.zne && result.zne.noise_factors.length > 0 && (
-              <div className="mt-5">
-                <h3 className="text-xs text-gray-400 mb-3 uppercase">ZNE Extrapolation Curve (R² = {result.zne.r_squared.toFixed(3)})</h3>
-                <div className="flex items-end gap-2 h-24 bg-gray-800 rounded p-2">
+              <div style={{ marginTop: 20 }}>
+                <h3 style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, textTransform: "uppercase" }}>ZNE Extrapolation Curve (R² = {result.zne.r_squared.toFixed(3)})</h3>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 96, background: "var(--surface)", borderRadius: 6, padding: 8 }}>
                   {result.zne.noise_factors.map((lam, i) => {
                     const vals = result.zne!.raw_values;
                     const mn = Math.min(...vals); const mx = Math.max(...vals);
                     const pct = mx === mn ? 50 : ((vals[i] - mn) / (mx - mn)) * 100;
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full bg-indigo-500 rounded-t" style={{ height: `${Math.max(4, pct)}%` }} />
-                        <div className="text-xs font-mono text-gray-500">λ={lam}</div>
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <div style={{ width: "100%", background: "var(--strong)", borderRadius: "4px 4px 0 0", height: `${Math.max(4, pct)}%` }} />
+                        <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--muted)" }}>λ={lam}</div>
                       </div>
                     );
                   })}
-                  <div className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full bg-green-400 rounded-t opacity-70" style={{ height: "10%" }} title="λ=0 extrapolated" />
-                    <div className="text-xs font-mono text-green-400">λ=0*</div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: "100%", background: "var(--ok)", borderRadius: "4px 4px 0 0", opacity: 0.7, height: "10%" }} title="λ=0 extrapolated" />
+                    <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--ok)" }}>λ=0*</div>
                   </div>
                 </div>
               </div>
@@ -139,9 +148,9 @@ export default function ZnePecPage() {
           </div>
 
           {result.recommendations && result.recommendations.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 space-y-1">
-              <h2 className="font-semibold text-sm mb-2">Recommendations</h2>
-              {result.recommendations.map((r, i) => <div key={i} className="text-sm text-gray-300">• {r}</div>)}
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+              <h2 style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Recommendations</h2>
+              {result.recommendations.map((r, i) => <div key={i} style={{ fontSize: 13, color: "var(--text)" }}>• {r}</div>)}
             </div>
           )}
         </div>

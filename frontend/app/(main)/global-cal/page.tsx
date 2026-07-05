@@ -42,21 +42,29 @@ type CompareResult = {
 
 function PercentileGauge({ value, label }: { value: number; label: string }) {
   const pct = Math.round(value);
-  const color =
-    pct >= 75 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500";
+  const barColor =
+    pct >= 75 ? "var(--ok)" : pct >= 40 ? "#f59e0b" : "var(--danger)";
   return (
-    <div className="flex flex-col items-center">
-      <div className="text-3xl font-bold text-white">
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ fontSize: 30, fontWeight: 700, color: "var(--text)" }}>
         {pct}
-        <span className="text-lg text-gray-400">th</span>
+        <span style={{ fontSize: 18, color: "var(--muted)" }}>th</span>
       </div>
-      <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden mt-1">
+      <div
+        style={{
+          width: 128,
+          height: 8,
+          background: "var(--line)",
+          borderRadius: 999,
+          overflow: "hidden",
+          marginTop: 4,
+        }}
+      >
         <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: barColor }}
         />
       </div>
-      <div className="text-xs text-gray-400 mt-1">{label}</div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{label}</div>
     </div>
   );
 }
@@ -103,7 +111,7 @@ export default function GlobalCalPage() {
       setLbError(null);
       try {
         const data = await getCalLeaderboard();
-        setLeaderboard(data.leaderboard);
+        setLeaderboard(data.leaderboard ?? []);
       } catch (e) {
         setLbError(e instanceof Error ? e.message : "Failed to load leaderboard");
       } finally {
@@ -165,68 +173,84 @@ export default function GlobalCalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-1">Global Calibration DB</h1>
-      <p className="text-gray-400 text-sm mb-6">
+    <div style={{ minHeight: "100vh", background: "var(--surface)", color: "var(--text)", padding: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Global Calibration DB</h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
         Crowdsourced T1/T2 calibration data contributed by the quantum
         community worldwide.
       </p>
 
       {/* Toast */}
       {contribToast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-800 border border-green-500 text-green-100 text-sm px-4 py-3 rounded-xl shadow-lg">
+        <div
+          style={{
+            position: "fixed",
+            top: 16,
+            right: 16,
+            zIndex: 50,
+            background: "rgba(16,185,129,0.1)",
+            border: "1px solid var(--ok)",
+            color: "var(--ok)",
+            fontSize: 13,
+            padding: "12px 16px",
+            borderRadius: 12,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+        >
           Calibration contributed! Record ID: {contribToast.record_id}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
         {/* ── Section 1: Leaderboard ── */}
-        <div className="bg-gray-800 rounded-xl p-4">
-          <h2 className="font-semibold text-gray-200 mb-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, border: "1px solid var(--line)" }}>
+          <h2 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
             Backend Leaderboard
           </h2>
 
           {lbLoading && (
-            <div className="text-gray-500 text-sm py-4 text-center">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "16px 0", textAlign: "center" }}>
               Loading…
             </div>
           )}
           {lbError && (
-            <p className="text-red-400 text-sm">{lbError}</p>
+            <p style={{ color: "var(--danger)", fontSize: 13 }}>{lbError}</p>
           )}
           {!lbLoading && leaderboard.length === 0 && !lbError && (
-            <p className="text-gray-500 text-sm">No data available.</p>
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>No data available.</p>
           )}
 
           {leaderboard.length > 0 && (
-            <table className="w-full text-sm">
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
               <thead>
-                <tr className="text-gray-400 text-xs border-b border-gray-700">
-                  <th className="text-left pb-2">#</th>
-                  <th className="text-left pb-2">Backend</th>
-                  <th className="text-right pb-2">Median T2 (µs)</th>
-                  <th className="text-right pb-2">Contributors</th>
+                <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ textAlign: "left", paddingBottom: 8 }}>#</th>
+                  <th style={{ textAlign: "left", paddingBottom: 8 }}>Backend</th>
+                  <th style={{ textAlign: "right", paddingBottom: 8 }}>Median T2 (µs)</th>
+                  <th style={{ textAlign: "right", paddingBottom: 8 }}>Contributors</th>
                 </tr>
               </thead>
               <tbody>
-                {leaderboard.map((row) => (
+                {(leaderboard ?? []).map((row) => (
                   <tr
                     key={row.backend}
                     onClick={() => handleRowClick(row.backend)}
-                    className={`border-b border-gray-700 last:border-0 cursor-pointer hover:bg-gray-700 transition-colors ${
-                      selectedBackend === row.backend ? "bg-gray-700" : ""
-                    }`}
+                    style={{
+                      borderBottom: "1px solid var(--line)",
+                      cursor: "pointer",
+                      background: selectedBackend === row.backend ? "var(--line)" : "transparent",
+                    }}
                   >
-                    <td className="py-2 text-gray-400 font-mono">
+                    <td style={{ padding: "8px 0", color: "var(--muted)", fontFamily: "ui-monospace,monospace" }}>
                       {row.rank}
                     </td>
-                    <td className="py-2 text-indigo-300 font-medium">
+                    <td style={{ padding: "8px 0", color: "var(--strong)", fontWeight: 500 }}>
                       {row.backend}
                     </td>
-                    <td className="py-2 text-right text-white">
+                    <td style={{ padding: "8px 0", textAlign: "right", color: "var(--text)" }}>
                       {row.median_t2_us.toFixed(1)}
                     </td>
-                    <td className="py-2 text-right text-gray-400">
+                    <td style={{ padding: "8px 0", textAlign: "right", color: "var(--muted)" }}>
                       {row.n_contributors}
                     </td>
                   </tr>
@@ -237,63 +261,74 @@ export default function GlobalCalPage() {
         </div>
 
         {/* ── Section 2: Backend Detail ── */}
-        <div className="bg-gray-800 rounded-xl p-4">
-          <h2 className="font-semibold text-gray-200 mb-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, border: "1px solid var(--line)" }}>
+          <h2 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
             {selectedBackend
               ? `Backend Detail — ${selectedBackend}`
               : "Backend Detail"}
           </h2>
 
           {!selectedBackend && (
-            <p className="text-gray-500 text-sm">
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>
               Click a row in the leaderboard to load backend details.
             </p>
           )}
 
           {calLoading && (
-            <div className="text-gray-500 text-sm py-4 text-center">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "16px 0", textAlign: "center" }}>
               Loading…
             </div>
           )}
 
           {backendCal && !calLoading && (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Community medians */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-gray-900 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-white">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>
                     {backendCal.community_t1_median.toFixed(1)}
                   </div>
-                  <div className="text-xs text-gray-400">Median T1 (µs)</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Median T1 (µs)</div>
                 </div>
-                <div className="bg-gray-900 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-white">
+                <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>
                     {backendCal.community_t2_median.toFixed(1)}
                   </div>
-                  <div className="text-xs text-gray-400">Median T2 (µs)</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Median T2 (µs)</div>
                 </div>
-                <div className="bg-gray-900 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-white">
+                <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>
                     {(backendCal.community_gate_error_median * 1000).toFixed(2)}
                   </div>
-                  <div className="text-xs text-gray-400">Gate Err (m)</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Gate Err (m)</div>
                 </div>
               </div>
 
               {/* Trend + forecast */}
-              <div className="flex gap-3 flex-wrap">
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <span
-                  className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                    backendCal.trend === "improving"
-                      ? "bg-green-800 text-green-200"
-                      : backendCal.trend === "degrading"
-                      ? "bg-red-800 text-red-200"
-                      : "bg-gray-700 text-gray-300"
-                  }`}
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    fontWeight: 600,
+                    background:
+                      backendCal.trend === "improving"
+                        ? "rgba(16,185,129,0.1)"
+                        : backendCal.trend === "degrading"
+                        ? "rgba(239,68,68,0.1)"
+                        : "var(--line)",
+                    color:
+                      backendCal.trend === "improving"
+                        ? "var(--ok)"
+                        : backendCal.trend === "degrading"
+                        ? "var(--danger)"
+                        : "var(--text)",
+                  }}
                 >
                   {backendCal.trend}
                 </span>
-                <span className="text-xs bg-gray-700 text-gray-300 px-3 py-1 rounded-full">
+                <span style={{ fontSize: 12, background: "var(--line)", color: "var(--text)", padding: "4px 12px", borderRadius: 999 }}>
                   Forecast 24h — T1:{" "}
                   {backendCal.forecast_next_24h.t1.toFixed(1)} µs, T2:{" "}
                   {backendCal.forecast_next_24h.t2.toFixed(1)} µs
@@ -301,42 +336,42 @@ export default function GlobalCalPage() {
               </div>
 
               {/* Recent records */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr className="text-gray-400 border-b border-gray-700">
-                      <th className="text-left pb-1">Qubit</th>
-                      <th className="text-right pb-1">T1</th>
-                      <th className="text-right pb-1">T2</th>
-                      <th className="text-right pb-1">Gate err</th>
-                      <th className="text-right pb-1">Read err</th>
-                      <th className="text-left pb-1 pl-2">Institution</th>
-                      <th className="text-right pb-1">Date</th>
+                    <tr style={{ color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                      <th style={{ textAlign: "left", paddingBottom: 4 }}>Qubit</th>
+                      <th style={{ textAlign: "right", paddingBottom: 4 }}>T1</th>
+                      <th style={{ textAlign: "right", paddingBottom: 4 }}>T2</th>
+                      <th style={{ textAlign: "right", paddingBottom: 4 }}>Gate err</th>
+                      <th style={{ textAlign: "right", paddingBottom: 4 }}>Read err</th>
+                      <th style={{ textAlign: "left", paddingBottom: 4, paddingLeft: 8 }}>Institution</th>
+                      <th style={{ textAlign: "right", paddingBottom: 4 }}>Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {backendCal.records.slice(0, 10).map((r: GlobalCalRecord) => (
+                    {(backendCal.records ?? []).slice(0, 10).map((r: GlobalCalRecord) => (
                       <tr
                         key={r.record_id}
-                        className="border-b border-gray-700 last:border-0"
+                        style={{ borderBottom: "1px solid var(--line)" }}
                       >
-                        <td className="py-1 text-gray-300">{r.qubit}</td>
-                        <td className="py-1 text-right text-white">
+                        <td style={{ padding: "4px 0", color: "var(--text)" }}>{r.qubit}</td>
+                        <td style={{ padding: "4px 0", textAlign: "right", color: "var(--text)" }}>
                           {r.t1_us.toFixed(1)}
                         </td>
-                        <td className="py-1 text-right text-white">
+                        <td style={{ padding: "4px 0", textAlign: "right", color: "var(--text)" }}>
                           {r.t2_us.toFixed(1)}
                         </td>
-                        <td className="py-1 text-right text-yellow-300">
+                        <td style={{ padding: "4px 0", textAlign: "right", color: "#f59e0b" }}>
                           {(r.gate_error * 1000).toFixed(2)}m
                         </td>
-                        <td className="py-1 text-right text-gray-400">
+                        <td style={{ padding: "4px 0", textAlign: "right", color: "var(--muted)" }}>
                           {(r.readout_error * 100).toFixed(1)}%
                         </td>
-                        <td className="py-1 pl-2 text-gray-400 truncate max-w-[80px]">
+                        <td style={{ padding: "4px 0 4px 8px", color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80 }}>
                           {r.institution ?? "—"}
                         </td>
-                        <td className="py-1 text-right text-gray-500">
+                        <td style={{ padding: "4px 0", textAlign: "right", color: "var(--muted)" }}>
                           {new Date(r.timestamp).toLocaleDateString()}
                         </td>
                       </tr>
@@ -349,16 +384,17 @@ export default function GlobalCalPage() {
         </div>
 
         {/* ── Section 3: Contribute ── */}
-        <div className="bg-gray-800 rounded-xl p-4">
-          <h2 className="font-semibold text-gray-200 mb-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, border: "1px solid var(--line)" }}>
+          <h2 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
             Contribute Calibration
           </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ gridColumn: "span 2" }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <input
                 type="text"
-                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="e.g. ibm_brisbane"
                 value={contribForm.backend}
                 onChange={(e) =>
@@ -377,13 +413,14 @@ export default function GlobalCalPage() {
               ] as [string, keyof ContributeForm, string][]
             ).map(([label, key, type]) => (
               <div key={key}>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   {label}
                 </label>
                 <input
                   type={type}
                   step="any"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={contribForm[key]}
                   onChange={(e) =>
                     setContribForm((f) => ({
@@ -398,13 +435,14 @@ export default function GlobalCalPage() {
               </div>
             ))}
 
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">
+            <div style={{ gridColumn: "span 2" }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 Institution (optional)
               </label>
               <input
                 type="text"
-                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
                 placeholder="MIT, Oxford…"
                 value={contribForm.institution}
                 onChange={(e) =>
@@ -420,26 +458,39 @@ export default function GlobalCalPage() {
           <button
             onClick={handleContribute}
             disabled={contributing || !contribForm.backend}
-            className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+            style={{
+              marginTop: 16,
+              width: "100%",
+              background: "var(--strong)",
+              color: "var(--text)",
+              fontSize: 13,
+              fontWeight: 500,
+              padding: "8px 0",
+              borderRadius: 8,
+              border: "none",
+              cursor: contributing || !contribForm.backend ? "not-allowed" : "pointer",
+              opacity: contributing || !contribForm.backend ? 0.5 : 1,
+            }}
           >
             {contributing ? "Submitting…" : "Submit Calibration"}
           </button>
           {contribError && (
-            <p className="text-red-400 text-xs mt-2">{contribError}</p>
+            <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{contribError}</p>
           )}
         </div>
 
         {/* ── Section 4: Compare ── */}
-        <div className="bg-gray-800 rounded-xl p-4">
-          <h2 className="font-semibold text-gray-200 mb-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, border: "1px solid var(--line)" }}>
+          <h2 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
             Compare My Calibration
           </h2>
 
-          <div className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <select
-                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
                 value={compareForm.backend}
                 onChange={(e) =>
                   setCompareForm((f) => ({ ...f, backend: e.target.value }))
@@ -452,15 +503,16 @@ export default function GlobalCalPage() {
               </select>
             </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   Your T1 (µs)
                 </label>
                 <input
                   type="number"
                   step="any"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={compareForm.your_t1}
                   onChange={(e) =>
                     setCompareForm((f) => ({
@@ -470,14 +522,15 @@ export default function GlobalCalPage() {
                   }
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   Your T2 (µs)
                 </label>
                 <input
                   type="number"
                   step="any"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={compareForm.your_t2}
                   onChange={(e) =>
                     setCompareForm((f) => ({
@@ -492,23 +545,43 @@ export default function GlobalCalPage() {
             <button
               onClick={handleCompare}
               disabled={comparing}
-              className="w-full bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              style={{
+                width: "100%",
+                background: "#0d9488",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 0",
+                borderRadius: 8,
+                border: "none",
+                cursor: comparing ? "not-allowed" : "pointer",
+                opacity: comparing ? 0.5 : 1,
+              }}
             >
               {comparing ? "Comparing…" : "Compare"}
             </button>
             {compareError && (
-              <p className="text-red-400 text-xs">{compareError}</p>
+              <p style={{ color: "var(--danger)", fontSize: 12 }}>{compareError}</p>
             )}
 
             {compareResult && (
-              <div className="space-y-3 mt-2">
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
                 {/* Percentile gauges */}
-                <div className="flex justify-around bg-gray-900 rounded-xl p-4">
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-around",
+                    background: "var(--surface)",
+                    borderRadius: 12,
+                    padding: 16,
+                    border: "1px solid var(--line)",
+                  }}
+                >
                   <PercentileGauge
                     value={compareResult.your_percentile_t1}
                     label="T1 Percentile"
                   />
-                  <div className="w-px bg-gray-700" />
+                  <div style={{ width: 1, background: "var(--line)" }} />
                   <PercentileGauge
                     value={compareResult.your_percentile_t2}
                     label="T2 Percentile"
@@ -516,22 +589,38 @@ export default function GlobalCalPage() {
                 </div>
 
                 {/* Assessment */}
-                <p className="text-sm text-gray-300 bg-gray-900 rounded-lg p-3">
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text)",
+                    background: "var(--surface)",
+                    borderRadius: 8,
+                    padding: 12,
+                    border: "1px solid var(--line)",
+                    margin: 0,
+                  }}
+                >
                   {compareResult.assessment}
                 </p>
 
                 {/* Community averages */}
                 {Object.keys(compareResult.community_average).length > 0 && (
-                  <div className="bg-gray-900 rounded-lg p-3">
-                    <p className="text-xs text-gray-400 mb-2">
+                  <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, border: "1px solid var(--line)" }}>
+                    <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8, margin: "0 0 8px 0" }}>
                       Community Averages
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {Object.entries(compareResult.community_average).map(
                         ([k, v]) => (
                           <span
                             key={k}
-                            className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded"
+                            style={{
+                              fontSize: 12,
+                              background: "var(--line)",
+                              color: "var(--text)",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                            }}
                           >
                             {k}: {typeof v === "number" ? v.toFixed(2) : v}
                           </span>

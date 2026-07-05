@@ -93,35 +93,35 @@ export default function TranspilerHubPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-10">
+    <div style={{ minHeight: "100vh", background: "var(--surface)", color: "var(--text)", padding: 24, display: "flex", flexDirection: "column", gap: 40 }}>
       <div>
-        <h1 className="text-3xl font-bold text-white">Universal Quantum Transpiler</h1>
-        <p className="text-gray-400 mt-1">
+        <h1 style={{ fontSize: 30, fontWeight: 700, color: "var(--text)", margin: 0 }}>Universal Quantum Transpiler</h1>
+        <p style={{ color: "var(--muted)", marginTop: 4, marginBottom: 0 }}>
           Convert circuits between Qiskit, Cirq, PennyLane, Q#, tket, and Braket
         </p>
       </div>
 
       {/* Section 1: SDK Reference */}
       <section>
-        <h2 className="text-xl font-semibold text-gray-200 mb-4">Supported SDKs</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", marginBottom: 16, marginTop: 0 }}>Supported SDKs</h2>
         {sdksLoading && (
-          <p className="text-gray-400 animate-pulse">Loading SDKs...</p>
+          <p style={{ color: "var(--muted)" }}>Loading SDKs...</p>
         )}
         {sdksError && (
-          <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">
+          <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 16px" }}>
             {sdksError}
           </p>
         )}
         {!sdksLoading && !sdksError && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {sdks.map((sdk) => (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12 }}>
+            {(sdks ?? []).map((sdk) => (
               <div
                 key={sdk.name}
-                className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1"
+                style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}
               >
-                <div className="font-semibold text-indigo-400 text-sm">{sdk.name}</div>
-                <div className="text-xs text-gray-500">v{sdk.version}</div>
-                <div className="text-xs text-gray-400 leading-snug">{sdk.description}</div>
+                <div style={{ fontWeight: 600, color: "var(--strong)", fontSize: 13 }}>{sdk.name}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>v{sdk.version}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.3 }}>{sdk.description}</div>
               </div>
             ))}
           </div>
@@ -129,16 +129,17 @@ export default function TranspilerHubPage() {
       </section>
 
       {/* Section 2: Translate */}
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
-        <h2 className="text-xl font-semibold text-gray-200">Translate Circuit</h2>
+      <section style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", margin: 0 }}>Translate Circuit</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Source SDK</label>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Source SDK</label>
             <select
               value={sourceSDK}
               onChange={(e) => setSourceSDK(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="input"
+              style={{ width: "100%" }}
             >
               {SDK_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -146,11 +147,12 @@ export default function TranspilerHubPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Target SDK</label>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Target SDK</label>
             <select
               value={targetSDK}
               onChange={(e) => setTargetSDK(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="input"
+              style={{ width: "100%" }}
             >
               {SDK_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -160,36 +162,37 @@ export default function TranspilerHubPage() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Circuit Code</label>
+          <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Circuit Code</label>
           <textarea
             value={circuit}
             onChange={(e) => setCircuit(e.target.value)}
             rows={8}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-green-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, padding: "8px 12px", color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
           />
         </div>
 
-        <div className="flex flex-wrap gap-6 items-center">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
             <div
               onClick={() => setOptimize((v) => !v)}
-              className={`w-10 h-5 rounded-full transition-colors ${optimize ? "bg-indigo-600" : "bg-gray-700"} relative`}
+              style={{ width: 40, height: 20, borderRadius: 999, background: optimize ? "var(--strong)" : "var(--line)", position: "relative", cursor: "pointer", flexShrink: 0 }}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${optimize ? "translate-x-5" : ""}`}
+                style={{ position: "absolute", top: 2, left: optimize ? 22 : 2, width: 16, height: 16, background: "white", borderRadius: 999, transition: "left 0.15s" }}
               />
             </div>
-            <span className="text-sm text-gray-300">Optimize</span>
+            <span style={{ fontSize: 13, color: "var(--text)" }}>Optimize</span>
           </label>
 
-          <div className="flex-1 min-w-48">
-            <label className="block text-sm text-gray-400 mb-1">Backend (optional)</label>
+          <div style={{ flex: 1, minWidth: 192 }}>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Backend (optional)</label>
             <input
               type="text"
               value={backend}
               onChange={(e) => setBackend(e.target.value)}
               placeholder="e.g. ibm_nairobi"
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="input"
+              style={{ width: "100%", fontSize: 13, boxSizing: "border-box" }}
             />
           </div>
         </div>
@@ -197,76 +200,77 @@ export default function TranspilerHubPage() {
         <button
           onClick={handleTranslate}
           disabled={translating}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          className="button"
+          style={{ opacity: translating ? 0.5 : 1, alignSelf: "flex-start" }}
         >
           {translating ? "Translating..." : "Translate"}
         </button>
 
         {translateError && (
-          <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">
+          <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 16px", margin: 0 }}>
             {translateError}
           </p>
         )}
 
         {result && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
               <div>
-                <div className="text-xs text-gray-500 mb-1 uppercase tracking-wide">
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Original ({sourceSDK})
                 </div>
-                <pre className="bg-gray-950 border border-gray-700 rounded p-4 text-green-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+                <pre style={{ fontFamily: "ui-monospace,monospace", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto", whiteSpace: "pre-wrap", color: "var(--ok)", fontSize: 12, margin: 0 }}>
                   {result.original_circuit}
                 </pre>
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1 uppercase tracking-wide">
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Translated ({targetSDK})
                 </div>
-                <pre className="bg-gray-950 border border-gray-700 rounded p-4 text-cyan-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+                <pre style={{ fontFamily: "ui-monospace,monospace", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto", whiteSpace: "pre-wrap", color: "var(--info-text)", fontSize: 12, margin: 0 }}>
                   {result.translated_circuit}
                 </pre>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-gray-800 rounded-lg p-3">
-                <div className="text-2xl font-bold text-indigo-400">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, textAlign: "center" }}>
+              <div style={{ background: "var(--line)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--strong)" }}>
                   {(result.equivalence_score * 100).toFixed(1)}%
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">Equivalence Score</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Equivalence Score</div>
               </div>
-              <div className="bg-gray-800 rounded-lg p-3">
-                <div className="text-2xl font-bold text-gray-200">
+              <div style={{ background: "var(--line)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
                   {result.original_gate_count}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">Original Gates</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Original Gates</div>
               </div>
-              <div className="bg-gray-800 rounded-lg p-3">
-                <div className="text-2xl font-bold text-gray-200">
+              <div style={{ background: "var(--line)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
                   {result.translated_gate_count}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">Translated Gates</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Translated Gates</div>
               </div>
             </div>
 
-            {result.warnings && result.warnings.length > 0 && (
-              <div className="bg-yellow-950 border border-yellow-800 rounded p-3">
-                <div className="text-xs font-semibold text-yellow-400 mb-1">Warnings</div>
-                <ul className="space-y-1">
-                  {result.warnings.map((w, i) => (
-                    <li key={i} className="text-xs text-yellow-300">• {w}</li>
+            {(result.warnings ?? []).length > 0 && (
+              <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid #f59e0b", borderRadius: 6, padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", marginBottom: 4 }}>Warnings</div>
+                <ul style={{ display: "flex", flexDirection: "column", gap: 4, margin: 0, padding: 0, listStyle: "none" }}>
+                  {(result.warnings ?? []).map((w, i) => (
+                    <li key={i} style={{ fontSize: 12, color: "#f59e0b" }}>• {w}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {result.notes && result.notes.length > 0 && (
-              <div className="bg-blue-950 border border-blue-800 rounded p-3">
-                <div className="text-xs font-semibold text-blue-400 mb-1">Notes</div>
-                <ul className="space-y-1">
-                  {result.notes.map((n, i) => (
-                    <li key={i} className="text-xs text-blue-300">• {n}</li>
+            {(result.notes ?? []).length > 0 && (
+              <div style={{ background: "rgba(59,130,246,0.1)", border: "1px solid var(--info-text)", borderRadius: 6, padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--info-text)", marginBottom: 4 }}>Notes</div>
+                <ul style={{ display: "flex", flexDirection: "column", gap: 4, margin: 0, padding: 0, listStyle: "none" }}>
+                  {(result.notes ?? []).map((n, i) => (
+                    <li key={i} style={{ fontSize: 12, color: "var(--info-text)" }}>• {n}</li>
                   ))}
                 </ul>
               </div>
@@ -276,9 +280,9 @@ export default function TranspilerHubPage() {
       </section>
 
       {/* Section 3: Auto-Detect */}
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-xl font-semibold text-gray-200">Auto-Detect SDK</h2>
-        <p className="text-sm text-gray-400">
+      <section style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", margin: 0 }}>Auto-Detect SDK</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
           Paste a circuit snippet and we will identify which SDK it belongs to.
         </p>
 
@@ -287,44 +291,45 @@ export default function TranspilerHubPage() {
           onChange={(e) => setDetectCircuit(e.target.value)}
           rows={5}
           placeholder="Paste circuit code here..."
-          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+          style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, padding: "8px 12px", color: "var(--text)", fontFamily: "ui-monospace,monospace", fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
         />
 
         <button
           onClick={handleDetect}
           disabled={detecting || !detectCircuit.trim()}
-          className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          className="button"
+          style={{ opacity: detecting || !detectCircuit.trim() ? 0.5 : 1, alignSelf: "flex-start", background: "#0d9488" }}
         >
           {detecting ? "Detecting..." : "Detect SDK"}
         </button>
 
         {detectError && (
-          <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">
+          <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 16px", margin: 0 }}>
             {detectError}
           </p>
         )}
 
         {detection && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <span className="bg-indigo-700 text-white text-sm font-semibold px-4 py-1 rounded-full">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ background: "var(--strong)", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "4px 16px", borderRadius: 999 }}>
                 {detection.detected_sdk}
               </span>
-              <span className="text-gray-300 text-sm">
+              <span style={{ color: "var(--text)", fontSize: 13 }}>
                 Confidence:{" "}
-                <span className="font-bold text-green-400">
+                <span style={{ fontWeight: 700, color: "var(--ok)" }}>
                   {(detection.confidence * 100).toFixed(1)}%
                 </span>
               </span>
             </div>
-            {detection.indicators && detection.indicators.length > 0 && (
+            {(detection.indicators ?? []).length > 0 && (
               <div>
-                <div className="text-xs text-gray-500 mb-1">Indicators</div>
-                <div className="flex flex-wrap gap-2">
-                  {detection.indicators.map((ind, i) => (
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Indicators</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(detection.indicators ?? []).map((ind, i) => (
                     <span
                       key={i}
-                      className="bg-gray-800 border border-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded"
+                      style={{ background: "var(--line)", border: "1px solid var(--line)", fontSize: 12, color: "var(--text)", padding: "2px 8px", borderRadius: 6 }}
                     >
                       {ind}
                     </span>

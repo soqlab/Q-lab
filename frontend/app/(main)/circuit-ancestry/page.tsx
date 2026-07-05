@@ -51,68 +51,74 @@ export default function CircuitAncestryPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Circuit Ancestry</h1>
-        <button onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Circuit Ancestry</h1>
+        <button onClick={() => setShowCreate(!showCreate)} className="button">
           + New Circuit
         </button>
       </div>
-      <p className="text-gray-400">Git-style versioning for quantum circuits — commit, fork, and diff across circuit lineages.</p>
+      <p style={{ color: "var(--muted)" }}>Git-style versioning for quantum circuits — commit, fork, and diff across circuit lineages.</p>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {showCreate && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-3">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <input placeholder="Circuit name" value={name} onChange={e => setName(e.target.value)}
-            className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+            className="input" style={{ width: "100%" }} />
           <textarea value={qasm} onChange={e => setQasm(e.target.value)}
-            className="w-full h-36 bg-gray-800 text-green-400 font-mono text-sm px-3 py-2 rounded border border-gray-700" />
+            className="input" style={{ width: "100%", height: 144, color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 13 }} />
           <input placeholder="Commit message" value={msg} onChange={e => setMsg(e.target.value)}
-            className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
-          <div className="flex gap-3">
-            <button onClick={create} disabled={loading} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">Commit</button>
-            <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+            className="input" style={{ width: "100%" }} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={create} disabled={loading}
+              style={{ padding: "8px 16px", background: "var(--ok)", borderRadius: 6, fontSize: 13, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer", color: "var(--text)", border: "none" }}>
+              Commit
+            </button>
+            <button onClick={() => setShowCreate(false)} className="button secondary">Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {circuits.map((c) => (
-          <div key={c.circuit_id} className="bg-gray-900 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{c.name}</span>
-              <span className="font-mono text-xs text-gray-500">{c.circuit_id.slice(0, 8)}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
+        {(circuits ?? []).map((c) => (
+          <div key={c.circuit_id} style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: 600 }}>{c.name}</span>
+              <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 12, color: "var(--muted)" }}>{c.circuit_id.slice(0, 8)}</span>
             </div>
-            <div className="flex gap-4 text-sm text-gray-400">
+            <div style={{ display: "flex", gap: 16, fontSize: 13, color: "var(--muted)" }}>
               <span>{c.total_versions} version{c.total_versions !== 1 ? "s" : ""}</span>
               <span>{c.total_forks} fork{c.total_forks !== 1 ? "s" : ""}</span>
             </div>
-            <div className="flex gap-2">
+            <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => loadTree(c.circuit_id)}
-                className="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-xs">View Tree</button>
+                style={{ padding: "4px 12px", background: "var(--strong)", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "var(--text)", border: "none" }}>
+                View Tree
+              </button>
               <button onClick={() => fork(c.circuit_id)}
-                className="px-3 py-1 bg-purple-700 hover:bg-purple-600 rounded text-xs">Fork</button>
+                style={{ padding: "4px 12px", background: "#7c3aed", borderRadius: 6, fontSize: 12, cursor: "pointer", color: "var(--text)", border: "none" }}>
+                Fork
+              </button>
             </div>
           </div>
         ))}
       </div>
 
       {tree && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-          <h2 className="font-semibold">Version History: {tree.circuit_id.slice(0, 8)}</h2>
-          <div className="space-y-2">
-            {tree.versions.map(v => (
-              <div key={v.version_id} className={`flex items-center gap-4 p-3 rounded border ${v.is_head ? "border-indigo-500 bg-indigo-900/20" : "border-gray-700"}`}>
-                <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-mono">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontWeight: 600 }}>Version History: {tree.circuit_id.slice(0, 8)}</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {(tree.versions ?? []).map(v => (
+              <div key={v.version_id} style={{ display: "flex", alignItems: "center", gap: 16, padding: 12, borderRadius: 6, border: v.is_head ? "1px solid var(--strong)" : "1px solid var(--line)", background: v.is_head ? "rgba(99,102,241,0.1)" : "transparent" }}>
+                <div style={{ width: 32, height: 32, borderRadius: 999, background: "var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontFamily: "ui-monospace,monospace", flexShrink: 0 }}>
                   v{v.version_number}
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{v.commit_message}</div>
-                  <div className="text-xs text-gray-500">{v.n_qubits}q · depth {v.depth} · {v.gate_count} gates</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{v.commit_message}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{v.n_qubits}q · depth {v.depth} · {v.gate_count} gates</div>
                 </div>
-                {v.is_head && <span className="text-xs bg-indigo-600 px-2 py-0.5 rounded">HEAD</span>}
+                {v.is_head && <span style={{ fontSize: 12, background: "var(--strong)", padding: "2px 8px", borderRadius: 6, color: "var(--text)", flexShrink: 0 }}>HEAD</span>}
               </div>
             ))}
           </div>

@@ -15,23 +15,71 @@ import {
 type MainTab = "Researchers" | "Jobs" | "Post";
 const MAIN_TABS: MainTab[] = ["Researchers", "Jobs", "Post"];
 
-const ROLE_COLORS: Record<string, string> = {
-  phd_student: "bg-sky-900/60 text-sky-300",
-  postdoc: "bg-indigo-900/60 text-indigo-300",
-  faculty: "bg-purple-900/60 text-purple-300",
-  industry: "bg-emerald-900/60 text-emerald-300",
+const ROLE_STYLES: Record<string, React.CSSProperties> = {
+  phd_student: { background: "rgba(12,74,110,0.6)", color: "#7dd3fc" },
+  postdoc: { background: "rgba(49,46,129,0.6)", color: "var(--strong)" },
+  faculty: { background: "rgba(88,28,135,0.6)", color: "#d8b4fe" },
+  industry: { background: "rgba(6,78,59,0.6)", color: "var(--ok)" },
 };
 
-const JOB_TYPE_COLORS: Record<string, string> = {
-  full_time: "bg-emerald-900/60 text-emerald-300",
-  part_time: "bg-amber-900/60 text-amber-300",
-  internship: "bg-sky-900/60 text-sky-300",
-  contract: "bg-rose-900/60 text-rose-300",
+const JOB_TYPE_STYLES: Record<string, React.CSSProperties> = {
+  full_time: { background: "rgba(6,78,59,0.6)", color: "var(--ok)" },
+  part_time: { background: "rgba(120,53,15,0.6)", color: "#fcd34d" },
+  internship: { background: "rgba(12,74,110,0.6)", color: "#7dd3fc" },
+  contract: { background: "rgba(136,19,55,0.6)", color: "#fca5a5" },
+};
+
+const badgeBaseStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 600,
+  textTransform: "capitalize",
+};
+
+const defaultBadgeExtras: React.CSSProperties = {
+  background: "var(--surface)",
+  color: "var(--muted)",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 13,
+  color: "var(--text)",
+  boxSizing: "border-box",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  color: "var(--muted)",
+  marginBottom: 4,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+const filterSelectStyle: React.CSSProperties = {
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 13,
+  color: "var(--text)",
+};
+
+const filterInputStyle: React.CSSProperties = {
+  ...filterSelectStyle,
+  width: 208,
 };
 
 function RoleBadge({ role }: { role: string }) {
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_COLORS[role] ?? "bg-gray-800 text-gray-400"}`}>
+    <span style={{ ...badgeBaseStyle, ...(ROLE_STYLES[role] ?? defaultBadgeExtras) }}>
       {role.replace(/_/g, " ")}
     </span>
   );
@@ -39,7 +87,7 @@ function RoleBadge({ role }: { role: string }) {
 
 function JobTypeBadge({ type }: { type: string }) {
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${JOB_TYPE_COLORS[type] ?? "bg-gray-800 text-gray-400"}`}>
+    <span style={{ ...badgeBaseStyle, ...(JOB_TYPE_STYLES[type] ?? defaultBadgeExtras) }}>
       {type.replace(/_/g, " ")}
     </span>
   );
@@ -47,7 +95,14 @@ function JobTypeBadge({ type }: { type: string }) {
 
 function SkillChip({ skill }: { skill: string }) {
   return (
-    <span className="inline-block bg-gray-800 text-gray-300 text-xs px-2 py-0.5 rounded-full">
+    <span style={{
+      display: "inline-block",
+      background: "var(--line)",
+      color: "var(--text)",
+      fontSize: 12,
+      padding: "2px 8px",
+      borderRadius: 999,
+    }}>
       {skill}
     </span>
   );
@@ -65,49 +120,60 @@ function ResearcherCard({
   matches: TalentMatch[] | null;
 }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
         <RoleBadge role={profile.role} />
         {profile.open_to_opportunities && (
-          <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">
+          <span style={{ fontSize: 12, background: "rgba(16,185,129,0.1)", color: "var(--ok)", padding: "2px 8px", borderRadius: 999 }}>
             Open to Opportunities
           </span>
         )}
       </div>
-      <h3 className="text-gray-100 font-semibold text-sm">{profile.name}</h3>
-      <p className="text-gray-500 text-xs mb-1">{profile.institution}</p>
-      <p className="text-gray-500 text-xs mb-3">
+      <h3 style={{ color: "var(--text)", fontWeight: 600, fontSize: 13, margin: 0 }}>{profile.name}</h3>
+      <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 0, marginBottom: 4 }}>{profile.institution}</p>
+      <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 0, marginBottom: 12 }}>
         h-index: {profile.h_index} &middot; {profile.publications} publications
       </p>
-      <div className="flex flex-wrap gap-1 mb-3">
-        {profile.expertise.slice(0, 4).map((e) => (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
+        {(profile.expertise ?? []).slice(0, 4).map((e) => (
           <SkillChip key={e} skill={e} />
         ))}
-        {profile.expertise.length > 4 && (
-          <span className="text-xs text-gray-600">+{profile.expertise.length - 4}</span>
+        {(profile.expertise ?? []).length > 4 && (
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>+{(profile.expertise ?? []).length - 4}</span>
         )}
       </div>
       <button
         onClick={onFindMatches}
         disabled={loadingMatches}
-        className="w-full text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-1.5 rounded-lg transition-colors font-medium"
+        style={{
+          width: "100%",
+          fontSize: 12,
+          background: "var(--strong)",
+          color: "#fff",
+          padding: "6px 0",
+          borderRadius: 8,
+          fontWeight: 500,
+          border: "none",
+          cursor: loadingMatches ? "not-allowed" : "pointer",
+          opacity: loadingMatches ? 0.5 : 1,
+        }}
       >
         {loadingMatches ? "Finding Matches…" : "Find Job Matches"}
       </button>
       {matches !== null && (
-        <div className="mt-3 space-y-2">
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {matches.length === 0 ? (
-            <p className="text-xs text-gray-600">No matches found.</p>
+            <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>No matches found.</p>
           ) : (
             matches.map((m) => (
-              <div key={m.job_id} className="bg-gray-800 rounded-lg p-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-400 font-mono">{m.job_id}</span>
-                  <span className="text-xs font-bold text-indigo-400">{(m.match_score * 100).toFixed(0)}%</span>
+              <div key={m.job_id} style={{ background: "rgba(0,0,0,0.15)", borderRadius: 8, padding: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "ui-monospace,monospace" }}>{m.job_id}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--strong)" }}>{(m.match_score * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {m.matching_skills.map((s) => (
-                    <span key={s} className="text-xs bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {(m.matching_skills ?? []).map((s) => (
+                    <span key={s} style={{ fontSize: 12, background: "rgba(99,102,241,0.2)", color: "var(--strong)", padding: "2px 6px", borderRadius: 4 }}>
                       {s}
                     </span>
                   ))}
@@ -125,39 +191,70 @@ function JobCard({ job }: { job: TalentJobListing }) {
   const [showContact, setShowContact] = useState(false);
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
         <JobTypeBadge type={job.type} />
         {job.deadline && (
-          <span className="text-xs text-gray-500 flex-shrink-0">
+          <span style={{ fontSize: 12, color: "var(--muted)", flexShrink: 0 }}>
             Deadline: {new Date(job.deadline).toLocaleDateString()}
           </span>
         )}
       </div>
-      <h3 className="text-gray-100 font-semibold text-sm mb-0.5">{job.title}</h3>
-      <p className="text-gray-400 text-xs mb-0.5">{job.institution}</p>
-      <p className="text-gray-500 text-xs mb-2">{job.location}</p>
+      <h3 style={{ color: "var(--text)", fontWeight: 600, fontSize: 13, margin: "0 0 2px 0" }}>{job.title}</h3>
+      <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 2px 0" }}>{job.institution}</p>
+      <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 8px 0" }}>{job.location}</p>
       {job.salary_range && (
-        <p className="text-emerald-400 text-xs font-medium mb-2">{job.salary_range}</p>
+        <p style={{ color: "var(--ok)", fontSize: 12, fontWeight: 500, margin: "0 0 8px 0" }}>{job.salary_range}</p>
       )}
-      <p className="text-gray-500 text-xs mb-3 line-clamp-2">{job.description}</p>
-      <div className="flex flex-wrap gap-1 mb-3">
-        {job.required_skills.slice(0, 4).map((s) => (
+      <p style={{
+        color: "var(--muted)",
+        fontSize: 12,
+        marginBottom: 12,
+        marginTop: 0,
+        WebkitLineClamp: 2,
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}>{job.description}</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
+        {(job.required_skills ?? []).slice(0, 4).map((s) => (
           <SkillChip key={s} skill={s} />
         ))}
-        {job.required_skills.length > 4 && (
-          <span className="text-xs text-gray-600">+{job.required_skills.length - 4} more</span>
+        {(job.required_skills ?? []).length > 4 && (
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>+{(job.required_skills ?? []).length - 4} more</span>
         )}
       </div>
-      <div className="relative">
+      <div style={{ position: "relative" }}>
         <button
           onClick={() => setShowContact(!showContact)}
-          className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors font-medium"
+          style={{
+            fontSize: 12,
+            background: "var(--line)",
+            color: "var(--text)",
+            padding: "6px 12px",
+            borderRadius: 8,
+            fontWeight: 500,
+            border: "none",
+            cursor: "pointer",
+          }}
         >
           Apply
         </button>
         {showContact && (
-          <div className="absolute bottom-8 left-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-indigo-300 whitespace-nowrap z-10 shadow-lg">
+          <div style={{
+            position: "absolute",
+            bottom: 32,
+            left: 0,
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: "var(--strong)",
+            whiteSpace: "nowrap",
+            zIndex: 10,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}>
             Contact: {job.contact_email}
           </div>
         )}
@@ -320,24 +417,29 @@ export default function TalentPage() {
     }
   }
 
-  const inputCls = "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500";
-
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-100">Quantum Talent Board</h1>
-        <p className="text-gray-500 text-sm mt-1">Connect researchers and opportunities in quantum computing.</p>
+    <main style={{ minHeight: "100vh", color: "var(--text)", padding: 24 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)", margin: 0 }}>Quantum Talent Board</h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4, marginBottom: 0 }}>Connect researchers and opportunities in quantum computing.</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-900 rounded-lg p-1 w-fit">
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "var(--surface)", borderRadius: 8, padding: 4, width: "fit-content" }}>
         {MAIN_TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-gray-200"
-            }`}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              border: "none",
+              cursor: "pointer",
+              background: activeTab === tab ? "var(--strong)" : "transparent",
+              color: activeTab === tab ? "#fff" : "var(--muted)",
+            }}
           >
             {tab}
           </button>
@@ -348,11 +450,11 @@ export default function TalentPage() {
       {activeTab === "Researchers" && (
         <div>
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
+              style={filterSelectStyle}
             >
               <option value="all">All Roles</option>
               <option value="phd_student">PhD Student</option>
@@ -364,28 +466,37 @@ export default function TalentPage() {
               value={expertiseFilter}
               onChange={(e) => setExpertiseFilter(e.target.value)}
               placeholder="Search expertise…"
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-52"
+              style={filterInputStyle}
             />
             <button
               onClick={loadResearchers}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              style={{
+                background: "var(--strong)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               Search
             </button>
           </div>
           {researchersError && (
-            <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+            <div style={{ marginBottom: 16, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", color: "var(--danger)", borderRadius: 8, padding: "12px 16px", fontSize: 13 }}>
               {researchersError}
             </div>
           )}
           {researchersLoading ? (
-            <div className="text-gray-500 text-sm py-8 text-center">Loading researchers…</div>
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center" }}>Loading researchers…</div>
           ) : researchers.length === 0 ? (
-            <div className="text-gray-600 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
               No profiles found.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
               {researchers.map((profile) => (
                 <ResearcherCard
                   key={profile.profile_id}
@@ -403,11 +514,11 @@ export default function TalentPage() {
       {/* Jobs Tab */}
       {activeTab === "Jobs" && (
         <div>
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
             <select
               value={jobTypeFilter}
               onChange={(e) => setJobTypeFilter(e.target.value)}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
+              style={filterSelectStyle}
             >
               <option value="all">All Types</option>
               <option value="full_time">Full Time</option>
@@ -419,28 +530,37 @@ export default function TalentPage() {
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               placeholder="Filter by location…"
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-52"
+              style={filterInputStyle}
             />
             <button
               onClick={loadJobs}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              style={{
+                background: "var(--strong)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               Search
             </button>
           </div>
           {jobsError && (
-            <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+            <div style={{ marginBottom: 16, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", color: "var(--danger)", borderRadius: 8, padding: "12px 16px", fontSize: 13 }}>
               {jobsError}
             </div>
           )}
           {jobsLoading ? (
-            <div className="text-gray-500 text-sm py-8 text-center">Loading jobs…</div>
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center" }}>Loading jobs…</div>
           ) : jobs.length === 0 ? (
-            <div className="text-gray-600 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
               No job listings found.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
               {jobs.map((job) => (
                 <JobCard key={job.job_id} job={job} />
               ))}
@@ -451,29 +571,29 @@ export default function TalentPage() {
 
       {/* Post Tab */}
       {activeTab === "Post" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 32 }}>
           {/* Post Profile */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-100 mb-4">Post Your Profile</h2>
-            <form onSubmit={handlePostProfile} className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginTop: 0, marginBottom: 16 }}>Post Your Profile</h2>
+            <form onSubmit={handlePostProfile} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Name</label>
-                  <input value={ppName} onChange={(e) => setPpName(e.target.value)} placeholder="Alice Smith" className={inputCls} required />
+                  <label style={labelStyle}>Name</label>
+                  <input value={ppName} onChange={(e) => setPpName(e.target.value)} placeholder="Alice Smith" style={inputStyle} required />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Email</label>
-                  <input type="email" value={ppEmail} onChange={(e) => setPpEmail(e.target.value)} placeholder="alice@university.edu" className={inputCls} required />
+                  <label style={labelStyle}>Email</label>
+                  <input type="email" value={ppEmail} onChange={(e) => setPpEmail(e.target.value)} placeholder="alice@university.edu" style={inputStyle} required />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Institution</label>
-                  <input value={ppInstitution} onChange={(e) => setPpInstitution(e.target.value)} placeholder="MIT" className={inputCls} required />
+                  <label style={labelStyle}>Institution</label>
+                  <input value={ppInstitution} onChange={(e) => setPpInstitution(e.target.value)} placeholder="MIT" style={inputStyle} required />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Role</label>
-                  <select value={ppRole} onChange={(e) => setPpRole(e.target.value)} className={inputCls}>
+                  <label style={labelStyle}>Role</label>
+                  <select value={ppRole} onChange={(e) => setPpRole(e.target.value)} style={inputStyle}>
                     <option value="phd_student">PhD Student</option>
                     <option value="postdoc">Postdoc</option>
                     <option value="faculty">Faculty</option>
@@ -482,30 +602,45 @@ export default function TalentPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Expertise (comma-separated)</label>
-                <input value={ppExpertise} onChange={(e) => setPpExpertise(e.target.value)} placeholder="VQE, Error Correction, Qiskit" className={inputCls} />
+                <label style={labelStyle}>Expertise (comma-separated)</label>
+                <input value={ppExpertise} onChange={(e) => setPpExpertise(e.target.value)} placeholder="VQE, Error Correction, Qiskit" style={inputStyle} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Publications</label>
-                  <input type="number" min={0} value={ppPublications} onChange={(e) => setPpPublications(Number(e.target.value))} className={inputCls} />
+                  <label style={labelStyle}>Publications</label>
+                  <input type="number" min={0} value={ppPublications} onChange={(e) => setPpPublications(Number(e.target.value))} style={inputStyle} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">h-index</label>
-                  <input type="number" min={0} value={ppHIndex} onChange={(e) => setPpHIndex(Number(e.target.value))} className={inputCls} />
+                  <label style={labelStyle}>h-index</label>
+                  <input type="number" min={0} value={ppHIndex} onChange={(e) => setPpHIndex(Number(e.target.value))} style={inputStyle} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Bio</label>
-                <textarea value={ppBio} onChange={(e) => setPpBio(e.target.value)} rows={3} placeholder="Research interests and background…" className={`${inputCls} resize-none`} />
+                <label style={labelStyle}>Bio</label>
+                <textarea value={ppBio} onChange={(e) => setPpBio(e.target.value)} rows={3} placeholder="Research interests and background…" style={{ ...inputStyle, resize: "none" }} />
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="openTo" checked={ppOpenTo} onChange={(e) => setPpOpenTo(e.target.checked)} className="accent-indigo-500" />
-                <label htmlFor="openTo" className="text-sm text-gray-300">Open to Opportunities</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" id="openTo" checked={ppOpenTo} onChange={(e) => setPpOpenTo(e.target.checked)} style={{ accentColor: "var(--strong)" }} />
+                <label htmlFor="openTo" style={{ fontSize: 13, color: "var(--text)" }}>Open to Opportunities</label>
               </div>
-              {ppError && <p className="text-red-400 text-sm">{ppError}</p>}
-              {ppSuccess && <p className="text-emerald-400 text-sm">Profile posted successfully!</p>}
-              <button type="submit" disabled={ppSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+              {ppError && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{ppError}</p>}
+              {ppSuccess && <p style={{ color: "var(--ok)", fontSize: 13, margin: 0 }}>Profile posted successfully!</p>}
+              <button
+                type="submit"
+                disabled={ppSubmitting}
+                style={{
+                  width: "100%",
+                  background: "var(--strong)",
+                  color: "#fff",
+                  fontWeight: 500,
+                  padding: "8px 0",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: ppSubmitting ? "not-allowed" : "pointer",
+                  opacity: ppSubmitting ? 0.5 : 1,
+                }}
+              >
                 {ppSubmitting ? "Posting…" : "Post Profile"}
               </button>
             </form>
@@ -513,26 +648,26 @@ export default function TalentPage() {
 
           {/* Post Job */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-100 mb-4">Post a Job Listing</h2>
-            <form onSubmit={handlePostJob} className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginTop: 0, marginBottom: 16 }}>Post a Job Listing</h2>
+            <form onSubmit={handlePostJob} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Job Title</label>
-                  <input value={pjTitle} onChange={(e) => setPjTitle(e.target.value)} placeholder="Quantum Research Engineer" className={inputCls} required />
+                  <label style={labelStyle}>Job Title</label>
+                  <input value={pjTitle} onChange={(e) => setPjTitle(e.target.value)} placeholder="Quantum Research Engineer" style={inputStyle} required />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Institution</label>
-                  <input value={pjInstitution} onChange={(e) => setPjInstitution(e.target.value)} placeholder="IBM Research" className={inputCls} required />
+                  <label style={labelStyle}>Institution</label>
+                  <input value={pjInstitution} onChange={(e) => setPjInstitution(e.target.value)} placeholder="IBM Research" style={inputStyle} required />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Location</label>
-                  <input value={pjLocation} onChange={(e) => setPjLocation(e.target.value)} placeholder="New York, NY" className={inputCls} required />
+                  <label style={labelStyle}>Location</label>
+                  <input value={pjLocation} onChange={(e) => setPjLocation(e.target.value)} placeholder="New York, NY" style={inputStyle} required />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Type</label>
-                  <select value={pjType} onChange={(e) => setPjType(e.target.value)} className={inputCls}>
+                  <label style={labelStyle}>Type</label>
+                  <select value={pjType} onChange={(e) => setPjType(e.target.value)} style={inputStyle}>
                     <option value="full_time">Full Time</option>
                     <option value="part_time">Part Time</option>
                     <option value="internship">Internship</option>
@@ -541,34 +676,49 @@ export default function TalentPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Description</label>
-                <textarea value={pjDescription} onChange={(e) => setPjDescription(e.target.value)} rows={3} placeholder="Role responsibilities and requirements…" className={`${inputCls} resize-none`} required />
+                <label style={labelStyle}>Description</label>
+                <textarea value={pjDescription} onChange={(e) => setPjDescription(e.target.value)} rows={3} placeholder="Role responsibilities and requirements…" style={{ ...inputStyle, resize: "none" }} required />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Required Skills (comma-separated)</label>
-                <input value={pjRequired} onChange={(e) => setPjRequired(e.target.value)} placeholder="Qiskit, Python, Linear Algebra" className={inputCls} />
+                <label style={labelStyle}>Required Skills (comma-separated)</label>
+                <input value={pjRequired} onChange={(e) => setPjRequired(e.target.value)} placeholder="Qiskit, Python, Linear Algebra" style={inputStyle} />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Preferred Skills (comma-separated)</label>
-                <input value={pjPreferred} onChange={(e) => setPjPreferred(e.target.value)} placeholder="Cirq, Quantum Error Correction" className={inputCls} />
+                <label style={labelStyle}>Preferred Skills (comma-separated)</label>
+                <input value={pjPreferred} onChange={(e) => setPjPreferred(e.target.value)} placeholder="Cirq, Quantum Error Correction" style={inputStyle} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Salary Range</label>
-                  <input value={pjSalary} onChange={(e) => setPjSalary(e.target.value)} placeholder="$120k – $160k" className={inputCls} />
+                  <label style={labelStyle}>Salary Range</label>
+                  <input value={pjSalary} onChange={(e) => setPjSalary(e.target.value)} placeholder="$120k – $160k" style={inputStyle} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Deadline</label>
-                  <input type="date" value={pjDeadline} onChange={(e) => setPjDeadline(e.target.value)} className={inputCls} />
+                  <label style={labelStyle}>Deadline</label>
+                  <input type="date" value={pjDeadline} onChange={(e) => setPjDeadline(e.target.value)} style={inputStyle} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Contact Email</label>
-                <input type="email" value={pjContact} onChange={(e) => setPjContact(e.target.value)} placeholder="careers@ibm.com" className={inputCls} required />
+                <label style={labelStyle}>Contact Email</label>
+                <input type="email" value={pjContact} onChange={(e) => setPjContact(e.target.value)} placeholder="careers@ibm.com" style={inputStyle} required />
               </div>
-              {pjError && <p className="text-red-400 text-sm">{pjError}</p>}
-              {pjSuccess && <p className="text-emerald-400 text-sm">Job listing posted successfully!</p>}
-              <button type="submit" disabled={pjSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+              {pjError && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{pjError}</p>}
+              {pjSuccess && <p style={{ color: "var(--ok)", fontSize: 13, margin: 0 }}>Job listing posted successfully!</p>}
+              <button
+                type="submit"
+                disabled={pjSubmitting}
+                style={{
+                  width: "100%",
+                  background: "var(--strong)",
+                  color: "#fff",
+                  fontWeight: 500,
+                  padding: "8px 0",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: pjSubmitting ? "not-allowed" : "pointer",
+                  opacity: pjSubmitting ? 0.5 : 1,
+                }}
+              >
                 {pjSubmitting ? "Posting…" : "Post Job Listing"}
               </button>
             </form>
