@@ -57,6 +57,129 @@ function SortTh({
 }
 
 // ------------------------------------------------------------------
+// ─── Dashboard routing fabric ─────────────────────────────────────────────────
+function DashFabric() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
+    let W = 0, H = 0, raf = 0, t0 = 0;
+    const reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+    function resize() {
+      const r = canvas!.getBoundingClientRect();
+      W = r.width; H = r.height;
+      canvas!.width = W * dpr; canvas!.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    const N = {
+      exp:     { x:.09, y:.50, r:6   },
+      qlab:    { x:.40, y:.50, r:12  },
+      ibm:     { x:.76, y:.17, r:8   },
+      ionq:    { x:.80, y:.40, r:6   },
+      rigetti: { x:.80, y:.60, r:6   },
+      aer:     { x:.76, y:.83, r:6   },
+    };
+
+    const P = (n:{x:number,y:number}) => ({ x: n.x*W, y: n.y*H });
+
+    function bez(a:{x:number,y:number}, b:{x:number,y:number}) {
+      const A=P(a),B=P(b),mx=(A.x+B.x)/2;
+      ctx.beginPath(); ctx.moveTo(A.x,A.y);
+      ctx.bezierCurveTo(mx,A.y,mx,B.y,B.x,B.y);
+    }
+
+    function ptBez(a:{x:number,y:number}, b:{x:number,y:number}, t:number) {
+      const A=P(a),B=P(b),mx=(A.x+B.x)/2,u=1-t;
+      return { x:u*u*u*A.x+3*u*u*t*mx+3*u*t*t*mx+t*t*t*B.x, y:u*u*u*A.y+3*u*u*t*A.y+3*u*t*t*B.y+t*t*t*B.y };
+    }
+
+    function edge(a:{x:number,y:number},b:{x:number,y:number},col:string,lw:number,alpha:number) {
+      bez(a,b); ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.globalAlpha=alpha; ctx.stroke(); ctx.globalAlpha=1;
+    }
+
+    function circle(c:{x:number,y:number},r:number,fill:string,stroke:string,lw:number) {
+      ctx.beginPath(); ctx.arc(c.x,c.y,r,0,Math.PI*2);
+      ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
+    }
+
+    function lbl(n:{x:number,y:number},text:string,side:"left"|"right"|"above"|"below") {
+      ctx.fillStyle="rgba(148,163,184,0.7)";
+      ctx.font="9px ui-monospace,monospace";
+      ctx.textAlign=(side==="left"?"right":side==="right"?"left":"center") as CanvasTextAlign;
+      const ox=side==="left"?-10:side==="right"?10:0, oy=side==="above"?-12:side==="below"?14:3;
+      ctx.fillText(text.toUpperCase(),P(n).x+ox,P(n).y+oy);
+    }
+
+    function frame(ts:number) {
+      if (!t0) t0=ts;
+      const time=(ts-t0)/1000;
+      ctx.clearRect(0,0,W,H);
+
+      [[N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer]].forEach(([a,b])=>edge(a,b,"var(--line)" as string,1,0.8));
+      [[N.exp,N.qlab],[N.qlab,N.ibm]].forEach(([a,b])=>edge(a,b,"#6366f1",1.6,0.55));
+
+      if (!reduce) {
+        ([[N.exp,N.qlab,2.2],[N.qlab,N.ibm,2.8]] as any[]).forEach(([a,b,cyc])=>{
+          for(let k=0;k<3;k++){
+            const ph=((time/cyc)+k/3)%1;
+            const pt=ptBez(a,b,ph);
+            ctx.globalAlpha=0.25+0.75*Math.sin(ph*Math.PI);
+            ctx.fillStyle="#33e0c6";
+            ctx.beginPath(); ctx.arc(pt.x,pt.y,2.6,0,Math.PI*2); ctx.fill();
+          }
+        });
+        ctx.globalAlpha=1;
+        const C=P(N.qlab), pulse=0.4-0.4*Math.abs(Math.sin(time*1.8));
+        ctx.globalAlpha=pulse;
+        ctx.beginPath(); ctx.arc(C.x,C.y,N.qlab.r+6+4*Math.abs(Math.sin(time*1.8)),0,Math.PI*2);
+        ctx.strokeStyle="#6366f1"; ctx.lineWidth=1.2; ctx.stroke();
+        ctx.globalAlpha=1;
+      }
+
+      circle(P(N.ionq),N.ionq.r,"var(--surface)","#a78bfa",1.4);
+      circle(P(N.rigetti),N.rigetti.r,"var(--surface)","#a78bfa",1.4);
+      circle(P(N.aer),N.aer.r,"var(--surface)","var(--line)",1.4);
+      circle(P(N.ibm),N.ibm.r,"rgba(51,224,198,0.1)","#33e0c6",1.8);
+      circle(P(N.exp),N.exp.r,"rgba(99,102,241,0.1)","#6366f1",1.6);
+      circle(P(N.qlab),N.qlab.r,"rgba(99,102,241,0.12)","#6366f1",2);
+
+      lbl(N.exp,"experiment","left");
+      lbl(N.qlab,"Q-LAB","above");
+      lbl(N.ibm,"ibm ★","right");
+      lbl(N.ionq,"ionq","right");
+      lbl(N.rigetti,"rigetti","right");
+      lbl(N.aer,"aer_sim","right");
+
+      raf=requestAnimationFrame(frame);
+    }
+
+    const ro=new ResizeObserver(resize);
+    ro.observe(canvas); resize();
+    raf=requestAnimationFrame(frame);
+    return ()=>{ cancelAnimationFrame(raf); ro.disconnect(); };
+  }, []);
+
+  return (
+    <div style={{
+      margin:"0 0 20px",
+      background:"rgba(99,102,241,0.04)",
+      border:"1px solid var(--line)",
+      borderRadius:12, overflow:"hidden", position:"relative",
+    }}>
+      <canvas ref={ref} style={{ display:"block", width:"100%", aspectRatio:"16/6" }} />
+      <span style={{
+        position:"absolute", bottom:8, left:14,
+        fontFamily:"ui-monospace,monospace", fontSize:9.5,
+        letterSpacing:"0.15em", textTransform:"uppercase", color:"var(--muted)", opacity:0.5,
+      }}>live routing fabric</span>
+    </div>
+  );
+}
+
 // Welcome workflow picker (empty state)
 // ------------------------------------------------------------------
 function QuickStart() {
@@ -92,7 +215,10 @@ function QuickStart() {
         <h2>Welcome to Q-Lab — what would you like to do?</h2>
         <span style={{ fontSize: 13, color: "var(--muted)" }}>Your experiments will appear here once submitted</span>
       </div>
-      <div style={{ padding: "24px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+      <div style={{ padding: "20px 20px 0" }}>
+        <DashFabric />
+      </div>
+      <div style={{ padding: "4px 20px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
         {workflows.map((w) => (
           <a key={w.href} href={w.href} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, background: "var(--surface)", border: `1px solid ${w.accent}30`, borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s, transform 0.15s" }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = w.accent; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}

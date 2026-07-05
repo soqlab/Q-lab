@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth";
@@ -695,6 +695,145 @@ const FEATURES = [
   },
 ];
 
+// ─── Hero routing fabric ─────────────────────────────────────────────────────
+function HeroFabric() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
+    let W = 0, H = 0, raf = 0, t0 = 0;
+    const reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+    function resize() {
+      const r = canvas!.getBoundingClientRect();
+      W = r.width; H = r.height;
+      canvas!.width = W * dpr; canvas!.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    const N = {
+      code:      { x:.07, y:.50, r:5.5 },
+      sdk:       { x:.27, y:.50, r:7   },
+      qlab:      { x:.49, y:.50, r:13  },
+      oracle:    { x:.49, y:.17, r:5   },
+      assistant: { x:.49, y:.83, r:5   },
+      ibm:       { x:.81, y:.18, r:8   },
+      ionq:      { x:.86, y:.40, r:5.5 },
+      rigetti:   { x:.86, y:.60, r:5.5 },
+      aer:       { x:.81, y:.82, r:5.5 },
+    };
+
+    const P = (n: {x:number,y:number}) => ({ x: n.x * W, y: n.y * H });
+
+    function bez(a:{x:number,y:number}, b:{x:number,y:number}) {
+      const A = P(a), B = P(b), mx = (A.x+B.x)/2;
+      ctx.beginPath(); ctx.moveTo(A.x,A.y);
+      ctx.bezierCurveTo(mx,A.y,mx,B.y,B.x,B.y);
+    }
+
+    function ptBez(a:{x:number,y:number}, b:{x:number,y:number}, t:number) {
+      const A=P(a),B=P(b),mx=(A.x+B.x)/2,u=1-t;
+      return { x:u*u*u*A.x+3*u*u*t*mx+3*u*t*t*mx+t*t*t*B.x, y:u*u*u*A.y+3*u*u*t*A.y+3*u*t*t*B.y+t*t*t*B.y };
+    }
+
+    function edge(a:{x:number,y:number}, b:{x:number,y:number}, col:string, lw:number, alpha:number) {
+      bez(a,b); ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.globalAlpha=alpha; ctx.stroke(); ctx.globalAlpha=1;
+    }
+
+    function circle(c:{x:number,y:number}, r:number, fill:string, stroke:string, lw:number) {
+      ctx.beginPath(); ctx.arc(c.x,c.y,r,0,Math.PI*2);
+      ctx.fillStyle=fill; ctx.fill();
+      ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
+    }
+
+    function label(n:{x:number,y:number}, text:string, side:"left"|"right"|"above"|"below") {
+      ctx.fillStyle="rgba(148,163,184,0.75)";
+      ctx.font="9px ui-monospace,monospace";
+      ctx.textAlign = (side==="left"?"right":side==="right"?"left":"center") as CanvasTextAlign;
+      const ox=side==="left"?-10:side==="right"?10:0;
+      const oy=side==="above"?-12:side==="below"?14:3;
+      ctx.fillText(text.toUpperCase(), P(n).x+ox, P(n).y+oy);
+    }
+
+    function frame(ts:number) {
+      if (!t0) t0=ts;
+      const time=(ts-t0)/1000;
+      ctx.clearRect(0,0,W,H);
+
+      // passive edges
+      [N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer],[N.qlab,N.oracle],[N.qlab,N.assistant];
+      [[N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer],[N.qlab,N.oracle],[N.qlab,N.assistant]]
+        .forEach(([a,b])=>edge(a,b,"#1e2d45",1,1));
+      // active edges
+      [[N.code,N.sdk],[N.sdk,N.qlab],[N.qlab,N.ibm]]
+        .forEach(([a,b])=>edge(a,b,"#6366f1",1.7,0.55));
+
+      if (!reduce) {
+        // particles
+        ([[N.code,N.sdk,2.3],[N.sdk,N.qlab,2.7],[N.qlab,N.ibm,3.1]] as any[]).forEach(([a,b,cyc],ei)=>{
+          for(let k=0;k<3;k++){
+            const ph=((time/cyc)+k/3)%1;
+            const pt=ptBez(a,b,ph);
+            ctx.globalAlpha=0.25+0.75*Math.sin(ph*Math.PI);
+            ctx.fillStyle="#33e0c6";
+            ctx.beginPath(); ctx.arc(pt.x,pt.y,2.8,0,Math.PI*2); ctx.fill();
+          }
+        });
+        ctx.globalAlpha=1;
+        // hub ring
+        const C=P(N.qlab), pulse=0.45-0.45*Math.abs(Math.sin(time*1.8));
+        ctx.globalAlpha=pulse;
+        ctx.beginPath(); ctx.arc(C.x,C.y,N.qlab.r+7+5*Math.abs(Math.sin(time*1.8)),0,Math.PI*2);
+        ctx.strokeStyle="#6366f1"; ctx.lineWidth=1.2; ctx.stroke();
+        ctx.globalAlpha=1;
+      }
+
+      // nodes
+      [[N.oracle,"#1e2d45"],[N.assistant,"#1e2d45"],[N.ionq,"#a78bfa"],[N.rigetti,"#a78bfa"],[N.aer,"#1e2d45"]]
+        .forEach(([n,s]) => circle(P(n as any),(n as any).r,"#070c1a",s as string,1.5));
+      circle(P(N.ibm), N.ibm.r, "rgba(51,224,198,0.1)", "#33e0c6", 1.8);
+      circle(P(N.sdk), N.sdk.r, "rgba(99,102,241,0.1)", "#6366f1", 1.7);
+      circle(P(N.code),N.code.r,"rgba(99,102,241,0.1)","#6366f1",1.5);
+      circle(P(N.qlab),N.qlab.r,"rgba(99,102,241,0.15)","#6366f1",2);
+
+      label(N.code,"code","left");
+      label(N.sdk,"sdk","above");
+      label(N.qlab,"Q-LAB","above");
+      label(N.oracle,"cost oracle","above");
+      label(N.assistant,"assistant","below");
+      label(N.ibm,"ibm ★","right");
+      label(N.ionq,"ionq","right");
+      label(N.rigetti,"rigetti","right");
+      label(N.aer,"aer_sim","right");
+
+      raf=requestAnimationFrame(frame);
+    }
+
+    const ro=new ResizeObserver(resize);
+    ro.observe(canvas); resize();
+    raf=requestAnimationFrame(frame);
+    return ()=>{ cancelAnimationFrame(raf); ro.disconnect(); };
+  }, []);
+
+  return (
+    <div style={{
+      background:"radial-gradient(130% 130% at 65% 10%,rgba(99,102,241,0.07),transparent 60%),#080c18",
+      border:"1px solid rgba(99,102,241,0.2)",
+      borderRadius:18, overflow:"hidden", position:"relative",
+      boxShadow:"0 24px 64px rgba(0,0,0,0.5)",
+    }}>
+      <canvas ref={ref} style={{ display:"block", width:"100%", aspectRatio:"4/3" }} />
+      <span style={{
+        position:"absolute", bottom:12, left:16,
+        fontFamily:"ui-monospace,monospace", fontSize:10,
+        letterSpacing:"0.17em", textTransform:"uppercase", color:"#3d506a",
+      }}>live routing fabric · q-lab</span>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function LandingPage() {
   const { user, loading } = useAuth();
@@ -806,48 +945,8 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right column — code card */}
-            <div className="lp-code-card">
-              <div className="lp-code-bar">
-                <span className="lp-code-dot" style={{ background: "#ff5f57" }} />
-                <span className="lp-code-dot" style={{ background: "#ffbd2e" }} />
-                <span className="lp-code-dot" style={{ background: "#28c840" }} />
-                <span className="lp-code-filename">bell_state.py</span>
-              </div>
-              <div className="lp-code-body">
-                <span className="lp-code-keyword">import</span>{" "}
-                <span className="lp-code-import">qlab</span>
-                {"\n"}
-                <span className="lp-code-hl">
-                  <span className="lp-code-func">qlab</span>
-                  <span style={{ color: "#f1f5f9" }}>.</span>
-                  <span className="lp-code-func">init</span>
-                  <span style={{ color: "#f1f5f9" }}>()</span>
-                  {"  "}
-                  <span className="lp-code-comment"># that&apos;s it</span>
-                </span>
-                {"\n"}
-                <span className="lp-code-keyword">from</span>{" "}
-                <span className="lp-code-import">qiskit</span>{" "}
-                <span className="lp-code-keyword">import</span>{" "}
-                <span style={{ color: "#f1f5f9" }}>QuantumCircuit</span>
-                {"\n\n"}
-                <span style={{ color: "#f1f5f9" }}>qc</span>{" = "}
-                <span className="lp-code-func">QuantumCircuit</span>
-                <span style={{ color: "#f1f5f9" }}>(2)</span>
-                {"\n"}
-                <span style={{ color: "#f1f5f9" }}>qc</span>
-                <span style={{ color: "#f1f5f9" }}>.</span>
-                <span className="lp-code-func">h</span>
-                <span style={{ color: "#f1f5f9" }}>(0); qc.</span>
-                <span className="lp-code-func">cx</span>
-                <span style={{ color: "#f1f5f9" }}>(0, 1)</span>
-                {"\n"}
-                <span className="lp-code-comment">
-                  # ↑ Q-Lab tracks it automatically
-                </span>
-              </div>
-            </div>
+            {/* Right column — routing fabric */}
+            <HeroFabric />
           </div>
         </section>
 
