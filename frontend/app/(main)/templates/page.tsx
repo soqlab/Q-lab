@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 
 const API = "/qlab-api";
-
-// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface Template {
   template_id: string;
@@ -38,28 +37,37 @@ interface UseResult {
   name: string;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const CATEGORY_COLORS: Record<string, string> = {
-  education: "#3b82f6",
-  chemistry: "#8b5cf6",
+  education:    "#3b82f6",
+  chemistry:    "#8b5cf6",
   optimization: "#f59e0b",
   benchmarking: "#06b6d4",
   cryptography: "#10b981",
-  ml: "#f97316",
-  custom: "#6b7280",
+  ml:           "#f97316",
+  custom:       "var(--muted)",
 };
 
 const ALGO_CHIPS: Record<string, string> = {
-  vqe: "VQE",
-  qaoa: "QAOA",
-  grover: "Grover",
-  qft: "QFT",
-  custom: "Custom",
+  vqe: "VQE", qaoa: "QAOA", grover: "Grover", qft: "QFT", custom: "Custom",
 };
 
-// ─── Code block with copy ────────────────────────────────────────────────────
+const SORTS = [
+  { value: "most_starred", label: "Most Starred" },
+  { value: "most_forked",  label: "Most Forked" },
+  { value: "most_run",     label: "Most Run" },
+  { value: "newest",       label: "Newest" },
+];
 
+async function safeFetch(url: string, opts?: RequestInit) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new Error(body || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+// ── Code block with copy ──────────────────────────────────────────────────────
 function CodeBlock({ code, label }: { code: string; label: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -70,18 +78,19 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ color: "#64748b", fontSize: 12, fontWeight: 600 }}>{label}</span>
+        <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>{label}</span>
         <button
           onClick={copy}
-          style={{ background: "#1e293b", border: "1px solid #334155", color: copied ? "#10b981" : "#3b82f6", borderRadius: 6, padding: "0.3rem 0.7rem", cursor: "pointer", fontSize: 12 }}
+          className="button secondary"
+          style={{ height: 28, fontSize: 11 }}
         >
           {copied ? "Copied!" : `Copy ${label}`}
         </button>
       </div>
       <pre style={{
-        background: "#0f172a", border: "1px solid #334155", borderRadius: 8,
-        padding: "1rem", overflowX: "auto", color: "#94a3b8", fontSize: "0.78rem",
-        lineHeight: 1.6, maxHeight: 220, margin: 0,
+        background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8,
+        padding: "12px 14px", overflowX: "auto", color: "var(--text)", fontSize: 11,
+        lineHeight: 1.6, maxHeight: 220, margin: 0, fontFamily: "ui-monospace,monospace",
       }}>
         {code}
       </pre>
@@ -89,27 +98,26 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
   );
 }
 
-// ─── Modal ───────────────────────────────────────────────────────────────────
-
+// ── Modal ─────────────────────────────────────────────────────────────────────
 function UseModal({ result, onClose }: { result: UseResult; onClose: () => void }) {
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "#00000099", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }} onClick={onClose}>
       <div
-        style={{ background: "#1e293b", borderRadius: 16, border: "1px solid #334155", padding: "1.5rem", maxWidth: 700, width: "100%", maxHeight: "90vh", overflowY: "auto" }}
+        className="panel"
+        style={{ maxWidth: 700, width: "100%", maxHeight: "90vh", overflowY: "auto", borderRadius: 16, margin: 0 }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ color: "#e2e8f0", margin: 0, fontSize: 16, fontWeight: 700 }}>{result.name}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>x</button>
+        <div className="panel-header">
+          <h2 style={{ margin: 0, fontSize: 15 }}>{result.name}</h2>
+          <button onClick={onClose} className="button secondary" style={{ height: 30, width: 30, padding: 0, fontSize: 18, lineHeight: 1 }}>×</button>
         </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
           <CodeBlock code={result.qasm} label="QASM" />
           <CodeBlock code={result.python_code} label="Python" />
-          <div style={{ background: "#0f172a", border: "1px solid #10b98133", borderRadius: 8, padding: "0.75rem 1rem", color: "#10b981", fontSize: 12 }}>
+          <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 8, padding: "10px 14px", color: "var(--ok)", fontSize: 12 }}>
             {result.run_instructions}
           </div>
         </div>
@@ -118,8 +126,7 @@ function UseModal({ result, onClose }: { result: UseResult; onClose: () => void 
   );
 }
 
-// ─── Template card ───────────────────────────────────────────────────────────
-
+// ── Template card ─────────────────────────────────────────────────────────────
 function TemplateCard({
   t, onStar, onFork, onUse, featured,
 }: {
@@ -129,80 +136,67 @@ function TemplateCard({
   onUse: (id: string) => void;
   featured?: boolean;
 }) {
-  const catColor = CATEGORY_COLORS[t.category] ?? "#6b7280";
+  const catColor = CATEGORY_COLORS[t.category] ?? "var(--muted)";
+  const [hover, setHover] = useState(false);
 
   return (
-    <div style={{
-      background: "#1e293b",
-      borderRadius: 12,
-      border: `1px solid ${featured ? catColor + "55" : "#334155"}`,
-      padding: "1.25rem",
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-      minWidth: featured ? 260 : undefined,
-      width: featured ? 280 : undefined,
-      flexShrink: featured ? 0 : undefined,
-    }}>
-      {/* Header row */}
+    <div
+      style={{
+        background: "var(--surface)", borderRadius: 12,
+        border: `1px solid ${hover ? catColor : "var(--line)"}`,
+        padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10,
+        minWidth: featured ? 260 : undefined, width: featured ? 280 : undefined,
+        flexShrink: featured ? 0 : undefined,
+        transition: "border-color 0.15s",
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{t.name}</div>
+          <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{t.name}</div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            <span style={{ background: catColor + "22", color: catColor, border: `1px solid ${catColor}44`, borderRadius: 4, padding: "1px 7px", fontSize: 10, fontWeight: 600 }}>
+            <span style={{ background: catColor + "20", color: catColor, border: `1px solid ${catColor}40`, borderRadius: 4, padding: "1px 7px", fontSize: 10, fontWeight: 600 }}>
               {t.category}
             </span>
             {t.algorithm !== "custom" && (
-              <span style={{ background: "#33415522", color: "#94a3b8", borderRadius: 4, padding: "1px 7px", fontSize: 10 }}>
+              <span style={{ background: "var(--info-bg)", color: "var(--muted)", borderRadius: 4, padding: "1px 7px", fontSize: 10 }}>
                 {ALGO_CHIPS[t.algorithm] ?? t.algorithm}
               </span>
             )}
-            <span style={{ background: "#0f172a", color: "#64748b", borderRadius: 4, padding: "1px 7px", fontSize: 10 }}>
+            <span style={{ background: "var(--surface)", color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 4, padding: "1px 7px", fontSize: 10 }}>
               {t.n_qubits_range[0] === t.n_qubits_range[1] ? `${t.n_qubits_range[0]}q` : `${t.n_qubits_range[0]}-${t.n_qubits_range[1]}q`}
             </span>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
-          {t.is_verified && <span title="Verified" style={{ fontSize: 14 }}>✓</span>}
+          {t.is_verified && <span title="Verified" style={{ fontSize: 13, color: "var(--ok)" }}>✓</span>}
           {t.is_featured && <span title="Featured" style={{ fontSize: 12, color: "#f59e0b" }}>★</span>}
         </div>
       </div>
 
-      {/* Description */}
-      <p style={{ color: "#94a3b8", fontSize: 12, margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+      <p style={{ color: "var(--muted)", fontSize: 12, margin: 0, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
         {t.description}
       </p>
 
-      {/* Author */}
-      <div style={{ color: "#475569", fontSize: 11 }}>
+      <div style={{ color: "var(--muted)", fontSize: 11 }}>
         {t.author}{t.institution ? ` · ${t.institution}` : ""}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b" }}>
+      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}>
         <span title="Stars">★ {t.star_count}</span>
         <span title="Forks">⑂ {t.fork_count}</span>
         <span title="Runs">▷ {t.run_count}</span>
       </div>
 
-      {/* Actions */}
       <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
-        <button
-          onClick={() => onStar(t.template_id)}
-          style={{ flex: 1, background: "#0f172a", border: "1px solid #334155", color: "#f59e0b", borderRadius: 6, padding: "0.4rem", cursor: "pointer", fontSize: 12 }}
-        >
+        <button onClick={() => onStar(t.template_id)} className="button secondary" style={{ flex: 1, height: 30, fontSize: 12, color: "#f59e0b" }}>
           Star
         </button>
-        <button
-          onClick={() => onFork(t.template_id)}
-          style={{ flex: 1, background: "#0f172a", border: "1px solid #334155", color: "#94a3b8", borderRadius: 6, padding: "0.4rem", cursor: "pointer", fontSize: 12 }}
-        >
+        <button onClick={() => onFork(t.template_id)} className="button secondary" style={{ flex: 1, height: 30, fontSize: 12 }}>
           Fork
         </button>
-        <button
-          onClick={() => onUse(t.template_id)}
-          style={{ flex: 2, background: "#3b82f6", border: "none", color: "#fff", borderRadius: 6, padding: "0.4rem", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-        >
+        <button onClick={() => onUse(t.template_id)} className="button" style={{ flex: 2, height: 30, fontSize: 12 }}>
           Use Template
         </button>
       </div>
@@ -210,15 +204,7 @@ function TemplateCard({
   );
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
-
-const SORTS = [
-  { value: "most_starred", label: "Most Starred" },
-  { value: "most_forked", label: "Most Forked" },
-  { value: "most_run", label: "Most Run" },
-  { value: "newest", label: "Newest" },
-];
-
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function TemplateMarketplacePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [featured, setFeatured] = useState<Template[]>([]);
@@ -239,20 +225,21 @@ export default function TemplateMarketplacePage() {
     try {
       const params = new URLSearchParams();
       if (activeCategory) params.set("category", activeCategory);
-      if (activeAlgo) params.set("algorithm", activeAlgo);
-      if (search) params.set("search", search);
+      if (activeAlgo)     params.set("algorithm", activeAlgo);
+      if (search)         params.set("search", search);
       params.set("sort", sort);
 
       const [t, f, c] = await Promise.all([
-        fetch(`${API}/api/v1/experiment-templates/?${params}`).then(r => r.json()),
-        fetch(`${API}/api/v1/experiment-templates/featured`).then(r => r.json()),
-        fetch(`${API}/api/v1/experiment-templates/categories`).then(r => r.json()),
+        safeFetch(`${API}/api/v1/experiment-templates/?${params}`),
+        safeFetch(`${API}/api/v1/experiment-templates/featured`),
+        safeFetch(`${API}/api/v1/experiment-templates/categories`),
       ]);
       setTemplates(Array.isArray(t) ? t : []);
       setFeatured(Array.isArray(f) ? f : []);
       setCategories(Array.isArray(c) ? c : []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load templates");
+      const msg = e instanceof Error ? e.message : "Failed to load templates";
+      setError(msg.includes("fetch") ? "Backend is warming up — please retry in a moment." : msg);
     } finally {
       setLoading(false);
     }
@@ -272,59 +259,58 @@ export default function TemplateMarketplacePage() {
 
   const handleUse = async (id: string) => {
     try {
-      const res = await fetch(`${API}/api/v1/experiment-templates/${id}/run`, {
+      const res = await safeFetch(`${API}/api/v1/experiment-templates/${id}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parameters: {} }),
-      }).then(r => r.json());
+      });
       setUseResult({ qasm: res.qasm, python_code: res.python_code, run_instructions: res.run_instructions, name: res.name });
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
 
-  const totalTemplates = templates.length;
   const totalForks = templates.reduce((s, t) => s + t.fork_count, 0);
-  const totalRuns = templates.reduce((s, t) => s + t.run_count, 0);
-
+  const totalRuns  = templates.reduce((s, t) => s + t.run_count, 0);
   const algorithms = [...new Set(templates.map(t => t.algorithm).filter(a => a !== "custom"))];
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem" }}>
+    <main className="page">
       {/* Hero */}
-      <div style={{ marginBottom: "1.5rem", textAlign: "center" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 800, color: "#e2e8f0", margin: "0 0 0.4rem 0" }}>
+      <div style={{ marginBottom: 24, textAlign: "center" }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: "var(--text)", margin: "0 0 6px" }}>
           Experiment Template Marketplace
         </h1>
-        <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
+        <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
           Community-curated quantum circuits. Fork, star, and run in one click.
         </p>
-        {/* Stat strip */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 32, marginTop: 16 }}>
           {[
-            { label: "Templates", value: totalTemplates },
+            { label: "Templates", value: templates.length },
             { label: "Total Forks", value: totalForks },
             { label: "Total Runs", value: totalRuns },
           ].map(({ label, value }) => (
             <div key={label} style={{ textAlign: "center" }}>
-              <div style={{ color: "#3b82f6", fontSize: 22, fontWeight: 800 }}>{value}</div>
-              <div style={{ color: "#64748b", fontSize: 11 }}>{label}</div>
+              <div style={{ color: "var(--strong)", fontSize: 22, fontWeight: 800 }}>{value}</div>
+              <div style={{ color: "var(--muted)", fontSize: 11 }}>{label}</div>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Error */}
       {error && (
-        <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>
-          {error}
+        <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid var(--danger)", borderRadius: 8, padding: "12px 16px", color: "var(--danger)", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span>{error}</span>
+          <button className="button secondary" style={{ height: 30, fontSize: 12, flexShrink: 0 }} onClick={() => void load()}>
+            <RefreshCw size={13} /> Retry
+          </button>
         </div>
       )}
 
-      {/* Featured horizontal scroll */}
+      {/* Featured scroll */}
       {featured.length > 0 && (
-        <div style={{ marginBottom: "2rem" }}>
-          <h2 style={{ color: "#e2e8f0", fontSize: 15, fontWeight: 600, marginBottom: "0.75rem" }}>Featured</h2>
-          <div style={{ display: "flex", gap: "1rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
+        <div style={{ marginBottom: 28 }}>
+          <h2 style={{ color: "var(--text)", fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Featured</h2>
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 6 }}>
             {featured.map(t => (
               <TemplateCard key={t.template_id} t={t} onStar={handleStar} onFork={handleFork} onUse={handleUse} featured />
             ))}
@@ -333,20 +319,20 @@ export default function TemplateMarketplacePage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
-        {/* Search */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
         <input
+          className="input"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && void load()}
           placeholder="Search templates…"
-          style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", padding: "0.5rem 0.9rem", fontSize: 13, width: 200 }}
+          style={{ width: 200 }}
         />
-
-        {/* Category tabs */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           <button
             onClick={() => setActiveCategory(null)}
-            style={{ padding: "0.4rem 0.9rem", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: !activeCategory ? "#3b82f6" : "#1e293b", color: !activeCategory ? "#fff" : "#64748b" }}
+            className={activeCategory ? "button secondary" : "button"}
+            style={{ height: 32, fontSize: 12 }}
           >
             All
           </button>
@@ -354,50 +340,52 @@ export default function TemplateMarketplacePage() {
             <button
               key={c.category}
               onClick={() => setActiveCategory(activeCategory === c.category ? null : c.category)}
-              style={{ padding: "0.4rem 0.9rem", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: activeCategory === c.category ? "#3b82f6" : "#1e293b", color: activeCategory === c.category ? "#fff" : "#94a3b8" }}
+              className={activeCategory === c.category ? "button" : "button secondary"}
+              style={{ height: 32, fontSize: 12 }}
             >
               {c.category} <span style={{ opacity: 0.7 }}>({c.count})</span>
             </button>
           ))}
         </div>
-
-        {/* Algorithm filter */}
         {algorithms.length > 0 && (
           <select
+            className="input"
             value={activeAlgo ?? ""}
             onChange={e => setActiveAlgo(e.target.value || null)}
-            style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", padding: "0.45rem 0.75rem", fontSize: 12 }}
+            style={{ width: 150 }}
           >
             <option value="">All Algorithms</option>
             {algorithms.map(a => <option key={a} value={a}>{ALGO_CHIPS[a] ?? a}</option>)}
           </select>
         )}
-
-        {/* Sort */}
         <select
+          className="input"
           value={sort}
           onChange={e => setSort(e.target.value)}
-          style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", padding: "0.45rem 0.75rem", fontSize: 12, marginLeft: "auto" }}
+          style={{ width: 150, marginLeft: "auto" }}
         >
           {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
 
-      {/* Main grid */}
+      {/* Grid */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "4rem", color: "#64748b" }}>Loading templates…</div>
-      ) : templates.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "4rem", color: "#475569" }}>No templates found.</div>
+        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted)", fontSize: 14 }}>
+          Loading templates…
+        </div>
+      ) : templates.length === 0 && !error ? (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted)", fontSize: 14 }}>
+          No templates found.
+        </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
           {templates.map(t => (
             <TemplateCard key={t.template_id} t={t} onStar={handleStar} onFork={handleFork} onUse={handleUse} />
           ))}
         </div>
       )}
 
-      {/* Use modal */}
       {useResult && <UseModal result={useResult} onClose={() => setUseResult(null)} />}
-    </div>
+    </main>
   );
 }
