@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { searchArxivFeed, getTrendingArxiv, ArxivFeedPaper, ArxivFeedResult } from "@/lib/api";
+import { searchArxivFeed, ArxivFeedPaper, ArxivFeedResult } from "../../../lib/api";
 
 function PaperCard({ paper }: { paper: ArxivFeedPaper }) {
   const [showAbstract, setShowAbstract] = useState(false);
   const [showBibtex, setShowBibtex] = useState(false);
   const bibtex = `@article{${paper.arxiv_id.replace(".", "_")},
   title={${paper.title}},
-  author={${paper.authors.join(" and ")}},
+  author={${(paper.authors ?? []).join(" and ")}},
   journal={${paper.journal}},
   year={${paper.date.slice(0, 4)}},
   eprint={${paper.arxiv_id}},
@@ -19,9 +19,9 @@ function PaperCard({ paper }: { paper: ArxivFeedPaper }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>{paper.title}</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>{paper.authors.join(", ")} &middot; {paper.journal} &middot; {paper.date}</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>{(paper.authors ?? []).join(", ")} &middot; {paper.journal} &middot; {paper.date}</div>
           <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-            {paper.categories.map(c => (
+            {(paper.categories ?? []).map(c => (
               <span key={c} style={{ padding: "2px 6px", borderRadius: 10, background: "#0f172a", color: "#94a3b8", fontSize: 11 }}>{c}</span>
             ))}
           </div>
@@ -97,10 +97,10 @@ export default function ArxivFeedPage() {
         {result && (
           <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
             <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Stats</div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>Papers indexed: <span style={{ color: "#e2e8f0" }}>{result.stats.total_papers_indexed}</span></div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>Avg citations: <span style={{ color: "#e2e8f0" }}>{result.stats.avg_citations}</span></div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>Papers indexed: <span style={{ color: "#e2e8f0" }}>{result.stats?.total_papers_indexed}</span></div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>Avg citations: <span style={{ color: "#e2e8f0" }}>{result.stats?.avg_citations}</span></div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>Most cited:</div>
-            <div style={{ fontSize: 11, color: "#a78bfa", lineHeight: 1.4 }}>{result.stats.most_cited.slice(0, 60)}…</div>
+            <div style={{ fontSize: 11, color: "#a78bfa", lineHeight: 1.4 }}>{result.stats?.most_cited?.slice(0, 60)}…</div>
           </div>
         )}
       </div>
@@ -112,7 +112,7 @@ export default function ArxivFeedPage() {
             <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>
               {result.returned} results {query && `for "${query}"`}
             </div>
-            {result.papers.map(p => <PaperCard key={p.arxiv_id} paper={p} />)}
+            {(result.papers ?? []).map(p => <PaperCard key={p.arxiv_id} paper={p} />)}
           </>
         )}
       </div>
