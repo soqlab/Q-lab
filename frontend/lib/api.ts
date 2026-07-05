@@ -5769,7 +5769,8 @@ export async function listArxivCategories(): Promise<{ id: string; description: 
 export async function getFeaturedPapers(): Promise<ArxivPaper[]> {
   const res = await fetch(apiUrl("/api/v1/arxiv-search/featured"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Featured failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.featured ?? data.papers ?? []);
 }
 
 // ------------------------------------------------------------------

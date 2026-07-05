@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Filter, RefreshCw, Wifi, Terminal, Key, Zap, ChevronUp, ChevronDown, Trash2, Download, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { createRunStream, deleteRun, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
@@ -342,7 +342,7 @@ function parseSmartQuery(raw: string): ParsedQuery {
 // ------------------------------------------------------------------
 // Main
 // ------------------------------------------------------------------
-export default function RunsPage() {
+function RunsInner() {
   const { token } = useAuth();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -721,5 +721,13 @@ export default function RunsPage() {
         </section>
       )}
     </main>
+  );
+}
+
+export default function RunsPage() {
+  return (
+    <Suspense fallback={<main className="page"><div className="empty">Loading…</div></main>}>
+      <RunsInner />
+    </Suspense>
   );
 }
