@@ -109,7 +109,7 @@ export default function BenchmarksPage() {
                   {bm.name || bm.benchmark_id.slice(0, 16) + "…"}
                 </div>
                 <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
-                  {bm.backends.join(" · ")} &nbsp;·&nbsp; {new Date(bm.created_at).toLocaleString()}
+                  {(bm.backends ?? []).join(" · ")} &nbsp;·&nbsp; {new Date(bm.created_at).toLocaleString()}
                   {bm.project && <> &nbsp;·&nbsp; <span style={{ fontWeight: 500 }}>{bm.project}</span></>}
                 </div>
               </div>

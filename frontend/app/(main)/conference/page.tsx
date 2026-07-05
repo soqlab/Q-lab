@@ -72,7 +72,7 @@ function AssetDetail({ asset, onClose }: { asset: ConferenceAsset; onClose: () =
             <h2 className="text-gray-100 font-semibold text-lg">{asset.title}</h2>
             <p className="text-gray-500 text-xs mt-1">
               {asset.file_size_kb} KB &middot; {asset.format} &middot;{" "}
-              {asset.authors.join(", ")}
+              {(asset.authors ?? []).join(", ")}
             </p>
           </div>
           <button
@@ -395,7 +395,7 @@ export default function ConferencePage() {
               <span className="text-gray-500 text-xs">{generatedAsset.file_size_kb} KB</span>
             </div>
             <h3 className="text-gray-100 font-semibold mb-1">{generatedAsset.title}</h3>
-            <p className="text-gray-500 text-xs mb-3">{generatedAsset.authors.join(", ")}</p>
+            <p className="text-gray-500 text-xs mb-3">{(generatedAsset.authors ?? []).join(", ")}</p>
             {generatedAsset.download_url && (
               <a
                 href={generatedAsset.download_url}

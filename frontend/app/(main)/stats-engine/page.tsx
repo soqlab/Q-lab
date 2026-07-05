@@ -2,6 +2,20 @@
 import { useState } from "react";
 import { runStatAnalysis, StatAnalysisResult } from "@/lib/api";
 
+function Meter({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+        <span>{label}</span>
+        <span style={{ fontFamily: "ui-monospace,monospace" }}>{(value * 100).toFixed(2)}%</span>
+      </div>
+      <div style={{ width: "100%", background: "var(--line)", borderRadius: 999, height: 6 }}>
+        <div style={{ width: `${Math.min(100, value * 100)}%`, height: 6, borderRadius: 999, background: "var(--strong)" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function StatsEnginePage() {
   const [nQubits, setNQubits] = useState(2);
   const [nShots, setNShots] = useState(8192);
@@ -25,15 +39,6 @@ export default function StatsEnginePage() {
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
-
-  const Meter = ({ value, label, color = "indigo" }: { value: number; label: string; color?: string }) => (
-    <div>
-      <div className="flex justify-between text-xs text-gray-400 mb-1"><span>{label}</span><span className="font-mono">{(value * 100).toFixed(2)}%</span></div>
-      <div className="w-full bg-gray-700 rounded-full h-2">
-        <div className={`bg-${color}-500 h-2 rounded-full transition-all`} style={{ width: `${Math.min(100, value * 100)}%` }} />
-      </div>
-    </div>
-  );
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
