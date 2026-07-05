@@ -101,7 +101,7 @@ export default function NoiseModelPage() {
             <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>QV Lower Bound: <span style={{ color: "#6366f1", fontWeight: 700 }}>{result.estimated_qv_lower_bound}</span></div>
               <div style={{ fontSize: 12, color: "#64748b" }}>Dominant error: {result.dominant_error_source}</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>Compatible with: {result.compatible_backends.join(", ")}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Compatible with: {(result.compatible_backends ?? []).join(", ")}</div>
               <pre style={{ marginTop: 10, background: "#0f172a", borderRadius: 6, padding: 10, fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>
                 {result.qasm_noise_pragma}
               </pre>

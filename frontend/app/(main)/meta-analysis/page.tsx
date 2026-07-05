@@ -459,7 +459,7 @@ export default function MetaAnalysisPage() {
                         <td style={{ padding: "8px 10px", fontWeight: 600, maxWidth: 200 }}>
                           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
                         </td>
-                        <td style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12 }}>{s.authors.join(", ")}</td>
+                        <td style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12 }}>{(s.authors ?? []).join(", ")}</td>
                         <td style={{ padding: "8px 10px" }}>{s.year}</td>
                         <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>{s.effect_size.toFixed(4)}</td>
                         <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>{s.std_error.toFixed(4)}</td>
