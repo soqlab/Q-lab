@@ -58,8 +58,29 @@ function SortTh({
 
 // ------------------------------------------------------------------
 // ─── Dashboard routing fabric ─────────────────────────────────────────────────
-function DashFabric() {
+function DashFabric({ runs }: { runs: QLabRun[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
+
+  // Derive active backends from real runs
+  const activeBackends = useMemo(() => {
+    const recent = runs.slice(0, 10);
+    const counts: Record<string, number> = {};
+    recent.forEach(r => {
+      const b = (r.backend || "").toLowerCase();
+      if (b.includes("ibm"))     counts.ibm     = (counts.ibm || 0) + 1;
+      if (b.includes("ionq"))    counts.ionq    = (counts.ionq || 0) + 1;
+      if (b.includes("rigetti")) counts.rigetti = (counts.rigetti || 0) + 1;
+      if (b.includes("aer") || b.includes("sim") || b === "") counts.aer = (counts.aer || 0) + 1;
+    });
+    return counts;
+  }, [runs]);
+
+  const latestCircuit = runs[0]?.circuit_name || runs[0]?.run_id?.slice(0, 8) || "experiment";
+
+  // Ref keeps animation loop reading fresh data without restarting the rAF loop
+  const dataRef = useRef({ activeBackends, latestCircuit });
+  useEffect(() => { dataRef.current = { activeBackends, latestCircuit }; }, [activeBackends, latestCircuit]);
+
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -119,11 +140,37 @@ function DashFabric() {
       const time=(ts-t0)/1000;
       ctx.clearRect(0,0,W,H);
 
-      [[N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer]].forEach(([a,b])=>edge(a,b,"var(--line)" as string,1,0.8));
-      [[N.exp,N.qlab],[N.qlab,N.ibm]].forEach(([a,b])=>edge(a,b,"#6366f1",1.6,0.55));
+      // Read fresh data every frame via ref — no stale closure
+      const { activeBackends: ab, latestCircuit: circuit } = dataRef.current;
+      const hasIbm     = (ab.ibm     || 0) > 0;
+      const hasIonq    = (ab.ionq    || 0) > 0;
+      const hasRigetti = (ab.rigetti || 0) > 0;
+      const hasAer     = (ab.aer     || 0) > 0;
+      const hasAny = hasIbm || hasIonq || hasRigetti || hasAer;
+      const chosen = Object.entries(ab).sort((a,b)=>b[1]-a[1])[0]?.[0] || "ibm";
+
+      // passive edges to unused backends
+      if (!hasIonq || !hasAny)    edge(N.qlab,N.ionq,"#1e2d45",1,0.5);
+      if (!hasRigetti || !hasAny) edge(N.qlab,N.rigetti,"#1e2d45",1,0.5);
+      if (!hasAer || !hasAny)     edge(N.qlab,N.aer,"#1e2d45",1,0.5);
+      if (!hasIbm || !hasAny)     edge(N.qlab,N.ibm,"#1e2d45",1,0.5);
+
+      // active edges to used backends
+      if (hasIbm     || !hasAny) edge(N.qlab,N.ibm,"#6366f1",hasIbm?1.8:1,hasIbm?0.6:0.3);
+      if (hasIonq)               edge(N.qlab,N.ionq,"#a78bfa",1.5,0.5);
+      if (hasRigetti)            edge(N.qlab,N.rigetti,"#a78bfa",1.5,0.5);
+      if (hasAer)                edge(N.qlab,N.aer,"#33e0c6",1.5,0.5);
+      edge(N.exp,N.qlab,"#6366f1",1.6,0.55);
 
       if (!reduce) {
-        ([[N.exp,N.qlab,2.2],[N.qlab,N.ibm,2.8]] as any[]).forEach(([a,b,cyc])=>{
+        // particles to chosen/active backends
+        const activePaths: [typeof N.exp, typeof N.ibm, number][] = [[N.exp,N.qlab,2.2]];
+        if (chosen==="ibm"     || !hasAny) activePaths.push([N.qlab,N.ibm,2.8]);
+        if (chosen==="ionq")              activePaths.push([N.qlab,N.ionq,3.0]);
+        if (chosen==="rigetti")           activePaths.push([N.qlab,N.rigetti,3.0]);
+        if (chosen==="aer")               activePaths.push([N.qlab,N.aer,2.6]);
+
+        (activePaths as any[]).forEach(([a,b,cyc])=>{
           for(let k=0;k<3;k++){
             const ph=((time/cyc)+k/3)%1;
             const pt=ptBez(a,b,ph);
@@ -140,19 +187,20 @@ function DashFabric() {
         ctx.globalAlpha=1;
       }
 
-      circle(P(N.ionq),N.ionq.r,"var(--surface)","#a78bfa",1.4);
-      circle(P(N.rigetti),N.rigetti.r,"var(--surface)","#a78bfa",1.4);
-      circle(P(N.aer),N.aer.r,"var(--surface)","var(--line)",1.4);
-      circle(P(N.ibm),N.ibm.r,"rgba(51,224,198,0.1)","#33e0c6",1.8);
+      const ibmActive=chosen==="ibm"||!hasAny;
+      circle(P(N.ionq),N.ionq.r,"var(--surface)",hasIonq?"#a78bfa":"#1e2d45",hasIonq?1.6:1.2);
+      circle(P(N.rigetti),N.rigetti.r,"var(--surface)",hasRigetti?"#a78bfa":"#1e2d45",hasRigetti?1.6:1.2);
+      circle(P(N.aer),N.aer.r,"var(--surface)",hasAer?"#33e0c6":"#1e2d45",hasAer?1.6:1.2);
+      circle(P(N.ibm),N.ibm.r,ibmActive?"rgba(51,224,198,0.12)":"var(--surface)",ibmActive?"#33e0c6":"#1e2d45",ibmActive?1.8:1.2);
       circle(P(N.exp),N.exp.r,"rgba(99,102,241,0.1)","#6366f1",1.6);
       circle(P(N.qlab),N.qlab.r,"rgba(99,102,241,0.12)","#6366f1",2);
 
-      lbl(N.exp,"experiment","left");
+      lbl(N.exp, circuit.length>12 ? circuit.slice(0,12)+"…" : circuit, "left");
       lbl(N.qlab,"Q-LAB","above");
-      lbl(N.ibm,"ibm ★","right");
-      lbl(N.ionq,"ionq","right");
-      lbl(N.rigetti,"rigetti","right");
-      lbl(N.aer,"aer_sim","right");
+      lbl(N.ibm, hasIbm ? `ibm (${ab.ibm})` : "ibm", "right");
+      lbl(N.ionq, hasIonq ? `ionq (${ab.ionq})` : "ionq", "right");
+      lbl(N.rigetti, hasRigetti ? `rigetti (${ab.rigetti})` : "rigetti", "right");
+      lbl(N.aer, hasAer ? `sim (${ab.aer})` : "aer_sim", "right");
 
       raf=requestAnimationFrame(frame);
     }
@@ -218,7 +266,7 @@ function QuickStart() {
         <span style={{ fontSize: 13, color: "var(--muted)" }}>Your experiments will appear here once submitted</span>
       </div>
       <div style={{ padding: "20px 20px 0" }}>
-        <DashFabric />
+        <DashFabric runs={[]} />
       </div>
       <div style={{ padding: "4px 20px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
         {workflows.map((w) => (
@@ -511,16 +559,21 @@ export default function RunsPage() {
         ))}
       </section>
 
-      {/* Chart */}
-      <section className="panel">
-        <div className="panel-header"><h2>Gate Depth — Last 20 Runs</h2></div>
-        <div style={{ height: 240, padding: "8px 16px" }}>
-          <GateDepthChart data={chartData} />
-        </div>
-      </section>
+      {/* Chart — only when there's data */}
+      {chartData.length > 0 && (
+        <section className="panel">
+          <div className="panel-header"><h2>Gate Depth — Last 20 Runs</h2></div>
+          <div style={{ height: 240, padding: "8px 16px" }}>
+            <GateDepthChart data={chartData} />
+          </div>
+        </section>
+      )}
 
       {/* Empty state */}
       {!loading && !runs.length && <QuickStart />}
+
+      {/* Live routing fabric — real backend usage from loaded runs */}
+      {!loading && runs.length > 0 && <DashFabric runs={runs} />}
 
       {/* Runs table */}
       {(!loading && runs.length > 0) && (
