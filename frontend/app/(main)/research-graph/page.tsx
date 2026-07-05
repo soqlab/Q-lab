@@ -71,7 +71,15 @@ export default function ResearchGraphPage() {
       </div>
       <p style={{ color: "var(--muted)" }}>Visualize the connections between hypotheses, runs, papers, circuits, and findings in your research workflow.</p>
 
-      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
+      {error && (
+        <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span>{error}</span>
+          <button onClick={() => { setError(""); load(); }}
+            style={{ padding: "6px 14px", background: "var(--danger)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {showAddNode && (
         <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>

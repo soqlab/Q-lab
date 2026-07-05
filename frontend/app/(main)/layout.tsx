@@ -12,23 +12,35 @@ function WarmupBanner() {
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 2500);
     const start = Date.now();
+    let cancelled = false;
 
-    fetch("/qlab-api/health", { signal: AbortSignal.timeout(45000) })
-      .then(() => {
-        clearTimeout(timer);
-        if (Date.now() - start > 2500) {
-          setDone(true);
-          setTimeout(() => setVisible(false), 2000);
-        } else {
-          setVisible(false);
-        }
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        setVisible(false);
-      });
+    function ping(attempt: number) {
+      if (cancelled) return;
+      fetch("/qlab-api/health", { signal: AbortSignal.timeout(35000) })
+        .then(() => {
+          if (cancelled) return;
+          clearTimeout(timer);
+          if (Date.now() - start > 2500) {
+            setDone(true);
+            setTimeout(() => setVisible(false), 2000);
+          } else {
+            setVisible(false);
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < 8) {
+            // Backend refused connection (cold start) — retry with backoff
+            setTimeout(() => ping(attempt + 1), Math.min(3000 + attempt * 1000, 8000));
+          } else {
+            clearTimeout(timer);
+            setVisible(false);
+          }
+        });
+    }
 
-    return () => clearTimeout(timer);
+    ping(0);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
   if (!visible) return null;
