@@ -1,6 +1,12 @@
 "use client";
 import { useState } from "react";
-import { captureEnvironment, diffEnvironments, EnvironmentSnapshot, EnvDiff } from "@/lib/api";
+import { captureEnvironment, diffEnvironments, EnvironmentSnapshot, EnvDiff } from "../../../lib/api";
+
+const RISK_COLORS: Record<string, string> = {
+  high:   "var(--danger)",
+  medium: "var(--warn, #f59e0b)",
+  low:    "var(--ok)",
+};
 
 export default function EnvironmentPage() {
   const [snapshots, setSnapshots] = useState<EnvironmentSnapshot[]>([]);
@@ -29,79 +35,108 @@ export default function EnvironmentPage() {
     finally { setLoading(false); }
   }
 
-  const riskColor = (level: string) =>
-    level === "high" ? "text-red-400" : level === "medium" ? "text-yellow-400" : "text-green-400";
-
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Environment Snapshots</h1>
-      <p className="text-gray-400">Capture your exact Python + package environment and diff between snapshots to detect reproducibility risks.</p>
+    <main className="page">
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Environment Snapshots</h1>
+        <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
+          Capture your exact Python + package environment and diff between snapshots to detect reproducibility risks.
+        </p>
+      </div>
 
-      <button onClick={capture} disabled={loading}
-        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
-        {loading ? "Capturing..." : "Capture Current Environment"}
+      <button onClick={() => void capture()} disabled={loading} className="button" style={{ marginBottom: 16 }}>
+        {loading ? "Capturing…" : "Capture Current Environment"}
       </button>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && (
+        <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.08)", border: "1px solid var(--danger)", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {snapshots.length > 0 && (
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
           {snapshots.map(s => (
-            <div key={s.env_id} className="bg-gray-900 rounded-lg p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm text-indigo-400">{s.env_id.slice(0, 8)}</span>
-                <span className="text-xs text-gray-500">{new Date(s.captured_at).toLocaleString()}</span>
+            <div key={s.env_id} className="panel" style={{ margin: 0 }}>
+              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 13, color: "var(--strong)", fontWeight: 600 }}>
+                    {s.env_id.slice(0, 8)}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {new Date(s.captured_at).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, fontSize: 13 }}>
+                  <div><span style={{ color: "var(--muted)" }}>Python: </span><span style={{ fontFamily: "ui-monospace,monospace" }}>{s.python_version}</span></div>
+                  <div><span style={{ color: "var(--muted)" }}>Qiskit: </span><span style={{ fontFamily: "ui-monospace,monospace" }}>{s.qiskit_version}</span></div>
+                  <div><span style={{ color: "var(--muted)" }}>Packages: </span><span>{s.packages.length}</span></div>
+                </div>
+                <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  hash: {s.env_hash}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div><span className="text-gray-500">Python:</span> <span className="font-mono">{s.python_version}</span></div>
-                <div><span className="text-gray-500">Qiskit:</span> <span className="font-mono">{s.qiskit_version}</span></div>
-                <div><span className="text-gray-500">Packages:</span> <span>{s.packages.length}</span></div>
-              </div>
-              <div className="font-mono text-xs text-gray-600 truncate">hash: {s.env_hash}</div>
             </div>
           ))}
         </div>
       )}
 
       {snapshots.length >= 2 && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <h2 className="font-semibold">Compare Snapshots</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {([["Snapshot A", diffA, setDiffA], ["Snapshot B", diffB, setDiffB]] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
-              <div key={label}>
-                <label className="text-xs text-gray-400">{label}</label>
-                <select value={val} onChange={e => set(e.target.value)}
-                  className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
-                  <option value="">Select...</option>
-                  {snapshots.map(s => <option key={s.env_id} value={s.env_id}>{s.env_id.slice(0, 8)} — {s.python_version}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-          <button onClick={runDiff} disabled={loading}
-            className="px-4 py-2 bg-purple-700 hover:bg-purple-600 rounded text-sm disabled:opacity-50">
-            Compare
-          </button>
-
-          {diff && (
-            <div className="space-y-3 mt-3">
-              <div className="flex gap-4 text-sm">
-                <span className="text-green-400">+{diff.added.length} added</span>
-                <span className="text-red-400">-{diff.removed.length} removed</span>
-                <span className="text-yellow-400">{diff.changed.length} changed</span>
-                <span className={`ml-auto font-semibold ${riskColor(diff.risk_level)}`}>Risk: {diff.risk_level}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${diff.reproducibility_score * 100}%` }} />
-              </div>
-              <div className="text-xs text-gray-400">Reproducibility score: {(diff.reproducibility_score * 100).toFixed(0)}%</div>
-              {diff.warnings.map((w, i) => (
-                <div key={i} className="text-yellow-300 bg-yellow-900/20 rounded p-2 text-sm">{w}</div>
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel-header"><h2>Compare Snapshots</h2></div>
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {([["Snapshot A", diffA, setDiffA], ["Snapshot B", diffB, setDiffB]] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
+                <div key={label}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{label}</label>
+                  <select
+                    value={val}
+                    onChange={e => set(e.target.value)}
+                    className="input"
+                    style={{ width: "100%" }}
+                  >
+                    <option value="">Select…</option>
+                    {snapshots.map(s => (
+                      <option key={s.env_id} value={s.env_id}>
+                        {s.env_id.slice(0, 8)} — {s.python_version}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ))}
             </div>
-          )}
+            <div>
+              <button onClick={() => void runDiff()} disabled={loading} className="button">
+                {loading ? "Comparing…" : "Compare"}
+              </button>
+            </div>
+
+            {diff && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", gap: 20, fontSize: 13, alignItems: "center" }}>
+                  <span style={{ color: "var(--ok)" }}>+{diff.added.length} added</span>
+                  <span style={{ color: "var(--danger)" }}>-{diff.removed.length} removed</span>
+                  <span style={{ color: "#f59e0b" }}>{diff.changed.length} changed</span>
+                  <span style={{ marginLeft: "auto", fontWeight: 600, color: RISK_COLORS[diff.risk_level] ?? "var(--text)" }}>
+                    Risk: {diff.risk_level}
+                  </span>
+                </div>
+                <div style={{ width: "100%", background: "var(--line)", borderRadius: 999, height: 6 }}>
+                  <div style={{ background: "var(--ok)", height: 6, borderRadius: 999, width: `${diff.reproducibility_score * 100}%` }} />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                  Reproducibility score: {(diff.reproducibility_score * 100).toFixed(0)}%
+                </div>
+                {diff.warnings.map((w, i) => (
+                  <div key={i} style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 8, padding: "8px 12px", color: "#f59e0b", fontSize: 13 }}>
+                    {w}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
