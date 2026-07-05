@@ -30,25 +30,25 @@ export default function MethodsGenPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Methods Section Generator</h1>
-      <p className="text-gray-400">Auto-generate publication-ready methods sections from your experiment runs, formatted for Nature, PRL, arXiv, and more.</p>
+    <div style={{ padding: 24, maxWidth: 896, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Methods Section Generator</h1>
+      <p style={{ color: "var(--muted)" }}>Auto-generate publication-ready methods sections from your experiment runs, formatted for Nature, PRL, arXiv, and more.</p>
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label className="text-sm text-gray-400">Journal Template</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Journal Template</label>
             <select value={template} onChange={e => setTemplate(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               {["nature", "prl", "arxiv", "thesis", "science"].map(t => (
                 <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Experiment Type</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Experiment Type</label>
             <select value={expType} onChange={e => setExpType(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               {["variational", "sensing", "error_correction", "benchmarking", "simulation"].map(t => (
                 <option key={t} value={t}>{t.replace("_", " ")}</option>
               ))}
@@ -56,48 +56,67 @@ export default function MethodsGenPage() {
           </div>
         </div>
         <div>
-          <label className="text-sm text-gray-400">Run IDs (one per line or comma-separated)</label>
+          <label style={{ fontSize: 13, color: "var(--muted)" }}>Run IDs (one per line or comma-separated)</label>
           <textarea value={runIds} onChange={e => setRunIds(e.target.value)} placeholder="run_abc123&#10;run_def456"
-            className="w-full h-24 mt-1 bg-gray-800 text-white font-mono text-sm px-3 py-2 rounded border border-gray-700" />
+            style={{ width: "100%", height: 96, marginTop: 4, background: "var(--surface)", color: "var(--text)", fontFamily: "ui-monospace,monospace", fontSize: 13, padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", display: "block", boxSizing: "border-box" }} />
         </div>
         <button onClick={generate} disabled={loading}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+          style={{ padding: "8px 24px", background: "var(--strong)", borderRadius: 6, fontWeight: 500, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer", border: "none", color: "var(--text)", alignSelf: "flex-start" }}>
           {loading ? "Generating..." : "Generate Methods Section"}
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
-          <div className="flex border-b border-gray-700">
+        <div style={{ background: "var(--surface)", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
             {(["methods", "calibration", "bibtex", "checklist"] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`px-4 py-3 text-sm font-medium ${tab === t ? "border-b-2 border-indigo-500 text-indigo-400" : "text-gray-400 hover:text-white"}`}>
+                style={{
+                  padding: "12px 16px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  background: "none",
+                  border: "none",
+                  borderBottom: tab === t ? "2px solid var(--strong)" : "2px solid transparent",
+                  color: tab === t ? "var(--strong)" : "var(--muted)",
+                  cursor: "pointer",
+                }}>
                 {t === "methods" ? "Methods" : t === "calibration" ? "Calibration Table" : t === "bibtex" ? "BibTeX" : "Checklist"}
               </button>
             ))}
-            <div className="ml-auto flex items-center px-4">
-              <span className="text-xs text-gray-500 mr-3">{result.word_count} words</span>
-              <button onClick={() => copy(tab === "methods" ? result.methods_text : tab === "calibration" ? result.calibration_table_md : tab === "bibtex" ? result.bibtex : result.reproducibility_checklist.map(c => `[${c.done ? "x" : " "}] ${c.item}`).join("\n"))}
-                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs">
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", padding: "0 16px" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 12 }}>{result.word_count} words</span>
+              <button onClick={() => copy(tab === "methods" ? result.methods_text : tab === "calibration" ? result.calibration_table_md : tab === "bibtex" ? result.bibtex : (result.reproducibility_checklist ?? []).map(c => `[${c.done ? "x" : " "}] ${c.item}`).join("\n"))}
+                style={{ padding: "4px 12px", background: "var(--line)", borderRadius: 6, fontSize: 12, border: "none", color: "var(--text)", cursor: "pointer" }}>
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
           </div>
 
-          <div className="p-5">
-            {tab === "methods" && <pre className="text-sm text-gray-200 whitespace-pre-wrap font-serif leading-relaxed">{result.methods_text}</pre>}
-            {tab === "calibration" && <pre className="text-sm text-gray-200 whitespace-pre-wrap font-mono">{result.calibration_table_md}</pre>}
-            {tab === "bibtex" && <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">{result.bibtex}</pre>}
+          <div style={{ padding: 20 }}>
+            {tab === "methods" && <pre style={{ fontSize: 13, color: "var(--text)", whiteSpace: "pre-wrap", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{result.methods_text}</pre>}
+            {tab === "calibration" && <pre style={{ fontSize: 13, color: "var(--text)", whiteSpace: "pre-wrap", fontFamily: "ui-monospace,monospace" }}>{result.calibration_table_md}</pre>}
+            {tab === "bibtex" && <pre style={{ fontSize: 12, color: "var(--ok)", whiteSpace: "pre-wrap", fontFamily: "ui-monospace,monospace" }}>{result.bibtex}</pre>}
             {tab === "checklist" && (
-              <div className="space-y-2">
-                {result.reproducibility_checklist.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${item.done ? "bg-green-600 border-green-500" : "border-gray-600"}`}>
-                      {item.done && <span className="text-white text-xs">✓</span>}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(result.reproducibility_checklist ?? []).map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 6,
+                      border: item.done ? "1px solid var(--ok)" : "1px solid var(--line)",
+                      background: item.done ? "rgba(16,185,129,0.1)" : "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      {item.done && <span style={{ color: "var(--ok)", fontSize: 12 }}>✓</span>}
                     </div>
-                    <span className={`text-sm ${item.done ? "text-gray-300" : "text-gray-500"}`}>{item.item}</span>
+                    <span style={{ fontSize: 13, color: item.done ? "var(--text)" : "var(--muted)" }}>{item.item}</span>
                   </div>
                 ))}
               </div>

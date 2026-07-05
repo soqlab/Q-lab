@@ -68,133 +68,140 @@ export default function BayesOptPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Bayesian Optimization</h1>
-        <button onClick={() => setShowStart(!showStart)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Bayesian Optimization</h1>
+        <button onClick={() => setShowStart(!showStart)} className="button">
           + New Session
         </button>
       </div>
-      <p className="text-gray-400">Intelligently explore circuit parameter spaces using Gaussian Process surrogate models and Expected Improvement acquisition.</p>
+      <p style={{ color: "var(--muted)" }}>Intelligently explore circuit parameter spaces using Gaussian Process surrogate models and Expected Improvement acquisition.</p>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {showStart && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <label className="text-sm text-gray-400">Session Name</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Session Name</label>
               <input value={optName} onChange={e => setOptName(e.target.value)}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }} />
             </div>
             <div>
-              <label className="text-sm text-gray-400">Objective</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Objective</label>
               <input value={objective} onChange={e => setObjective(e.target.value)}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }} />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
             <input type="checkbox" checked={minimize} onChange={e => setMinimize(e.target.checked)} />
             Minimize objective
           </label>
-          <h3 className="font-medium text-sm text-gray-300">Parameters</h3>
-          {params.map((p, i) => (
-            <div key={i} className="grid grid-cols-4 gap-2 items-end">
+          <h3 style={{ fontWeight: 500, fontSize: 13, color: "var(--text)" }}>Parameters</h3>
+          {(params ?? []).map((p, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, alignItems: "flex-end" }}>
               <input placeholder="Name" value={p.name} onChange={e => setParams(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                className="bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
               <input type="number" placeholder="Min" value={p.min_val} onChange={e => setParams(prev => prev.map((x, j) => j === i ? { ...x, min_val: Number(e.target.value) } : x))}
-                className="bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
               <input type="number" placeholder="Max" value={p.max_val} onChange={e => setParams(prev => prev.map((x, j) => j === i ? { ...x, max_val: Number(e.target.value) } : x))}
-                className="bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
               <button onClick={() => setParams(prev => prev.filter((_, j) => j !== i))}
-                className="px-2 py-1.5 bg-red-900 hover:bg-red-800 rounded text-xs">Remove</button>
+                style={{ padding: "6px 8px", background: "rgba(239,68,68,0.15)", color: "var(--danger)", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Remove</button>
             </div>
           ))}
           <button onClick={() => setParams(prev => [...prev, { name: `param_${prev.length}`, min_val: 0, max_val: 1, param_type: "continuous", log_scale: false }])}
-            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm">+ Add Parameter</button>
-          <div className="flex gap-3">
-            <button onClick={start} disabled={loading} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">Start</button>
-            <button onClick={() => setShowStart(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+            style={{ padding: "6px 12px", background: "var(--line)", border: "none", borderRadius: 6, fontSize: 13, cursor: "pointer", alignSelf: "flex-start" }}>+ Add Parameter</button>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={start} disabled={loading}
+              style={{ padding: "8px 16px", background: "rgba(16,185,129,0.2)", color: "var(--ok)", border: "none", borderRadius: 6, fontSize: 13, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>Start</button>
+            <button onClick={() => setShowStart(false)}
+              style={{ padding: "8px 16px", background: "var(--line)", border: "none", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-400 uppercase">Sessions</h2>
-          {sessions.map(s => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase" }}>Sessions</h2>
+          {(sessions ?? []).map(s => (
             <div key={s.opt_id} onClick={() => loadSession(s.opt_id)}
-              className={`bg-gray-900 rounded-lg p-3 cursor-pointer border transition-colors ${activeSession?.opt_id === s.opt_id ? "border-indigo-500" : "border-transparent hover:border-gray-600"}`}>
-              <div className="font-medium text-sm truncate">{s.name}</div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span className={s.status === "converged" ? "text-green-400" : s.status === "running" ? "text-blue-400" : "text-gray-500"}>{s.status}</span>
+              style={{
+                background: "var(--surface)",
+                borderRadius: 8,
+                padding: 12,
+                cursor: "pointer",
+                border: activeSession?.opt_id === s.opt_id ? "1px solid var(--strong)" : "1px solid transparent",
+              }}>
+              <div style={{ fontWeight: 500, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                <span style={{ color: s.status === "converged" ? "var(--ok)" : s.status === "running" ? "var(--info-text)" : "var(--muted)" }}>{s.status}</span>
                 <span>iter {s.current_iteration}</span>
               </div>
-              {s.best_value !== null && <div className="text-xs font-mono text-indigo-400 mt-1">best: {s.best_value.toFixed(6)}</div>}
+              {s.best_value !== null && <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--strong)", marginTop: 4 }}>best: {s.best_value.toFixed(6)}</div>}
             </div>
           ))}
         </div>
 
         {activeSession && (
-          <div className="lg:col-span-2 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div style={{ gridColumn: "span 2", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
               {([
-                ["Status", activeSession.status, activeSession.status === "converged" ? "text-green-400" : "text-blue-400"],
-                ["Iteration", String(activeSession.current_iteration), "text-white"],
-                ["Best Value", activeSession.best_value !== null ? activeSession.best_value.toFixed(6) : "—", "text-indigo-400"],
+                ["Status", activeSession.status, activeSession.status === "converged" ? "var(--ok)" : "var(--info-text)"],
+                ["Iteration", String(activeSession.current_iteration), "var(--text)"],
+                ["Best Value", activeSession.best_value !== null ? activeSession.best_value.toFixed(6) : "—", "var(--strong)"],
               ] as [string, string, string][]).map(([l, v, c]) => (
-                <div key={l} className="bg-gray-900 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">{l}</div>
-                  <div className={`font-mono font-semibold mt-1 ${c}`}>{v}</div>
+                <div key={l} style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                  <div style={{ fontFamily: "ui-monospace,monospace", fontWeight: 600, marginTop: 4, color: c }}>{v}</div>
                 </div>
               ))}
             </div>
 
             {activeSession.convergence_detected && (
-              <div className="bg-green-900/30 border border-green-700 rounded p-3 text-green-300 text-sm">
+              <div style={{ background: "rgba(16,185,129,0.1)", border: "1px solid var(--ok)", borderRadius: 6, padding: 12, color: "var(--ok)", fontSize: 13 }}>
                 Convergence detected — optimization has stabilized.
               </div>
             )}
 
-            <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-              <h3 className="font-medium text-sm">Submit Next Evaluation</h3>
-              <p className="text-xs text-gray-500">Suggested parameters (edit if needed, then paste your objective value)</p>
-              <div className="space-y-2">
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h3 style={{ fontWeight: 500, fontSize: 13 }}>Submit Next Evaluation</h3>
+              <p style={{ fontSize: 12, color: "var(--muted)" }}>Suggested parameters (edit if needed, then paste your objective value)</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {Object.entries(submitParams).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-3">
-                    <span className="text-sm font-mono text-gray-400 w-24">{k}</span>
+                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 13, fontFamily: "ui-monospace,monospace", color: "var(--muted)", width: 96, flexShrink: 0 }}>{k}</span>
                     <input type="number" step="any" value={v}
                       onChange={e => setSubmitParams(prev => ({ ...prev, [k]: e.target.value }))}
-                      className="flex-1 bg-gray-800 text-white font-mono px-3 py-1.5 rounded border border-gray-700 text-sm" />
+                      style={{ flex: 1, background: "var(--surface)", color: "var(--text)", fontFamily: "ui-monospace,monospace", padding: "6px 12px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
                   </div>
                 ))}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-mono text-gray-400 w-24">value</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 13, fontFamily: "ui-monospace,monospace", color: "var(--muted)", width: 96, flexShrink: 0 }}>value</span>
                 <input type="number" step="any" placeholder="Objective value" value={submitValue}
                   onChange={e => setSubmitValue(e.target.value)}
-                  className="flex-1 bg-gray-800 text-indigo-400 font-mono px-3 py-1.5 rounded border border-indigo-700 text-sm" />
+                  style={{ flex: 1, background: "var(--surface)", color: "var(--strong)", fontFamily: "ui-monospace,monospace", padding: "6px 12px", borderRadius: 6, border: "1px solid var(--strong)", fontSize: 13 }} />
               </div>
               <button onClick={submit} disabled={loading}
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">
+                style={{ width: "100%", padding: "8px 0", background: "var(--strong)", color: "var(--text)", border: "none", borderRadius: 6, fontSize: 13, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
                 {loading ? "Updating model..." : "Submit & Get Next Point"}
               </button>
             </div>
 
-            {activeSession.history.length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4">
-                <h3 className="font-medium text-sm mb-3">Optimization History</h3>
-                <div className="flex items-end gap-1 h-20">
-                  {activeSession.history.map((h, i) => {
+            {(activeSession.history ?? []).length > 0 && (
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+                <h3 style={{ fontWeight: 500, fontSize: 13, marginBottom: 12 }}>Optimization History</h3>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
+                  {(activeSession.history ?? []).map((h, i) => {
                     const vals = activeSession.history.map(x => x.value);
                     const mn = Math.min(...vals), mx = Math.max(...vals);
                     const pct = mx === mn ? 50 : ((h.value - mn) / (mx - mn)) * 100;
                     const height = activeSession.minimize ? (100 - pct) : pct;
-                    return <div key={i} className="flex-1 bg-indigo-500 rounded-t" style={{ height: `${Math.max(4, height)}%` }} title={`iter ${h.iteration}: ${h.value.toFixed(4)}`} />;
+                    return <div key={i} style={{ flex: 1, background: "var(--strong)", borderRadius: "4px 4px 0 0", height: `${Math.max(4, height)}%` }} title={`iter ${h.iteration}: ${h.value.toFixed(4)}`} />;
                   })}
                 </div>
-                <div className="text-xs text-gray-500 mt-1 text-center">{activeSession.history.length} evaluations · EI: {activeSession.expected_improvement.toFixed(4)}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "center" }}>{(activeSession.history ?? []).length} evaluations · EI: {activeSession.expected_improvement.toFixed(4)}</div>
               </div>
             )}
           </div>
