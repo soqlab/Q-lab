@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { listCalibrationBackends, getCalibration, getCalibrationHistory, BackendCalibration } from "@/lib/api";
 
 const TREND_COLORS: Record<string, string> = {
-  stable: "text-green-400",
-  degrading: "text-red-400",
-  improving: "text-blue-400",
+  stable: "var(--ok)",
+  degrading: "var(--danger)",
+  improving: "var(--info-text)",
 };
 
 function MetricBar({ value, max, label, unit }: { value: number; max: number; label: string; unit: string }) {
@@ -50,40 +50,53 @@ export default function CalibrationMonitorPage() {
   }, [selected]);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Calibration Monitor</h1>
-      <p className="text-gray-400">Real-time T1, T2, gate error, and readout fidelity tracking across all major backends.</p>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Calibration Monitor</h1>
+      <p style={{ color: "var(--muted)" }}>Real-time T1, T2, gate error, and readout fidelity tracking across all major backends.</p>
 
-      <div className="flex gap-2 flex-wrap">
-        {backends.map(b => (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {(backends ?? []).map(b => (
           <button key={b} onClick={() => setSelected(b)}
-            className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${selected === b ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              fontSize: 13,
+              fontFamily: "ui-monospace,monospace",
+              border: "none",
+              cursor: "pointer",
+              background: selected === b ? "var(--strong)" : "var(--surface)",
+              color: selected === b ? "var(--text)" : "var(--muted)",
+            }}>
             {b}
           </button>
         ))}
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
-      {loading && <div className="text-gray-400">Loading calibration data...</div>}
+      {error && (
+        <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>
+          {error}
+        </div>
+      )}
+      {loading && <div style={{ color: "var(--muted)" }}>Loading calibration data...</div>}
 
       {cal && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
             {([
               ["Health Score", `${(cal.health_score * 100).toFixed(0)}%`, ""],
               ["QV", cal.qv.toString(), ""],
               ["CLOPS", cal.clops.toLocaleString(), ""],
-              ["Trend", cal.trend, TREND_COLORS[cal.trend] ?? "text-gray-400"],
+              ["Trend", cal.trend, TREND_COLORS[cal.trend] ?? "var(--text)"],
             ] as [string, string, string][]).map(([label, val, color]) => (
-              <div key={label} className="bg-gray-900 rounded-lg p-4">
-                <div className="text-xs text-gray-500 uppercase">{label}</div>
-                <div className={`text-xl font-bold mt-1 ${color || "text-white"}`}>{val}</div>
+              <div key={label} style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4, color: color || "var(--text)" }}>{val}</div>
               </div>
             ))}
           </div>
 
-          <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-            <h2 className="font-semibold">Median Metrics</h2>
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+            <h2 style={{ fontWeight: 600 }}>Median Metrics</h2>
             <MetricBar value={cal.median_t1_us} max={500} label="T₁" unit="μs" />
             <MetricBar value={cal.median_t2_us} max={500} label="T₂" unit="μs" />
             <MetricBar value={cal.median_1q_error * 1000} max={5} label="1Q Gate Error" unit="×10⁻³" />
@@ -91,29 +104,38 @@ export default function CalibrationMonitorPage() {
             <MetricBar value={cal.median_readout_error * 100} max={10} label="Readout Error" unit="%" />
           </div>
 
-          {history.length > 1 && (
-            <div className="bg-gray-900 rounded-lg p-5">
-              <h2 className="font-semibold mb-3">T₁ History (μs)</h2>
-              <div className="flex items-end gap-1 h-24">
-                {history.slice().reverse().map((h, i) => {
+          {(history ?? []).length > 1 && (
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20 }}>
+              <h2 style={{ fontWeight: 600, marginBottom: 12 }}>T₁ History (μs)</h2>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 96 }}>
+                {(history ?? []).slice().reverse().map((h, i) => {
                   const pct = (h.median_t1_us / 400) * 100;
                   return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div className="w-full bg-indigo-500 rounded-t" style={{ height: `${pct}%` }} title={`${h.median_t1_us.toFixed(1)}μs`} />
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: "100%", background: "var(--strong)", borderRadius: "6px 6px 0 0", height: `${pct}%` }} title={`${h.median_t1_us.toFixed(1)}μs`} />
                     </div>
                   );
                 })}
               </div>
-              <div className="text-xs text-gray-500 mt-1 text-center">Last {history.length} calibrations</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "center" }}>Last {history.length} calibrations</div>
             </div>
           )}
 
-          <div className="bg-gray-900 rounded-lg p-5">
-            <h2 className="font-semibold mb-3">Per-Qubit T₁ (μs)</h2>
-            <div className="grid grid-cols-8 gap-1">
-              {cal.qubits.map(q => (
-                <div key={q.qubit_id} className="aspect-square rounded flex items-center justify-center text-xs font-mono"
-                  style={{ background: `rgba(99,102,241,${Math.min(1, q.t1_us / 400)})` }}
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20 }}>
+            <h2 style={{ fontWeight: 600, marginBottom: 12 }}>Per-Qubit T₁ (μs)</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 4 }}>
+              {(cal.qubits ?? []).map(q => (
+                <div key={q.qubit_id}
+                  style={{
+                    aspectRatio: "1/1",
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontFamily: "ui-monospace,monospace",
+                    background: `rgba(99,102,241,${Math.min(1, q.t1_us / 400)})`,
+                  }}
                   title={`Q${q.qubit_id}: T1=${q.t1_us.toFixed(0)}μs`}>
                   {q.qubit_id}
                 </div>

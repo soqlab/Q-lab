@@ -16,20 +16,24 @@ const CATEGORIES = ["cryostat", "microwave", "control_electronics", "software", 
 const STATUSES = ["operational", "maintenance", "failed", "decommissioned"];
 const MAINT_TYPES = ["preventive", "corrective", "calibration"];
 
-const statusColor: Record<string, string> = {
-  operational: "bg-green-900/40 text-green-400 border border-green-800",
-  maintenance: "bg-yellow-900/40 text-yellow-400 border border-yellow-800",
-  failed: "bg-red-900/40 text-red-400 border border-red-800",
-  decommissioned: "bg-gray-700/60 text-gray-400 border border-gray-600",
+type BadgeStyle = { background: string; color: string; border: string };
+
+const STATUS_STYLES: Record<string, BadgeStyle> = {
+  operational: { background: "rgba(16,185,129,0.1)", color: "var(--ok)", border: "1px solid var(--ok)" },
+  maintenance: { background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid #f59e0b" },
+  failed: { background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid var(--danger)" },
+  decommissioned: { background: "var(--line)", color: "var(--muted)", border: "1px solid var(--line)" },
 };
 
-const categoryColor: Record<string, string> = {
-  cryostat: "bg-blue-900/40 text-blue-400 border border-blue-800",
-  microwave: "bg-purple-900/40 text-purple-400 border border-purple-800",
-  control_electronics: "bg-orange-900/40 text-orange-400 border border-orange-800",
-  software: "bg-teal-900/40 text-teal-400 border border-teal-800",
-  consumable: "bg-gray-700/60 text-gray-400 border border-gray-600",
+const CATEGORY_STYLES: Record<string, BadgeStyle> = {
+  cryostat: { background: "rgba(59,130,246,0.1)", color: "var(--info-text)", border: "1px solid rgba(59,130,246,0.4)" },
+  microwave: { background: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.4)" },
+  control_electronics: { background: "rgba(249,115,22,0.1)", color: "#f97316", border: "1px solid rgba(249,115,22,0.4)" },
+  software: { background: "rgba(20,184,166,0.1)", color: "#2dd4bf", border: "1px solid rgba(20,184,166,0.4)" },
+  consumable: { background: "var(--line)", color: "var(--muted)", border: "1px solid var(--line)" },
 };
+
+const DEFAULT_BADGE: BadgeStyle = { background: "var(--line)", color: "var(--muted)", border: "1px solid var(--line)" };
 
 function isOverdue(date?: string) {
   if (!date) return false;
@@ -185,25 +189,22 @@ export default function LabInventoryPage() {
     }
   };
 
+  const addDisabled = addingItem || !addName || !addModel || !addSerial;
+  const logDisabled = loggingMaint || !logDescription || !logPerformedBy;
+
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-6">
+    <div className="page" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Lab Inventory</h1>
-          <p className="text-gray-400 mt-1 text-sm">Equipment tracking and maintenance scheduling</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Lab Inventory</h1>
+          <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 13 }}>Equipment tracking and maintenance scheduling</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleViewSchedule}
-            className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-3 py-2 text-sm transition-colors"
-          >
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleViewSchedule} className="button secondary">
             View Schedule
           </button>
-          <button
-            onClick={() => setShowAddForm((v) => !v)}
-            className="bg-indigo-600 hover:bg-indigo-500 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-          >
+          <button onClick={() => setShowAddForm((v) => !v)} className="button">
             {showAddForm ? "Cancel" : "+ Add Equipment"}
           </button>
         </div>
@@ -211,9 +212,9 @@ export default function LabInventoryPage() {
 
       {/* Add Equipment Form */}
       {showAddForm && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-indigo-400">New Equipment</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--strong)" }}>New Equipment</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 12 }}>
             {[
               { label: "Name", value: addName, set: setAddName, type: "text" },
               { label: "Model", value: addModel, set: setAddModel, type: "text" },
@@ -223,38 +224,48 @@ export default function LabInventoryPage() {
               { label: "Warranty Expires", value: addWarranty, set: setAddWarranty, type: "date" },
             ].map(({ label, value, set, type }) => (
               <div key={label}>
-                <label className="block text-xs text-gray-400 mb-1">{label}</label>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{label}</label>
                 <input
                   type={type}
                   value={value}
                   onChange={(e) => set(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                 />
               </div>
             ))}
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Category</label>
-              <select value={addCategory} onChange={(e) => setAddCategory(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Category</label>
+              <select value={addCategory} onChange={(e) => setAddCategory(e.target.value)} className="input" style={{ width: "100%" }}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Status</label>
-              <select value={addStatus} onChange={(e) => setAddStatus(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Status</label>
+              <select value={addStatus} onChange={(e) => setAddStatus(e.target.value)} className="input" style={{ width: "100%" }}>
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Linked Backends (comma-sep)</label>
-              <input type="text" value={addBackends} onChange={(e) => setAddBackends(e.target.value)} placeholder="ibm_brisbane, ibm_kyoto" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Linked Backends (comma-sep)</label>
+              <input type="text" value={addBackends} onChange={(e) => setAddBackends(e.target.value)} placeholder="ibm_brisbane, ibm_kyoto" className="input" style={{ width: "100%" }} />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Notes</label>
-            <textarea value={addNotes} onChange={(e) => setAddNotes(e.target.value)} rows={2} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Notes</label>
+            <textarea value={addNotes} onChange={(e) => setAddNotes(e.target.value)} rows={2} className="input" style={{ width: "100%" }} />
           </div>
-          {addError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{addError}</div>}
-          <button onClick={handleAddItem} disabled={addingItem || !addName || !addModel || !addSerial} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+          {addError && (
+            <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>
+              {addError}
+            </div>
+          )}
+          <button
+            onClick={handleAddItem}
+            disabled={addDisabled}
+            className="button"
+            style={{ opacity: addDisabled ? 0.5 : 1, cursor: addDisabled ? "not-allowed" : "pointer" }}
+          >
             {addingItem ? "Adding…" : "Add Equipment"}
           </button>
         </div>
@@ -262,38 +273,43 @@ export default function LabInventoryPage() {
 
       {/* Maintenance Schedule */}
       {showSchedule && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-indigo-400">Maintenance Schedule</h2>
-            <button onClick={() => setShowSchedule(false)} className="text-xs text-gray-500 hover:text-gray-300">Close</button>
+        <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--strong)" }}>Maintenance Schedule</h2>
+            <button
+              onClick={() => setShowSchedule(false)}
+              style={{ fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              Close
+            </button>
           </div>
           {loadingSchedule ? (
-            <div className="text-sm text-gray-400 animate-pulse">Loading schedule…</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading schedule…</div>
           ) : scheduleError ? (
-            <div className="text-red-400 text-sm">{scheduleError}</div>
-          ) : schedule.length === 0 ? (
-            <div className="text-sm text-gray-500">No scheduled maintenance.</div>
+            <div style={{ color: "var(--danger)", fontSize: 13 }}>{scheduleError}</div>
+          ) : (schedule ?? []).length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>No scheduled maintenance.</div>
           ) : (
-            <table className="w-full text-sm">
+            <table style={{ width: "100%", fontSize: 13 }}>
               <thead>
-                <tr className="text-left text-xs text-gray-400 border-b border-gray-800">
-                  <th className="pb-2 font-medium">Item</th>
-                  <th className="pb-2 font-medium">Type</th>
-                  <th className="pb-2 font-medium">Next Due</th>
-                  <th className="pb-2 font-medium">Status</th>
+                <tr style={{ textAlign: "left", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Item</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Type</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Next Due</th>
+                  <th style={{ paddingBottom: 8, fontWeight: 500 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {schedule.map((s, i) => (
-                  <tr key={i} className="border-b border-gray-800/50">
-                    <td className="py-2 pr-4 text-xs">{s.item_name}</td>
-                    <td className="py-2 pr-4 text-xs capitalize">{s.type}</td>
-                    <td className="py-2 pr-4 text-xs font-mono">{new Date(s.next_due).toLocaleDateString()}</td>
-                    <td className="py-2">
+                {(schedule ?? []).map((s, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ paddingTop: 8, paddingBottom: 8, paddingRight: 16, fontSize: 12 }}>{s.item_name}</td>
+                    <td style={{ paddingTop: 8, paddingBottom: 8, paddingRight: 16, fontSize: 12, textTransform: "capitalize" }}>{s.type}</td>
+                    <td style={{ paddingTop: 8, paddingBottom: 8, paddingRight: 16, fontSize: 12, fontFamily: "ui-monospace,monospace" }}>{new Date(s.next_due).toLocaleDateString()}</td>
+                    <td style={{ paddingTop: 8, paddingBottom: 8 }}>
                       {s.overdue ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800">Overdue</span>
+                        <span style={{ fontSize: 12, padding: "2px 6px", borderRadius: 999, background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid var(--danger)" }}>Overdue</span>
                       ) : (
-                        <span className="text-xs text-gray-400">Upcoming</span>
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>Upcoming</span>
                       )}
                     </td>
                   </tr>
@@ -305,15 +321,16 @@ export default function LabInventoryPage() {
       )}
 
       {/* Main two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 24 }}>
         {/* LEFT: Equipment List */}
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Filters */}
-          <div className="flex gap-2">
+          <div style={{ display: "flex", gap: 8 }}>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+              className="input"
+              style={{ flex: 1 }}
             >
               <option value="">All Categories</option>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -321,7 +338,8 @@ export default function LabInventoryPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+              className="input"
+              style={{ flex: 1 }}
             >
               <option value="">All Statuses</option>
               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -329,34 +347,42 @@ export default function LabInventoryPage() {
           </div>
 
           {loadingItems ? (
-            <div className="text-sm text-gray-400 animate-pulse">Loading equipment…</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading equipment…</div>
           ) : itemsError ? (
-            <div className="text-red-400 text-sm">{itemsError}</div>
-          ) : items.length === 0 ? (
-            <div className="text-sm text-gray-500">No equipment found.</div>
+            <div style={{ color: "var(--danger)", fontSize: 13 }}>{itemsError}</div>
+          ) : (items ?? []).length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>No equipment found.</div>
           ) : (
-            <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
-              {items.map((item) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 280px)", overflowY: "auto", paddingRight: 4 }}>
+              {(items ?? []).map((item) => (
                 <div
                   key={item.item_id}
                   onClick={() => handleSelectItem(item.item_id)}
-                  className={`bg-gray-900 border rounded-lg p-3 cursor-pointer transition-colors space-y-2 ${selectedItem?.item_id === item.item_id ? "border-indigo-600" : "border-gray-800 hover:border-gray-600"}`}
+                  className="panel"
+                  style={{
+                    padding: 12,
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    border: selectedItem?.item_id === item.item_id ? "1px solid var(--strong)" : "1px solid var(--line)",
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium leading-tight">{item.name}</p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${statusColor[item.status] ?? "bg-gray-700 text-gray-400"}`}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                    <p style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3 }}>{item.name}</p>
+                    <span style={{ fontSize: 12, padding: "2px 6px", borderRadius: 999, flexShrink: 0, ...(STATUS_STYLES[item.status] ?? DEFAULT_BADGE) }}>
                       {item.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${categoryColor[item.category] ?? "bg-gray-700 text-gray-400"}`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, padding: "2px 6px", borderRadius: 999, ...(CATEGORY_STYLES[item.category] ?? DEFAULT_BADGE) }}>
                       {item.category}
                     </span>
-                    <span className="text-xs text-gray-500">{item.model}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{item.model}</span>
                   </div>
-                  <p className="text-xs text-gray-500">{item.location}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)" }}>{item.location}</p>
                   {item.next_maintenance && (
-                    <p className={`text-xs ${isOverdue(item.next_maintenance) ? "text-red-400 font-medium" : "text-gray-400"}`}>
+                    <p style={{ fontSize: 12, color: isOverdue(item.next_maintenance) ? "var(--danger)" : "var(--muted)", fontWeight: isOverdue(item.next_maintenance) ? 500 : undefined }}>
                       Next maintenance: {new Date(item.next_maintenance).toLocaleDateString()}
                       {isOverdue(item.next_maintenance) && " — OVERDUE"}
                     </p>
@@ -368,29 +394,41 @@ export default function LabInventoryPage() {
         </div>
 
         {/* RIGHT: Detail Panel */}
-        <div className="lg:col-span-2">
+        <div>
           {loadingItem ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-sm text-gray-400 animate-pulse">Loading item…</div>
+            <div className="panel" style={{ padding: 24, fontSize: 13, color: "var(--muted)" }}>Loading item…</div>
           ) : selectedItem ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-              <div className="flex items-start justify-between gap-4">
+            <div className="panel" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
                 <div>
-                  <h2 className="text-lg font-semibold">{selectedItem.name}</h2>
-                  <p className="text-sm text-gray-400">{selectedItem.model}</p>
+                  <h2 style={{ fontSize: 18, fontWeight: 600 }}>{selectedItem.name}</h2>
+                  <p style={{ fontSize: 13, color: "var(--muted)" }}>{selectedItem.model}</p>
                 </div>
-                <div className="flex gap-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${categoryColor[selectedItem.category] ?? "bg-gray-700 text-gray-400"}`}>{selectedItem.category}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusColor[selectedItem.status] ?? "bg-gray-700 text-gray-400"}`}>{selectedItem.status}</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <span style={{ fontSize: 12, padding: "4px 8px", borderRadius: 999, ...(CATEGORY_STYLES[selectedItem.category] ?? DEFAULT_BADGE) }}>{selectedItem.category}</span>
+                  <span style={{ fontSize: 12, padding: "4px 8px", borderRadius: 999, ...(STATUS_STYLES[selectedItem.status] ?? DEFAULT_BADGE) }}>{selectedItem.status}</span>
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-1 border-b border-gray-800">
+              <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)" }}>
                 {(["details", "log"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === tab ? "text-indigo-400 border-b-2 border-indigo-500 -mb-px" : "text-gray-400 hover:text-gray-200"}`}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: activeTab === tab ? "var(--strong)" : "var(--muted)",
+                      background: "none",
+                      cursor: "pointer",
+                      borderTop: "none",
+                      borderLeft: "none",
+                      borderRight: "none",
+                      borderBottom: activeTab === tab ? "2px solid var(--strong)" : "2px solid transparent",
+                      marginBottom: activeTab === tab ? -1 : 0,
+                    }}
                   >
                     {tab === "details" ? "Details" : "Log Maintenance"}
                   </button>
@@ -398,8 +436,8 @@ export default function LabInventoryPage() {
               </div>
 
               {activeTab === "details" && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
                     {[
                       { label: "Serial Number", value: selectedItem.serial_number },
                       { label: "Location", value: selectedItem.location },
@@ -408,19 +446,19 @@ export default function LabInventoryPage() {
                       { label: "Last Maintenance", value: selectedItem.last_maintenance ? new Date(selectedItem.last_maintenance).toLocaleDateString() : "—" },
                       { label: "Next Maintenance", value: selectedItem.next_maintenance ? new Date(selectedItem.next_maintenance).toLocaleDateString() : "—" },
                     ].map(({ label, value }) => (
-                      <div key={label} className="bg-gray-800 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-                        <p className="text-sm text-gray-100">{value}</p>
+                      <div key={label} style={{ background: "var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                        <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>{label}</p>
+                        <p style={{ fontSize: 13, color: "var(--text)" }}>{value}</p>
                       </div>
                     ))}
                   </div>
 
-                  {selectedItem.linked_backends.length > 0 && (
+                  {(selectedItem.linked_backends ?? []).length > 0 && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-2">Linked Backends</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedItem.linked_backends.map((b) => (
-                          <span key={b} className="text-xs px-2 py-1 bg-indigo-900/40 text-indigo-400 border border-indigo-800 rounded-full">{b}</span>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Linked Backends</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {(selectedItem.linked_backends ?? []).map((b) => (
+                          <span key={b} style={{ fontSize: 12, padding: "4px 8px", background: "rgba(99,102,241,0.1)", color: "var(--strong)", border: "1px solid var(--strong)", borderRadius: 999 }}>{b}</span>
                         ))}
                       </div>
                     </div>
@@ -428,58 +466,71 @@ export default function LabInventoryPage() {
 
                   {selectedItem.notes && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-1">Notes</p>
-                      <p className="text-sm text-gray-300">{selectedItem.notes}</p>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Notes</p>
+                      <p style={{ fontSize: 13, color: "var(--text)" }}>{selectedItem.notes}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {activeTab === "log" && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Type</label>
-                      <select value={logType} onChange={(e) => setLogType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Type</label>
+                      <select value={logType} onChange={(e) => setLogType(e.target.value)} className="input" style={{ width: "100%" }}>
                         {MAINT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Performed By</label>
-                      <input type="text" value={logPerformedBy} onChange={(e) => setLogPerformedBy(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Performed By</label>
+                      <input type="text" value={logPerformedBy} onChange={(e) => setLogPerformedBy(e.target.value)} className="input" style={{ width: "100%" }} />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Duration (hours)</label>
-                      <input type="number" min={0} step={0.5} value={logDuration} onChange={(e) => setLogDuration(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Duration (hours)</label>
+                      <input type="number" min={0} step={0.5} value={logDuration} onChange={(e) => setLogDuration(Number(e.target.value))} className="input" style={{ width: "100%" }} />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Cost (USD)</label>
-                      <input type="number" min={0} value={logCost} onChange={(e) => setLogCost(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Cost (USD)</label>
+                      <input type="number" min={0} value={logCost} onChange={(e) => setLogCost(Number(e.target.value))} className="input" style={{ width: "100%" }} />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Parts Replaced (comma-sep)</label>
-                      <input type="text" value={logParts} onChange={(e) => setLogParts(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Parts Replaced (comma-sep)</label>
+                      <input type="text" value={logParts} onChange={(e) => setLogParts(e.target.value)} className="input" style={{ width: "100%" }} />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Next Due</label>
-                      <input type="date" value={logNextDue} onChange={(e) => setLogNextDue(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                      <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Next Due</label>
+                      <input type="date" value={logNextDue} onChange={(e) => setLogNextDue(e.target.value)} className="input" style={{ width: "100%" }} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Description</label>
-                    <textarea value={logDescription} onChange={(e) => setLogDescription(e.target.value)} rows={3} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+                    <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Description</label>
+                    <textarea value={logDescription} onChange={(e) => setLogDescription(e.target.value)} rows={3} className="input" style={{ width: "100%" }} />
                   </div>
-                  {logError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{logError}</div>}
-                  {logSuccess && <div className="text-green-400 text-sm bg-green-900/20 border border-green-800 rounded-lg px-3 py-2">Maintenance logged successfully.</div>}
-                  <button onClick={handleLogMaintenance} disabled={loggingMaint || !logDescription || !logPerformedBy} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                  {logError && (
+                    <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>
+                      {logError}
+                    </div>
+                  )}
+                  {logSuccess && (
+                    <div style={{ color: "var(--ok)", fontSize: 13, background: "rgba(16,185,129,0.1)", border: "1px solid var(--ok)", borderRadius: 8, padding: "8px 12px" }}>
+                      Maintenance logged successfully.
+                    </div>
+                  )}
+                  <button
+                    onClick={handleLogMaintenance}
+                    disabled={logDisabled}
+                    className="button"
+                    style={{ opacity: logDisabled ? 0.5 : 1, cursor: logDisabled ? "not-allowed" : "pointer" }}
+                  >
                     {loggingMaint ? "Logging…" : "Log Maintenance"}
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 flex items-center justify-center h-64">
-              <p className="text-gray-500 text-sm">Select an equipment item to view details</p>
+            <div className="panel" style={{ padding: 32, display: "flex", alignItems: "center", justifyContent: "center", height: 256 }}>
+              <p style={{ color: "var(--muted)", fontSize: 13 }}>Select an equipment item to view details</p>
             </div>
           )}
         </div>

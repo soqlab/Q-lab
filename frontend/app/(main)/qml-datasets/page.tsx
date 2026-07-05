@@ -11,12 +11,14 @@ import {
   QMLBenchmarkRun,
 } from "@/lib/api";
 
-const taskBadge: Record<string, string> = {
-  classification: "bg-blue-900/40 text-blue-400 border border-blue-800",
-  regression: "bg-purple-900/40 text-purple-400 border border-purple-800",
-  generation: "bg-green-900/40 text-green-400 border border-green-800",
-  reinforcement: "bg-orange-900/40 text-orange-400 border border-orange-800",
+const taskBadgeStyle: Record<string, React.CSSProperties> = {
+  classification: { background: "rgba(59,130,246,0.15)", color: "var(--info-text)", border: "1px solid rgba(59,130,246,0.4)" },
+  regression: { background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.4)" },
+  generation: { background: "rgba(16,185,129,0.15)", color: "var(--ok)", border: "1px solid rgba(16,185,129,0.4)" },
+  reinforcement: { background: "rgba(249,115,22,0.15)", color: "#f97316", border: "1px solid rgba(249,115,22,0.4)" },
 };
+
+const defaultBadgeStyle: React.CSSProperties = { background: "var(--line)", color: "var(--muted)", border: "1px solid var(--line)" };
 
 const MODEL_TYPES = ["vqc", "qnn", "hybrid_cnn", "classical_baseline"];
 const OPTIMIZERS = ["adam", "sgd", "adagrad"];
@@ -146,16 +148,16 @@ export default function QMLDatasetsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-6">
+    <div style={{ minHeight: "100vh", background: "var(--surface)", color: "var(--text)", padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">QML Dataset Hub</h1>
-          <p className="text-gray-400 mt-1 text-sm">Curated quantum machine learning datasets with benchmarking</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>QML Dataset Hub</h1>
+          <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 13 }}>Curated quantum machine learning datasets with benchmarking</p>
         </div>
         <button
           onClick={() => setShowUpload((v) => !v)}
-          className="bg-indigo-600 hover:bg-indigo-500 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+          style={{ background: "var(--strong)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 500, color: "var(--text)", border: "none", cursor: "pointer" }}
         >
           {showUpload ? "Cancel" : "Upload Dataset"}
         </button>
@@ -163,60 +165,66 @@ export default function QMLDatasetsPage() {
 
       {/* Upload Form */}
       {showUpload && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-indigo-400">Upload New Dataset</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Name</label>
-              <input type="text" value={upName} onChange={(e) => setUpName(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--strong)" }}>Upload New Dataset</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ gridColumn: "span 2" }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Name</label>
+              <input type="text" value={upName} onChange={(e) => setUpName(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Task</label>
-              <select value={upTask} onChange={(e) => setUpTask(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Task</label>
+              <select value={upTask} onChange={(e) => setUpTask(e.target.value)} className="input" style={{ width: "100%" }}>
                 {TASKS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Samples</label>
-              <input type="number" min={1} value={upNSamples} onChange={(e) => setUpNSamples(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Samples</label>
+              <input type="number" min={1} value={upNSamples} onChange={(e) => setUpNSamples(Number(e.target.value))} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Features</label>
-              <input type="number" min={1} value={upNFeatures} onChange={(e) => setUpNFeatures(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Features</label>
+              <input type="number" min={1} value={upNFeatures} onChange={(e) => setUpNFeatures(Number(e.target.value))} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Qubits</label>
-              <input type="number" min={1} value={upNQubits} onChange={(e) => setUpNQubits(Number(e.target.value))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Qubits</label>
+              <input type="number" min={1} value={upNQubits} onChange={(e) => setUpNQubits(Number(e.target.value))} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Encoding</label>
-              <select value={upEncoding} onChange={(e) => setUpEncoding(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Encoding</label>
+              <select value={upEncoding} onChange={(e) => setUpEncoding(e.target.value)} className="input" style={{ width: "100%" }}>
                 {ENCODINGS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">License</label>
-              <input type="text" value={upLicense} onChange={(e) => setUpLicense(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>License</label>
+              <input type="text" value={upLicense} onChange={(e) => setUpLicense(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Authors (comma-sep)</label>
-              <input type="text" value={upAuthors} onChange={(e) => setUpAuthors(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Authors (comma-sep)</label>
+              <input type="text" value={upAuthors} onChange={(e) => setUpAuthors(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Paper DOI</label>
-              <input type="text" value={upDOI} onChange={(e) => setUpDOI(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Paper DOI</label>
+              <input type="text" value={upDOI} onChange={(e) => setUpDOI(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Tags (comma-sep)</label>
-              <input type="text" value={upTags} onChange={(e) => setUpTags(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Tags (comma-sep)</label>
+              <input type="text" value={upTags} onChange={(e) => setUpTags(e.target.value)} className="input" style={{ width: "100%" }} />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Description</label>
-            <textarea value={upDesc} onChange={(e) => setUpDesc(e.target.value)} rows={2} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Description</label>
+            <textarea value={upDesc} onChange={(e) => setUpDesc(e.target.value)} rows={2} className="input" style={{ width: "100%" }} />
           </div>
-          {uploadError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{uploadError}</div>}
-          <button onClick={handleUpload} disabled={uploading || !upName || !upDesc} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+          {uploadError && (
+            <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>{uploadError}</div>
+          )}
+          <button
+            onClick={handleUpload}
+            disabled={uploading || !upName || !upDesc}
+            style={{ background: "var(--strong)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, border: "none", cursor: uploading || !upName || !upDesc ? "not-allowed" : "pointer", opacity: uploading || !upName || !upDesc ? 0.5 : 1 }}
+          >
             {uploading ? "Uploading…" : "Upload Dataset"}
           </button>
         </div>
@@ -224,45 +232,45 @@ export default function QMLDatasetsPage() {
 
       {/* Dataset Grid */}
       {loading ? (
-        <div className="text-sm text-gray-400 animate-pulse">Loading datasets…</div>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading datasets…</div>
       ) : error ? (
-        <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{error}</div>
+        <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>{error}</div>
       ) : datasets.length === 0 ? (
-        <div className="text-sm text-gray-500">No datasets available.</div>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>No datasets available.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
           {datasets.map((ds) => (
-            <div key={ds.dataset_id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3 flex flex-col">
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-sm leading-tight">{ds.name}</p>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${taskBadge[ds.task] ?? "bg-gray-700 text-gray-400"}`}>{ds.task}</span>
+            <div key={ds.dataset_id} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <p style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>{ds.name}</p>
+                <span style={{ fontSize: 12, padding: "2px 6px", borderRadius: 999, flexShrink: 0, ...(taskBadgeStyle[ds.task] ?? defaultBadgeStyle) }}>{ds.task}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                <span className="text-gray-400">Samples: <span className="text-gray-200">{ds.n_samples.toLocaleString()}</span></span>
-                <span className="text-gray-400">Qubits: <span className="text-gray-200">{ds.n_qubits}</span></span>
-                <span className="text-gray-400">Encoding: <span className="text-gray-200">{ds.encoding}</span></span>
-                <span className="text-gray-400">Size: <span className="text-gray-200">{ds.size_mb} MB</span></span>
-                <span className="text-gray-400">Accuracy: <span className="text-green-400 font-medium">{(ds.benchmark_accuracy * 100).toFixed(1)}%</span></span>
-                <span className="text-gray-400">License: <span className="text-gray-200">{ds.license}</span></span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
+                <span style={{ color: "var(--muted)" }}>Samples: <span style={{ color: "var(--text)" }}>{ds.n_samples.toLocaleString()}</span></span>
+                <span style={{ color: "var(--muted)" }}>Qubits: <span style={{ color: "var(--text)" }}>{ds.n_qubits}</span></span>
+                <span style={{ color: "var(--muted)" }}>Encoding: <span style={{ color: "var(--text)" }}>{ds.encoding}</span></span>
+                <span style={{ color: "var(--muted)" }}>Size: <span style={{ color: "var(--text)" }}>{ds.size_mb} MB</span></span>
+                <span style={{ color: "var(--muted)" }}>Accuracy: <span style={{ color: "var(--ok)", fontWeight: 500 }}>{(ds.benchmark_accuracy * 100).toFixed(1)}%</span></span>
+                <span style={{ color: "var(--muted)" }}>License: <span style={{ color: "var(--text)" }}>{ds.license}</span></span>
               </div>
 
-              {ds.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {ds.tags.map((tag) => (
-                    <span key={tag} className="text-xs px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded-full">{tag}</span>
+              {(ds.tags ?? []).length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {(ds.tags ?? []).map((tag) => (
+                    <span key={tag} style={{ fontSize: 12, padding: "2px 6px", background: "var(--line)", color: "var(--muted)", borderRadius: 999 }}>{tag}</span>
                   ))}
                 </div>
               )}
 
-              <div className="flex gap-2 mt-auto pt-1">
+              <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 4 }}>
                 {ds.paper_doi && (
-                  <a href={`https://doi.org/${ds.paper_doi}`} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300 underline">DOI</a>
+                  <a href={`https://doi.org/${ds.paper_doi}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--strong)", textDecoration: "underline" }}>DOI</a>
                 )}
-                <a href={ds.download_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300 underline">Download</a>
+                <a href={ds.download_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--strong)", textDecoration: "underline" }}>Download</a>
                 <button
                   onClick={() => handleBenchmarkOpen(ds)}
-                  className="ml-auto bg-indigo-600 hover:bg-indigo-500 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                  style={{ marginLeft: "auto", background: "var(--strong)", borderRadius: 8, padding: "4px 8px", fontSize: 12, fontWeight: 500, border: "none", cursor: "pointer" }}
                 >
                   Benchmark
                 </button>
@@ -274,49 +282,55 @@ export default function QMLDatasetsPage() {
 
       {/* Benchmark + Leaderboard Panel */}
       {benchmarkPanel && selectedDataset && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-indigo-400">Benchmark — {selectedDataset.name}</h2>
-            <button onClick={() => setBenchmarkPanel(null)} className="text-xs text-gray-500 hover:text-gray-300">Close</button>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--strong)" }}>Benchmark — {selectedDataset.name}</h2>
+            <button onClick={() => setBenchmarkPanel(null)} style={{ fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
             {/* Run benchmark */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-300">Run New Benchmark</h3>
-              <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>Run New Benchmark</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Model Type</label>
-                  <select value={benchModelType} onChange={(e) => setBenchModelType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Model Type</label>
+                  <select value={benchModelType} onChange={(e) => setBenchModelType(e.target.value)} className="input" style={{ width: "100%" }}>
                     {MODEL_TYPES.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Optimizer</label>
-                  <select value={benchOptimizer} onChange={(e) => setBenchOptimizer(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Optimizer</label>
+                  <select value={benchOptimizer} onChange={(e) => setBenchOptimizer(e.target.value)} className="input" style={{ width: "100%" }}>
                     {OPTIMIZERS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-gray-400 mb-1">Parameters: {benchNParams.toLocaleString()}</label>
-                  <input type="range" min={10} max={10000} step={10} value={benchNParams} onChange={(e) => setBenchNParams(Number(e.target.value))} className="w-full accent-indigo-500" />
+                <div style={{ gridColumn: "span 2" }}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Parameters: {benchNParams.toLocaleString()}</label>
+                  <input type="range" min={10} max={10000} step={10} value={benchNParams} onChange={(e) => setBenchNParams(Number(e.target.value))} style={{ width: "100%", accentColor: "var(--strong)" } as React.CSSProperties} />
                 </div>
               </div>
-              <button onClick={handleRunBenchmark} disabled={benchRunning} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg py-2 text-sm font-medium transition-colors">
+              <button
+                onClick={handleRunBenchmark}
+                disabled={benchRunning}
+                style={{ width: "100%", background: "var(--strong)", borderRadius: 8, padding: "8px 0", fontSize: 13, fontWeight: 500, border: "none", cursor: benchRunning ? "not-allowed" : "pointer", opacity: benchRunning ? 0.5 : 1 }}
+              >
                 {benchRunning ? "Running…" : "Run Benchmark"}
               </button>
-              {benchError && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">{benchError}</div>}
+              {benchError && (
+                <div style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>{benchError}</div>
+              )}
               {benchResult && (
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingTop: 4 }}>
                   {[
                     { label: "Accuracy", value: `${(benchResult.accuracy * 100).toFixed(2)}%` },
                     { label: "F1 Score", value: benchResult.f1_score.toFixed(4) },
                     { label: "Train Time", value: `${benchResult.training_time_sec.toFixed(1)}s` },
                     { label: "Qubits Used", value: benchResult.n_qubits_used },
                   ].map(({ label, value }) => (
-                    <div key={label} className="bg-gray-800 rounded-lg px-3 py-2 text-center">
-                      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-                      <p className="text-sm font-semibold text-green-400">{value}</p>
+                    <div key={label} style={{ background: "var(--line)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>{label}</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ok)" }}>{value}</p>
                     </div>
                   ))}
                 </div>
@@ -324,38 +338,38 @@ export default function QMLDatasetsPage() {
             </div>
 
             {/* Leaderboard */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-300">Leaderboard</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>Leaderboard</h3>
               {leaderboardLoading ? (
-                <div className="text-sm text-gray-400 animate-pulse">Loading leaderboard…</div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>Loading leaderboard…</div>
               ) : leaderboardError ? (
-                <div className="text-red-400 text-sm">{leaderboardError}</div>
+                <div style={{ color: "var(--danger)", fontSize: 13 }}>{leaderboardError}</div>
               ) : leaderboard.length === 0 ? (
-                <div className="text-sm text-gray-500">No benchmarks yet.</div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>No benchmarks yet.</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", fontSize: 12 }}>
                     <thead>
-                      <tr className="text-left text-gray-400 border-b border-gray-800">
-                        <th className="pb-2 font-medium">#</th>
-                        <th className="pb-2 font-medium">Model</th>
-                        <th className="pb-2 font-medium">Params</th>
-                        <th className="pb-2 font-medium">Acc</th>
-                        <th className="pb-2 font-medium">F1</th>
-                        <th className="pb-2 font-medium">Time</th>
-                        <th className="pb-2 font-medium">Opt</th>
+                      <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>#</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>Model</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>Params</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>Acc</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>F1</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>Time</th>
+                        <th style={{ paddingBottom: 8, fontWeight: 500 }}>Opt</th>
                       </tr>
                     </thead>
                     <tbody>
                       {leaderboard.map((run, i) => (
-                        <tr key={run.run_id} className="border-b border-gray-800/50">
-                          <td className="py-1.5 pr-2 text-gray-400">{i + 1}</td>
-                          <td className="py-1.5 pr-2">{run.model_type}</td>
-                          <td className="py-1.5 pr-2">{run.n_params.toLocaleString()}</td>
-                          <td className="py-1.5 pr-2 text-green-400 font-medium">{(run.accuracy * 100).toFixed(1)}%</td>
-                          <td className="py-1.5 pr-2">{run.f1_score.toFixed(3)}</td>
-                          <td className="py-1.5 pr-2">{run.training_time_sec.toFixed(0)}s</td>
-                          <td className="py-1.5">{run.optimizer}</td>
+                        <tr key={run.run_id} style={{ borderBottom: "1px solid var(--line)" }}>
+                          <td style={{ padding: "6px 8px 6px 0", color: "var(--muted)" }}>{i + 1}</td>
+                          <td style={{ padding: "6px 8px 6px 0" }}>{run.model_type}</td>
+                          <td style={{ padding: "6px 8px 6px 0" }}>{run.n_params.toLocaleString()}</td>
+                          <td style={{ padding: "6px 8px 6px 0", color: "var(--ok)", fontWeight: 500 }}>{(run.accuracy * 100).toFixed(1)}%</td>
+                          <td style={{ padding: "6px 8px 6px 0" }}>{run.f1_score.toFixed(3)}</td>
+                          <td style={{ padding: "6px 8px 6px 0" }}>{run.training_time_sec.toFixed(0)}s</td>
+                          <td style={{ padding: "6px 0" }}>{run.optimizer}</td>
                         </tr>
                       ))}
                     </tbody>

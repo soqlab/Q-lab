@@ -10,32 +10,42 @@ import {
   type CIPipelineRun,
 } from "@/lib/api";
 
-const TRIGGER_COLORS: Record<string, string> = {
-  push: "bg-sky-900/60 text-sky-300",
-  pr: "bg-purple-900/60 text-purple-300",
-  schedule: "bg-amber-900/60 text-amber-300",
+const TRIGGER_STYLES: Record<string, { background: string; color: string }> = {
+  push:     { background: "rgba(7,89,133,0.6)",   color: "#7dd3fc" },
+  pr:       { background: "rgba(88,28,135,0.6)",   color: "#d8b4fe" },
+  schedule: { background: "rgba(120,53,15,0.6)",   color: "#fcd34d" },
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-emerald-900/60 text-emerald-300",
-  inactive: "bg-gray-800 text-gray-500",
-  passed: "bg-emerald-900/60 text-emerald-300",
-  failed: "bg-red-900/60 text-red-300",
-  running: "bg-sky-900/60 text-sky-300",
-  pending: "bg-gray-800 text-gray-400",
+const STATUS_STYLES: Record<string, { background: string; color: string }> = {
+  active:   { background: "rgba(6,78,59,0.6)",    color: "#6ee7b7" },
+  inactive: { background: "var(--line)",           color: "var(--muted)" },
+  passed:   { background: "rgba(6,78,59,0.6)",    color: "#6ee7b7" },
+  failed:   { background: "rgba(127,29,29,0.6)",  color: "#fca5a5" },
+  running:  { background: "rgba(7,89,133,0.6)",   color: "#7dd3fc" },
+  pending:  { background: "var(--line)",           color: "var(--muted)" },
+};
+
+const badgeBase = {
+  display: "inline-block",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 12,
+  textTransform: "capitalize" as const,
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const colorStyle = STATUS_STYLES[status] ?? { background: "var(--line)", color: "var(--muted)" };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[status] ?? "bg-gray-800 text-gray-400"}`}>
+    <span style={{ ...badgeBase, fontWeight: 600, ...colorStyle }}>
       {status}
     </span>
   );
 }
 
 function TriggerBadge({ trigger }: { trigger: string }) {
+  const colorStyle = TRIGGER_STYLES[trigger] ?? { background: "var(--line)", color: "var(--muted)" };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${TRIGGER_COLORS[trigger] ?? "bg-gray-800 text-gray-400"}`}>
+    <span style={{ ...badgeBase, fontWeight: 600, ...colorStyle }}>
       {trigger}
     </span>
   );
@@ -49,12 +59,12 @@ function passRate(runs: CIPipelineRun[]): number {
 
 function PassRateBadge({ runs }: { runs: CIPipelineRun[] }) {
   const rate = passRate(runs);
-  const color =
-    rate >= 80 ? "bg-emerald-900/60 text-emerald-300" :
-    rate >= 50 ? "bg-amber-900/60 text-amber-300" :
-    "bg-red-900/60 text-red-300";
+  const colorStyle =
+    rate >= 80 ? { background: "rgba(6,78,59,0.6)",   color: "#6ee7b7" } :
+    rate >= 50 ? { background: "rgba(120,53,15,0.6)",  color: "#fcd34d" } :
+                 { background: "rgba(127,29,29,0.6)",  color: "#fca5a5" };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${color}`}>
+    <span style={{ ...badgeBase, fontWeight: 700, ...colorStyle }}>
       {rate.toFixed(0)}% pass
     </span>
   );
@@ -62,54 +72,60 @@ function PassRateBadge({ runs }: { runs: CIPipelineRun[] }) {
 
 function RunsTable({ runs }: { runs: CIPipelineRun[] }) {
   if (runs.length === 0) {
-    return <p className="text-gray-600 text-sm py-4 text-center">No runs yet.</p>;
+    return (
+      <p style={{ color: "var(--muted)", fontSize: 13, padding: "16px 0", textAlign: "center" }}>
+        No runs yet.
+      </p>
+    );
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs text-gray-300">
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", fontSize: 12, color: "var(--text)", borderCollapse: "collapse" }}>
         <thead>
-          <tr className="text-gray-500 border-b border-gray-800">
-            <th className="text-left pb-2 pr-3 font-medium">Commit</th>
-            <th className="text-left pb-2 pr-3 font-medium">Branch</th>
-            <th className="text-left pb-2 pr-3 font-medium">Triggered By</th>
-            <th className="text-left pb-2 pr-3 font-medium">Status</th>
-            <th className="text-right pb-2 pr-3 font-medium">Fidelity</th>
-            <th className="text-right pb-2 pr-3 font-medium">Duration</th>
-            <th className="text-left pb-2 font-medium">Started</th>
+          <tr style={{ color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+            <th style={{ textAlign: "left", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Commit</th>
+            <th style={{ textAlign: "left", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Branch</th>
+            <th style={{ textAlign: "left", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Triggered By</th>
+            <th style={{ textAlign: "left", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Status</th>
+            <th style={{ textAlign: "right", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Fidelity</th>
+            <th style={{ textAlign: "right", paddingBottom: 8, paddingRight: 12, fontWeight: 500 }}>Duration</th>
+            <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 500 }}>Started</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.run_id} className="border-b border-gray-800/60 hover:bg-gray-800/30">
-              <td className="py-2 pr-3">
+            <tr key={run.run_id} style={{ borderBottom: "1px solid var(--line)" }}>
+              <td style={{ padding: "8px 12px 8px 0" }}>
                 <a
                   href={run.log_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-indigo-400 hover:text-indigo-300 underline"
+                  style={{ fontFamily: "ui-monospace,monospace", color: "var(--strong)", textDecoration: "underline" }}
                 >
                   {run.commit_sha.slice(0, 7)}
                 </a>
               </td>
-              <td className="py-2 pr-3 font-mono text-gray-400">{run.branch}</td>
-              <td className="py-2 pr-3 text-gray-400">{run.triggered_by}</td>
-              <td className="py-2 pr-3">
+              <td style={{ padding: "8px 12px 8px 0", fontFamily: "ui-monospace,monospace", color: "var(--muted)" }}>
+                {run.branch}
+              </td>
+              <td style={{ padding: "8px 12px 8px 0", color: "var(--muted)" }}>{run.triggered_by}</td>
+              <td style={{ padding: "8px 12px 8px 0" }}>
                 <StatusBadge status={run.status} />
               </td>
-              <td className="py-2 pr-3 text-right">
+              <td style={{ padding: "8px 12px 8px 0", textAlign: "right" }}>
                 {run.achieved_fidelity != null ? (
-                  <span className={run.achieved_fidelity >= run.fidelity_threshold ? "text-emerald-400" : "text-red-400"}>
+                  <span style={{ color: run.achieved_fidelity >= run.fidelity_threshold ? "var(--ok)" : "var(--danger)" }}>
                     {run.achieved_fidelity.toFixed(4)}
                   </span>
                 ) : (
-                  <span className="text-gray-600">—</span>
+                  <span style={{ color: "var(--muted)" }}>—</span>
                 )}
-                <span className="text-gray-600"> / {run.fidelity_threshold}</span>
+                <span style={{ color: "var(--muted)" }}> / {run.fidelity_threshold}</span>
               </td>
-              <td className="py-2 pr-3 text-right text-gray-400">
+              <td style={{ padding: "8px 12px 8px 0", textAlign: "right", color: "var(--muted)" }}>
                 {run.duration_sec != null ? `${run.duration_sec}s` : "—"}
               </td>
-              <td className="py-2 text-gray-500">
+              <td style={{ padding: "8px 0", color: "var(--muted)" }}>
                 {new Date(run.started_at).toLocaleString()}
               </td>
             </tr>
@@ -130,6 +146,35 @@ const EXAMPLE_TEMPLATE = JSON.stringify(
   null,
   2
 );
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 13,
+  color: "var(--text)",
+  boxSizing: "border-box",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  color: "var(--muted)",
+  marginBottom: 4,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+const errorBannerStyle: React.CSSProperties = {
+  background: "rgba(239,68,68,0.1)",
+  border: "1px solid var(--danger)",
+  color: "var(--danger)",
+  borderRadius: 8,
+  padding: "12px 16px",
+  fontSize: 13,
+};
 
 export default function GithubCIPage() {
   const [pipelines, setPipelines] = useState<CIPipeline[]>([]);
@@ -243,77 +288,94 @@ export default function GithubCIPage() {
     }
   }
 
-  const inputCls = "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500";
-
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-100">GitHub CI Bridge</h1>
-        <p className="text-gray-500 text-sm mt-1">
+    <main className="page">
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>GitHub CI Bridge</h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
           Run quantum experiments automatically in your CI/CD pipeline.
         </p>
       </div>
 
       {triggerError && (
-        <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+        <div style={{ ...errorBannerStyle, marginBottom: 16 }}>
           {triggerError}
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 32 }}>
         {/* Pipeline list */}
-        <div className="xl:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-100 mb-3">Pipelines</h2>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Pipelines</h2>
           {pipelinesError && (
-            <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+            <div style={{ ...errorBannerStyle, marginBottom: 16 }}>
               {pipelinesError}
             </div>
           )}
           {pipelinesLoading ? (
-            <div className="text-gray-500 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
               Loading pipelines…
             </div>
           ) : pipelines.length === 0 ? (
-            <div className="text-gray-600 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+            <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
               No pipelines yet. Create one using the form.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {pipelines.map((pipeline) => {
                 const runs = runsMap[pipeline.pipeline_id];
                 const isSelected = selectedPipelineId === pipeline.pipeline_id;
 
                 return (
-                  <div key={pipeline.pipeline_id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 flex-wrap">
+                  <div key={pipeline.pipeline_id} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           <TriggerBadge trigger={pipeline.trigger} />
                           <StatusBadge status={pipeline.status} />
                           {runs && <PassRateBadge runs={runs} />}
                         </div>
-                        <span className="text-xs text-gray-500 flex-shrink-0">
+                        <span style={{ fontSize: 12, color: "var(--muted)", flexShrink: 0 }}>
                           {new Date(pipeline.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      <h3 className="text-gray-100 font-semibold text-sm mb-0.5">{pipeline.name}</h3>
-                      <p className="text-gray-500 text-xs font-mono mb-0.5">
+                      <h3 style={{ color: "var(--text)", fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{pipeline.name}</h3>
+                      <p style={{ color: "var(--muted)", fontSize: 12, fontFamily: "ui-monospace,monospace", marginBottom: 2 }}>
                         {pipeline.repo} @ {pipeline.branch_pattern}
                       </p>
-                      <p className="text-gray-600 text-xs mb-3">
+                      <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 12 }}>
                         Backend: {pipeline.backend} &middot; {pipeline.shots} shots
                       </p>
-                      <div className="flex gap-2">
+                      <div style={{ display: "flex", gap: 8 }}>
                         <button
                           onClick={() => handleTrigger(pipeline.pipeline_id)}
                           disabled={triggeringId === pipeline.pipeline_id}
-                          className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+                          style={{
+                            fontSize: 12,
+                            background: "var(--strong)",
+                            color: "#fff",
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            fontWeight: 500,
+                            border: "none",
+                            cursor: triggeringId === pipeline.pipeline_id ? "not-allowed" : "pointer",
+                            opacity: triggeringId === pipeline.pipeline_id ? 0.5 : 1,
+                          }}
                         >
                           {triggeringId === pipeline.pipeline_id ? "Triggering…" : "Trigger"}
                         </button>
                         <button
                           onClick={() => handleViewRuns(pipeline.pipeline_id)}
-                          className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                          style={{
+                            fontSize: 12,
+                            background: "var(--line)",
+                            color: "var(--text)",
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            fontWeight: 500,
+                            border: "none",
+                            cursor: "pointer",
+                          }}
                         >
                           {isSelected ? "Hide Runs" : "View Runs"}
                         </button>
@@ -322,10 +384,12 @@ export default function GithubCIPage() {
 
                     {/* Runs panel */}
                     {isSelected && (
-                      <div className="border-t border-gray-800 bg-gray-950 px-4 py-4">
-                        <h4 className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-3">Pipeline Runs</h4>
+                      <div style={{ borderTop: "1px solid var(--line)", background: "var(--surface)", padding: 16 }}>
+                        <h4 style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
+                          Pipeline Runs
+                        </h4>
                         {runsLoading === pipeline.pipeline_id ? (
-                          <p className="text-gray-500 text-xs py-2">Loading runs…</p>
+                          <p style={{ color: "var(--muted)", fontSize: 12, padding: "8px 0" }}>Loading runs…</p>
                         ) : (
                           <RunsTable runs={runs ?? []} />
                         )}
@@ -340,31 +404,34 @@ export default function GithubCIPage() {
 
         {/* Create pipeline form */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-100 mb-3">Create Pipeline</h2>
-          <form onSubmit={handleCreate} className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Create Pipeline</h2>
+          <form
+            onSubmit={handleCreate}
+            style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}
+          >
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Pipeline Name</label>
-              <input value={cfName} onChange={(e) => setCfName(e.target.value)} placeholder="Bell State CI" className={inputCls} required />
+              <label style={labelStyle}>Pipeline Name</label>
+              <input value={cfName} onChange={(e) => setCfName(e.target.value)} placeholder="Bell State CI" style={inputStyle} required />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Repository</label>
-              <input value={cfRepo} onChange={(e) => setCfRepo(e.target.value)} placeholder="org/repo" className={inputCls} required />
+              <label style={labelStyle}>Repository</label>
+              <input value={cfRepo} onChange={(e) => setCfRepo(e.target.value)} placeholder="org/repo" style={inputStyle} required />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Branch Pattern</label>
-              <input value={cfBranch} onChange={(e) => setCfBranch(e.target.value)} placeholder="main" className={inputCls} required />
+              <label style={labelStyle}>Branch Pattern</label>
+              <input value={cfBranch} onChange={(e) => setCfBranch(e.target.value)} placeholder="main" style={inputStyle} required />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Trigger</label>
-              <select value={cfTrigger} onChange={(e) => setCfTrigger(e.target.value)} className={inputCls}>
+              <label style={labelStyle}>Trigger</label>
+              <select value={cfTrigger} onChange={(e) => setCfTrigger(e.target.value)} style={inputStyle}>
                 <option value="push">Push</option>
                 <option value="pr">Pull Request</option>
                 <option value="schedule">Schedule</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Backend</label>
-              <select value={cfBackend} onChange={(e) => setCfBackend(e.target.value)} className={inputCls}>
+              <label style={labelStyle}>Backend</label>
+              <select value={cfBackend} onChange={(e) => setCfBackend(e.target.value)} style={inputStyle}>
                 <option value="ibmq_qasm_simulator">ibmq_qasm_simulator</option>
                 <option value="ibmq_manila">ibmq_manila</option>
                 <option value="statevector_simulator">statevector_simulator</option>
@@ -372,12 +439,13 @@ export default function GithubCIPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Shots</label>
-              <input type="number" min={1} max={100000} value={cfShots} onChange={(e) => setCfShots(Number(e.target.value))} className={inputCls} />
+              <label style={labelStyle}>Shots</label>
+              <input type="number" min={1} max={100000} value={cfShots} onChange={(e) => setCfShots(Number(e.target.value))} style={inputStyle} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">
-                Fidelity Threshold: <span className="text-indigo-400 font-semibold">{cfFidelityThreshold.toFixed(3)}</span>
+              <label style={labelStyle}>
+                Fidelity Threshold:{" "}
+                <span style={{ color: "var(--strong)", fontWeight: 600 }}>{cfFidelityThreshold.toFixed(3)}</span>
               </label>
               <input
                 type="range"
@@ -386,25 +454,38 @@ export default function GithubCIPage() {
                 step={0.001}
                 value={cfFidelityThreshold}
                 onChange={(e) => setCfFidelityThreshold(Number(e.target.value))}
-                className="w-full accent-indigo-500"
+                style={{ width: "100%", accentColor: "var(--strong)" }}
               />
-              <div className="flex justify-between text-xs text-gray-600 mt-0.5"><span>0.900</span><span>0.999</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                <span>0.900</span><span>0.999</span>
+              </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Experiment Template (JSON)</label>
+              <label style={labelStyle}>Experiment Template (JSON)</label>
               <textarea
                 value={cfTemplate}
                 onChange={(e) => setCfTemplate(e.target.value)}
                 rows={8}
-                className={`${inputCls} font-mono text-xs resize-y`}
+                style={{ ...inputStyle, fontFamily: "ui-monospace,monospace", fontSize: 12, resize: "vertical" }}
               />
             </div>
-            {cfError && <p className="text-red-400 text-sm">{cfError}</p>}
-            {cfSuccess && <p className="text-emerald-400 text-sm">Pipeline created successfully!</p>}
+            {cfError && <p style={{ color: "var(--danger)", fontSize: 13 }}>{cfError}</p>}
+            {cfSuccess && <p style={{ color: "var(--ok)", fontSize: 13 }}>Pipeline created successfully!</p>}
             <button
               type="submit"
               disabled={cfSubmitting}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              style={{
+                width: "100%",
+                background: "var(--strong)",
+                color: "#fff",
+                fontWeight: 500,
+                padding: "10px 0",
+                borderRadius: 8,
+                border: "none",
+                cursor: cfSubmitting ? "not-allowed" : "pointer",
+                opacity: cfSubmitting ? 0.5 : 1,
+                fontSize: 13,
+              }}
             >
               {cfSubmitting ? "Creating…" : "Create Pipeline"}
             </button>

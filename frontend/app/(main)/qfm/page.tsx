@@ -83,63 +83,71 @@ export default function QFMPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-1">Quantum Foundation Model</h1>
-      <p className="text-gray-400 text-sm mb-6">
+    <div style={{ minHeight: "100vh", background: "var(--surface)", color: "var(--text)", padding: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Quantum Foundation Model</h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
         AI-powered quantum research assistant backed by physics knowledge and
         literature.
       </p>
 
-      <div className="flex gap-6">
+      <div style={{ display: "flex", gap: 24 }}>
         {/* ── Left: Chat ── */}
-        <div className="flex-1 flex flex-col bg-gray-800 rounded-xl overflow-hidden min-h-[70vh]">
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--line)", borderRadius: 12, overflow: "hidden", minHeight: "70vh" }}>
           {/* Message history */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
             {messages.length === 0 && (
-              <p className="text-gray-500 text-sm text-center mt-12">
+              <p style={{ color: "var(--muted)", fontSize: 13, textAlign: "center", marginTop: 48 }}>
                 Ask anything about quantum circuits, backends, or error
                 mitigation…
               </p>
             )}
-            {messages.map((msg, i) => {
+            {(messages ?? []).map((msg, i) => {
               if (msg.role === "user") {
                 return (
-                  <div key={i} className="flex justify-end">
-                    <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2 max-w-[75%] text-sm">
+                  <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ background: "var(--strong)", color: "var(--text)", borderRadius: 16, borderTopRightRadius: 4, padding: "8px 16px", maxWidth: "75%", fontSize: 13 }}>
                       {msg.content as string}
                     </div>
                   </div>
                 );
               }
               const session = msg.content as QFMSession;
+              const confBadgeStyle: React.CSSProperties =
+                session.confidence >= 0.8
+                  ? { background: "rgba(16,185,129,0.2)", color: "var(--ok)" }
+                  : session.confidence >= 0.5
+                  ? { background: "rgba(245,158,11,0.2)", color: "#f59e0b" }
+                  : { background: "rgba(239,68,68,0.2)", color: "var(--danger)" };
               return (
-                <div key={i} className="flex flex-col gap-2 max-w-[85%]">
-                  <div className="bg-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-gray-300 leading-relaxed">
+                <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: "85%" }}>
+                  <div style={{ background: "var(--line)", borderRadius: 16, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 13 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ color: "var(--text)", lineHeight: 1.6 }}>
                         {session.reply}
                       </span>
                       <span
-                        className={`ml-auto shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          session.confidence >= 0.8
-                            ? "bg-green-700 text-green-200"
-                            : session.confidence >= 0.5
-                            ? "bg-yellow-700 text-yellow-200"
-                            : "bg-red-800 text-red-200"
-                        }`}
+                        style={{
+                          marginLeft: "auto",
+                          flexShrink: 0,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          ...confBadgeStyle,
+                        }}
                       >
                         {Math.round(session.confidence * 100)}% conf
                       </span>
                     </div>
 
-                    {session.citations.length > 0 && (
-                      <div className="mt-2 border-t border-gray-600 pt-2">
-                        <p className="text-gray-400 text-xs mb-1">Citations</p>
-                        <ul className="space-y-1">
-                          {session.citations.map((c, ci) => (
-                            <li key={ci} className="text-xs text-indigo-300">
+                    {(session.citations ?? []).length > 0 && (
+                      <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                        <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>Citations</p>
+                        <ul style={{ display: "flex", flexDirection: "column", gap: 4, listStyle: "none", margin: 0, padding: 0 }}>
+                          {(session.citations ?? []).map((c, ci) => (
+                            <li key={ci} style={{ fontSize: 12, color: "var(--strong)" }}>
                               [{c.arxiv_id}] {c.title}{" "}
-                              <span className="text-gray-500">
+                              <span style={{ color: "var(--muted)" }}>
                                 ({Math.round(c.relevance * 100)}%)
                               </span>
                             </li>
@@ -149,13 +157,13 @@ export default function QFMPage() {
                     )}
                   </div>
 
-                  {session.follow_ups.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {session.follow_ups.map((fu, fi) => (
+                  {(session.follow_ups ?? []).length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {(session.follow_ups ?? []).map((fu, fi) => (
                         <button
                           key={fi}
                           onClick={() => handleFollowUp(fu)}
-                          className="text-xs bg-gray-700 hover:bg-gray-600 text-indigo-300 border border-gray-600 rounded-full px-3 py-1 transition-colors"
+                          style={{ fontSize: 12, background: "var(--line)", color: "var(--strong)", border: "1px solid var(--line)", borderRadius: 999, padding: "4px 12px", cursor: "pointer" }}
                         >
                           {fu}
                         </button>
@@ -166,22 +174,23 @@ export default function QFMPage() {
               );
             })}
             {sending && (
-              <div className="flex">
-                <div className="bg-gray-700 rounded-2xl px-4 py-2 text-sm text-gray-400 animate-pulse">
+              <div style={{ display: "flex" }}>
+                <div style={{ background: "var(--line)", borderRadius: 16, padding: "8px 16px", fontSize: 13, color: "var(--muted)" }}>
                   Thinking…
                 </div>
               </div>
             )}
             {chatError && (
-              <p className="text-red-400 text-sm">{chatError}</p>
+              <p style={{ color: "var(--danger)", fontSize: 13 }}>{chatError}</p>
             )}
             <div ref={bottomRef} />
           </div>
 
           {/* Input bar */}
-          <div className="p-4 border-t border-gray-700 flex gap-2">
+          <div style={{ padding: 16, borderTop: "1px solid var(--line)", display: "flex", gap: 8 }}>
             <input
-              className="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="input"
+              style={{ flex: 1 }}
               placeholder="Ask the Quantum Foundation Model…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -189,9 +198,10 @@ export default function QFMPage() {
               disabled={sending}
             />
             <button
+              className="button"
               onClick={handleSend}
               disabled={sending || !input.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              style={{ opacity: sending || !input.trim() ? 0.5 : 1, cursor: sending || !input.trim() ? "not-allowed" : "pointer" }}
             >
               Send
             </button>
@@ -199,18 +209,18 @@ export default function QFMPage() {
         </div>
 
         {/* ── Right: Fidelity Predictor ── */}
-        <div className="w-80 shrink-0 flex flex-col gap-4">
-          <div className="bg-gray-800 rounded-xl p-4">
-            <h2 className="font-semibold text-gray-200 mb-3">
+        <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16 }}>
+            <h2 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
               Fidelity Predictor
             </h2>
 
-            <label className="block text-xs text-gray-400 mb-1">
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
               Circuit QASM
             </label>
             <textarea
               rows={4}
-              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 mb-3 font-mono"
+              style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "var(--text)", marginBottom: 12, fontFamily: "ui-monospace,monospace", boxSizing: "border-box" }}
               placeholder="OPENQASM 2.0; …"
               value={fidelityForm.circuit_qasm}
               onChange={(e) =>
@@ -218,9 +228,10 @@ export default function QFMPage() {
               }
             />
 
-            <label className="block text-xs text-gray-400 mb-1">Backend</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
             <select
-              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 mb-3"
+              className="input"
+              style={{ width: "100%", marginBottom: 12 }}
               value={fidelityForm.backend}
               onChange={(e) =>
                 setFidelityForm((f) => ({ ...f, backend: e.target.value }))
@@ -232,15 +243,16 @@ export default function QFMPage() {
               <option value="quantinuum_h2">quantinuum_h2</option>
             </select>
 
-            <div className="flex gap-2 mb-3">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   Qubits
                 </label>
                 <input
+                  className="input"
                   type="number"
                   min={1}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  style={{ width: "100%", boxSizing: "border-box" }}
                   value={fidelityForm.n_qubits}
                   onChange={(e) =>
                     setFidelityForm((f) => ({
@@ -250,14 +262,15 @@ export default function QFMPage() {
                   }
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                   Depth
                 </label>
                 <input
+                  className="input"
                   type="number"
                   min={1}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  style={{ width: "100%", boxSizing: "border-box" }}
                   value={fidelityForm.depth}
                   onChange={(e) =>
                     setFidelityForm((f) => ({
@@ -272,60 +285,66 @@ export default function QFMPage() {
             <button
               onClick={handlePredict}
               disabled={predicting || !fidelityForm.circuit_qasm.trim()}
-              className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              style={{ width: "100%", background: "#7c3aed", color: "#fff", fontSize: 13, fontWeight: 500, padding: "8px 0", borderRadius: 8, border: "none", opacity: predicting || !fidelityForm.circuit_qasm.trim() ? 0.5 : 1, cursor: predicting || !fidelityForm.circuit_qasm.trim() ? "not-allowed" : "pointer" }}
             >
               {predicting ? "Predicting…" : "Predict Fidelity"}
             </button>
 
             {predError && (
-              <p className="text-red-400 text-xs mt-2">{predError}</p>
+              <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{predError}</p>
             )}
           </div>
 
           {prediction && (
-            <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+            <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
               {/* Big fidelity number */}
-              <div className="text-center">
-                <div className="text-5xl font-bold text-violet-400">
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 48, fontWeight: 700, color: "#a78bfa" }}>
                   {Math.round(prediction.predicted_fidelity * 100)}%
                 </div>
-                <div className="text-gray-400 text-sm mt-1">
+                <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
                   Predicted Fidelity
                 </div>
               </div>
 
-              <div className="text-center text-gray-300 text-sm">
+              <div style={{ textAlign: "center", color: "var(--text)", fontSize: 13 }}>
                 &plusmn;{(prediction.uncertainty * 100).toFixed(1)}% uncertainty
               </div>
 
-              <div className="bg-gray-900 rounded-lg p-2 text-xs text-gray-300 text-center">
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: 8, fontSize: 12, color: "var(--text)", textAlign: "center", border: "1px solid var(--line)" }}>
                 CI [{(prediction.confidence_interval[0] * 100).toFixed(1)}%,{" "}
                 {(prediction.confidence_interval[1] * 100).toFixed(1)}%]
               </div>
 
-              <div className="flex flex-col gap-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Dominant noise</span>
-                  <span className="text-yellow-300 font-medium">
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Dominant noise</span>
+                  <span style={{ color: "#f59e0b", fontWeight: 500 }}>
                     {prediction.dominant_noise}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Mitigation</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--muted)" }}>Mitigation</span>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      prediction.mitigation_recommended === "recommended" ||
-                      prediction.mitigation_recommended === "strongly_recommended"
-                        ? "bg-orange-700 text-orange-200"
-                        : "bg-gray-700 text-gray-300"
-                    }`}
+                    style={{
+                      fontSize: 12,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      fontWeight: 600,
+                      ...(
+                        prediction.mitigation_recommended === "recommended" ||
+                        prediction.mitigation_recommended === "strongly_recommended"
+                          ? { background: "rgba(249,115,22,0.2)", color: "#f97316" }
+                          : { background: "var(--line)", color: "var(--text)" }
+                      ),
+                    }}
                   >
                     {prediction.mitigation_recommended}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Improvement potential</span>
-                  <span className="text-green-400 font-medium">
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Improvement potential</span>
+                  <span style={{ color: "var(--ok)", fontWeight: 500 }}>
                     +{(prediction.improvement_potential * 100).toFixed(1)}%
                   </span>
                 </div>

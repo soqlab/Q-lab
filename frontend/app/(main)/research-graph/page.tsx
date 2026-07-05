@@ -59,77 +59,77 @@ export default function ResearchGraphPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Research Knowledge Graph</h1>
-        <div className="flex gap-2">
+    <div style={{ padding: 24, maxWidth: 1152, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Research Knowledge Graph</h1>
+        <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowAddNode(!showAddNode)}
-            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm">+ Node</button>
+            style={{ padding: "8px 12px", background: "var(--strong)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>+ Node</button>
           <button onClick={() => setShowAddEdge(!showAddEdge)}
-            className="px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded text-sm">+ Edge</button>
+            style={{ padding: "8px 12px", background: "#7c3aed", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>+ Edge</button>
         </div>
       </div>
-      <p className="text-gray-400">Visualize the connections between hypotheses, runs, papers, circuits, and findings in your research workflow.</p>
+      <p style={{ color: "var(--muted)" }}>Visualize the connections between hypotheses, runs, papers, circuits, and findings in your research workflow.</p>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {showAddNode && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <select value={nodeType} onChange={e => setNodeType(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               {NODE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             <input placeholder="Label" value={nodeLabel} onChange={e => setNodeLabel(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }} />
           </div>
           <input placeholder="Description" value={nodeDesc} onChange={e => setNodeDesc(e.target.value)}
-            className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
-          <div className="flex gap-2">
-            <button onClick={addNode} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm">Add</button>
-            <button onClick={() => setShowAddNode(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+            style={{ width: "100%", background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={addNode} style={{ padding: "8px 16px", background: "rgba(16,185,129,0.8)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>Add</button>
+            <button onClick={() => setShowAddNode(false)} style={{ padding: "8px 16px", background: "var(--line)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>Cancel</button>
           </div>
         </div>
       )}
 
       {showAddEdge && graph && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
             <select value={srcId} onChange={e => setSrcId(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               <option value="">Source node...</option>
-              {graph.nodes.map(n => <option key={n.node_id} value={n.node_id}>{n.label}</option>)}
+              {(graph.nodes ?? []).map(n => <option key={n.node_id} value={n.node_id}>{n.label}</option>)}
             </select>
             <select value={edgeType} onChange={e => setEdgeType(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               {EDGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             <select value={tgtId} onChange={e => setTgtId(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }}>
               <option value="">Target node...</option>
-              {graph.nodes.map(n => <option key={n.node_id} value={n.node_id}>{n.label}</option>)}
+              {(graph.nodes ?? []).map(n => <option key={n.node_id} value={n.node_id}>{n.label}</option>)}
             </select>
           </div>
-          <div className="flex gap-2">
-            <button onClick={addEdge} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm">Add Edge</button>
-            <button onClick={() => setShowAddEdge(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={addEdge} style={{ padding: "8px 16px", background: "rgba(16,185,129,0.8)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>Add Edge</button>
+            <button onClick={() => setShowAddEdge(false)} style={{ padding: "8px 16px", background: "var(--line)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>Cancel</button>
           </div>
         </div>
       )}
 
-      {loading && <div className="text-gray-400">Loading graph...</div>}
+      {loading && <div style={{ color: "var(--muted)" }}>Loading graph...</div>}
 
       {graph && (
-        <div className="bg-gray-900 rounded-xl overflow-hidden">
-          <svg ref={svgRef} width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block" style={{ background: "#111" }}>
+        <div style={{ background: "var(--surface)", borderRadius: 12, overflow: "hidden" }}>
+          <svg ref={svgRef} width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ display: "block", background: "#111" }}>
             <defs>
               <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#4b5563" />
               </marker>
             </defs>
-            {(graph.edges as ResearchGraphEdge[]).map(e => {
-              const src = (graph.nodes as ResearchGraphNode[]).find(n => n.node_id === e.source_id);
-              const tgt = (graph.nodes as ResearchGraphNode[]).find(n => n.node_id === e.target_id);
+            {(graph.edges as ResearchGraphEdge[] ?? []).map(e => {
+              const src = (graph.nodes as ResearchGraphNode[] ?? []).find(n => n.node_id === e.source_id);
+              const tgt = (graph.nodes as ResearchGraphNode[] ?? []).find(n => n.node_id === e.target_id);
               if (!src || !tgt) return null;
               const sp = nodePos(src);
               const tp = nodePos(tgt);
@@ -141,13 +141,13 @@ export default function ResearchGraphPage() {
                 </g>
               );
             })}
-            {(graph.nodes as ResearchGraphNode[]).map(n => {
+            {(graph.nodes as ResearchGraphNode[] ?? []).map(n => {
               const pos = nodePos(n);
               const r = 18 * n.size;
               return (
                 <g key={n.node_id} transform={`translate(${pos.x},${pos.y})`}
                   onMouseEnter={() => setHoveredNode(n)} onMouseLeave={() => setHoveredNode(null)}
-                  className="cursor-pointer">
+                  style={{ cursor: "pointer" }}>
                   <circle r={r} fill={n.color} fillOpacity={0.85} stroke={hoveredNode?.node_id === n.node_id ? "#fff" : "transparent"} strokeWidth={2} />
                   <text y={r + 12} textAnchor="middle" fill="#d1d5db" fontSize={10}>{n.label.slice(0, 18)}</text>
                   <title>{n.label}: {n.description}</title>
@@ -159,23 +159,23 @@ export default function ResearchGraphPage() {
       )}
 
       {graph && (
-        <div className="grid grid-cols-4 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
           {Object.entries(graph.stats.node_types).filter(([, count]) => count > 0).map(([type, count]) => (
-            <div key={type} className="bg-gray-900 rounded p-3 text-sm">
-              <span className="text-gray-400">{type}:</span> <span className="font-mono">{count}</span>
+            <div key={type} style={{ background: "var(--surface)", borderRadius: 6, padding: 12, fontSize: 13 }}>
+              <span style={{ color: "var(--muted)" }}>{type}:</span> <span style={{ fontFamily: "ui-monospace,monospace" }}>{count}</span>
             </div>
           ))}
         </div>
       )}
 
       {hoveredNode && (
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-          <div className="flex gap-3 items-start">
-            <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0" style={{ background: hoveredNode.color }} />
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, border: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div style={{ width: 12, height: 12, borderRadius: 999, marginTop: 4, flexShrink: 0, background: hoveredNode.color }} />
             <div>
-              <div className="font-semibold">{hoveredNode.label}</div>
-              <div className="text-xs text-gray-500 mb-1">{hoveredNode.node_type}</div>
-              <div className="text-sm text-gray-400">{hoveredNode.description}</div>
+              <div style={{ fontWeight: 600 }}>{hoveredNode.label}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{hoveredNode.node_type}</div>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>{hoveredNode.description}</div>
             </div>
           </div>
         </div>

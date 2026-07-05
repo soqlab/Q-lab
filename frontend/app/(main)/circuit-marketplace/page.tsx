@@ -19,7 +19,7 @@ const SORT_OPTIONS = [
 
 function StarRating({ rating }: { rating: number }) {
   return (
-    <span className="text-yellow-400 text-sm">
+    <span style={{ color: "#f59e0b", fontSize: 13 }}>
       {Array.from({ length: 5 }, (_, i) => (
         <span key={i}>{i < Math.round(rating) ? "★" : "☆"}</span>
       ))}
@@ -122,15 +122,15 @@ export default function CircuitMarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="page">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Circuit Marketplace</h1>
-          <p className="text-gray-400 mt-1">Buy and sell optimized quantum circuits</p>
+          <h1 style={{ fontSize: 30, fontWeight: 700, color: "var(--text)" }}>Circuit Marketplace</h1>
+          <p style={{ color: "var(--muted)", marginTop: 4 }}>Buy and sell optimized quantum circuits</p>
         </div>
         <button
           onClick={() => setShowCreate((v) => !v)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+          className="button"
         >
           {showCreate ? "Cancel" : "+ List Circuit"}
         </button>
@@ -138,152 +138,155 @@ export default function CircuitMarketplacePage() {
 
       {/* Create Listing Panel */}
       {showCreate && (
-        <div className="bg-gray-900 border border-indigo-800 rounded-xl p-5 space-y-4">
-          <h2 className="text-lg font-semibold text-indigo-300">New Listing</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="panel" style={{ border: "1px solid var(--strong)", marginTop: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--strong)", marginBottom: 16 }}>New Listing</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Title</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Title</label>
               <input type="text" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Author</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Author</label>
               <input type="text" value={createAuthor} onChange={(e) => setCreateAuthor(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Category</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Category</label>
               <input type="text" value={createCategory} onChange={(e) => setCreateCategory(e.target.value)}
                 placeholder="e.g. optimization"
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Tags (comma-separated)</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Tags (comma-separated)</label>
               <input type="text" value={createTags} onChange={(e) => setCreateTags(e.target.value)}
                 placeholder="vqe, ansatz, chemistry"
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Price (USD)</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Price (USD)</label>
               <input type="number" min={0} step={0.01} value={createPrice}
                 onChange={(e) => setCreatePrice(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                className="input" style={{ width: "100%" }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">License</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>License</label>
               <select value={createLicense} onChange={(e) => setCreateLicense(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                className="input" style={{ width: "100%" }}>
                 {LICENSE_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
           </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Description</label>
             <textarea value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} rows={2}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y" />
+              className="input" style={{ width: "100%", resize: "vertical" }} />
           </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Circuit QASM</label>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Circuit QASM</label>
             <textarea value={createQasm} onChange={(e) => setCreateQasm(e.target.value)} rows={5}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-green-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y" />
+              className="input" style={{ width: "100%", resize: "vertical", color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 12 }} />
           </div>
           {createError && (
-            <p className="text-red-400 bg-red-950 border border-red-800 rounded px-3 py-2 text-sm">{createError}</p>
+            <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 12px", fontSize: 13, marginTop: 16 }}>{createError}</p>
           )}
           <button onClick={handleCreate} disabled={creating || !createTitle.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+            className="button"
+            style={{ opacity: (creating || !createTitle.trim()) ? 0.5 : 1, marginTop: 16 }}>
             {creating ? "Submitting..." : "Submit Listing"}
           </button>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap gap-4 items-end">
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", marginTop: 24 }}>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Category</label>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Category</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            className="input">
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div className="min-w-48">
-          <label className="block text-xs text-gray-500 mb-1">Max Price: ${maxPrice}</label>
+        <div style={{ minWidth: 192 }}>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Max Price: ${maxPrice}</label>
           <input type="range" min={0} max={100} value={maxPrice}
             onChange={(e) => setMaxPrice(Number(e.target.value))}
-            className="w-full accent-indigo-500" />
+            style={{ width: "100%" }} />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Sort</label>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Sort</label>
           <select value={sort} onChange={(e) => setSort(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            className="input">
             {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
       </div>
 
       {/* Listings Grid */}
-      {loading && <p className="text-gray-400 animate-pulse">Loading listings...</p>}
+      {loading && <p style={{ color: "var(--muted)", marginTop: 24 }}>Loading listings...</p>}
       {error && (
-        <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">{error}</p>
+        <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 16px", marginTop: 24 }}>{error}</p>
       )}
 
       {!loading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {listings.map((listing) => (
-            <div key={listing.listing_id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3 flex flex-col">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-white text-sm leading-snug">{listing.title}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">by {listing.author}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginTop: 24 }}>
+          {(listings ?? []).map((listing) => (
+            <div key={listing.listing_id} className="panel" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 13, lineHeight: 1.3 }}>{listing.title}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>by {listing.author}</div>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-xs bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded">
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, background: "rgba(99,102,241,0.15)", color: "var(--strong)", padding: "2px 8px", borderRadius: 6 }}>
                     {listing.category}
                   </span>
                   {listing.price_usd === 0 ? (
-                    <span className="text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded font-semibold">FREE</span>
+                    <span style={{ fontSize: 12, background: "rgba(16,185,129,0.1)", color: "var(--ok)", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>FREE</span>
                   ) : (
-                    <span className="text-xs text-gray-200 font-semibold">${listing.price_usd.toFixed(2)}</span>
+                    <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>${listing.price_usd.toFixed(2)}</span>
                   )}
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{listing.description}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, WebkitLineClamp: 2, display: "-webkit-box", WebkitBoxOrient: "vertical", overflow: "hidden" } as React.CSSProperties}>{listing.description}</p>
 
-              <div className="flex items-center gap-3 text-xs text-gray-500">
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "var(--muted)" }}>
                 <StarRating rating={listing.rating} />
                 <span>({listing.review_count})</span>
                 <span>{listing.downloads} downloads</span>
               </div>
 
-              <div className="flex flex-wrap gap-1">
-                {listing.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="bg-gray-800 text-gray-400 text-xs px-1.5 py-0.5 rounded">{tag}</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {(listing.tags ?? []).slice(0, 3).map((tag) => (
+                  <span key={tag} style={{ background: "var(--surface)", color: "var(--muted)", fontSize: 12, padding: "2px 6px", borderRadius: 6 }}>{tag}</span>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between mt-auto pt-1">
-                <span className="text-xs bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 4 }}>
+                <span style={{ fontSize: 12, background: "var(--surface)", border: "1px solid var(--line)", color: "var(--muted)", padding: "2px 8px", borderRadius: 6 }}>
                   {listing.license}
                 </span>
                 <button
                   onClick={() => handlePurchase(listing.listing_id)}
                   disabled={purchasingId === listing.listing_id}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                  className="button"
+                  style={{ fontSize: 12, padding: "6px 12px", opacity: purchasingId === listing.listing_id ? 0.5 : 1 }}
                 >
                   {purchasingId === listing.listing_id ? "..." : "Purchase"}
                 </button>
               </div>
 
               {purchasedQasm[listing.listing_id] && expandedPurchase === listing.listing_id && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-green-400 font-semibold">Circuit QASM</span>
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, color: "var(--ok)", fontWeight: 600 }}>Circuit QASM</span>
                     <button onClick={() => setExpandedPurchase(null)}
-                      className="text-xs text-gray-500 hover:text-gray-300">Close</button>
+                      className="button secondary"
+                      style={{ fontSize: 12, padding: "2px 8px" }}>Close</button>
                   </div>
-                  <pre className="bg-gray-950 border border-gray-700 rounded p-3 text-green-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-48">
+                  <pre style={{ fontFamily: "ui-monospace,monospace", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto", whiteSpace: "pre-wrap", color: "var(--ok)", fontSize: 12, maxHeight: 192 }}>
                     {purchasedQasm[listing.listing_id]}
                   </pre>
                 </div>

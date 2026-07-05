@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import type { CSSProperties } from "react";
 import {
   generatePoster,
   generateSlides,
@@ -14,14 +15,48 @@ type TabType = "Poster" | "Slides" | "Abstract";
 
 const TAB_LIST: TabType[] = ["Poster", "Slides", "Abstract"];
 
+const TYPE_BADGE_COLORS: Record<string, CSSProperties> = {
+  poster:   { background: "rgba(67,56,202,0.35)",  color: "var(--strong)" },
+  slides:   { background: "rgba(16,185,129,0.15)", color: "#34d399" },
+  abstract: { background: "rgba(245,158,11,0.15)", color: "#f59e0b" },
+};
+
+const LABEL_STYLE: CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  color: "var(--muted)",
+  marginBottom: 4,
+  fontWeight: 500,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+const INPUT_STYLE: CSSProperties = {
+  width: "100%",
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 13,
+  color: "var(--text)",
+  boxSizing: "border-box",
+};
+
 function TypeBadge({ type }: { type: string }) {
-  const colors: Record<string, string> = {
-    poster: "bg-indigo-900/60 text-indigo-300",
-    slides: "bg-emerald-900/60 text-emerald-300",
-    abstract: "bg-amber-900/60 text-amber-300",
-  };
+  const colorStyle = TYPE_BADGE_COLORS[type] ?? { background: "var(--surface)", color: "var(--muted)" };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${colors[type] ?? "bg-gray-800 text-gray-300"}`}>
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        ...colorStyle,
+      }}
+    >
       {type}
     </span>
   );
@@ -37,14 +72,36 @@ function AssetCard({
   return (
     <button
       onClick={onClick}
-      className="text-left w-full bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-indigo-600 transition-colors"
+      style={{
+        textAlign: "left",
+        width: "100%",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 12,
+        padding: 16,
+        cursor: "pointer",
+      }}
     >
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
         <TypeBadge type={asset.type} />
-        <span className="text-xs text-gray-500">{new Date(asset.created_at).toLocaleDateString()}</span>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>{new Date(asset.created_at).toLocaleDateString()}</span>
       </div>
-      <p className="text-gray-100 font-medium text-sm leading-snug mb-1 line-clamp-2">{asset.title}</p>
-      <p className="text-gray-500 text-xs">{asset.venue}</p>
+      <p
+        style={{
+          color: "var(--text)",
+          fontWeight: 500,
+          fontSize: 13,
+          lineHeight: 1.3,
+          marginBottom: 4,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+        }}
+      >
+        {asset.title}
+      </p>
+      <p style={{ color: "var(--muted)", fontSize: 12 }}>{asset.venue}</p>
     </button>
   );
 }
@@ -61,60 +118,127 @@ function AssetDetail({ asset, onClose }: { asset: ConferenceAsset; onClose: () =
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between p-5 border-b border-gray-800">
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.7)",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: 16,
+          width: "100%",
+          maxWidth: 672,
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            padding: 20,
+            borderBottom: "1px solid var(--line)",
+          }}
+        >
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <TypeBadge type={asset.type} />
-              <span className="text-xs text-gray-500">{asset.venue}</span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{asset.venue}</span>
             </div>
-            <h2 className="text-gray-100 font-semibold text-lg">{asset.title}</h2>
-            <p className="text-gray-500 text-xs mt-1">
+            <h2 style={{ color: "var(--text)", fontWeight: 600, fontSize: 18 }}>{asset.title}</h2>
+            <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 4 }}>
               {asset.file_size_kb} KB &middot; {asset.format} &middot;{" "}
               {(asset.authors ?? []).join(", ")}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-200 ml-4 text-xl leading-none"
+            style={{
+              color: "var(--muted)",
+              marginLeft: 16,
+              fontSize: 20,
+              lineHeight: 1,
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+            }}
           >
             &times;
           </button>
         </div>
 
-        <div className="p-5 space-y-2">
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 8 }}>
           {asset.download_url && (
             <a
               href={asset.download_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "var(--strong)",
+                color: "#fff",
+                fontSize: 13,
+                padding: "8px 16px",
+                borderRadius: 8,
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
             >
               Download File
             </a>
           )}
 
-          <div className="mt-4 space-y-2">
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
             {asset.sections.map((sec, i) => (
-              <div key={i} className="bg-gray-900 rounded-lg border border-gray-800">
+              <div key={i} style={{ background: "var(--surface)", borderRadius: 8, border: "1px solid var(--line)" }}>
                 <button
                   onClick={() => toggle(i)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                  }}
                 >
-                  <span className="text-gray-100 font-medium text-sm">{sec.title}</span>
-                  <span className="text-gray-500 text-sm">{expanded.has(i) ? "▲" : "▼"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{sec.title}</span>
+                  <span style={{ color: "var(--muted)", fontSize: 13 }}>{expanded.has(i) ? "▲" : "▼"}</span>
                 </button>
                 {expanded.has(i) && (
-                  <div className="px-4 pb-4">
-                    <p className="text-gray-400 text-sm whitespace-pre-wrap leading-relaxed">{sec.content}</p>
+                  <div style={{ padding: "0 16px 16px" }}>
+                    <p style={{ color: "var(--muted)", fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{sec.content}</p>
                     {sec.figures && sec.figures.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {sec.figures.map((fig, fi) => (
                           <div
                             key={fi}
-                            className="bg-gray-800 rounded-lg flex items-center justify-center text-gray-600 text-xs"
-                            style={{ width: 120, height: 80 }}
+                            style={{
+                              background: "var(--line)",
+                              borderRadius: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "var(--muted)",
+                              fontSize: 12,
+                              width: 120,
+                              height: 80,
+                            }}
                           >
                             Figure {fi + 1}
                           </div>
@@ -219,33 +343,50 @@ export default function ConferencePage() {
     }
   }
 
+  const isGenerateDisabled = generating || !title || !venue;
+
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-6">
+    <main className="page">
       {selectedAsset && (
         <AssetDetail asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
       )}
 
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-100">Conference Asset Builder</h1>
-        <p className="text-gray-500 text-sm mt-1">
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Conference Asset Builder</h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
           Auto-generate posters, slides, and abstracts from experiment data.
         </p>
       </div>
 
       {/* Generator card */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+      <div className="panel" style={{ marginBottom: 32 }}>
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-950 rounded-lg p-1 w-fit">
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            marginBottom: 24,
+            background: "var(--surface)",
+            borderRadius: 8,
+            padding: 4,
+            width: "fit-content",
+          }}
+        >
           {TAB_LIST.map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setGenError(null); setGeneratedAsset(null); }}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                border: "none",
+                background: activeTab === tab ? "var(--strong)" : "transparent",
+                color: activeTab === tab ? "#fff" : "var(--muted)",
+              }}
             >
               {tab}
             </button>
@@ -253,54 +394,54 @@ export default function ConferencePage() {
         </div>
 
         {/* Shared form */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Title</label>
+            <label style={LABEL_STYLE}>Title</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Variational Quantum Eigensolver for H2"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Venue</label>
+            <label style={LABEL_STYLE}>Venue</label>
             <input
               value={venue}
               onChange={(e) => setVenue(e.target.value)}
               placeholder="IEEE Quantum Week 2025"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Authors (comma-separated)</label>
+            <label style={LABEL_STYLE}>Authors (comma-separated)</label>
             <input
               value={authors}
               onChange={(e) => setAuthors(e.target.value)}
               placeholder="Alice Smith, Bob Chen"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Experiment IDs (comma-separated)</label>
+            <label style={LABEL_STYLE}>Experiment IDs (comma-separated)</label>
             <input
               value={experimentIds}
               onChange={(e) => setExperimentIds(e.target.value)}
               placeholder="exp-001, exp-002"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+              style={INPUT_STYLE}
             />
           </div>
         </div>
 
         {/* Tab-specific options */}
         {activeTab === "Poster" && (
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Template</label>
+              <label style={LABEL_STYLE}>Template</label>
               <select
                 value={posterTemplate}
                 onChange={(e) => setPosterTemplate(e.target.value as "ieee" | "acm" | "nature")}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                style={INPUT_STYLE}
               >
                 <option value="ieee">IEEE</option>
                 <option value="acm">ACM</option>
@@ -308,11 +449,11 @@ export default function ConferencePage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Highlight Metric</label>
+              <label style={LABEL_STYLE}>Highlight Metric</label>
               <select
                 value={highlightMetric}
                 onChange={(e) => setHighlightMetric(e.target.value as "fidelity" | "depth" | "gate_count")}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                style={INPUT_STYLE}
               >
                 <option value="fidelity">Fidelity</option>
                 <option value="depth">Depth</option>
@@ -323,10 +464,11 @@ export default function ConferencePage() {
         )}
 
         {activeTab === "Slides" && (
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">
-                Number of Slides: <span className="text-indigo-400 font-semibold">{nSlides}</span>
+              <label style={LABEL_STYLE}>
+                Number of Slides:{" "}
+                <span style={{ color: "var(--strong)", fontWeight: 600 }}>{nSlides}</span>
               </label>
               <input
                 type="range"
@@ -334,16 +476,18 @@ export default function ConferencePage() {
                 max={20}
                 value={nSlides}
                 onChange={(e) => setNSlides(Number(e.target.value))}
-                className="w-full accent-indigo-500"
+                style={{ width: "100%", accentColor: "var(--strong)" }}
               />
-              <div className="flex justify-between text-xs text-gray-600 mt-0.5"><span>8</span><span>20</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                <span>8</span><span>20</span>
+              </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Template</label>
+              <label style={LABEL_STYLE}>Template</label>
               <select
                 value={slidesTemplate}
                 onChange={(e) => setSlidesTemplate(e.target.value as "clean" | "dark" | "academic")}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                style={INPUT_STYLE}
               >
                 <option value="clean">Clean</option>
                 <option value="dark">Dark</option>
@@ -354,9 +498,10 @@ export default function ConferencePage() {
         )}
 
         {activeTab === "Abstract" && (
-          <div className="mb-4 max-w-sm">
-            <label className="block text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">
-              Max Words: <span className="text-indigo-400 font-semibold">{maxWords}</span>
+          <div style={{ marginBottom: 16, maxWidth: 384 }}>
+            <label style={LABEL_STYLE}>
+              Max Words:{" "}
+              <span style={{ color: "var(--strong)", fontWeight: 600 }}>{maxWords}</span>
             </label>
             <input
               type="range"
@@ -364,57 +509,110 @@ export default function ConferencePage() {
               max={500}
               value={maxWords}
               onChange={(e) => setMaxWords(Number(e.target.value))}
-              className="w-full accent-indigo-500"
+              style={{ width: "100%", accentColor: "var(--strong)" }}
             />
-            <div className="flex justify-between text-xs text-gray-600 mt-0.5"><span>150</span><span>500</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+              <span>150</span><span>500</span>
+            </div>
           </div>
         )}
 
         {genError && (
-          <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+          <div
+            style={{
+              marginBottom: 16,
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid var(--danger)",
+              color: "var(--danger)",
+              borderRadius: 8,
+              padding: "12px 16px",
+              fontSize: 13,
+            }}
+          >
             {genError}
           </div>
         )}
 
         <button
           onClick={handleGenerate}
-          disabled={generating || !title || !venue}
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors"
+          disabled={isGenerateDisabled}
+          style={{
+            background: "var(--strong)",
+            color: "#fff",
+            fontWeight: 500,
+            fontSize: 13,
+            padding: "10px 24px",
+            borderRadius: 8,
+            border: "none",
+            cursor: isGenerateDisabled ? "not-allowed" : "pointer",
+            opacity: isGenerateDisabled ? 0.5 : 1,
+          }}
         >
           {generating ? "Generating…" : `Generate ${activeTab}`}
         </button>
 
         {/* Generated result */}
         {generatedAsset && (
-          <div className="mt-6 border border-indigo-800 bg-indigo-950/30 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
+          <div
+            style={{
+              marginTop: 24,
+              border: "1px solid var(--strong)",
+              background: "rgba(99,102,241,0.08)",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <TypeBadge type={generatedAsset.type} />
-                <span className="text-gray-300 text-sm font-medium">{generatedAsset.venue}</span>
+                <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 500 }}>{generatedAsset.venue}</span>
               </div>
-              <span className="text-gray-500 text-xs">{generatedAsset.file_size_kb} KB</span>
+              <span style={{ color: "var(--muted)", fontSize: 12 }}>{generatedAsset.file_size_kb} KB</span>
             </div>
-            <h3 className="text-gray-100 font-semibold mb-1">{generatedAsset.title}</h3>
-            <p className="text-gray-500 text-xs mb-3">{(generatedAsset.authors ?? []).join(", ")}</p>
+            <h3 style={{ color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>{generatedAsset.title}</h3>
+            <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 12 }}>{(generatedAsset.authors ?? []).join(", ")}</p>
             {generatedAsset.download_url && (
               <a
                 href={generatedAsset.download_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors mb-3"
+                style={{
+                  display: "inline-block",
+                  background: "var(--strong)",
+                  color: "#fff",
+                  fontSize: 12,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  marginBottom: 12,
+                }}
               >
                 Download
               </a>
             )}
-            <div className="space-y-2 mt-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
               {generatedAsset.sections.map((sec, i) => (
-                <div key={i} className="bg-gray-900 rounded-lg p-3">
-                  <p className="text-gray-100 text-xs font-bold mb-1">{sec.title}</p>
-                  <p className="text-gray-400 text-xs leading-relaxed">{sec.content}</p>
+                <div key={i} style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                  <p style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{sec.title}</p>
+                  <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.6 }}>{sec.content}</p>
                   {sec.figures && sec.figures.length > 0 && (
-                    <div className="mt-2 flex gap-2 flex-wrap">
+                    <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {sec.figures.map((_, fi) => (
-                        <div key={fi} className="bg-gray-800 rounded w-24 h-16 flex items-center justify-center text-gray-600 text-xs">
+                        <div
+                          key={fi}
+                          style={{
+                            background: "var(--line)",
+                            borderRadius: 6,
+                            width: 96,
+                            height: 64,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--muted)",
+                            fontSize: 12,
+                          }}
+                        >
                           Fig {fi + 1}
                         </div>
                       ))}
@@ -429,29 +627,59 @@ export default function ConferencePage() {
 
       {/* Assets list */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-100 mb-3">All Conference Assets</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>All Conference Assets</h2>
         {assetsError && (
-          <div className="bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm mb-4">
+          <div
+            style={{
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid var(--danger)",
+              color: "var(--danger)",
+              borderRadius: 8,
+              padding: "12px 16px",
+              fontSize: 13,
+              marginBottom: 16,
+            }}
+          >
             {assetsError}
           </div>
         )}
         {assetsLoading ? (
-          <div className="text-gray-500 text-sm py-8 text-center">Loading assets…</div>
+          <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center" }}>Loading assets…</div>
         ) : assets.length === 0 ? (
-          <div className="text-gray-600 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+          <div
+            style={{
+              color: "var(--muted)",
+              fontSize: 13,
+              padding: "32px 0",
+              textAlign: "center",
+              background: "var(--surface)",
+              borderRadius: 12,
+              border: "1px solid var(--line)",
+            }}
+          >
             No assets yet. Generate your first one above.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
             {assets.map((asset) => (
-              <div key={asset.asset_id} className="relative">
+              <div key={asset.asset_id} style={{ position: "relative" }}>
                 <AssetCard
                   asset={asset}
                   onClick={() => handleSelectAsset(asset.asset_id)}
                 />
                 {loadingDetail && (
-                  <div className="absolute inset-0 bg-gray-950/60 rounded-xl flex items-center justify-center">
-                    <span className="text-xs text-gray-400">Loading…</span>
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "rgba(0,0,0,0.4)",
+                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>Loading…</span>
                   </div>
                 )}
               </div>

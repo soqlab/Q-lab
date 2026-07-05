@@ -75,20 +75,21 @@ export default function AutoMitigationPage() {
     : 1;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-1">Auto-Mitigation Selector</h1>
-      <p className="text-gray-400 text-sm mb-6">
+    <div className="page" style={{ padding: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Auto-Mitigation Selector</h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
         ML-driven selection of optimal error-mitigation strategy combinations.
       </p>
 
-      <div className="flex gap-6">
+      <div style={{ display: "flex", gap: 24 }}>
         {/* ── Left: Form ── */}
-        <div className="w-72 shrink-0">
-          <div className="bg-gray-800 rounded-xl p-4 space-y-4">
+        <div style={{ width: 288, flexShrink: 0 }}>
+          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <select
-                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
                 value={form.backend}
                 onChange={(e) => setForm((f) => ({ ...f, backend: e.target.value }))}
               >
@@ -99,25 +100,27 @@ export default function AutoMitigationPage() {
               </select>
             </div>
 
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">Qubits</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Qubits</label>
                 <input
                   type="number"
                   min={1}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={form.n_qubits}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, n_qubits: Number(e.target.value) }))
                   }
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">Depth</label>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Depth</label>
                 <input
                   type="number"
                   min={1}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="input"
+                  style={{ width: "100%" }}
                   value={form.circuit_depth}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, circuit_depth: Number(e.target.value) }))
@@ -127,7 +130,7 @@ export default function AutoMitigationPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 Budget overhead: {form.budget_overhead.toFixed(1)}x
               </label>
               <input
@@ -135,20 +138,20 @@ export default function AutoMitigationPage() {
                 min={1.0}
                 max={10.0}
                 step={0.1}
-                className="w-full accent-indigo-500"
+                style={{ width: "100%" }}
                 value={form.budget_overhead}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, budget_overhead: Number(e.target.value) }))
                 }
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                 <span>1.0x</span>
                 <span>10.0x</span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 Target fidelity: {form.target_fidelity.toFixed(2)}
               </label>
               <input
@@ -156,13 +159,13 @@ export default function AutoMitigationPage() {
                 min={0.8}
                 max={0.99}
                 step={0.01}
-                className="w-full accent-indigo-500"
+                style={{ width: "100%" }}
                 value={form.target_fidelity}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, target_fidelity: Number(e.target.value) }))
                 }
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                 <span>0.80</span>
                 <span>0.99</span>
               </div>
@@ -171,19 +174,20 @@ export default function AutoMitigationPage() {
             <button
               onClick={handleSelect}
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="button"
+              style={{ width: "100%", opacity: loading ? 0.5 : 1 }}
             >
               {loading ? "Selecting…" : "Select Mitigation"}
             </button>
 
-            {error && <p className="text-red-400 text-xs">{error}</p>}
+            {error && <p style={{ color: "var(--danger)", fontSize: 12 }}>{error}</p>}
           </div>
         </div>
 
         {/* ── Right: Results ── */}
-        <div className="flex-1 space-y-5">
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
           {!rec && !loading && (
-            <div className="flex items-center justify-center h-64 text-gray-600 text-sm">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 256, color: "var(--muted)", fontSize: 13 }}>
               Configure parameters and click Select Mitigation.
             </div>
           )}
@@ -191,73 +195,72 @@ export default function AutoMitigationPage() {
           {rec && (
             <>
               {/* Strategy card */}
-              <div className="bg-gray-800 rounded-xl p-5">
-                <div className="flex items-start justify-between mb-4">
+              <div className="panel" style={{ padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                   <div>
-                    <div className="text-2xl font-bold text-indigo-300">
+                    <div style={{ fontSize: 24, fontWeight: 700, color: "var(--strong)" }}>
                       {rec.strategy}
                     </div>
-                    <div className="text-sm text-gray-400 mt-0.5">
+                    <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
                       Recommended strategy
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-green-400">
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 30, fontWeight: 700, color: "var(--ok)" }}>
                       {Math.round(rec.predicted_fidelity * 100)}%
                     </div>
-                    <div className="text-xs text-gray-400">predicted fidelity</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>predicted fidelity</div>
                   </div>
                 </div>
 
                 {/* Confidence bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                     <span>Confidence</span>
                     <span>{Math.round(rec.confidence * 100)}%</span>
                   </div>
-                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div style={{ height: 8, background: "var(--line)", borderRadius: 999, overflow: "hidden" }}>
                     <div
-                      className="h-full bg-indigo-500 rounded-full"
-                      style={{ width: `${rec.confidence * 100}%` }}
+                      style={{ height: "100%", background: "var(--strong)", borderRadius: 999, width: `${rec.confidence * 100}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Overhead */}
-                <div className="text-sm text-gray-300 mb-4">
+                <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 16 }}>
                   Combined overhead:{" "}
-                  <span className="text-yellow-300 font-semibold">
+                  <span style={{ color: "#f59e0b", fontWeight: 600 }}>
                     {rec.combined_overhead.toFixed(2)}x
                   </span>
                 </div>
 
                 {/* Reasoning */}
-                <p className="text-sm text-gray-300 bg-gray-900 rounded-lg p-3">
+                <p style={{ fontSize: 13, color: "var(--text)", background: "var(--surface)", borderRadius: 8, padding: 12 }}>
                   {rec.reasoning}
                 </p>
               </div>
 
               {/* Techniques list */}
-              <div className="bg-gray-800 rounded-xl p-5">
-                <h3 className="font-semibold text-gray-200 mb-3">Techniques</h3>
-                <div className="space-y-3">
-                  {rec.techniques.map((t, i) => (
+              <div className="panel" style={{ padding: 20 }}>
+                <h3 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Techniques</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(rec.techniques ?? []).map((t, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-3 bg-gray-900 rounded-lg p-3"
+                      style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", borderRadius: 8, padding: 12 }}
                     >
-                      <span className="w-6 h-6 rounded-full bg-indigo-700 text-indigo-200 text-xs font-bold flex items-center justify-center shrink-0">
+                      <span style={{ width: 24, height: 24, borderRadius: 999, background: "rgba(79,70,229,0.5)", color: "var(--strong)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         {t.order}
                       </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-white truncate">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {t.name}
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
                           Overhead: {t.overhead.toFixed(2)}x
                         </div>
                       </div>
-                      <span className="text-green-400 text-sm font-semibold shrink-0">
+                      <span style={{ color: "var(--ok)", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
                         +{(t.expected_improvement * 100).toFixed(1)}%
                       </span>
                     </div>
@@ -266,100 +269,105 @@ export default function AutoMitigationPage() {
               </div>
 
               {/* Alternatives table */}
-              {rec.alternatives.length > 0 && (
-                <div className="bg-gray-800 rounded-xl p-5">
-                  <h3 className="font-semibold text-gray-200 mb-3">
+              {(rec.alternatives ?? []).length > 0 && (
+                <div className="panel" style={{ padding: 20 }}>
+                  <h3 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
                     Alternative Strategies
                   </h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-400 text-xs border-b border-gray-700">
-                        <th className="text-left pb-2">Strategy</th>
-                        <th className="text-right pb-2">Fidelity</th>
-                        <th className="text-right pb-2">Overhead</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rec.alternatives.map((alt, i) => (
-                        <tr
-                          key={i}
-                          className="border-b border-gray-700 last:border-0"
-                        >
-                          <td className="py-2 text-gray-300">{alt.strategy}</td>
-                          <td className="py-2 text-right text-white">
-                            {Math.round(alt.fidelity * 100)}%
-                          </td>
-                          <td className="py-2 text-right text-yellow-300">
-                            {alt.overhead.toFixed(2)}x
-                          </td>
+                  <div className="table-wrap">
+                    <table style={{ width: "100%", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
+                          <th style={{ textAlign: "left", paddingBottom: 8 }}>Strategy</th>
+                          <th style={{ textAlign: "right", paddingBottom: 8 }}>Fidelity</th>
+                          <th style={{ textAlign: "right", paddingBottom: 8 }}>Overhead</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(rec.alternatives ?? []).map((alt, i) => (
+                          <tr
+                            key={i}
+                            style={{ borderBottom: i < (rec.alternatives ?? []).length - 1 ? "1px solid var(--line)" : "none" }}
+                          >
+                            <td style={{ paddingTop: 8, paddingBottom: 8, color: "var(--text)" }}>{alt.strategy}</td>
+                            <td style={{ paddingTop: 8, paddingBottom: 8, textAlign: "right", color: "var(--text)" }}>
+                              {Math.round(alt.fidelity * 100)}%
+                            </td>
+                            <td style={{ paddingTop: 8, paddingBottom: 8, textAlign: "right", color: "#f59e0b" }}>
+                              {alt.overhead.toFixed(2)}x
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {/* Apply button */}
-              <div className="bg-gray-800 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-200">
+              <div className="panel" style={{ padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <h3 style={{ fontWeight: 600, color: "var(--text)" }}>
                     Apply to Sample Counts
                   </h3>
                   <button
                     onClick={handleApply}
                     disabled={applying}
-                    className="bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+                    className="button"
+                    style={{ background: "rgba(16,185,129,0.8)", opacity: applying ? 0.5 : 1, fontSize: 13, fontWeight: 500, padding: "6px 16px" }}
                   >
                     {applying ? "Applying…" : "Apply"}
                   </button>
                 </div>
-                <p className="text-xs text-gray-400">
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>
                   Uses circuit_counts = &#123;&quot;0&quot;: 850, &quot;1&quot;: 150&#125;
                 </p>
                 {applyError && (
-                  <p className="text-red-400 text-xs mt-2">{applyError}</p>
+                  <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{applyError}</p>
                 )}
 
                 {applied && (
-                  <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div className="bg-gray-900 rounded-lg p-3">
-                        <div className="text-xl font-bold text-green-400">
+                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, textAlign: "center" }}>
+                      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ok)" }}>
                           {applied.mitigated_value.toFixed(4)}
                         </div>
-                        <div className="text-xs text-gray-400">Mitigated</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Mitigated</div>
                       </div>
-                      <div className="bg-gray-900 rounded-lg p-3">
-                        <div className="text-xl font-bold text-gray-300">
+                      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>
                           {applied.raw_value.toFixed(4)}
                         </div>
-                        <div className="text-xs text-gray-400">Raw</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Raw</div>
                       </div>
-                      <div className="bg-gray-900 rounded-lg p-3">
-                        <div className="text-xl font-bold text-indigo-400">
+                      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "var(--strong)" }}>
                           +{(applied.improvement_pct * 100).toFixed(1)}%
                         </div>
-                        <div className="text-xs text-gray-400">Improvement</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>Improvement</div>
                       </div>
                     </div>
 
                     {/* Technique contributions bar chart */}
-                    <div className="bg-gray-900 rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-3">
+                    <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
                         Technique Contributions
                       </p>
-                      <div className="space-y-2">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {Object.entries(applied.technique_contributions).map(
                           ([name, val]) => (
                             <div key={name}>
-                              <div className="flex justify-between text-xs text-gray-300 mb-0.5">
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text)", marginBottom: 2 }}>
                                 <span>{name}</span>
                                 <span>{(val * 100).toFixed(1)}%</span>
                               </div>
-                              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div style={{ height: 8, background: "var(--line)", borderRadius: 999, overflow: "hidden" }}>
                                 <div
-                                  className="h-full bg-indigo-500 rounded-full"
                                   style={{
+                                    height: "100%",
+                                    background: "var(--strong)",
+                                    borderRadius: 999,
                                     width: `${(val / maxContrib) * 100}%`,
                                   }}
                                 />

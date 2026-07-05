@@ -50,116 +50,127 @@ export default function JobSchedulerPage() {
     finally { setLoading(false); }
   }
 
-  return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Job Scheduler</h1>
-      <p className="text-gray-400">Optimally assign a batch of circuits across multiple backends. Minimizes cost, wait time, or maximizes fidelity — respecting budget constraints.</p>
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    marginTop: 2,
+    background: "var(--line)",
+    color: "var(--text)",
+    fontSize: 13,
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: "1px solid var(--line)",
+  };
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm">Circuit Batch</h2>
-          <button onClick={addCircuit} className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">+ Add Circuit</button>
+  return (
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Job Scheduler</h1>
+      <p style={{ color: "var(--muted)" }}>Optimally assign a batch of circuits across multiple backends. Minimizes cost, wait time, or maximizes fidelity — respecting budget constraints.</p>
+
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ fontWeight: 600, fontSize: 13 }}>Circuit Batch</h2>
+          <button onClick={addCircuit} style={{ fontSize: 12, padding: "4px 12px", background: "var(--line)", borderRadius: 6, border: "none", color: "var(--text)", cursor: "pointer" }}>+ Add Circuit</button>
         </div>
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {circuits.map((c, i) => (
-            <div key={i} className="grid grid-cols-6 gap-2 items-end bg-gray-800 rounded-lg p-3">
-              <div className="col-span-2">
-                <label className="text-xs text-gray-400">Circuit ID</label>
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, alignItems: "flex-end", background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>Circuit ID</label>
                 <input value={c.circuit_id} onChange={e => updateCircuit(i, "circuit_id", e.target.value)}
-                  className="w-full mt-0.5 bg-gray-700 text-white text-sm px-2 py-1.5 rounded border border-gray-600 font-mono" />
+                  style={{ ...inputStyle, fontFamily: "ui-monospace,monospace" }} />
               </div>
               <div>
-                <label className="text-xs text-gray-400">Qubits</label>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>Qubits</label>
                 <input type="number" value={c.n_qubits} onChange={e => updateCircuit(i, "n_qubits", Number(e.target.value))}
-                  className="w-full mt-0.5 bg-gray-700 text-white text-sm px-2 py-1.5 rounded border border-gray-600" />
+                  style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs text-gray-400">Depth</label>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>Depth</label>
                 <input type="number" value={c.circuit_depth} onChange={e => updateCircuit(i, "circuit_depth", Number(e.target.value))}
-                  className="w-full mt-0.5 bg-gray-700 text-white text-sm px-2 py-1.5 rounded border border-gray-600" />
+                  style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs text-gray-400">Shots</label>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>Shots</label>
                 <input type="number" value={c.n_shots} onChange={e => updateCircuit(i, "n_shots", Number(e.target.value))}
-                  className="w-full mt-0.5 bg-gray-700 text-white text-sm px-2 py-1.5 rounded border border-gray-600" />
+                  style={inputStyle} />
               </div>
-              <div className="flex gap-1 items-end">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400">Priority</label>
+              <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: "var(--muted)" }}>Priority</label>
                   <select value={c.priority} onChange={e => updateCircuit(i, "priority", e.target.value)}
-                    className="w-full mt-0.5 bg-gray-700 text-white text-sm px-2 py-1.5 rounded border border-gray-600">
+                    style={inputStyle}>
                     {["high", "normal", "low"].map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
-                <button onClick={() => removeCircuit(i)} className="text-red-400 hover:text-red-300 px-2 pb-1">×</button>
+                <button onClick={() => removeCircuit(i)} style={{ color: "var(--danger)", padding: "0 8px 4px", background: "none", border: "none", cursor: "pointer", fontSize: 18 }}>×</button>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label className="text-sm text-gray-400">Objective</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Objective</label>
             <select value={objective} onChange={e => setObjective(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 text-sm">
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--line)", fontSize: 13 }}>
               {OBJECTIVES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-sm text-gray-400">Budget (USD)</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Budget (USD)</label>
             <input type="number" step="0.1" value={budget} onChange={e => setBudget(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 text-sm" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--line)", fontSize: 13 }} />
           </div>
         </div>
         <button onClick={schedule} disabled={loading || circuits.length === 0}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+          style={{ padding: "8px 24px", background: "var(--strong)", borderRadius: 6, fontWeight: 500, border: "none", color: "var(--text)", cursor: loading || circuits.length === 0 ? "not-allowed" : "pointer", opacity: loading || circuits.length === 0 ? 0.5 : 1 }}>
           {loading ? "Scheduling..." : "Optimize Schedule"}
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
             {([
-              ["Total Cost", `$${result.total_cost_usd.toFixed(4)}`, result.total_cost_usd <= budget ? "text-green-400" : "text-red-400"],
-              ["Makespan", `${result.makespan_min.toFixed(0)} min`, "text-white"],
-              ["Avg Fidelity", `${(result.average_fidelity * 100).toFixed(2)}%`, "text-indigo-400"],
-              ["Savings vs Random", `$${result.savings_vs_random_usd.toFixed(4)}`, "text-green-400"],
-            ] as [string, string, string][]).map(([l, v, c]) => (
-              <div key={l} className="bg-gray-900 rounded-lg p-4 text-center">
-                <div className="text-xs text-gray-500 mb-1">{l}</div>
-                <div className={`text-lg font-mono font-bold ${c}`}>{v}</div>
+              ["Total Cost", `$${result.total_cost_usd.toFixed(4)}`, result.total_cost_usd <= budget ? "var(--ok)" : "var(--danger)"],
+              ["Makespan", `${result.makespan_min.toFixed(0)} min`, "var(--text)"],
+              ["Avg Fidelity", `${(result.average_fidelity * 100).toFixed(2)}%`, "var(--strong)"],
+              ["Savings vs Random", `$${result.savings_vs_random_usd.toFixed(4)}`, "var(--ok)"],
+            ] as [string, string, string][]).map(([l, v, metricColor]) => (
+              <div key={l} style={{ background: "var(--surface)", borderRadius: 8, padding: 16, textAlign: "center" }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{l}</div>
+                <div style={{ fontSize: 18, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: metricColor }}>{v}</div>
               </div>
             ))}
           </div>
 
-          <div className="bg-gray-900 rounded-lg p-5">
-            <h2 className="font-semibold text-sm mb-4">Assignment Table</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20 }}>
+            <h2 style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>Assignment Table</h2>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 13 }}>
                 <thead>
-                  <tr className="text-xs text-gray-500 border-b border-gray-700">
-                    <th className="text-left py-2 pr-4">Circuit</th>
-                    <th className="text-left pr-4">Backend</th>
-                    <th className="text-right pr-4">Fidelity</th>
-                    <th className="text-right pr-4">Cost</th>
-                    <th className="text-right pr-4">Queue Pos.</th>
-                    <th className="text-right pr-4">Score</th>
-                    <th className="text-left">Reason</th>
+                  <tr style={{ fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                    <th style={{ textAlign: "left", padding: "8px 16px 8px 0" }}>Circuit</th>
+                    <th style={{ textAlign: "left", paddingRight: 16 }}>Backend</th>
+                    <th style={{ textAlign: "right", paddingRight: 16 }}>Fidelity</th>
+                    <th style={{ textAlign: "right", paddingRight: 16 }}>Cost</th>
+                    <th style={{ textAlign: "right", paddingRight: 16 }}>Queue Pos.</th>
+                    <th style={{ textAlign: "right", paddingRight: 16 }}>Score</th>
+                    <th style={{ textAlign: "left" }}>Reason</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {result.assignments.map((a: ScheduleAssignment, i: number) => (
-                    <tr key={i} className="border-b border-gray-800">
-                      <td className="py-2 pr-4 font-mono text-sm">{a.circuit_id}</td>
-                      <td className="pr-4 font-mono text-indigo-300 text-xs">{a.backend}</td>
-                      <td className="text-right pr-4 font-mono">{(a.estimated_fidelity * 100).toFixed(2)}%</td>
-                      <td className="text-right pr-4 font-mono text-yellow-400">${a.estimated_cost_usd.toFixed(4)}</td>
-                      <td className="text-right pr-4 font-mono text-gray-400">#{a.queue_position}</td>
-                      <td className="text-right pr-4 font-mono text-indigo-400">{a.score.toFixed(3)}</td>
-                      <td className="text-gray-400 text-xs">{a.reason}</td>
+                  {(result.assignments ?? []).map((a: ScheduleAssignment, i: number) => (
+                    <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                      <td style={{ padding: "8px 16px 8px 0", fontFamily: "ui-monospace,monospace", fontSize: 13 }}>{a.circuit_id}</td>
+                      <td style={{ paddingRight: 16, fontFamily: "ui-monospace,monospace", color: "var(--strong)", fontSize: 12 }}>{a.backend}</td>
+                      <td style={{ textAlign: "right", paddingRight: 16, fontFamily: "ui-monospace,monospace" }}>{(a.estimated_fidelity * 100).toFixed(2)}%</td>
+                      <td style={{ textAlign: "right", paddingRight: 16, fontFamily: "ui-monospace,monospace", color: "#f59e0b" }}>${a.estimated_cost_usd.toFixed(4)}</td>
+                      <td style={{ textAlign: "right", paddingRight: 16, fontFamily: "ui-monospace,monospace", color: "var(--muted)" }}>#{a.queue_position}</td>
+                      <td style={{ textAlign: "right", paddingRight: 16, fontFamily: "ui-monospace,monospace", color: "var(--strong)" }}>{a.score.toFixed(3)}</td>
+                      <td style={{ color: "var(--muted)", fontSize: 12 }}>{a.reason}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -168,9 +179,9 @@ export default function JobSchedulerPage() {
           </div>
 
           {result.recommendations && result.recommendations.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-4 space-y-1">
-              <h2 className="font-semibold text-sm mb-2">Recommendations</h2>
-              {result.recommendations.map((r, i) => <div key={i} className="text-sm text-gray-300">• {r}</div>)}
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+              <h2 style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Recommendations</h2>
+              {result.recommendations.map((r, i) => <div key={i} style={{ fontSize: 13, color: "var(--text)" }}>• {r}</div>)}
             </div>
           )}
         </div>

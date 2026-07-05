@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, CSSProperties } from "react";
 import {
   submitHPCJob,
   listHPCJobs,
@@ -25,12 +25,12 @@ type ClusterInfo = {
   partitions: string[];
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  submitted: "bg-gray-700 text-gray-300",
-  queued: "bg-yellow-700 text-yellow-200",
-  running: "bg-blue-700 text-blue-200",
-  completed: "bg-green-700 text-green-200",
-  failed: "bg-red-700 text-red-200",
+const STATUS_STYLES: Record<string, CSSProperties> = {
+  submitted: { background: "var(--line)", color: "var(--text)" },
+  queued: { background: "rgba(245,158,11,0.2)", color: "#f59e0b" },
+  running: { background: "rgba(59,130,246,0.2)", color: "var(--info-text)" },
+  completed: { background: "rgba(16,185,129,0.2)", color: "var(--ok)" },
+  failed: { background: "rgba(239,68,68,0.2)", color: "var(--danger)" },
 };
 
 export default function HPCBridgePage() {
@@ -132,43 +132,43 @@ export default function HPCBridgePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-8">
+    <div style={{ minHeight: "100vh", padding: 24, display: "flex", flexDirection: "column", gap: 32 }}>
       <div>
-        <h1 className="text-3xl font-bold text-white">HPC Hybrid Bridge</h1>
-        <p className="text-gray-400 mt-1">
+        <h1 style={{ fontSize: 30, fontWeight: 700, color: "var(--text)" }}>HPC Hybrid Bridge</h1>
+        <p style={{ color: "var(--muted)", marginTop: 4 }}>
           Submit classical post-processing jobs to SLURM, PBS, and LSF clusters
         </p>
       </div>
 
       {/* Clusters */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-300 mb-3">Cluster Status</h2>
-        {clustersLoading && <p className="text-gray-400 animate-pulse">Loading clusters...</p>}
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Cluster Status</h2>
+        {clustersLoading && <p style={{ color: "var(--muted)" }}>Loading clusters...</p>}
         {clustersError && (
-          <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">
+          <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 16px" }}>
             {clustersError}
           </p>
         )}
         {!clustersLoading && !clustersError && (
-          <div className="flex flex-wrap gap-3">
-            {clusters.map((c) => (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {(clusters ?? []).map((c) => (
               <div
                 key={c.name}
-                className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 min-w-48 space-y-1"
+                style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "12px 16px", minWidth: 192, display: "flex", flexDirection: "column", gap: 4 }}
               >
-                <div className="font-semibold text-white">{c.name}</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded">
+                <div style={{ fontWeight: 600, color: "var(--text)" }}>{c.name}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ background: "var(--strong)", color: "var(--info-text)", padding: "2px 8px", borderRadius: 6 }}>
                     {c.scheduler}
                   </span>
-                  <span className="text-gray-400">{c.available_nodes} nodes free</span>
+                  <span style={{ color: "var(--muted)" }}>{c.available_nodes} nodes free</span>
                 </div>
-                <div className="text-xs text-gray-500">Wait: {c.typical_wait_min}min</div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {c.partitions.map((p) => (
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>Wait: {c.typical_wait_min}min</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                  {(c.partitions ?? []).map((p) => (
                     <span
                       key={p}
-                      className="bg-gray-800 text-gray-400 text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: "var(--line)", color: "var(--muted)", fontSize: 12, padding: "2px 6px", borderRadius: 6 }}
                     >
                       {p}
                     </span>
@@ -180,29 +180,31 @@ export default function HPCBridgePage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
         {/* Job Submission */}
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-200">Submit Job</h2>
+        <section style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)" }}>Submit Job</h2>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Job Name</label>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Job Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="post-process-vqe"
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="input"
+              style={{ width: "100%" }}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Scheduler</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Scheduler</label>
               <select
                 value={scheduler}
                 onChange={(e) => setScheduler(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {SCHEDULER_OPTIONS.map((s) => (
                   <option key={s} value={s}>{s.toUpperCase()}</option>
@@ -210,7 +212,7 @@ export default function HPCBridgePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>
                 Nodes (1–64)
               </label>
               <input
@@ -219,18 +221,20 @@ export default function HPCBridgePage() {
                 max={64}
                 value={nNodes}
                 onChange={(e) => setNNodes(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Cores/Node</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Cores/Node</label>
               <select
                 value={nCores}
                 onChange={(e) => setNCores(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {CORES_OPTIONS.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -238,11 +242,12 @@ export default function HPCBridgePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Memory (GB)</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Memory (GB)</label>
               <select
                 value={memoryGb}
                 onChange={(e) => setMemoryGb(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               >
                 {MEMORY_OPTIONS.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -251,57 +256,61 @@ export default function HPCBridgePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Walltime (hours)</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Walltime (hours)</label>
               <input
                 type="number"
                 min={1}
                 value={walltimeHours}
                 onChange={(e) => setWalltimeHours(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Partition (optional)</label>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Partition (optional)</label>
               <input
                 type="text"
                 value={partition}
                 onChange={(e) => setPartition(e.target.value)}
                 placeholder="gpu"
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="input"
+                style={{ width: "100%" }}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Quantum Run ID (optional)</label>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Quantum Run ID (optional)</label>
             <input
               type="text"
               value={quantumRunId}
               onChange={(e) => setQuantumRunId(e.target.value)}
               placeholder="run_abc123"
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="input"
+              style={{ width: "100%" }}
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Job Script</label>
+            <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Job Script</label>
             <textarea
               value={script}
               onChange={(e) => setScript(e.target.value)}
               rows={6}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-green-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+              className="input"
+              style={{ width: "100%", color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 12, resize: "vertical" }}
             />
           </div>
 
           {submitError && (
-            <p className="text-red-400 bg-red-950 border border-red-800 rounded px-3 py-2 text-sm">
+            <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 12px", fontSize: 13 }}>
               {submitError}
             </p>
           )}
           {submitSuccess && (
-            <p className="text-green-400 bg-green-950 border border-green-800 rounded px-3 py-2 text-sm">
+            <p style={{ color: "var(--ok)", background: "rgba(16,185,129,0.1)", border: "1px solid var(--ok)", borderRadius: 6, padding: "8px 12px", fontSize: 13 }}>
               Job submitted successfully
             </p>
           )}
@@ -309,68 +318,69 @@ export default function HPCBridgePage() {
           <button
             onClick={handleSubmit}
             disabled={submitting || !name.trim()}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 rounded-lg font-medium transition-colors"
+            className="button"
+            style={{ width: "100%", opacity: (submitting || !name.trim()) ? 0.5 : 1, cursor: (submitting || !name.trim()) ? "not-allowed" : "pointer" }}
           >
             {submitting ? "Submitting..." : "Submit Job"}
           </button>
         </section>
 
         {/* Job List */}
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-200">Jobs</h2>
+        <section style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)" }}>Jobs</h2>
             <button
               onClick={fetchJobs}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              style={{ fontSize: 12, color: "var(--strong)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
               Refresh
             </button>
           </div>
 
-          {jobsLoading && <p className="text-gray-400 animate-pulse">Loading jobs...</p>}
+          {jobsLoading && <p style={{ color: "var(--muted)" }}>Loading jobs...</p>}
           {jobsError && (
-            <p className="text-red-400 bg-red-950 border border-red-800 rounded px-3 py-2 text-sm">
+            <p style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", borderRadius: 6, padding: "8px 12px", fontSize: 13 }}>
               {jobsError}
             </p>
           )}
           {!jobsLoading && !jobsError && jobs.length === 0 && (
-            <p className="text-gray-500 text-sm">No jobs yet.</p>
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>No jobs yet.</p>
           )}
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-            {jobs.map((job) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 600, overflowY: "auto", paddingRight: 4 }}>
+            {(jobs ?? []).map((job) => (
               <div
                 key={job.job_id}
-                className="bg-gray-800 border border-gray-700 rounded-lg"
+                style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8 }}
               >
-                <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-100 text-sm truncate">{job.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, color: "var(--text)", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                       {job.slurm_id && <span>ID: {job.slurm_id} · </span>}
                       {job.submitted_at}
                     </div>
                   </div>
 
-                  <span className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">
+                  <span style={{ fontSize: 12, background: "var(--line)", color: "var(--text)", padding: "2px 8px", borderRadius: 6 }}>
                     {job.scheduler?.toUpperCase()}
                   </span>
 
                   <span
-                    className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_STYLES[job.status] ?? "bg-gray-700 text-gray-300"}`}
+                    style={{ fontSize: 12, padding: "2px 8px", borderRadius: 6, fontWeight: 500, ...(STATUS_STYLES[job.status] ?? { background: "var(--line)", color: "var(--text)" }) }}
                   >
                     {job.status}
                   </span>
 
                   {job.queue_position != null && (
-                    <span className="text-xs text-gray-500">pos {job.queue_position}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>pos {job.queue_position}</span>
                   )}
 
                   {(job.status === "running" || job.status === "queued") && (
                     <button
                       onClick={() => handleCancel(job.job_id)}
                       disabled={cancellingId === job.job_id}
-                      className="text-xs bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-300 px-2 py-0.5 rounded transition-colors"
+                      style={{ fontSize: 12, background: "rgba(239,68,68,0.1)", color: "var(--danger)", padding: "2px 8px", borderRadius: 6, border: "none", cursor: cancellingId === job.job_id ? "not-allowed" : "pointer", opacity: cancellingId === job.job_id ? 0.5 : 1 }}
                     >
                       {cancellingId === job.job_id ? "..." : "Cancel"}
                     </button>
@@ -378,21 +388,21 @@ export default function HPCBridgePage() {
 
                   <button
                     onClick={() => toggleExpand(job.job_id)}
-                    className="text-xs text-gray-500 hover:text-gray-300"
+                    style={{ fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
                   >
                     {expandedJobs.has(job.job_id) ? "▲" : "▼"}
                   </button>
                 </div>
 
                 {expandedJobs.has(job.job_id) && (
-                  <div className="border-t border-gray-700 px-4 py-3 space-y-2">
+                  <div style={{ borderTop: "1px solid var(--line)", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                     {job.node_allocation && (
-                      <div className="text-xs text-gray-400">
-                        <span className="text-gray-500">Nodes: </span>{job.node_allocation}
+                      <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                        <span style={{ color: "var(--muted)" }}>Nodes: </span>{job.node_allocation}
                       </div>
                     )}
                     {job.stdout_excerpt && (
-                      <pre className="bg-gray-950 rounded p-2 text-xs text-green-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-32">
+                      <pre style={{ fontFamily: "ui-monospace,monospace", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto", whiteSpace: "pre-wrap", fontSize: 12, color: "var(--ok)", maxHeight: 128 }}>
                         {job.stdout_excerpt}
                       </pre>
                     )}
