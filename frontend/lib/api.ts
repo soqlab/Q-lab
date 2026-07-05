@@ -5763,7 +5763,8 @@ export async function searchArxiv(req: { query: string; category?: string; year_
 export async function listArxivCategories(): Promise<{ id: string; description: string }[]> {
   const res = await fetch(apiUrl("/api/v1/arxiv-search/categories"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Categories failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.categories ?? []);
 }
 
 export async function getFeaturedPapers(): Promise<ArxivPaper[]> {
@@ -7724,7 +7725,8 @@ export async function schedulePulse(req: { name: string; backend: string; n_qubi
 export async function listPulseSchedules(): Promise<PulseSchedule[]> {
   const res = await fetch(apiUrl("/api/v1/pulse-control/schedules"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.schedules ?? []);
 }
 export async function simulatePulse(req: { schedule_id: string; n_shots?: number }): Promise<PulseSimResult> {
   const res = await fetch(apiUrl("/api/v1/pulse-control/simulate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
@@ -7750,7 +7752,8 @@ export async function registerAnalysis(req: { title: string; hypothesis: string;
 export async function listAnalysisRegistrations(): Promise<AnalysisRegistration[]> {
   const res = await fetch(apiUrl("/api/v1/blind-analysis/registrations"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.registrations ?? []);
 }
 export async function getAnalysisRegistration(regId: string): Promise<AnalysisRegistration> {
   const res = await fetch(apiUrl(`/api/v1/blind-analysis/registration/${regId}`), { cache: "no-store", headers: authHeaders() });
@@ -7776,7 +7779,8 @@ export async function designExperiment(req: { name: string; experiment_type: str
 export async function listExperimentDesigns(): Promise<ExperimentDesign[]> {
   const res = await fetch(apiUrl("/api/v1/oed/designs"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.designs ?? []);
 }
 export async function getExperimentDesign(designId: string): Promise<ExperimentDesign> {
   const res = await fetch(apiUrl(`/api/v1/oed/design/${designId}`), { cache: "no-store", headers: authHeaders() });
@@ -7802,7 +7806,8 @@ export async function addMetaStudy(req: { title: string; authors: string[]; year
 export async function listMetaStudies(): Promise<MetaStudy[]> {
   const res = await fetch(apiUrl("/api/v1/meta-analysis/studies"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.studies ?? []);
 }
 export async function runFullMetaAnalysis(req: { name: string; metric: string; study_ids: string[]; model?: string }): Promise<FullMetaAnalysisResult> {
   const res = await fetch(apiUrl("/api/v1/meta-analysis/analyze"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
@@ -7812,7 +7817,8 @@ export async function runFullMetaAnalysis(req: { name: string; metric: string; s
 export async function listFullMetaAnalyses(): Promise<FullMetaAnalysisResult[]> {
   const res = await fetch(apiUrl("/api/v1/meta-analysis/analyses"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.analyses ?? []);
 }
 export async function getFullMetaAnalysis(analysisId: string): Promise<FullMetaAnalysisResult> {
   const res = await fetch(apiUrl(`/api/v1/meta-analysis/analysis/${analysisId}`), { cache: "no-store", headers: authHeaders() });
@@ -7833,7 +7839,8 @@ export async function publishDataset(req: { title: string; description: string; 
 export async function listDatasetPublications(): Promise<DatasetPublication[]> {
   const res = await fetch(apiUrl("/api/v1/dataset-publish/publications"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.publications ?? []);
 }
 export async function getDatasetPublication(pubId: string): Promise<DatasetPublication> {
   const res = await fetch(apiUrl(`/api/v1/dataset-publish/publication/${pubId}`), { cache: "no-store", headers: authHeaders() });
