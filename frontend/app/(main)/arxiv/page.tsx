@@ -63,7 +63,7 @@ export default function ArxivPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getFeaturedPapers().then(setFeaturedPapers).catch(() => {});
+    getFeaturedPapers().then(data => setFeaturedPapers(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
 
   const handleSearch = async () => {
