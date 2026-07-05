@@ -17,7 +17,7 @@ export default function RBACPage() {
   const load = () => {
     setLoading(true);
     Promise.all([getRbacRoles(), listRbacUsers()])
-      .then(([r, u]) => { setRoles(r.roles); setUsers(u); setErr(""); })
+      .then(([r, u]) => { setRoles(r.roles ?? []); setUsers(u ?? []); setErr(""); })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
@@ -56,7 +56,7 @@ export default function RBACPage() {
             </div>
             <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>{role.description}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {role.permissions.map(p => (
+              {(role.permissions ?? []).map(p => (
                 <span key={p} style={{ fontSize: 10, padding: "1px 5px", borderRadius: 2, background: "#1f2937", color: "#9ca3af" }}>{p}</span>
               ))}
             </div>

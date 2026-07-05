@@ -13,6 +13,43 @@ const STATUS_COLOR: Record<string, string> = {
 
 const ALGORITHMS = ["vqe", "qaoa", "adapt_vqe", "other"];
 
+function renderChart(vr: VariationalRun): React.ReactNode {
+  const iters = vr.iterations ?? [];
+  if (iters.length === 0) return <div style={{ color: "#6b7280", fontSize: 13 }}>No iterations yet.</div>;
+  const energies = iters.map(i => i.energy);
+  const minE = Math.min(...energies);
+  const maxE = Math.max(...energies);
+  const range = maxE - minE || 1;
+  const W = 400, H = 120, pad = 20;
+
+  return (
+    <svg width={W} height={H} style={{ overflow: "visible" }}>
+      {/* Y axis labels */}
+      <text x={pad - 4} y={pad} fontSize={9} fill="#6b7280" textAnchor="end">{maxE.toFixed(3)}</text>
+      <text x={pad - 4} y={H - pad + 4} fontSize={9} fill="#6b7280" textAnchor="end">{minE.toFixed(3)}</text>
+      {/* Axes */}
+      <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="#374151" />
+      <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#374151" />
+      {/* Energy line */}
+      {energies.map((e, i) => {
+        if (i === 0) return null;
+        const x1 = pad + ((i - 1) / (iters.length - 1)) * (W - 2 * pad);
+        const x2 = pad + (i / (iters.length - 1)) * (W - 2 * pad);
+        const y1 = pad + (1 - (energies[i - 1] - minE) / range) * (H - 2 * pad);
+        const y2 = pad + (1 - (e - minE) / range) * (H - 2 * pad);
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3b82f6" strokeWidth={1.5} />;
+      })}
+      {/* Final point */}
+      {iters.length > 0 && (() => {
+        const e = energies[energies.length - 1];
+        const x = pad + ((iters.length - 1) / Math.max(1, iters.length - 1)) * (W - 2 * pad);
+        const y = pad + (1 - (e - minE) / range) * (H - 2 * pad);
+        return <circle cx={x} cy={y} r={3} fill="#10b981" />;
+      })()}
+    </svg>
+  );
+}
+
 export default function VariationalPage() {
   const [vruns, setVruns] = useState<VariationalRun[]>([]);
   const [selected, setSelected] = useState<VariationalRun | null>(null);
@@ -68,43 +105,6 @@ export default function VariationalPage() {
     } finally {
       setAddingIter(false);
     }
-  };
-
-  const renderChart = (vr: VariationalRun) => {
-    const iters = vr.iterations;
-    if (!iters || iters.length === 0) return <div style={{ color: "#6b7280", fontSize: 13 }}>No iterations yet.</div>;
-    const energies = iters.map(i => i.energy);
-    const minE = Math.min(...energies);
-    const maxE = Math.max(...energies);
-    const range = maxE - minE || 1;
-    const W = 400, H = 120, pad = 20;
-
-    return (
-      <svg width={W} height={H} style={{ overflow: "visible" }}>
-        {/* Y axis labels */}
-        <text x={pad - 4} y={pad} fontSize={9} fill="#6b7280" textAnchor="end">{maxE.toFixed(3)}</text>
-        <text x={pad - 4} y={H - pad + 4} fontSize={9} fill="#6b7280" textAnchor="end">{minE.toFixed(3)}</text>
-        {/* Axes */}
-        <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="#374151" />
-        <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#374151" />
-        {/* Energy line */}
-        {energies.map((e, i) => {
-          if (i === 0) return null;
-          const x1 = pad + ((i - 1) / (iters.length - 1)) * (W - 2 * pad);
-          const x2 = pad + (i / (iters.length - 1)) * (W - 2 * pad);
-          const y1 = pad + (1 - (energies[i - 1] - minE) / range) * (H - 2 * pad);
-          const y2 = pad + (1 - (e - minE) / range) * (H - 2 * pad);
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3b82f6" strokeWidth={1.5} />;
-        })}
-        {/* Final point */}
-        {iters.length > 0 && (() => {
-          const e = energies[energies.length - 1];
-          const x = pad + ((iters.length - 1) / Math.max(1, iters.length - 1)) * (W - 2 * pad);
-          const y = pad + (1 - (e - minE) / range) * (H - 2 * pad);
-          return <circle cx={x} cy={y} r={3} fill="#10b981" />;
-        })()}
-      </svg>
-    );
   };
 
   return (
@@ -190,7 +190,7 @@ export default function VariationalPage() {
                   }}>{vr.convergence_status}</span>
                 </div>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
-                  {vr.n_qubits}q · {vr.n_parameters} params · {vr.iterations.length} iters
+                  {vr.n_qubits}q · {vr.n_parameters} params · {(vr.iterations ?? []).length} iters
                 </div>
                 {vr.optimal_energy != null && (
                   <div style={{ fontSize: 12, color: "#10b981", marginTop: 2 }}>E = {vr.optimal_energy.toFixed(4)}</div>
@@ -218,7 +218,7 @@ export default function VariationalPage() {
                     {[
                       { label: "N Qubits", value: selected.n_qubits },
                       { label: "N Parameters", value: selected.n_parameters },
-                      { label: "Iterations", value: selected.iterations.length },
+                      { label: "Iterations", value: (selected.iterations ?? []).length },
                       { label: "Ansatz", value: selected.ansatz_type ?? "—" },
                       { label: "Hamiltonian", value: selected.hamiltonian_type ?? "—" },
                       { label: "Optimal Energy", value: selected.optimal_energy?.toFixed(6) ?? "—" },
