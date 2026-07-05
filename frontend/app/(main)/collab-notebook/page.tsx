@@ -11,7 +11,7 @@ import {
   CollabNotebook,
   CollabCell,
   CollabExecutionResult,
-} from "@/lib/api";
+} from "../../../lib/api";
 
 const KERNELS = ["python", "julia", "q_sharp"];
 const CELL_TYPES = ["code", "markdown"];
@@ -94,8 +94,11 @@ export default function CollabNotebookPage() {
 
   const openWs = useCallback((notebookId: string) => {
     closeWs();
+    // Derive WS URL from the current page origin so it works in production
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const host  = window.location.host;
     const ws = new WebSocket(
-      `ws://localhost:8000/api/v1/collab-notebook/notebook/${notebookId}/ws`
+      `${proto}://${host}/qlab-ws/api/v1/collab-notebook/notebook/${notebookId}/ws`
     );
     wsRef.current = ws;
 
@@ -310,73 +313,84 @@ export default function CollabNotebookPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div style={{ display: "flex", gap: 0, minHeight: 500 }}>
       {/* Left Sidebar */}
-      <div className="w-72 shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col h-screen sticky top-0 overflow-hidden">
-        <div className="p-4 border-b border-gray-800">
-          <h1 className="text-base font-bold text-gray-100">Collaborative Notebooks</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Shared quantum computing notebooks</p>
+      <div style={{ width: 280, flexShrink: 0, borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", background: "var(--surface)", maxHeight: "calc(100vh - 130px)", position: "sticky", top: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+          <h1 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "0 0 2px" }}>Collaborative Notebooks</h1>
+          <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>Shared quantum computing notebooks</p>
         </div>
 
         {/* Owner filter */}
-        <div className="p-3 border-b border-gray-800 flex gap-2">
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--line)", display: "flex", gap: 6 }}>
           <input
             type="text"
             placeholder="Filter by owner…"
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLoadOwner()}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+            className="input"
+            style={{ flex: 1, height: 30, fontSize: 12 }}
           />
-          <button onClick={handleLoadOwner} className="bg-gray-700 hover:bg-gray-600 rounded-lg px-2 py-1.5 text-xs transition-colors">Load</button>
+          <button onClick={handleLoadOwner} className="button secondary" style={{ height: 30, fontSize: 12, flexShrink: 0 }}>Load</button>
         </div>
 
         {/* Notebooks list */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div style={{ flex: 1, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 4 }}>
           {loadingNotebooks ? (
-            <div className="text-xs text-gray-500 animate-pulse p-2">Loading…</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", padding: 8 }}>Loading…</div>
           ) : notebooksError ? (
-            <div className="text-xs text-red-400 p-2">{notebooksError}</div>
+            <div style={{ fontSize: 12, color: "var(--danger)", padding: 8 }}>{notebooksError}</div>
           ) : notebooks.length === 0 ? (
-            <div className="text-xs text-gray-500 p-2">No notebooks found.</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", padding: 8 }}>No notebooks found.</div>
           ) : (
-            notebooks.map((nb) => (
-              <div
-                key={nb.notebook_id}
-                onClick={() => handleOpenNotebook(nb.notebook_id)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors space-y-1.5 ${selectedNotebook?.notebook_id === nb.notebook_id ? "bg-indigo-900/30 border border-indigo-700" : "hover:bg-gray-800 border border-transparent"}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${statusDot[nb.status] ?? "bg-gray-400"}`} />
-                  <p className="text-xs font-medium leading-tight truncate">{nb.title}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${kernelBadge[nb.kernel] ?? "bg-gray-700 text-gray-400"}`}>{nb.kernel}</span>
-                  <span className="text-xs text-gray-500">{nb.collaborators.length} collabs</span>
-                </div>
-                {nb.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {nb.tags.slice(0, 3).map((t) => (
-                      <span key={t} className="text-xs px-1 py-0.5 bg-gray-800 text-gray-500 rounded">{t}</span>
-                    ))}
+            notebooks.map((nb) => {
+              const isActive = selectedNotebook?.notebook_id === nb.notebook_id;
+              return (
+                <div
+                  key={nb.notebook_id}
+                  onClick={() => handleOpenNotebook(nb.notebook_id)}
+                  style={{
+                    padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+                    background: isActive ? "var(--info-bg)" : "transparent",
+                    border: `1px solid ${isActive ? "var(--strong)" : "transparent"}`,
+                    display: "flex", flexDirection: "column", gap: 6,
+                    transition: "background 0.12s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: nb.status === "running" ? "#3b82f6" : nb.status === "error" ? "var(--danger)" : "var(--ok)" }} />
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nb.title}</p>
                   </div>
-                )}
-                <p className="text-xs text-gray-600">{new Date(nb.created_at).toLocaleDateString()}</p>
-              </div>
-            ))
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: "var(--info-bg)", color: "var(--info-text)" }}>{nb.kernel}</span>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{nb.collaborators.length} collabs</span>
+                  </div>
+                  {nb.tags.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {nb.tags.slice(0, 3).map((t) => (
+                        <span key={t} style={{ fontSize: 10, padding: "1px 5px", background: "var(--surface)", color: "var(--muted)", border: "1px solid var(--line)", borderRadius: 4 }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>{new Date(nb.created_at).toLocaleDateString()}</p>
+                </div>
+              );
+            })
           )}
         </div>
 
         {/* New Notebook */}
-        <div className="p-3 border-t border-gray-800">
+        <div style={{ padding: "12px", borderTop: "1px solid var(--line)", flexShrink: 0 }}>
           <button
             onClick={() => setShowNewNb((v) => !v)}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 rounded-lg py-2 text-xs font-medium transition-colors"
+            className={showNewNb ? "button secondary" : "button"}
+            style={{ width: "100%", fontSize: 12 }}
           >
             {showNewNb ? "Cancel" : "New Notebook"}
           </button>
           {showNewNb && (
-            <div className="mt-3 space-y-2">
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {[
                 { label: "Title", value: newTitle, set: setNewTitle },
                 { label: "Owner", value: newOwner, set: setNewOwner },
@@ -384,18 +398,20 @@ export default function CollabNotebookPage() {
                 { label: "Tags", value: newTags, set: setNewTags, placeholder: "q, ml" },
               ].map(({ label, value, set, placeholder }) => (
                 <div key={label}>
-                  <label className="block text-xs text-gray-400 mb-0.5">{label}</label>
-                  <input type="text" value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+                  <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 3 }}>{label}</label>
+                  <input type="text" value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder}
+                    className="input" style={{ width: "100%", height: 28, fontSize: 12 }} />
                 </div>
               ))}
               <div>
-                <label className="block text-xs text-gray-400 mb-0.5">Kernel</label>
-                <select value={newKernel} onChange={(e) => setNewKernel(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none">
+                <label style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 3 }}>Kernel</label>
+                <select value={newKernel} onChange={(e) => setNewKernel(e.target.value)} className="input" style={{ width: "100%", height: 28, fontSize: 12 }}>
                   {KERNELS.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
               </div>
-              {createNbError && <p className="text-red-400 text-xs">{createNbError}</p>}
-              <button onClick={handleCreateNotebook} disabled={creatingNb || !newTitle || !newOwner} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded py-1.5 text-xs font-medium transition-colors">
+              {createNbError && <p style={{ color: "var(--danger)", fontSize: 11, margin: 0 }}>{createNbError}</p>}
+              <button onClick={() => void handleCreateNotebook()} disabled={creatingNb || !newTitle || !newOwner}
+                className="button" style={{ width: "100%", fontSize: 12 }}>
                 {creatingNb ? "Creating…" : "Create"}
               </button>
             </div>
@@ -404,15 +420,15 @@ export default function CollabNotebookPage() {
       </div>
 
       {/* Main Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div style={{ flex: 1, overflowY: "auto" }}>
         {loadingNotebook ? (
-          <div className="p-8 text-sm text-gray-400 animate-pulse">Loading notebook…</div>
+          <div style={{ padding: 32, fontSize: 14, color: "var(--muted)" }}>Loading notebook…</div>
         ) : !selectedNotebook ? (
-          <div className="flex items-center justify-center h-full min-h-96">
-            <p className="text-gray-500 text-sm">Select a notebook to open it</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
+            <p style={{ color: "var(--muted)", fontSize: 14 }}>Select a notebook to open it</p>
           </div>
         ) : (
-          <div className="p-6 space-y-5">
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Notebook Header */}
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
