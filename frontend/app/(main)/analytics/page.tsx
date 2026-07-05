@@ -191,15 +191,16 @@ export default function AnalyticsPage() {
     setError(null);
     try {
       const [s, m, ht] = await Promise.all([
-        fetchAnalyticsTimeseries(token, { days }),
-        fetchRunMetrics(token),
+        fetchAnalyticsTimeseries(token, { days }).catch(() => []),
+        fetchRunMetrics(token).catch(() => null),
         fetchHealthTrend({ days }).catch(() => null),
       ]);
-      setSeries(s);
-      setMetrics(m);
+      setSeries(s as any);
+      setMetrics(m as any);
       setHealthTrend(ht);
+      if (!s && !m) setError("Backend is warming up — please refresh in a moment.");
     } catch {
-      setError("Failed to load analytics data");
+      setError("Backend is warming up — please refresh in a moment.");
     } finally {
       setLoading(false);
     }
@@ -231,7 +232,14 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {error && <div className="auth-error">{error}</div>}
+      {error && (
+        <div className="auth-error" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span>{error}</span>
+          <button onClick={() => window.location.reload()} style={{ background: "none", border: "1px solid currentColor", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12, color: "inherit", flexShrink: 0 }}>
+            Retry
+          </button>
+        </div>
+      )}
       {loading && <div className="empty">Loading analytics…</div>}
 
       {!loading && metrics && (
