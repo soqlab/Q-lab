@@ -824,9 +824,11 @@ function HeroFabric() {
       borderRadius:18, overflow:"hidden", position:"relative",
       boxShadow:"0 24px 64px rgba(0,0,0,0.5)",
     }}>
-      <canvas ref={ref} style={{ display:"block", width:"100%", aspectRatio:"4/3" }} />
+      <div style={{ position:"relative", width:"100%", aspectRatio:"16/11", maxHeight:420 }}>
+        <canvas ref={ref} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
+      </div>
       <span style={{
-        position:"absolute", bottom:12, left:16,
+        position:"absolute", bottom:10, left:16,
         fontFamily:"ui-monospace,monospace", fontSize:10,
         letterSpacing:"0.17em", textTransform:"uppercase", color:"#3d506a",
       }}>live routing fabric · q-lab</span>

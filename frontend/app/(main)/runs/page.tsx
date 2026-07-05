@@ -170,7 +170,9 @@ function DashFabric() {
       border:"1px solid var(--line)",
       borderRadius:12, overflow:"hidden", position:"relative",
     }}>
-      <canvas ref={ref} style={{ display:"block", width:"100%", aspectRatio:"16/6" }} />
+      <div style={{ position:"relative", width:"100%", aspectRatio:"21/6", maxHeight:160 }}>
+        <canvas ref={ref} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
+      </div>
       <span style={{
         position:"absolute", bottom:8, left:14,
         fontFamily:"ui-monospace,monospace", fontSize:9.5,
