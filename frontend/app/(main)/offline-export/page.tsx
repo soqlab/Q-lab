@@ -6,7 +6,7 @@ import {
   getOfflineExportStatus,
   getExportRequirements,
   OfflineExport,
-} from "@/lib/api";
+} from "../../../lib/api";
 
 type ExportRequirements = {
   cpu_cores: number;
@@ -31,25 +31,56 @@ const CLASSIFICATION_OPTIONS = [
   { value: "SECRET", label: "SECRET" },
 ];
 
-const CLASSIFICATION_STYLES: Record<string, string> = {
-  unclassified: "bg-green-900 text-green-300",
-  CUI: "bg-yellow-900 text-yellow-300",
-  SECRET: "bg-red-900 text-red-200",
+const CLASSIFICATION_COLORS: Record<string, string> = {
+  unclassified: "var(--ok)",
+  CUI: "var(--warn)",
+  SECRET: "var(--danger)",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-gray-700 text-gray-300",
-  building: "bg-blue-700 text-blue-200",
-  ready: "bg-green-700 text-green-200",
-  failed: "bg-red-700 text-red-200",
+const STATUS_COLORS: Record<string, string> = {
+  pending: "var(--muted)",
+  building: "var(--info-text)",
+  ready: "var(--ok)",
+  failed: "var(--danger)",
 };
+
+// ── Toggle — defined at module scope so React sees a stable component type ──
+function Toggle({
+  value,
+  onChange,
+  label,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", userSelect: "none" }}>
+      <div
+        onClick={() => onChange(!value)}
+        style={{
+          width: 40, height: 22, borderRadius: 999,
+          background: value ? "var(--strong)" : "var(--line)",
+          position: "relative", flexShrink: 0,
+          transition: "background 0.15s",
+        }}
+      >
+        <span style={{
+          position: "absolute", top: 3, left: value ? 21 : 3,
+          width: 16, height: 16, borderRadius: "50%",
+          background: "#fff", transition: "left 0.15s",
+        }} />
+      </div>
+      <span style={{ fontSize: 14, color: "var(--text)" }}>{label}</span>
+    </label>
+  );
+}
 
 export default function OfflineExportPage() {
   const [requirements, setRequirements] = useState<ExportRequirements | null>(null);
   const [reqLoading, setReqLoading] = useState(true);
   const [reqError, setReqError] = useState<string | null>(null);
 
-  // Form
   const [includeData, setIncludeData] = useState(true);
   const [includeModels, setIncludeModels] = useState(false);
   const [format, setFormat] = useState("docker-compose");
@@ -112,246 +143,224 @@ export default function OfflineExportPage() {
     });
   }
 
-  function Toggle({
-    value,
-    onChange,
-    label,
-  }: {
-    value: boolean;
-    onChange: (v: boolean) => void;
-    label: string;
-  }) {
-    return (
-      <label className="flex items-center gap-3 cursor-pointer select-none">
-        <div
-          onClick={() => onChange(!value)}
-          className={`w-10 h-5 rounded-full transition-colors ${value ? "bg-indigo-600" : "bg-gray-700"} relative shrink-0`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${value ? "translate-x-5" : ""}`}
-          />
-        </div>
-        <span className="text-sm text-gray-300">{label}</span>
-      </label>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Offline / Air-Gap Export</h1>
-        <p className="text-gray-400 mt-1">
+    <main className="page">
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>
+          Offline / Air-Gap Export
+        </h1>
+        <p style={{ fontSize: 14, color: "var(--muted)" }}>
           Bundle Q-Lab for classified or disconnected networks
         </p>
       </div>
 
       {/* System Requirements */}
-      <section>
-        <h2 className="text-lg font-semibold text-gray-300 mb-3">System Requirements</h2>
-        {reqLoading && <p className="text-gray-400 animate-pulse">Loading requirements...</p>}
-        {reqError && (
-          <p className="text-red-400 bg-red-950 border border-red-800 rounded px-4 py-2">{reqError}</p>
-        )}
-        {requirements && (
-          <div className="bg-blue-950 border border-blue-800 rounded-xl p-5 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <div className="text-xs text-blue-400 uppercase tracking-wide mb-0.5">CPU Cores</div>
-                <div className="font-semibold text-white">{requirements.cpu_cores}</div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-400 uppercase tracking-wide mb-0.5">RAM</div>
-                <div className="font-semibold text-white">{requirements.ram_gb} GB</div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-400 uppercase tracking-wide mb-0.5">Disk</div>
-                <div className="font-semibold text-white">{requirements.disk_gb} GB</div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-400 uppercase tracking-wide mb-0.5">Docker</div>
-                <div className="font-semibold text-white">{requirements.docker_version}</div>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-blue-400 uppercase tracking-wide mb-1">Supported OS</div>
-              <div className="flex flex-wrap gap-2">
-                {requirements.os.map((os) => (
-                  <span key={os} className="bg-blue-900 text-blue-200 text-xs px-2 py-0.5 rounded">{os}</span>
-                ))}
-              </div>
-            </div>
-            {requirements.notes.length > 0 && (
-              <ul className="space-y-1">
-                {requirements.notes.map((note, i) => (
-                  <li key={i} className="text-xs text-blue-300">• {note}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Export Config Form */}
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5">
-          <h2 className="text-lg font-semibold text-gray-200">Export Configuration</h2>
-
-          <div className="space-y-3">
-            <Toggle value={includeData} onChange={setIncludeData} label="Include all experiment data" />
-            <Toggle value={includeModels} onChange={setIncludeModels} label="Include ML models" />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Bundle Format</label>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {FORMAT_OPTIONS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Classification Level</label>
-            <select
-              value={classificationLevel}
-              onChange={(e) => setClassificationLevel(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {CLASSIFICATION_OPTIONS.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {generateError && (
-            <p className="text-red-400 bg-red-950 border border-red-800 rounded px-3 py-2 text-sm">
-              {generateError}
+      <section className="panel" style={{ marginBottom: 20 }}>
+        <div className="panel-header">
+          <h2>System Requirements</h2>
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          {reqLoading && <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading requirements…</p>}
+          {reqError && (
+            <p style={{ color: "var(--danger)", background: "var(--danger-bg, rgba(239,68,68,0.08))", border: "1px solid var(--danger)", borderRadius: 8, padding: "10px 14px", fontSize: 14 }}>
+              {reqError}
             </p>
           )}
+          {requirements && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 16 }}>
+                {[
+                  ["CPU Cores", requirements.cpu_cores],
+                  ["RAM", `${requirements.ram_gb} GB`],
+                  ["Disk", `${requirements.disk_gb} GB`],
+                  ["Docker", requirements.docker_version],
+                ].map(([label, value]) => (
+                  <div key={String(label)}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Supported OS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(requirements.os ?? []).map((os) => (
+                    <span key={os} style={{ background: "var(--info-bg)", color: "var(--info-text)", borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 500 }}>{os}</span>
+                  ))}
+                </div>
+              </div>
+              {(requirements.notes ?? []).length > 0 && (
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {requirements.notes.map((note, i) => (
+                    <li key={i} style={{ fontSize: 12, color: "var(--muted)" }}>• {note}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
-          >
-            {generating ? "Generating Bundle..." : "Generate Bundle"}
-          </button>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+        {/* Export Config Form */}
+        <section className="panel">
+          <div className="panel-header"><h2>Export Configuration</h2></div>
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 18 }}>
+            <Toggle value={includeData} onChange={setIncludeData} label="Include all experiment data" />
+            <Toggle value={includeModels} onChange={setIncludeModels} label="Include ML models" />
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>Bundle Format</label>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                className="input"
+                style={{ width: "100%" }}
+              >
+                {FORMAT_OPTIONS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>Classification Level</label>
+              <select
+                value={classificationLevel}
+                onChange={(e) => setClassificationLevel(e.target.value)}
+                className="input"
+                style={{ width: "100%" }}
+              >
+                {CLASSIFICATION_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {generateError && (
+              <p style={{ color: "var(--danger)", fontSize: 13, background: "rgba(239,68,68,0.08)", border: "1px solid var(--danger)", borderRadius: 8, padding: "8px 12px" }}>
+                {generateError}
+              </p>
+            )}
+
+            <button
+              className="button"
+              onClick={() => void handleGenerate()}
+              disabled={generating}
+              style={{ width: "100%" }}
+            >
+              {generating ? "Generating bundle…" : "Generate Bundle"}
+            </button>
+          </div>
         </section>
 
         {/* Export Card */}
         {exportBundle && (
-          <section className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-lg font-semibold text-gray-200">Export Bundle</h2>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs px-2 py-0.5 rounded font-semibold ${STATUS_STYLES[exportBundle.status] ?? "bg-gray-700 text-gray-300"}`}
-                >
-                  {exportBundle.status}
-                  {exportBundle.status === "building" && (
-                    <span className="ml-1 animate-pulse">...</span>
-                  )}
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Export Bundle</h2>
+              <div style={{ display: "flex", gap: 8 }}>
+                <span style={{
+                  fontSize: 12, padding: "2px 10px", borderRadius: 999, fontWeight: 600,
+                  background: "var(--info-bg)", color: STATUS_COLORS[exportBundle.status] ?? "var(--muted)",
+                }}>
+                  {exportBundle.status}{exportBundle.status === "building" ? "…" : ""}
                 </span>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded font-semibold ${CLASSIFICATION_STYLES[exportBundle.classification_level ?? ""] ?? "bg-gray-700 text-gray-300"}`}
-                >
-                  {exportBundle.classification_level ?? ""}
-                </span>
+                {exportBundle.classification_level && (
+                  <span style={{
+                    fontSize: 12, padding: "2px 10px", borderRadius: 999, fontWeight: 600,
+                    background: "var(--info-bg)", color: CLASSIFICATION_COLORS[exportBundle.classification_level] ?? "var(--muted)",
+                  }}>
+                    {exportBundle.classification_level}
+                  </span>
+                )}
               </div>
             </div>
+            <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>
+                Estimated size: <strong style={{ color: "var(--text)" }}>{exportBundle.estimated_size_mb} MB</strong>
+              </p>
 
-            <div className="text-sm text-gray-400">
-              Estimated size:{" "}
-              <span className="text-gray-200 font-medium">{exportBundle.estimated_size_mb} MB</span>
-            </div>
+              {exportBundle.checksum && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <code style={{ flex: 1, background: "var(--surface)", color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 11, padding: "6px 10px", borderRadius: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {exportBundle.checksum}
+                  </code>
+                  <button className="button secondary" style={{ height: 30, fontSize: 12, flexShrink: 0 }} onClick={copyChecksum}>
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              )}
 
-            {/* Checksum */}
-            {exportBundle.checksum && (
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-800 text-green-300 font-mono text-xs px-3 py-1.5 rounded truncate">
-                  {exportBundle.checksum}
-                </code>
-                <button
-                  onClick={copyChecksum}
-                  className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1.5 rounded transition-colors shrink-0"
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)" }}>
+                {(["components", "compose", "readme"] as ExportTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 500,
+                      color: activeTab === tab ? "var(--strong)" : "var(--muted)",
+                      borderBottom: activeTab === tab ? "2px solid var(--strong)" : "2px solid transparent",
+                      marginBottom: -1,
+                    }}
+                  >
+                    {tab === "components" ? "Components" : tab === "compose" ? "Docker Compose" : "README"}
+                  </button>
+                ))}
               </div>
-            )}
 
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-gray-800">
-              {(["components", "compose", "readme"] as ExportTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    activeTab === tab
-                      ? "border-b-2 border-indigo-500 text-indigo-400"
-                      : "text-gray-500 hover:text-gray-300"
-                  }`}
-                >
-                  {tab === "components" ? "Components" : tab === "compose" ? "Docker Compose" : "README"}
-                </button>
-              ))}
-            </div>
-
-            {activeTab === "components" && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-gray-500 border-b border-gray-800">
-                      <th className="text-left pb-2">Component</th>
-                      <th className="text-right pb-2">Size (MB)</th>
-                      <th className="text-right pb-2">Included</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {exportBundle.components?.map((c) => (
-                      <tr key={c.name} className="border-b border-gray-800 last:border-0">
-                        <td className="py-2 text-gray-200">{c.name}</td>
-                        <td className="py-2 text-right text-gray-400">{c.size_mb}</td>
-                        <td className="py-2 text-right">
-                          {c.included ? (
-                            <span className="text-green-400">✓</span>
-                          ) : (
-                            <span className="text-gray-600">✗</span>
-                          )}
-                        </td>
+              {activeTab === "components" && (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Component</th>
+                        <th style={{ textAlign: "right" }}>Size (MB)</th>
+                        <th style={{ textAlign: "right" }}>Included</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {(exportBundle.components ?? []).map((c) => (
+                        <tr key={c.name}>
+                          <td>{c.name}</td>
+                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.size_mb}</td>
+                          <td style={{ textAlign: "right" }}>
+                            {c.included
+                              ? <span style={{ color: "var(--ok)" }}>✓</span>
+                              : <span style={{ color: "var(--muted)" }}>✗</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            {activeTab === "compose" && (
-              <pre className="bg-gray-950 border border-gray-700 rounded p-4 text-green-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-72">
-                {exportBundle.docker_compose_yaml ?? "Not available yet"}
-              </pre>
-            )}
+              {activeTab === "compose" && (
+                <pre style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 14, fontSize: 11, fontFamily: "ui-monospace,monospace", color: "var(--ok)", overflowX: "auto", whiteSpace: "pre-wrap", maxHeight: 280, margin: 0 }}>
+                  {exportBundle.docker_compose_yaml ?? "Not available yet"}
+                </pre>
+              )}
 
-            {activeTab === "readme" && (
-              <pre className="bg-gray-950 border border-gray-700 rounded p-4 text-gray-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-72">
-                {exportBundle.readme ?? "Not available yet"}
-              </pre>
-            )}
+              {activeTab === "readme" && (
+                <pre style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 14, fontSize: 11, fontFamily: "ui-monospace,monospace", color: "var(--text)", overflowX: "auto", whiteSpace: "pre-wrap", maxHeight: 280, margin: 0 }}>
+                  {exportBundle.readme ?? "Not available yet"}
+                </pre>
+              )}
 
-            <button
-              onClick={handleCheckStatus}
-              disabled={checkingStatus}
-              className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              {checkingStatus ? "Checking..." : "Check Status"}
-            </button>
+              <button
+                className="button secondary"
+                onClick={() => void handleCheckStatus()}
+                disabled={checkingStatus}
+                style={{ width: "100%" }}
+              >
+                {checkingStatus ? "Checking…" : "Check Status"}
+              </button>
+            </div>
           </section>
         )}
       </div>
-    </div>
+    </main>
   );
 }
