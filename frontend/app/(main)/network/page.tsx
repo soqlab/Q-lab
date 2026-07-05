@@ -463,18 +463,18 @@ export default function NetworkPage() {
                         Global Metrics
                       </div>
                       <div className="metrics-grid">
-                        {Object.entries(aggregate.global_metrics).map(([k, stat]) =>
+                        {Object.entries(aggregate.global_metrics ?? {}).map(([k, stat]) =>
                           stat.n > 0 ? <MetricCard key={k} name={k} stat={stat} /> : null
                         )}
                       </div>
 
-                      {aggregate.per_source.length > 0 && (
+                      {(aggregate.per_source ?? []).length > 0 && (
                         <>
                           <div className="section-title" style={{ fontSize: 13, marginTop: 20, marginBottom: 8 }}>
                             Per-Source Breakdown
                           </div>
-                          {aggregate.source_status.map((s) => {
-                            const snap = aggregate.per_source.find(
+                          {(aggregate.source_status ?? []).map((s) => {
+                            const snap = (aggregate.per_source ?? []).find(
                               (p) => p.instance_id === s.instance_id
                             );
                             return (
