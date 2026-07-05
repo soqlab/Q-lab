@@ -103,9 +103,9 @@ function ResultCard({
             </div>
           )}
 
-          {r.tags.length > 0 && (
+          {(r.tags ?? []).length > 0 && (
             <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-              {r.tags.slice(0, 4).map(t => (
+              {(r.tags ?? []).slice(0, 4).map(t => (
                 <span key={t} style={{ fontSize: 11, background: "#ebf5fb", color: "#1d6f8f", padding: "2px 7px", borderRadius: 10 }}>{t}</span>
               ))}
             </div>
@@ -346,11 +346,11 @@ function CircuitSearchPage() {
             </div>
           )}
 
-          {result.results.length === 0 ? (
+          {(result.results ?? []).length === 0 ? (
             <div className="empty">No circuits found above the similarity threshold. Try lowering the minimum similarity or removing filters.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {result.results.map(r => (
+              {(result.results ?? []).map(r => (
                 <ResultCard key={r.run_id} r={r} anchorId={anchorId} onVerify={handleVerify} />
               ))}
             </div>

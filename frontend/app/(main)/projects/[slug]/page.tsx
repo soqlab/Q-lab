@@ -97,7 +97,7 @@ function HealthHistogram({ scores }: { scores: number[] }) {
 // Recent runs table
 // ------------------------------------------------------------------
 function RecentRunsTable({ runs }: { runs: ProjectTimelinePoint[] }) {
-  const recent = [...runs].reverse().slice(0, 15);
+  const recent = [...(runs ?? [])].reverse().slice(0, 15);
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -164,12 +164,12 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
   const running = data.total_runs - completed - failed;
 
   // Health timeline for sparkline
-  const healthTimeline = data.timeline
+  const healthTimeline = (data.timeline ?? [])
     .filter(r => r.health_score != null)
     .map(r => r.health_score as number);
 
-  const bestRun = [...data.timeline].filter(r => r.health_score != null).sort((a, b) => (b.health_score ?? 0) - (a.health_score ?? 0))[0];
-  const worstRun = [...data.timeline].filter(r => r.health_score != null).sort((a, b) => (a.health_score ?? 0) - (b.health_score ?? 0))[0];
+  const bestRun = [...(data.timeline ?? [])].filter(r => r.health_score != null).sort((a, b) => (b.health_score ?? 0) - (a.health_score ?? 0))[0];
+  const worstRun = [...(data.timeline ?? [])].filter(r => r.health_score != null).sort((a, b) => (a.health_score ?? 0) - (b.health_score ?? 0))[0];
 
   return (
     <main className="page">
@@ -265,11 +265,11 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
       </div>
 
       {/* Backend breakdown */}
-      {Object.keys(data.by_backend).length > 0 && (
+      {Object.keys(data.by_backend ?? {}).length > 0 && (
         <section className="panel" style={{ marginTop: 18 }}>
           <div className="panel-header"><h2>Backends Used</h2></div>
           <div style={{ padding: "16px 18px" }}>
-            <BackendChart byBackend={data.by_backend} />
+            <BackendChart byBackend={data.by_backend ?? {}} />
           </div>
         </section>
       )}
@@ -309,7 +309,7 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
       )}
 
       {/* Recent runs */}
-      {data.timeline.length > 0 && (
+      {(data.timeline ?? []).length > 0 && (
         <section className="panel" style={{ marginTop: 18 }}>
           <div className="panel-header">
             <h2>Recent Runs</h2>
@@ -317,7 +317,7 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
               Showing last 15 of {data.total_runs}
             </span>
           </div>
-          <RecentRunsTable runs={data.timeline} />
+          <RecentRunsTable runs={data.timeline ?? []} />
         </section>
       )}
     </main>

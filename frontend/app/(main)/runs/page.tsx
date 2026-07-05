@@ -676,8 +676,8 @@ export default function RunsPage() {
                       {new Date(run.created_at).toLocaleString()}
                     </td>
                     <td style={{ fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {run.tags.length
-                        ? run.tags.map(t => (
+                      {(run.tags ?? []).length
+                        ? (run.tags ?? []).map(t => (
                           <span key={t} style={{ display: "inline-block", background: "var(--info-bg)", color: "var(--info-text)", borderRadius: 999, padding: "1px 7px", marginRight: 4, fontWeight: 600 }}>{t}</span>
                         ))
                         : <span style={{ color: "var(--muted)" }}>—</span>

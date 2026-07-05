@@ -144,9 +144,9 @@ export default function CopilotPage() {
       )}
 
       {/* Follow-up suggestions */}
-      {lastResponse && lastResponse.follow_up_questions.length > 0 && messages.length > 0 && (
+      {lastResponse && (lastResponse.follow_up_questions ?? []).length > 0 && messages.length > 0 && (
         <div style={{ display: "flex", gap: 8, paddingTop: 10, flexWrap: "wrap", flexShrink: 0 }}>
-          {lastResponse.follow_up_questions.map(q => (
+          {(lastResponse.follow_up_questions ?? []).map(q => (
             <button
               key={q}
               onClick={() => setInput(q)}
@@ -193,8 +193,8 @@ export default function CopilotPage() {
       {lastResponse && (
         <div style={{ paddingBottom: 12, fontSize: 11, color: "var(--muted)", display: "flex", gap: 12, flexShrink: 0 }}>
           <span>Confidence: {(lastResponse.confidence * 100).toFixed(0)}%</span>
-          {lastResponse.cited_run_ids.length > 0 && (
-            <span>· Cited {lastResponse.cited_run_ids.length} run{lastResponse.cited_run_ids.length > 1 ? "s" : ""}</span>
+          {(lastResponse.cited_run_ids ?? []).length > 0 && (
+            <span>· Cited {(lastResponse.cited_run_ids ?? []).length} run{(lastResponse.cited_run_ids ?? []).length > 1 ? "s" : ""}</span>
           )}
           {sessionId && <span>· Session {sessionId.slice(0, 8)}</span>}
         </div>

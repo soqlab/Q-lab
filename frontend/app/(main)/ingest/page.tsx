@@ -65,7 +65,7 @@ export default function IngestPage() {
   };
 
   const topCounts = result
-    ? Object.entries(result.counts).sort((a, b) => b[1] - a[1]).slice(0, 16)
+    ? Object.entries(result.counts ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 16)
     : [];
   const maxCount = topCounts[0]?.[1] ?? 1;
 

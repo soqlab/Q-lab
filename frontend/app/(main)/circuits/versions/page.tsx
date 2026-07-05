@@ -14,6 +14,16 @@ h q[0];
 cx q[0],q[1];
 measure q -> c;`;
 
+function renderDeltaBadge(delta: number, label: string) {
+  const color = delta === 0 ? "#6b7280" : delta > 0 ? "#ef4444" : "#10b981";
+  const sign = delta > 0 ? "+" : "";
+  return (
+    <span key={label} style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: `${color}22`, color, marginRight: 4 }}>
+      {label}: {sign}{delta}
+    </span>
+  );
+}
+
 export default function CircuitVersionsPage() {
   const [families, setFamilies] = useState<CircuitFamily[]>([]);
   const [versions, setVersions] = useState<CircuitVersion[]>([]);
@@ -78,21 +88,11 @@ export default function CircuitVersionsPage() {
   const handleHistory = async (v: CircuitVersion) => {
     try {
       const h = await getCircuitVersionHistory(v.version_id);
-      setHistory(h.history);
+      setHistory(h.history ?? []);
       setTab("history");
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     }
-  };
-
-  const renderDeltaBadge = (delta: number, label: string) => {
-    const color = delta === 0 ? "#6b7280" : delta > 0 ? "#ef4444" : "#10b981";
-    const sign = delta > 0 ? "+" : "";
-    return (
-      <span key={label} style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: `${color}22`, color, marginRight: 4 }}>
-        {label}: {sign}{delta}
-      </span>
-    );
   };
 
   return (
@@ -232,7 +232,7 @@ export default function CircuitVersionsPage() {
                           {v.version_num > 1 && ds.delta_qubits != null && renderDeltaBadge(ds.delta_qubits, "Δqubits")}
                           {ns.num_qubits != null && <span style={{ fontSize: 11, color: "#6b7280" }}>{ns.num_qubits}q</span>}
                           {ns.gate_count != null && <span style={{ fontSize: 11, color: "#6b7280" }}>{ns.gate_count} gates</span>}
-                          {v.tags?.length > 0 && v.tags.map(tag => (
+                          {(v.tags ?? []).map(tag => (
                             <span key={tag} style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: "#1d4ed822", color: "#3b82f6" }}>{tag}</span>
                           ))}
                           <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>{new Date(v.created_at).toLocaleDateString()}</span>
