@@ -8,6 +8,20 @@ const TREND_COLORS: Record<string, string> = {
   improving: "text-blue-400",
 };
 
+function MetricBar({ value, max, label, unit }: { value: number; max: number; label: string; unit: string }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+        <span>{label}</span>
+        <span style={{ fontFamily: "ui-monospace,monospace" }}>{value.toFixed(1)}{unit}</span>
+      </div>
+      <div style={{ width: "100%", background: "var(--line)", borderRadius: 999, height: 5 }}>
+        <div style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: 5, borderRadius: 999, background: "var(--strong)" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function CalibrationMonitorPage() {
   const [backends, setBackends] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
@@ -34,17 +48,6 @@ export default function CalibrationMonitorPage() {
       .catch(e => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [selected]);
-
-  const MetricBar = ({ value, max, label, unit }: { value: number; max: number; label: string; unit: string }) => (
-    <div>
-      <div className="flex justify-between text-xs text-gray-400 mb-1">
-        <span>{label}</span><span className="font-mono">{value.toFixed(1)}{unit}</span>
-      </div>
-      <div className="w-full bg-gray-700 rounded-full h-1.5">
-        <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-      </div>
-    </div>
-  );
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

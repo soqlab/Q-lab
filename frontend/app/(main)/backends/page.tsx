@@ -37,6 +37,18 @@ function AgeChip({ days }: { days: number | null }) {
 
 type SortKey = "backend" | "run_count" | "avg_ge_2q" | "avg_t1_us" | "avg_ro";
 
+function SortHeader({ col, label, sortKey, sortDir, onSort }: {
+  col: SortKey; label: string; sortKey: SortKey; sortDir: "asc" | "desc"; onSort: (col: SortKey) => void;
+}) {
+  const active = sortKey === col;
+  return (
+    <th style={{ cursor: "pointer", userSelect: "none", color: active ? "var(--fg, #17202a)" : "var(--muted, #5f6f80)", fontWeight: active ? 700 : 600 }}
+      onClick={() => onSort(col)}>
+      {label} {active ? (sortDir === "asc" ? "↑" : "↓") : ""}
+    </th>
+  );
+}
+
 export default function BackendsPage() {
   const [backends, setBackends] = useState<BackendInfo[]>([]);
   const [scores, setScores] = useState<Record<string, { score: number; grade: string }>>({});
@@ -82,16 +94,6 @@ export default function BackendsPage() {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  function SortHeader({ col, label }: { col: SortKey; label: string }) {
-    const active = sortKey === col;
-    return (
-      <th style={{ cursor: "pointer", userSelect: "none", color: active ? "var(--fg, #17202a)" : "var(--muted, #5f6f80)", fontWeight: active ? 700 : 600 }}
-        onClick={() => toggleSort(col)}>
-        {label} {active ? (sortDir === "asc" ? "↑" : "↓") : ""}
-      </th>
-    );
-  }
-
   const GRADE_COLOR: Record<string, string> = {
     "A+": "#1f8a5b", A: "#27ae60", "B+": "#2ecc71", B: "#f39c12",
     "C+": "#e67e22", C: "#e67e22", D: "#e74c3c", F: "#c0392b",
@@ -130,13 +132,13 @@ export default function BackendsPage() {
               <table>
                 <thead>
                   <tr>
-                    <SortHeader col="backend" label="Backend" />
+                    <SortHeader col="backend" label="Backend" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <th>Cal freshness</th>
-                    <SortHeader col="avg_ge_2q" label="2Q gate err" />
-                    <SortHeader col="avg_t1_us" label="Avg T1" />
-                    <SortHeader col="avg_ro" label="Readout err" />
+                    <SortHeader col="avg_ge_2q" label="2Q gate err" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortHeader col="avg_t1_us" label="Avg T1" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortHeader col="avg_ro" label="Readout err" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <th>Fit score</th>
-                    <SortHeader col="run_count" label="Runs" />
+                    <SortHeader col="run_count" label="Runs" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <th>Latest run</th>
                   </tr>
                 </thead>

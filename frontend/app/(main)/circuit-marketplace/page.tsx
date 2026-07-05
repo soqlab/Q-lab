@@ -70,7 +70,7 @@ export default function CircuitMarketplacePage() {
   }, [category, maxPrice, sort]);
 
   useEffect(() => {
-    listMarketplaceCategories().then((data) => setCategories(data.categories.map((c) => c.name))).catch(() => {});
+    listMarketplaceCategories().then((data) => setCategories((data.categories ?? []).map((c) => c.name))).catch(() => {});
   }, []);
 
   useEffect(() => {

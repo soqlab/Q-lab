@@ -121,6 +121,24 @@ function KpiStrip({ overview }: { overview: Overview }) {
 // Leaderboard table
 // ---------------------------------------------------------------------------
 
+function SortBtn({ id, label, sortBy, onSort }: { id: string; label: string; sortBy: string; onSort: (s: string) => void }) {
+  const active = sortBy === id;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(id)}
+      style={{
+        border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12,
+        background: active ? "rgba(99,102,241,0.15)" : "transparent",
+        color: active ? "#6366f1" : "var(--muted, #6b7280)",
+        borderRadius: 4, padding: "2px 8px",
+      }}
+    >
+      {active ? "▼ " : ""}{label}
+    </button>
+  );
+}
+
 function LeaderboardTable({
   data,
   sortBy,
@@ -130,33 +148,15 @@ function LeaderboardTable({
   sortBy: string;
   onSortChange: (s: string) => void;
 }) {
-  function SortBtn({ id, label }: { id: string; label: string }) {
-    const active = sortBy === id;
-    return (
-      <button
-        type="button"
-        onClick={() => onSortChange(id)}
-        style={{
-          border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12,
-          background: active ? "rgba(99,102,241,0.15)" : "transparent",
-          color: active ? "#6366f1" : "var(--muted, #6b7280)",
-          borderRadius: 4, padding: "2px 8px",
-        }}
-      >
-        {active ? "▼ " : ""}{label}
-      </button>
-    );
-  }
-
   return (
     <section className="panel" style={{ marginBottom: 20 }}>
       <div className="panel-header">
         <h2>Researcher Leaderboard</h2>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "var(--muted, #6b7280)" }}>Sort by:</span>
-          <SortBtn id="runs" label="Runs" />
-          <SortBtn id="health" label="Health" />
-          <SortBtn id="qpu_time" label="QPU Time" />
+          <SortBtn id="runs" label="Runs" sortBy={sortBy} onSort={onSortChange} />
+          <SortBtn id="health" label="Health" sortBy={sortBy} onSort={onSortChange} />
+          <SortBtn id="qpu_time" label="QPU Time" sortBy={sortBy} onSort={onSortChange} />
         </div>
       </div>
       {!data.leaderboard.length ? (

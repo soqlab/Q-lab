@@ -215,9 +215,9 @@ function DOICard({ record }: { record: DOIRecord }) {
           <div style={{ ...S.muted, marginBottom: 4 }}>
             Run: <code style={{ fontSize: 12, color: "#94a3b8" }}>{record.run_id}</code>
           </div>
-          {record.authors.length > 0 && (
+          {(record.authors ?? []).length > 0 && (
             <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
-              {record.authors.join(", ")}
+              {(record.authors ?? []).join(", ")}
             </div>
           )}
           {record.citation_text && (
