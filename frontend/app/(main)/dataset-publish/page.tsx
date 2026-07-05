@@ -135,14 +135,14 @@ function PublicationCard({
         <span>License: <strong style={{ color: "var(--text)" }}>{pub.license}</strong></span>
         <span>{pub.file_size_mb.toFixed(1)} MB</span>
         <span>{pub.record_count.toLocaleString()} records</span>
-        <span>{pub.run_ids.length} run{pub.run_ids.length !== 1 ? "s" : ""}</span>
+        <span>{(pub.run_ids ?? []).length} run{(pub.run_ids ?? []).length !== 1 ? "s" : ""}</span>
         <span>Created {new Date(pub.created_at).toLocaleDateString()}</span>
         {pub.published_at && <span>Published {new Date(pub.published_at).toLocaleDateString()}</span>}
       </div>
 
-      {pub.keywords.length > 0 && (
+      {(pub.keywords ?? []).length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {pub.keywords.map(k => (
+          {(pub.keywords ?? []).map(k => (
             <span key={k} style={{
               padding: "2px 8px", borderRadius: 999, fontSize: 11,
               background: "var(--panel-2)", border: "1px solid var(--line)",
