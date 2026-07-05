@@ -34,88 +34,102 @@ export default function CrossBenchPage() {
 
   const selected = benchmarks.find(b => b.benchmark_id === selectedId);
 
+  function verdictBoxStyle(r: CrossBenchResult): React.CSSProperties {
+    if (r.beats_sota) {
+      return { borderRadius: 8, padding: 20, textAlign: "center", background: "rgba(245,158,11,0.12)", border: "1px solid #d97706" };
+    }
+    if (r.beats_classical) {
+      return { borderRadius: 8, padding: 20, textAlign: "center", background: "rgba(16,185,129,0.1)", border: "1px solid var(--ok)" };
+    }
+    return { borderRadius: 8, padding: 20, textAlign: "center", background: "var(--surface)" };
+  }
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Cross-Lab Benchmarking</h1>
-      <p className="text-gray-400">Compare your results against published state-of-the-art benchmarks, classical bounds, and the community leaderboard.</p>
+    <div style={{ padding: 24, maxWidth: 896, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Cross-Lab Benchmarking</h1>
+      <p style={{ color: "var(--muted)" }}>Compare your results against published state-of-the-art benchmarks, classical bounds, and the community leaderboard.</p>
 
-      <div className="bg-gray-900 rounded-lg p-5 space-y-4">
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <label className="text-sm text-gray-400">Benchmark</label>
+          <label style={{ fontSize: 13, color: "var(--muted)" }}>Benchmark</label>
           <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
-            className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
-            {benchmarks.map(b => <option key={b.benchmark_id} value={b.benchmark_id}>{b.name}</option>)}
+            className="input" style={{ width: "100%", marginTop: 4 }}>
+            {(benchmarks ?? []).map(b => <option key={b.benchmark_id} value={b.benchmark_id}>{b.name}</option>)}
           </select>
-          {selected && <p className="text-xs text-gray-500 mt-1">{selected.description} · Metric: {selected.metric} · SoTA: {selected.sota_value}</p>}
+          {selected && <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{selected.description} · Metric: {selected.metric} · SoTA: {selected.sota_value}</p>}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
           <div>
-            <label className="text-sm text-gray-400">Your Value ({selected?.metric ?? "metric"})</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Your Value ({selected?.metric ?? "metric"})</label>
             <input type="number" value={yourValue} onChange={e => setYourValue(e.target.value)} step="any"
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Qubits</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Qubits</label>
             <input type="number" value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ width: "100%", marginTop: 4 }} />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Backend</label>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Backend</label>
             <input value={backend} onChange={e => setBackend(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              className="input" style={{ width: "100%", marginTop: 4 }} />
           </div>
         </div>
 
-        <button onClick={compare} disabled={loading}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium disabled:opacity-50">
+        <button onClick={compare} disabled={loading} className="button"
+          style={{ padding: "8px 24px", borderRadius: 6, fontWeight: 500, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer", alignSelf: "flex-start" }}>
           {loading ? "Comparing..." : "Compare to SoTA"}
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {result && (
-        <div className="space-y-4">
-          <div className={`rounded-lg p-5 text-center ${result.beats_sota ? "bg-yellow-900/30 border border-yellow-600" : result.beats_classical ? "bg-green-900/30 border border-green-700" : "bg-gray-900"}`}>
-            <div className="text-2xl font-bold mb-1">{result.verdict}</div>
-            <div className="text-gray-400 text-sm">Rank #{result.rank} of {result.total_entries} · {result.your_percentile.toFixed(1)}th percentile</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={verdictBoxStyle(result)}>
+            <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{result.verdict}</div>
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>Rank #{result.rank} of {result.total_entries} · {result.your_percentile.toFixed(1)}th percentile</div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
             {([
               ["Your Value", result.your_value.toFixed(4)],
               ["SoTA", result.sota_value.toFixed(4)],
               ["Gap to SoTA", `${result.gap_to_sota_pct.toFixed(1)}%`],
             ] as [string, string][]).map(([label, val]) => (
-              <div key={label} className="bg-gray-900 rounded-lg p-4 text-center">
-                <div className="text-xs text-gray-500 mb-1">{label}</div>
-                <div className="text-lg font-mono font-semibold">{val}</div>
+              <div key={label} style={{ background: "var(--surface)", borderRadius: 8, padding: 16, textAlign: "center" }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 18, fontFamily: "ui-monospace,monospace", fontWeight: 600 }}>{val}</div>
               </div>
             ))}
           </div>
 
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-700 font-medium">Leaderboard</div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700 text-gray-400">
-                  {["#", "Label", "Value", "Qubits", "Backend", "Year"].map(h => <th key={h} className="text-left py-2 px-4">{h}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {result.all_entries.map((e, i) => (
-                  <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50">
-                    <td className="py-2 px-4 text-gray-500">{i + 1}</td>
-                    <td className="py-2 px-4">{e.label}</td>
-                    <td className="py-2 px-4 font-mono">{e.value}</td>
-                    <td className="py-2 px-4">{e.n_qubits}</td>
-                    <td className="py-2 px-4 text-gray-400 text-xs">{e.backend}</td>
-                    <td className="py-2 px-4 text-gray-500">{e.year}</td>
+          <div style={{ background: "var(--surface)", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", fontWeight: 500 }}>Leaderboard</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
+                    {["#", "Label", "Value", "Qubits", "Backend", "Year"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 16px" }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(result.all_entries ?? []).map((e, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                      <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{i + 1}</td>
+                      <td style={{ padding: "8px 16px" }}>{e.label}</td>
+                      <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace" }}>{e.value}</td>
+                      <td style={{ padding: "8px 16px" }}>{e.n_qubits}</td>
+                      <td style={{ padding: "8px 16px", color: "var(--muted)", fontSize: 12 }}>{e.backend}</td>
+                      <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{e.year}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

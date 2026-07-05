@@ -40,73 +40,94 @@ export default function RegistryPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Experiment Registry</h1>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Experiment Registry</h1>
         <button onClick={() => setShowPublish(!showPublish)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+          className="button"
+          style={{ padding: "8px 16px", fontWeight: 500 }}>
           Publish Experiment
         </button>
       </div>
-      <p className="text-gray-400">Discover, star, and fork published quantum experiments from the community.</p>
+      <p style={{ color: "var(--muted)" }}>Discover, star, and fork published quantum experiments from the community.</p>
 
-      <div className="flex gap-3">
+      <div style={{ display: "flex", gap: 12 }}>
         <input value={query} onChange={e => setQuery(e.target.value)}
           onKeyDown={e => e.key === "Enter" && search(query)}
           placeholder="Search experiments..."
-          className="flex-1 bg-gray-800 text-white px-4 py-2 rounded border border-gray-700 focus:outline-none focus:border-indigo-500" />
-        <button onClick={() => search(query)} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Search</button>
+          className="input"
+          style={{ flex: 1 }} />
+        <button onClick={() => search(query)} className="button secondary">Search</button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && (
+        <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>
+          {error}
+        </div>
+      )}
 
       {showPublish && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-3">
-          <h2 className="font-semibold">Publish New Experiment</h2>
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <h2 style={{ fontWeight: 600 }}>Publish New Experiment</h2>
           <input placeholder="Title" value={pubTitle} onChange={e => setPubTitle(e.target.value)}
-            className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+            className="input"
+            style={{ width: "100%" }} />
           <textarea placeholder="Description" value={pubDesc} onChange={e => setPubDesc(e.target.value)}
-            className="w-full h-24 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+            className="input"
+            style={{ width: "100%", height: 96 }} />
           <input placeholder="Tags (comma-separated)" value={pubTags} onChange={e => setPubTags(e.target.value)}
-            className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
-          <div className="flex gap-3">
-            <button onClick={publish} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm">Publish</button>
-            <button onClick={() => setShowPublish(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+            className="input"
+            style={{ width: "100%" }} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={publish}
+              style={{ padding: "8px 16px", background: "#15803d", borderRadius: 6, fontSize: 13, color: "var(--text)", border: "none", cursor: "pointer" }}>
+              Publish
+            </button>
+            <button onClick={() => setShowPublish(false)}
+              style={{ padding: "8px 16px", background: "var(--line)", borderRadius: 6, fontSize: 13, color: "var(--text)", border: "none", cursor: "pointer" }}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {loading && <div className="text-gray-400">Searching...</div>}
+      {loading && <div style={{ color: "var(--muted)" }}>Searching...</div>}
 
-      <div className="space-y-3">
-        {results.map(r => (
-          <div key={r.registry_id} className="bg-gray-900 rounded-lg p-5 space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="font-semibold">{r.title}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {(results ?? []).map(r => (
+          <div key={r.registry_id} style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>{r.title}</span>
                   {r.reproducibility_badge && (
-                    <span className="text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded">Reproducible</span>
+                    <span style={{ fontSize: 12, background: "rgba(16,185,129,0.1)", color: "var(--ok)", padding: "2px 8px", borderRadius: 6 }}>
+                      Reproducible
+                    </span>
                   )}
                 </div>
-                <p className="text-gray-400 text-sm">{r.description}</p>
-                <div className="flex gap-3 mt-2 text-xs text-gray-500">
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>{r.description}</p>
+                <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
                   <span>{r.author}</span>
                   {r.institution && <span>· {r.institution}</span>}
                   {r.doi && <span>· DOI: {r.doi}</span>}
                   <span>· {r.backend}</span>
                   <span>· {r.n_qubits}q</span>
                 </div>
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  {r.tags.map(t => <span key={t} className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">{t}</span>)}
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  {(r.tags ?? []).map(t => (
+                    <span key={t} style={{ fontSize: 12, background: "var(--surface)", color: "var(--muted)", padding: "2px 8px", borderRadius: 6, border: "1px solid var(--line)" }}>
+                      {t}
+                    </span>
+                  ))}
                 </div>
               </div>
-              <div className="text-right space-y-1">
+              <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 4 }}>
                 <button onClick={() => star(r.registry_id)}
-                  className="flex items-center gap-1 px-3 py-1 bg-yellow-900/30 hover:bg-yellow-900/50 rounded text-yellow-400 text-sm">
+                  style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 12px", background: "rgba(245,158,11,0.1)", borderRadius: 6, color: "#f59e0b", fontSize: 13, border: "none", cursor: "pointer" }}>
                   ★ {r.stars}
                 </button>
-                <div className="text-xs text-gray-500">{r.forks} forks · {r.views} views</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{r.forks} forks · {r.views} views</div>
               </div>
             </div>
           </div>
