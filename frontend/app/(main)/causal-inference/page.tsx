@@ -44,55 +44,59 @@ const DEFAULT_LOG = JSON.stringify(
 
 function StrengthBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
-  const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-yellow-500" : "bg-slate-500";
+  const barColor = pct >= 70 ? "var(--danger)" : pct >= 40 ? "#f59e0b" : "var(--muted)";
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 flex-1 rounded-full bg-slate-700">
-        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ height: 6, flex: 1, borderRadius: 999, background: "var(--line)" }}>
+        <div style={{ height: 6, borderRadius: 999, background: barColor, width: `${pct}%` }} />
       </div>
-      <span className="w-10 text-right text-xs font-mono text-slate-300">{pct}%</span>
+      <span style={{ width: 40, textAlign: "right", fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>{pct}%</span>
     </div>
   );
 }
 
 function AnalysisView({ result }: { result: CausalAnalysisResult }) {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 16 }}>
         {[
-          { label: "ATE", value: result.ate.toFixed(4), sub: `± ${result.ate_std.toFixed(4)}`, color: "text-white" },
-          { label: "p-value", value: result.p_value.toFixed(4), sub: "", color: result.p_value < 0.05 ? "text-emerald-400" : "text-yellow-400" },
-          { label: "CI Low", value: result.confidence_interval[0].toFixed(4), sub: "", color: "text-white" },
-          { label: "CI High", value: result.confidence_interval[1].toFixed(4), sub: "", color: "text-white" },
+          { label: "ATE", value: result.ate.toFixed(4), sub: `± ${result.ate_std.toFixed(4)}`, color: "var(--text)" },
+          { label: "p-value", value: result.p_value.toFixed(4), sub: "", color: result.p_value < 0.05 ? "var(--ok)" : "#f59e0b" },
+          { label: "CI Low", value: result.confidence_interval[0].toFixed(4), sub: "", color: "var(--text)" },
+          { label: "CI High", value: result.confidence_interval[1].toFixed(4), sub: "", color: "var(--text)" },
         ].map(({ label, value, sub, color }) => (
-          <div key={label} className="rounded-xl border border-slate-700 bg-slate-800 p-4 text-center">
-            <p className="text-xs uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-            <p className={`text-3xl font-black ${color}`}>{value}</p>
-            {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+          <div key={label} style={{ borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 16, textAlign: "center" }}>
+            <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", marginBottom: 4 }}>{label}</p>
+            <p style={{ fontSize: 30, fontWeight: 900, color }}>{value}</p>
+            {sub && <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{sub}</p>}
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl border border-indigo-700 bg-indigo-950/40 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400 mb-2">Interpretation</p>
-        <p className="text-slate-200 leading-relaxed">{result.interpretation}</p>
+      <div style={{ borderRadius: 12, border: "1px solid var(--strong)", background: "rgba(59,130,246,0.1)", padding: "16px 20px" }}>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--strong)", marginBottom: 8 }}>Interpretation</p>
+        <p style={{ color: "var(--text)", lineHeight: 1.6 }}>{result.interpretation}</p>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Refutation Tests</p>
-        <div className="overflow-x-auto rounded-lg border border-slate-700">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-700 bg-slate-800/60 text-slate-400">
-              <th className="px-4 py-2 text-left font-medium">Test</th>
-              <th className="px-4 py-2 text-center font-medium">Passed</th>
-              <th className="px-4 py-2 text-right font-medium">p-value</th>
-            </tr></thead>
+        <p style={{ marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Refutation Tests</p>
+        <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--line)" }}>
+          <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)" }}>
+                <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 500 }}>Test</th>
+                <th style={{ padding: "8px 16px", textAlign: "center", fontWeight: 500 }}>Passed</th>
+                <th style={{ padding: "8px 16px", textAlign: "right", fontWeight: 500 }}>p-value</th>
+              </tr>
+            </thead>
             <tbody>
-              {result.refutation_results.map((r, i) => (
-                <tr key={i} className="border-b border-slate-800 last:border-0">
-                  <td className="px-4 py-2 text-slate-300">{r.test}</td>
-                  <td className="px-4 py-2 text-center"><span className={r.passed ? "text-emerald-400" : "text-red-400"}>{r.passed ? "✓" : "✗"}</span></td>
-                  <td className="px-4 py-2 text-right font-mono text-slate-300">{r.p_value.toFixed(4)}</td>
+              {(result.refutation_results ?? []).map((r, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "8px 16px", color: "var(--text)" }}>{r.test}</td>
+                  <td style={{ padding: "8px 16px", textAlign: "center" }}>
+                    <span style={{ color: r.passed ? "var(--ok)" : "var(--danger)" }}>{r.passed ? "✓" : "✗"}</span>
+                  </td>
+                  <td style={{ padding: "8px 16px", textAlign: "right", fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>{r.p_value.toFixed(4)}</td>
                 </tr>
               ))}
             </tbody>
@@ -100,35 +104,39 @@ function AnalysisView({ result }: { result: CausalAnalysisResult }) {
         </div>
       </div>
 
-      {result.confounders_detected.length > 0 && (
+      {(result.confounders_detected ?? []).length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Confounders Detected</p>
-          <div className="flex flex-wrap gap-2">
-            {result.confounders_detected.map((c, i) => (
-              <span key={i} className="rounded-full border border-yellow-700 bg-yellow-950/50 px-3 py-1 text-xs text-yellow-300">{c}</span>
+          <p style={{ marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Confounders Detected</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {(result.confounders_detected ?? []).map((c, i) => (
+              <span key={i} style={{ borderRadius: 999, border: "1px solid #f59e0b", background: "rgba(245,158,11,0.1)", padding: "4px 12px", fontSize: 12, color: "#f59e0b" }}>{c}</span>
             ))}
           </div>
         </div>
       )}
 
-      {result.causal_graph_edges.length > 0 && (
+      {(result.causal_graph_edges ?? []).length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Causal Graph</p>
-          <div className="overflow-x-auto rounded-lg border border-slate-700">
-            <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-700 bg-slate-800/60 text-slate-400">
-                <th className="px-4 py-2 text-left">From</th>
-                <th className="px-4 py-2 text-center">→</th>
-                <th className="px-4 py-2 text-left">To</th>
-                <th className="px-4 py-2 text-left">Type</th>
-              </tr></thead>
+          <p style={{ marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Causal Graph</p>
+          <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--line)" }}>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)" }}>
+                  <th style={{ padding: "8px 16px", textAlign: "left" }}>From</th>
+                  <th style={{ padding: "8px 16px", textAlign: "center" }}>→</th>
+                  <th style={{ padding: "8px 16px", textAlign: "left" }}>To</th>
+                  <th style={{ padding: "8px 16px", textAlign: "left" }}>Type</th>
+                </tr>
+              </thead>
               <tbody>
-                {result.causal_graph_edges.map((e, i) => (
-                  <tr key={i} className="border-b border-slate-800 last:border-0">
-                    <td className="px-4 py-2 font-mono text-slate-300">{e.from}</td>
-                    <td className="px-4 py-2 text-center text-slate-500">→</td>
-                    <td className="px-4 py-2 font-mono text-slate-300">{e.to}</td>
-                    <td className="px-4 py-2"><span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300">{e.type}</span></td>
+                {(result.causal_graph_edges ?? []).map((e, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>{e.from}</td>
+                    <td style={{ padding: "8px 16px", textAlign: "center", color: "var(--muted)" }}>→</td>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>{e.to}</td>
+                    <td style={{ padding: "8px 16px" }}>
+                      <span style={{ borderRadius: 999, background: "var(--line)", padding: "2px 8px", fontSize: 12, color: "var(--text)" }}>{e.type}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -183,56 +191,75 @@ export default function CausalInferencePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6 text-white lg:p-8">
-      <h1 className="mb-1 text-3xl font-black tracking-tight">Causal Inference Engine</h1>
-      <p className="mb-8 text-slate-400">Discover causation vs correlation in your quantum experiments using DoWhy-style analysis.</p>
+    <div className="page">
+      <h1 style={{ marginBottom: 4, fontSize: 30, fontWeight: 900 }}>Causal Inference Engine</h1>
+      <p style={{ marginBottom: 32, color: "var(--muted)" }}>Discover causation vs correlation in your quantum experiments using DoWhy-style analysis.</p>
 
-      <div className="mb-6 flex gap-1 border-b border-slate-700">
+      <div style={{ marginBottom: 24, display: "flex", gap: 4, borderBottom: "1px solid var(--line)" }}>
         {([{ key: "analysis", label: "Causal Analysis" }, { key: "confounders", label: "Identify Confounders" }] as { key: ActiveTab; label: string }[]).map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-5 py-2.5 text-sm font-medium transition-colors ${activeTab === t.key ? "border-b-2 border-indigo-500 text-indigo-400" : "text-slate-400 hover:text-slate-200"}`}>
+            style={{
+              padding: "10px 20px",
+              fontSize: 13,
+              fontWeight: 500,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              ...(activeTab === t.key
+                ? { borderBottom: "2px solid var(--strong)", color: "var(--strong)", marginBottom: -1 }
+                : { color: "var(--muted)" }),
+            }}>
             {t.label}
           </button>
         ))}
       </div>
 
       {activeTab === "analysis" && (
-        <div className="space-y-8">
-          <form onSubmit={handleAnalysis} className="space-y-5 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+          <form onSubmit={handleAnalysis} style={{ display: "flex", flexDirection: "column", gap: 20, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16 }}>
               {[
                 { label: "Treatment", val: treatment, set: setTreatment, opts: TREATMENTS },
                 { label: "Outcome", val: outcome, set: setOutcome, opts: OUTCOMES },
                 { label: "Method", val: method, set: setMethod, opts: ["linear_regression", "propensity_score", "iv"] },
               ].map(({ label, val, set, opts }) => (
                 <div key={label}>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</label>
-                  <select value={val} onChange={e => set(e.target.value)}
-                    className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none">
+                  <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>{label}</label>
+                  <select value={val} onChange={e => set(e.target.value)} className="input" style={{ width: "100%" }}>
                     {opts.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
               ))}
             </div>
             <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-400">Covariates</label>
-              <div className="flex flex-wrap gap-2">
+              <label style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Covariates</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {PRESET_COVARIATES.map(c => (
                   <button key={c} type="button" onClick={() => toggleCovariate(c)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${covariates.includes(c) ? "bg-indigo-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 12px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      border: "none",
+                      ...(covariates.includes(c)
+                        ? { background: "var(--strong)", color: "var(--text)" }
+                        : { background: "var(--line)", color: "var(--text)" }),
+                    }}>
                     {c}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">Data (JSON array)</label>
+              <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Data (JSON array)</label>
               <textarea rows={8} value={dataJson} onChange={e => setDataJson(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 font-mono text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+                style={{ width: "100%", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: "8px 12px", fontFamily: "ui-monospace,monospace", fontSize: 12, color: "var(--text)", boxSizing: "border-box" }} />
             </div>
-            {analysisError && <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">{analysisError}</div>}
-            <button type="submit" disabled={analysisLoading}
-              className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">
+            {analysisError && <div style={{ borderRadius: 8, border: "1px solid var(--danger)", background: "rgba(239,68,68,0.1)", padding: "12px 16px", fontSize: 13, color: "var(--danger)" }}>{analysisError}</div>}
+            <button type="submit" disabled={analysisLoading} className="button"
+              style={{ width: "100%", opacity: analysisLoading ? 0.5 : 1, cursor: analysisLoading ? "not-allowed" : "pointer" }}>
               {analysisLoading ? "Running..." : "Run Causal Analysis"}
             </button>
           </form>
@@ -241,44 +268,44 @@ export default function CausalInferencePage() {
       )}
 
       {activeTab === "confounders" && (
-        <div className="space-y-8">
-          <form onSubmit={handleConfounders} className="space-y-5 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+          <form onSubmit={handleConfounders} style={{ display: "flex", flexDirection: "column", gap: 20, borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">Variables (comma-separated)</label>
+                <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Variables (comma-separated)</label>
                 <input required value={confVariables} onChange={e => setConfVariables(e.target.value)} placeholder="backend, n_qubits, gate_error, t2_us"
-                  className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none" />
+                  className="input" style={{ width: "100%", boxSizing: "border-box" }} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">Outcome</label>
+                <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Outcome</label>
                 <input required value={confOutcome} onChange={e => setConfOutcome(e.target.value)} placeholder="fidelity"
-                  className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none" />
+                  className="input" style={{ width: "100%", boxSizing: "border-box" }} />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">Experiment Log (JSON array)</label>
+              <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Experiment Log (JSON array)</label>
               <textarea rows={8} value={confLog} onChange={e => setConfLog(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 font-mono text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+                style={{ width: "100%", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: "8px 12px", fontFamily: "ui-monospace,monospace", fontSize: 12, color: "var(--text)", boxSizing: "border-box" }} />
             </div>
-            {confError && <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">{confError}</div>}
-            <button type="submit" disabled={confLoading}
-              className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">
+            {confError && <div style={{ borderRadius: 8, border: "1px solid var(--danger)", background: "rgba(239,68,68,0.1)", padding: "12px 16px", fontSize: 13, color: "var(--danger)" }}>{confError}</div>}
+            <button type="submit" disabled={confLoading} className="button"
+              style={{ width: "100%", opacity: confLoading ? 0.5 : 1, cursor: confLoading ? "not-allowed" : "pointer" }}>
               {confLoading ? "Identifying..." : "Identify Confounders"}
             </button>
           </form>
           {confResult && (
-            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6 space-y-4">
-              <h2 className="text-lg font-bold">{confResult.length} Confounder{confResult.length !== 1 ? "s" : ""} Found</h2>
-              {confResult.length === 0 ? <p className="text-slate-400">No significant confounders detected.</p> : (
-                <div className="space-y-4">
+            <div style={{ borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>{confResult.length} Confounder{confResult.length !== 1 ? "s" : ""} Found</h2>
+              {confResult.length === 0 ? <p style={{ color: "var(--muted)" }}>No significant confounders detected.</p> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {confResult.map((c, i) => (
-                    <div key={i} className="rounded-lg border border-slate-700 bg-slate-800 p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold">{c.variable}</span>
-                        <span className="text-xs font-mono text-slate-400">strength: {(c.strength * 100).toFixed(1)}%</span>
+                    <div key={i} style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontWeight: 600 }}>{c.variable}</span>
+                        <span style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--muted)" }}>strength: {(c.strength * 100).toFixed(1)}%</span>
                       </div>
                       <StrengthBar value={c.strength} />
-                      <p className="text-sm text-slate-400">{c.evidence}</p>
+                      <p style={{ fontSize: 13, color: "var(--muted)" }}>{c.evidence}</p>
                     </div>
                   ))}
                 </div>

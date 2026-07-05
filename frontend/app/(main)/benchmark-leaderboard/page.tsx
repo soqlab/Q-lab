@@ -19,18 +19,18 @@ function scoreColor(v: number): string {
 function TrendBadge({ trend }: { trend: string }) {
   if (trend === "up")
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-green-900/50 text-green-400">
+      <span style={{ display:"inline-flex", alignItems:"center", borderRadius:999, padding:"2px 8px", fontSize:12, fontWeight:700, background:"rgba(16,185,129,0.1)", color:"var(--ok)" }}>
         ↑
       </span>
     );
   if (trend === "down")
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-red-900/50 text-red-400">
+      <span style={{ display:"inline-flex", alignItems:"center", borderRadius:999, padding:"2px 8px", fontSize:12, fontWeight:700, background:"rgba(239,68,68,0.1)", color:"var(--danger)" }}>
         ↓
       </span>
     );
   return (
-    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-zinc-700 text-zinc-400">
+    <span style={{ display:"inline-flex", alignItems:"center", borderRadius:999, padding:"2px 8px", fontSize:12, fontWeight:700, background:"var(--line)", color:"var(--muted)" }}>
       —
     </span>
   );

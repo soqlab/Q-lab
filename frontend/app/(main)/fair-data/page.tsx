@@ -19,18 +19,17 @@ const METADATA_TABS = [
 type MetadataTab = typeof METADATA_TABS[number]["key"];
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
-  const color =
-    value >= 80 ? "bg-emerald-500" : value >= 50 ? "bg-yellow-500" : "bg-red-500";
+  const barColor =
+    value >= 80 ? "var(--ok)" : value >= 50 ? "#f59e0b" : "var(--danger)";
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-slate-300">{label}</span>
-        <span className="font-mono text-white">{value}%</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+        <span style={{ color: "var(--text)" }}>{label}</span>
+        <span style={{ fontFamily: "ui-monospace,monospace", color: "var(--text)" }}>{value}%</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-700">
+      <div style={{ height: 8, borderRadius: 999, background: "var(--line)" }}>
         <div
-          className={`h-2 rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${value}%` }}
+          style={{ height: 8, borderRadius: 999, background: barColor, width: `${value}%` }}
         />
       </div>
     </div>
@@ -48,10 +47,22 @@ function CopyBadge({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-2 rounded-full border border-indigo-500 bg-indigo-950 px-4 py-1.5 font-mono text-sm text-indigo-300 hover:bg-indigo-900 transition-colors"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        borderRadius: 999,
+        border: "1px solid var(--strong)",
+        background: "var(--surface)",
+        padding: "6px 16px",
+        fontFamily: "ui-monospace,monospace",
+        fontSize: 13,
+        color: "var(--strong)",
+        cursor: "pointer",
+      }}
     >
       {text}
-      <span className="text-xs text-indigo-400">{copied ? "Copied!" : "Click to copy"}</span>
+      <span style={{ fontSize: 12, color: "var(--strong)" }}>{copied ? "Copied!" : "Click to copy"}</span>
     </button>
   );
 }
@@ -76,21 +87,29 @@ function RecordResult({ record }: { record: FAIRRecord }) {
   const score: FAIRScore = record.fair_score;
 
   return (
-    <div className="space-y-6 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: 24,
+      borderRadius: 12,
+      border: "1px solid var(--line)",
+      background: "var(--surface)",
+      padding: 24,
+    }}>
       {/* DOI */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">DOI</p>
+        <p style={{ marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>DOI</p>
         <CopyBadge text={record.doi} />
       </div>
 
       {/* Total score */}
-      <div className="text-center">
-        <p className="text-6xl font-black text-white">{score.total}</p>
-        <p className="text-slate-400 text-sm mt-1">FAIR Total Score / 100</p>
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 60, fontWeight: 900, color: "var(--text)" }}>{score.total}</p>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>FAIR Total Score / 100</p>
       </div>
 
       {/* Score bars */}
-      <div className="space-y-3">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <ScoreBar label="Findable" value={score.findable} />
         <ScoreBar label="Accessible" value={score.accessible} />
         <ScoreBar label="Interoperable" value={score.interoperable} />
@@ -99,14 +118,14 @@ function RecordResult({ record }: { record: FAIRRecord }) {
 
       {/* Checklist */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Checklist</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {record.checklist.map((item, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-700/50 px-3 py-2">
-              <span className={item.done ? "text-emerald-400 mt-0.5" : "text-slate-500 mt-0.5"}>
+        <p style={{ marginBottom: 12, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Checklist</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+          {(record.checklist ?? []).map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, borderRadius: 8, background: "var(--line)", padding: "8px 12px" }}>
+              <span style={{ color: item.done ? "var(--ok)" : "var(--muted)", marginTop: 2 }}>
                 {item.done ? "✓" : "○"}
               </span>
-              <span className={`text-sm ${item.done ? "text-slate-200" : "text-slate-400"}`}>{item.item}</span>
+              <span style={{ fontSize: 13, color: item.done ? "var(--text)" : "var(--muted)" }}>{item.item}</span>
             </div>
           ))}
         </div>
@@ -114,12 +133,12 @@ function RecordResult({ record }: { record: FAIRRecord }) {
 
       {/* Landing page */}
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">Landing Page</p>
+        <p style={{ marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Landing Page</p>
         <a
           href={record.landing_page_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-indigo-400 hover:text-indigo-300 underline text-sm break-all"
+          style={{ color: "var(--strong)", textDecoration: "underline", fontSize: 13, wordBreak: "break-all" }}
         >
           {record.landing_page_url}
         </a>
@@ -127,29 +146,57 @@ function RecordResult({ record }: { record: FAIRRecord }) {
 
       {/* Metadata tabs */}
       <div>
-        <div className="flex gap-1 border-b border-slate-700 mb-4">
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 16 }}>
           {METADATA_TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === t.key
-                  ? "border-b-2 border-indigo-500 text-indigo-400"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              style={{
+                padding: "8px 16px",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                background: "none",
+                border: "none",
+                borderBottom: activeTab === t.key ? "2px solid var(--strong)" : "2px solid transparent",
+                color: activeTab === t.key ? "var(--strong)" : "var(--muted)",
+              }}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <div className="relative">
+        <div style={{ position: "relative" }}>
           <button
             onClick={handleCopyTab}
-            className="absolute right-2 top-2 rounded bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600"
+            style={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              borderRadius: 6,
+              background: "var(--line)",
+              padding: "4px 8px",
+              fontSize: 12,
+              color: "var(--text)",
+              cursor: "pointer",
+              border: "none",
+            }}
           >
             {copiedTab ? "Copied!" : "Copy"}
           </button>
-          <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-300 font-mono whitespace-pre-wrap break-words">
+          <pre style={{
+            maxHeight: 288,
+            overflowY: "auto",
+            borderRadius: 8,
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            padding: 16,
+            fontSize: 12,
+            color: "var(--text)",
+            fontFamily: "ui-monospace,monospace",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}>
             {tabContent[activeTab]}
           </pre>
         </div>
@@ -219,46 +266,65 @@ export default function FAIRDataPage() {
     }
   };
 
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "var(--muted)",
+  };
+
   return (
-    <div className="flex min-h-screen bg-slate-950 text-white">
+    <div style={{ display: "flex", minHeight: "100vh", color: "var(--text)" }}>
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <h1 className="mb-1 text-3xl font-black tracking-tight text-white">FAIR Data Compliance Engine</h1>
-        <p className="mb-8 text-slate-400">
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        <h1 style={{ marginBottom: 4, fontSize: 30, fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text)" }}>FAIR Data Compliance Engine</h1>
+        <p style={{ marginBottom: 32, color: "var(--muted)" }}>
           Make your experiments Findable, Accessible, Interoperable, Reusable.
         </p>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-slate-700 bg-slate-800/60 p-6 mb-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 20,
+          borderRadius: 12,
+          border: "1px solid var(--line)",
+          background: "var(--surface)",
+          padding: 24,
+          marginBottom: 32,
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Title *
               </label>
               <input
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
                 placeholder="Experiment title"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Algorithm *
               </label>
               <input
                 required
                 value={algorithm}
                 onChange={(e) => setAlgorithm(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
                 placeholder="e.g. VQE, QAOA"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <label style={labelStyle}>
               Description *
             </label>
             <textarea
@@ -266,20 +332,20 @@ export default function FAIRDataPage() {
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+              className="input"
               placeholder="Describe the experiment..."
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Backend *
               </label>
               <select
                 value={backend}
                 onChange={(e) => setBackend(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
               >
                 {BACKENDS.map((b) => (
                   <option key={b} value={b}>{b}</option>
@@ -287,7 +353,7 @@ export default function FAIRDataPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Qubits *
               </label>
               <input
@@ -297,11 +363,11 @@ export default function FAIRDataPage() {
                 required
                 value={nQubits}
                 onChange={(e) => setNQubits(parseInt(e.target.value) || 1)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Shots *
               </label>
               <input
@@ -310,14 +376,14 @@ export default function FAIRDataPage() {
                 required
                 value={nShots}
                 onChange={(e) => setNShots(parseInt(e.target.value) || 1024)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                className="input"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Fidelity (optional)
               </label>
               <input
@@ -327,25 +393,32 @@ export default function FAIRDataPage() {
                 max={1}
                 value={fidelity}
                 onChange={(e) => setFidelity(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
                 placeholder="0.0 – 1.0"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <label style={labelStyle}>
                 Run IDs (comma-separated, optional)
               </label>
               <input
                 value={runIds}
                 onChange={(e) => setRunIds(e.target.value)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="input"
                 placeholder="run-abc, run-def"
               />
             </div>
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            <div style={{
+              borderRadius: 8,
+              border: "1px solid var(--danger)",
+              background: "rgba(239,68,68,0.1)",
+              padding: "12px 16px",
+              fontSize: 13,
+              color: "var(--danger)",
+            }}>
               {error}
             </div>
           )}
@@ -353,7 +426,8 @@ export default function FAIRDataPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            className="button"
+            style={{ width: "100%", opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}
           >
             {loading ? "Generating FAIR Record..." : "Generate FAIR Record"}
           </button>
@@ -363,31 +437,38 @@ export default function FAIRDataPage() {
       </div>
 
       {/* Sidebar */}
-      <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-slate-700 bg-slate-900 p-5 lg:block">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">Past Records</h2>
+      <aside style={{
+        width: 288,
+        flexShrink: 0,
+        overflowY: "auto",
+        borderLeft: "1px solid var(--line)",
+        background: "var(--surface)",
+        padding: 20,
+      }}>
+        <h2 style={{ marginBottom: 16, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)" }}>Past Records</h2>
         {pastLoading ? (
-          <p className="text-slate-500 text-sm">Loading...</p>
-        ) : pastRecords.length === 0 ? (
-          <p className="text-slate-500 text-sm">No records yet.</p>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading...</p>
+        ) : (pastRecords ?? []).length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>No records yet.</p>
         ) : (
-          <div className="space-y-3">
-            {pastRecords.map((r) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {(pastRecords ?? []).map((r) => (
               <div
                 key={r.record_id}
-                className="rounded-lg border border-slate-700 bg-slate-800 p-3"
+                style={{ borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", padding: 12 }}
               >
-                <p className="font-mono text-xs text-indigo-400 break-all mb-1">{r.doi}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400">FAIR Score</span>
-                  <span
-                    className={`text-sm font-bold ${
-                      r.fair_score.total >= 80
-                        ? "text-emerald-400"
-                        : r.fair_score.total >= 50
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                    }`}
-                  >
+                <p style={{ fontFamily: "ui-monospace,monospace", fontSize: 12, color: "var(--strong)", wordBreak: "break-all", marginBottom: 4 }}>{r.doi}</p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>FAIR Score</span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: r.fair_score.total >= 80
+                      ? "var(--ok)"
+                      : r.fair_score.total >= 50
+                      ? "#f59e0b"
+                      : "var(--danger)",
+                  }}>
                     {r.fair_score.total}
                   </span>
                 </div>

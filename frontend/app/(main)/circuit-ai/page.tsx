@@ -21,11 +21,11 @@ cx q[0],q[1];
 cx q[1],q[2];
 measure q -> c;`;
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "bg-red-800 text-red-200",
-  high: "bg-orange-800 text-orange-200",
-  medium: "bg-yellow-800 text-yellow-200",
-  low: "bg-gray-700 text-gray-300",
+const SEVERITY_STYLES: Record<string, React.CSSProperties> = {
+  critical: { background: "rgba(239,68,68,0.2)", color: "var(--danger)" },
+  high: { background: "rgba(249,115,22,0.2)", color: "#f97316" },
+  medium: { background: "rgba(245,158,11,0.2)", color: "#f59e0b" },
+  low: { background: "var(--line)", color: "var(--muted)" },
 };
 
 export default function CircuitAIPage() {
@@ -102,37 +102,54 @@ export default function CircuitAIPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-1">Circuit AI</h1>
-      <p className="text-gray-400 text-sm mb-5">
+    <div className="page">
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Circuit AI</h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 20 }}>
         AI-powered quantum circuit debugging, optimization, and explanation.
       </p>
 
       {/* Shared QASM textarea */}
-      <div className="bg-gray-800 rounded-xl p-4 mb-5">
-        <label className="block text-xs text-gray-400 mb-2">
+      <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, marginBottom: 20, border: "1px solid var(--line)" }}>
+        <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
           Circuit QASM (shared across all tabs)
         </label>
         <textarea
           rows={9}
           spellCheck={false}
-          className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-xs text-green-300 font-mono focus:outline-none focus:border-indigo-500 resize-y"
+          style={{
+            width: "100%",
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: "var(--ok)",
+            fontFamily: "ui-monospace,monospace",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
           value={qasm}
           onChange={(e) => setQasm(e.target.value)}
         />
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-800 p-1 rounded-lg w-fit mb-5">
+      <div style={{ display: "flex", gap: 4, background: "var(--surface)", padding: 4, borderRadius: 8, width: "fit-content", marginBottom: 20, border: "1px solid var(--line)" }}>
         {(["debug", "optimize", "explain"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
-              tab === t
-                ? "bg-indigo-600 text-white"
-                : "text-gray-400 hover:text-white"
-            }`}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              textTransform: "capitalize",
+              cursor: "pointer",
+              border: "none",
+              background: tab === t ? "var(--strong)" : "transparent",
+              color: tab === t ? "#fff" : "var(--muted)",
+            }}
           >
             {t}
           </button>
@@ -141,12 +158,12 @@ export default function CircuitAIPage() {
 
       {/* ── Debug Tab ── */}
       {tab === "debug" && (
-        <div className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="w-56">
-              <label className="block text-xs text-gray-400 mb-1">Backend</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ width: 224 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Backend</label>
               <select
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
                 value={debugBackend}
                 onChange={(e) => setDebugBackend(e.target.value)}
               >
@@ -159,37 +176,42 @@ export default function CircuitAIPage() {
             <button
               onClick={handleDebug}
               disabled={debugging || !qasm.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+              className="button"
+              style={{ opacity: debugging || !qasm.trim() ? 0.5 : 1 }}
             >
               {debugging ? "Debugging…" : "Debug Circuit"}
             </button>
           </div>
 
-          {debugError && <p className="text-red-400 text-sm">{debugError}</p>}
+          {debugError && <p style={{ color: "var(--danger)", fontSize: 13 }}>{debugError}</p>}
 
           {debugResult && (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Score badge */}
-              <div className="flex items-center gap-4">
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <span
-                  className={`text-lg font-bold px-4 py-1 rounded-full ${
-                    debugResult.score >= 80
-                      ? "bg-green-800 text-green-200"
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    padding: "4px 16px",
+                    borderRadius: 999,
+                    ...(debugResult.score >= 80
+                      ? { background: "rgba(16,185,129,0.15)", color: "var(--ok)" }
                       : debugResult.score >= 50
-                      ? "bg-yellow-800 text-yellow-200"
-                      : "bg-red-800 text-red-200"
-                  }`}
+                      ? { background: "rgba(245,158,11,0.15)", color: "#f59e0b" }
+                      : { background: "rgba(239,68,68,0.15)", color: "var(--danger)" }),
+                  }}
                 >
                   Score: {debugResult.score}%
                 </span>
-                <span className="text-sm text-gray-400">
-                  {debugResult.bugs.length} bug(s) &middot;{" "}
-                  {debugResult.warnings.length} warning(s)
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                  {(debugResult.bugs ?? []).length} bug(s) &middot;{" "}
+                  {(debugResult.warnings ?? []).length} warning(s)
                 </span>
               </div>
 
               {/* Circuit stats */}
-              <div className="grid grid-cols-5 gap-2">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
                 {(
                   [
                     ["Qubits", debugResult.circuit_stats.n_qubits],
@@ -201,44 +223,47 @@ export default function CircuitAIPage() {
                 ).map(([label, val]) => (
                   <div
                     key={label}
-                    className="bg-gray-800 rounded-lg p-3 text-center"
+                    style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 12, textAlign: "center" }}
                   >
-                    <div className="text-xl font-bold text-white">{val}</div>
-                    <div className="text-xs text-gray-400">{label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{val}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{label}</div>
                   </div>
                 ))}
               </div>
 
               {/* Bugs */}
-              {debugResult.bugs.length > 0 && (
-                <div className="bg-gray-800 rounded-xl p-4">
-                  <h3 className="font-semibold text-red-400 mb-3">Bugs</h3>
-                  <div className="space-y-3">
-                    {debugResult.bugs.map((bug, i) => (
+              {(debugResult.bugs ?? []).length > 0 && (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                  <h3 style={{ fontWeight: 600, color: "var(--danger)", marginBottom: 12 }}>Bugs</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {(debugResult.bugs ?? []).map((bug, i) => (
                       <div
                         key={i}
-                        className="bg-gray-900 rounded-lg p-3 border-l-2 border-red-600"
+                        style={{ background: "rgba(239,68,68,0.05)", borderRadius: 8, padding: 12, borderLeft: "2px solid var(--danger)" }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-gray-500">
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>
                             Line {bug.line}
                           </span>
                           <span
-                            className={`text-xs font-bold px-2 py-0.5 rounded ${
-                              SEVERITY_COLORS[bug.severity] ??
-                              "bg-gray-700 text-gray-300"
-                            }`}
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 6,
+                              ...(SEVERITY_STYLES[bug.severity] ?? { background: "var(--line)", color: "var(--muted)" }),
+                            }}
                           >
                             {bug.severity}
                           </span>
-                          <span className="text-xs text-indigo-300 font-medium">
+                          <span style={{ fontSize: 12, color: "var(--strong)", fontWeight: 500 }}>
                             {bug.type}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-300 mb-1">
+                        <p style={{ fontSize: 13, color: "var(--text)", marginBottom: 4 }}>
                           {bug.description}
                         </p>
-                        <p className="text-xs text-green-300">
+                        <p style={{ fontSize: 12, color: "var(--ok)" }}>
                           Fix: {bug.fix}
                         </p>
                       </div>
@@ -248,21 +273,21 @@ export default function CircuitAIPage() {
               )}
 
               {/* Warnings */}
-              {debugResult.warnings.length > 0 && (
-                <div className="bg-gray-800 rounded-xl p-4">
-                  <h3 className="font-semibold text-yellow-400 mb-3">
+              {(debugResult.warnings ?? []).length > 0 && (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                  <h3 style={{ fontWeight: 600, color: "#f59e0b", marginBottom: 12 }}>
                     Warnings
                   </h3>
-                  <div className="space-y-2">
-                    {debugResult.warnings.map((w, i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {(debugResult.warnings ?? []).map((w, i) => (
                       <div
                         key={i}
-                        className="flex gap-3 bg-gray-900 rounded-lg p-3 text-sm"
+                        style={{ display: "flex", gap: 12, background: "rgba(245,158,11,0.05)", borderRadius: 8, padding: 12, fontSize: 13 }}
                       >
-                        <span className="text-gray-500 shrink-0">
+                        <span style={{ color: "var(--muted)", flexShrink: 0 }}>
                           L{w.line}
                         </span>
-                        <span className="text-gray-300">{w.message}</span>
+                        <span style={{ color: "var(--text)" }}>{w.message}</span>
                       </div>
                     ))}
                   </div>
@@ -270,12 +295,12 @@ export default function CircuitAIPage() {
               )}
 
               {/* Suggestions */}
-              {debugResult.suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {debugResult.suggestions.map((s, i) => (
+              {(debugResult.suggestions ?? []).length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(debugResult.suggestions ?? []).map((s, i) => (
                     <span
                       key={i}
-                      className="text-xs bg-gray-800 border border-gray-600 text-indigo-300 px-3 py-1 rounded-full"
+                      style={{ fontSize: 12, background: "var(--surface)", border: "1px solid var(--line)", color: "var(--strong)", padding: "4px 12px", borderRadius: 999 }}
                     >
                       {s}
                     </span>
@@ -289,14 +314,14 @@ export default function CircuitAIPage() {
 
       {/* ── Optimize Tab ── */}
       {tab === "optimize" && (
-        <div className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="w-48">
-              <label className="block text-xs text-gray-400 mb-1">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ width: 192 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 Objective
               </label>
               <select
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
                 value={optObjective}
                 onChange={(e) => setOptObjective(e.target.value)}
               >
@@ -308,65 +333,75 @@ export default function CircuitAIPage() {
             <button
               onClick={handleOptimize}
               disabled={optimizing || !qasm.trim()}
-              className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+              style={{
+                background: "#7c3aed",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 20px",
+                borderRadius: 8,
+                border: "none",
+                cursor: optimizing || !qasm.trim() ? "not-allowed" : "pointer",
+                opacity: optimizing || !qasm.trim() ? 0.5 : 1,
+              }}
             >
               {optimizing ? "Optimizing…" : "Optimize Circuit"}
             </button>
           </div>
 
-          {optError && <p className="text-red-400 text-sm">{optError}</p>}
+          {optError && <p style={{ color: "var(--danger)", fontSize: 13 }}>{optError}</p>}
 
           {optResult && (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Before / After */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-800 rounded-xl p-4 text-center">
-                  <div className="text-xs text-gray-400 mb-1">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                     Original Depth
                   </div>
-                  <div className="text-4xl font-bold text-gray-300">
+                  <div style={{ fontSize: 36, fontWeight: 700, color: "var(--text)" }}>
                     {optResult.original_depth}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                     {optResult.original_gates} gates
                   </div>
                 </div>
-                <div className="bg-gray-800 rounded-xl p-4 text-center">
-                  <div className="text-xs text-gray-400 mb-1">
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                     Optimized Depth
                   </div>
-                  <div className="text-4xl font-bold text-green-400">
+                  <div style={{ fontSize: 36, fontWeight: 700, color: "var(--ok)" }}>
                     {optResult.optimized_depth}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                     {optResult.optimized_gates} gates
                   </div>
                 </div>
               </div>
 
               {/* Reduction stats */}
-              <div className="flex gap-4">
-                <div className="bg-gray-800 rounded-lg px-4 py-2 text-center">
-                  <div className="text-xl font-bold text-green-400">
+              <div style={{ display: "flex", gap: 16 }}>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ok)" }}>
                     -{optResult.depth_reduction_pct.toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-400">Depth Reduction</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Depth Reduction</div>
                 </div>
-                <div className="bg-gray-800 rounded-lg px-4 py-2 text-center">
-                  <div className="text-xl font-bold text-indigo-400">
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--strong)" }}>
                     +{(optResult.fidelity_improvement * 100).toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-400">Fidelity Improvement</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Fidelity Improvement</div>
                 </div>
               </div>
 
               {/* Optimizations applied chips */}
-              {optResult.optimizations_applied.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {optResult.optimizations_applied.map((o, i) => (
+              {(optResult.optimizations_applied ?? []).length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(optResult.optimizations_applied ?? []).map((o, i) => (
                     <span
                       key={i}
-                      className="text-xs bg-violet-900 border border-violet-600 text-violet-200 px-3 py-1 rounded-full"
+                      style={{ fontSize: 12, background: "rgba(109,40,217,0.2)", border: "1px solid #7c3aed", color: "#c4b5fd", padding: "4px 12px", borderRadius: 999 }}
                     >
                       {o}
                     </span>
@@ -375,21 +410,21 @@ export default function CircuitAIPage() {
               )}
 
               {/* Optimized QASM */}
-              <div className="bg-gray-800 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-200 text-sm">
+              <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>
                     Optimized QASM
                   </h3>
                   <button
                     onClick={() =>
                       navigator.clipboard.writeText(optResult.optimized_qasm)
                     }
-                    className="text-xs text-gray-400 hover:text-white transition-colors"
+                    style={{ fontSize: 12, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer" }}
                   >
                     Copy
                   </button>
                 </div>
-                <pre className="bg-gray-900 rounded-lg p-3 text-xs text-green-300 font-mono overflow-x-auto whitespace-pre-wrap">
+                <pre style={{ fontFamily: "ui-monospace,monospace", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto", whiteSpace: "pre-wrap", fontSize: 12, color: "var(--ok)" }}>
                   {optResult.optimized_qasm}
                 </pre>
               </div>
@@ -400,14 +435,14 @@ export default function CircuitAIPage() {
 
       {/* ── Explain Tab ── */}
       {tab === "explain" && (
-        <div className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="w-48">
-              <label className="block text-xs text-gray-400 mb-1">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ width: 192 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 Detail Level
               </label>
               <select
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="input"
                 value={detailLevel}
                 onChange={(e) => setDetailLevel(e.target.value)}
               >
@@ -419,68 +454,80 @@ export default function CircuitAIPage() {
             <button
               onClick={handleExplain}
               disabled={explaining || !qasm.trim()}
-              className="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+              style={{
+                background: "#0d9488",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                padding: "8px 20px",
+                borderRadius: 8,
+                border: "none",
+                cursor: explaining || !qasm.trim() ? "not-allowed" : "pointer",
+                opacity: explaining || !qasm.trim() ? 0.5 : 1,
+              }}
             >
               {explaining ? "Explaining…" : "Explain Circuit"}
             </button>
           </div>
 
           {explainError && (
-            <p className="text-red-400 text-sm">{explainError}</p>
+            <p style={{ color: "var(--danger)", fontSize: 13 }}>{explainError}</p>
           )}
 
           {explainResult && (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Algorithm detected + use case */}
-              <div className="bg-gray-800 rounded-xl p-4 flex items-start gap-4">
+              <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, display: "flex", alignItems: "flex-start", gap: 16 }}>
                 {explainResult.algorithm_detected && (
-                  <span className="bg-teal-800 text-teal-200 text-sm font-bold px-3 py-1 rounded-full shrink-0">
+                  <span style={{ background: "rgba(13,148,136,0.2)", color: "#5eead4", fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 999, flexShrink: 0 }}>
                     {explainResult.algorithm_detected}
                   </span>
                 )}
-                <p className="text-gray-300 text-sm">{explainResult.use_case}</p>
+                <p style={{ color: "var(--text)", fontSize: 13 }}>{explainResult.use_case}</p>
               </div>
 
               {/* Step-by-step table */}
-              {explainResult.step_by_step.length > 0 && (
-                <div className="bg-gray-800 rounded-xl p-4">
-                  <h3 className="font-semibold text-gray-200 mb-3">
+              {(explainResult.step_by_step ?? []).length > 0 && (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                  <h3 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
                     Step-by-Step
                   </h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-400 text-xs border-b border-gray-700">
-                        <th className="text-left pb-2">Gate</th>
-                        <th className="text-left pb-2">Qubits</th>
-                        <th className="text-left pb-2">Purpose</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {explainResult.step_by_step.map((step, i) => (
-                        <tr
-                          key={i}
-                          className="border-b border-gray-700 last:border-0"
-                        >
-                          <td className="py-2 font-mono text-teal-300 font-bold">
-                            {step.gate}
-                          </td>
-                          <td className="py-2 text-gray-400 font-mono text-xs">
-                            [{step.qubits.join(", ")}]
-                          </td>
-                          <td className="py-2 text-gray-300">{step.purpose}</td>
+                  <div className="table-wrap">
+                    <table style={{ width: "100%", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
+                          <th style={{ textAlign: "left", paddingBottom: 8 }}>Gate</th>
+                          <th style={{ textAlign: "left", paddingBottom: 8 }}>Qubits</th>
+                          <th style={{ textAlign: "left", paddingBottom: 8 }}>Purpose</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(explainResult.step_by_step ?? []).map((step, i, arr) => (
+                          <tr
+                            key={i}
+                            style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--line)" : "none" }}
+                          >
+                            <td style={{ padding: "8px 0", fontFamily: "ui-monospace,monospace", color: "#5eead4", fontWeight: 700 }}>
+                              {step.gate}
+                            </td>
+                            <td style={{ padding: "8px 0", color: "var(--muted)", fontFamily: "ui-monospace,monospace", fontSize: 12 }}>
+                              [{(step.qubits ?? []).join(", ")}]
+                            </td>
+                            <td style={{ padding: "8px 0", color: "var(--text)" }}>{step.purpose}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {/* Full explanation */}
-              <div className="bg-gray-800 rounded-xl p-4">
-                <h3 className="font-semibold text-gray-200 mb-2">
+              <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                <h3 style={{ fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
                   Full Explanation
                 </h3>
-                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                <p style={{ color: "var(--text)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                   {explainResult.explanation}
                 </p>
               </div>

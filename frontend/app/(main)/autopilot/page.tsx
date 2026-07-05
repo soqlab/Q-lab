@@ -48,151 +48,153 @@ export default function AutopilotPage() {
     finally { setLoading(false); }
   }
 
-  const statusColor: Record<string, string> = { running: "text-blue-400", converged: "text-green-400", stopped: "text-gray-500", max_iter: "text-yellow-400" };
+  const statusColor: Record<string, string> = { running: "var(--info-text)", converged: "var(--ok)", stopped: "var(--muted)", max_iter: "#f59e0b" };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Experiment Autopilot</h1>
-        <button onClick={() => setShowStart(!showStart)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+    <div style={{ padding:24, maxWidth:1100, margin:"0 auto", display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <h1 style={{ fontSize:24, fontWeight:700 }}>Experiment Autopilot</h1>
+        <button onClick={() => setShowStart(!showStart)} className="button">
           + Launch Mission
         </button>
       </div>
-      <p className="text-gray-400">Set a target (e.g. "find ground state energy to 1 mHa") and Q-Lab iterates circuits, adjusts parameters, picks backends, and stops when converged.</p>
+      <p style={{ color:"var(--muted)" }}>Set a target (e.g. "find ground state energy to 1 mHa") and Q-Lab iterates circuits, adjusts parameters, picks backends, and stops when converged.</p>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color:"var(--danger)", background:"rgba(239,68,68,0.1)", borderRadius:6, padding:12 }}>{error}</div>}
 
       {showStart && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div style={{ background:"var(--surface)", borderRadius:8, padding:20, display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
             <div>
-              <label className="text-sm text-gray-400">Mission Name</label>
+              <label style={{ fontSize:13, color:"var(--muted)" }}>Mission Name</label>
               <input value={missionName} onChange={e => setMissionName(e.target.value)}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                className="input" style={{ width:"100%", marginTop:4 }} />
             </div>
             <div>
-              <label className="text-sm text-gray-400">Goal</label>
+              <label style={{ fontSize:13, color:"var(--muted)" }}>Goal</label>
               <select value={goal} onChange={e => setGoal(e.target.value)}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+                className="input" style={{ width:"100%", marginTop:4 }}>
                 {["minimize_energy", "maximize_fidelity", "maximize_approximation_ratio", "minimize_error"].map(g => (
                   <option key={g} value={g}>{g.replace(/_/g, " ")}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-sm text-gray-400">Backend</label>
+              <label style={{ fontSize:13, color:"var(--muted)" }}>Backend</label>
               <select value={backend} onChange={e => setBackend(e.target.value)}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+                className="input" style={{ width:"100%", marginTop:4 }}>
                 {["ibm_brisbane", "ionq_aria_1", "rigetti_ankaa_2"].map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-sm text-gray-400">Target Value</label>
+              <label style={{ fontSize:13, color:"var(--muted)" }}>Target Value</label>
               <input type="number" step="any" value={targetValue} onChange={e => setTargetValue(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-gray-700" />
+                className="input" style={{ width:"100%", marginTop:4, fontFamily:"ui-monospace,monospace" }} />
             </div>
             <div>
-              <label className="text-sm text-gray-400">Max Iterations</label>
+              <label style={{ fontSize:13, color:"var(--muted)" }}>Max Iterations</label>
               <input type="number" value={maxIter} onChange={e => setMaxIter(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                className="input" style={{ width:"100%", marginTop:4 }} />
             </div>
           </div>
-          <div className="flex gap-3">
-            <button onClick={start} disabled={loading} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">Launch</button>
-            <button onClick={() => setShowStart(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+          <div style={{ display:"flex", gap:12 }}>
+            <button onClick={start} disabled={loading}
+              style={{ padding:"8px 16px", background:"rgba(16,185,129,0.1)", border:"1px solid var(--ok)", color:"var(--ok)", borderRadius:6, fontSize:13, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
+              Launch
+            </button>
+            <button onClick={() => setShowStart(false)} className="button secondary">Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-400 uppercase">Missions</h2>
-          {missions.map(m => (
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:24 }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <h2 style={{ fontSize:13, fontWeight:500, color:"var(--muted)", textTransform:"uppercase" }}>Missions</h2>
+          {(missions ?? []).map(m => (
             <div key={m.mission_id} onClick={() => setActive(m as unknown as AutopilotMission)}
-              className={`bg-gray-900 rounded-lg p-3 cursor-pointer border transition-colors ${active?.mission_id === m.mission_id ? "border-indigo-500" : "border-transparent hover:border-gray-600"}`}>
-              <div className="font-medium text-sm truncate">{m.name}</div>
-              <div className="flex justify-between text-xs mt-1">
-                <span className={statusColor[m.status] ?? "text-gray-400"}>{m.status}</span>
-                <span className="text-gray-500">iter {m.current_iteration}</span>
+              style={{ background:"var(--surface)", borderRadius:8, padding:12, cursor:"pointer", border: active?.mission_id === m.mission_id ? "1px solid var(--strong)" : "1px solid transparent" }}>
+              <div style={{ fontWeight:500, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.name}</div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginTop:4 }}>
+                <span style={{ color: statusColor[m.status] ?? "var(--muted)" }}>{m.status}</span>
+                <span style={{ color:"var(--muted)" }}>iter {m.current_iteration}</span>
               </div>
-              <div className="mt-1.5 w-full bg-gray-700 rounded-full h-1.5">
-                <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${m.estimated_completion_pct}%` }} />
+              <div style={{ marginTop:6, width:"100%", background:"var(--line)", borderRadius:999, height:6 }}>
+                <div style={{ background:"var(--strong)", height:6, borderRadius:999, width:`${m.estimated_completion_pct}%` }} />
               </div>
-              {m.best_value !== null && <div className="text-xs font-mono text-indigo-400 mt-1">best: {m.best_value.toFixed(6)}</div>}
+              {m.best_value !== null && <div style={{ fontSize:12, fontFamily:"ui-monospace,monospace", color:"var(--strong)", marginTop:4 }}>best: {m.best_value.toFixed(6)}</div>}
             </div>
           ))}
         </div>
 
         {active && (
-          <div className="lg:col-span-2 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div style={{ gridColumn:"span 2", display:"flex", flexDirection:"column", gap:16 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
               {([
-                ["Status", active.status, statusColor[active.status] ?? "text-gray-400"],
-                ["Iteration", String(active.current_iteration), "text-white"],
-                ["Best Value", active.best_value !== null ? active.best_value.toFixed(6) : "—", "text-indigo-400"],
+                ["Status", active.status, statusColor[active.status] ?? "var(--muted)"],
+                ["Iteration", String(active.current_iteration), "var(--text)"],
+                ["Best Value", active.best_value !== null ? active.best_value.toFixed(6) : "—", "var(--strong)"],
               ] as [string, string, string][]).map(([l, v, c]) => (
-                <div key={l} className="bg-gray-900 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-500">{l}</div>
-                  <div className={`font-mono font-semibold mt-1 ${c}`}>{v}</div>
+                <div key={l} style={{ background:"var(--surface)", borderRadius:8, padding:12, textAlign:"center" }}>
+                  <div style={{ fontSize:12, color:"var(--muted)" }}>{l}</div>
+                  <div style={{ fontFamily:"ui-monospace,monospace", fontWeight:600, marginTop:4, color:c }}>{v}</div>
                 </div>
               ))}
             </div>
 
-            <div className="w-full bg-gray-700 rounded-full h-3">
-              <div className="bg-indigo-500 h-3 rounded-full transition-all" style={{ width: `${active.estimated_completion_pct}%` }} />
+            <div style={{ width:"100%", background:"var(--line)", borderRadius:999, height:12 }}>
+              <div style={{ background:"var(--strong)", height:12, borderRadius:999, width:`${active.estimated_completion_pct}%` }} />
             </div>
-            <div className="text-xs text-gray-500 text-center">{active.estimated_completion_pct.toFixed(1)}% complete · ${active.total_cost_usd.toFixed(4)} spent</div>
+            <div style={{ fontSize:12, color:"var(--muted)", textAlign:"center" }}>{active.estimated_completion_pct.toFixed(1)}% complete · ${active.total_cost_usd.toFixed(4)} spent</div>
 
             {active.converged && (
-              <div className="bg-green-900/30 border border-green-700 rounded p-3 text-green-300 text-sm">
+              <div style={{ background:"rgba(16,185,129,0.1)", border:"1px solid var(--ok)", borderRadius:6, padding:12, color:"var(--ok)", fontSize:13 }}>
                 {active.convergence_reason}
               </div>
             )}
 
             {!active.converged && active.next_action && (
-              <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-                <h3 className="font-medium text-sm">Next Suggested Point</h3>
-                <div className="grid grid-cols-2 gap-2">
+              <div style={{ background:"var(--surface)", borderRadius:8, padding:16, display:"flex", flexDirection:"column", gap:12 }}>
+                <h3 style={{ fontWeight:500, fontSize:13 }}>Next Suggested Point</h3>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                   {Object.entries(active.next_action.params as Record<string, unknown> || {}).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-400 font-mono">{k}:</span>
-                      <span className="font-mono text-indigo-300">{typeof v === "number" ? v.toFixed(4) : String(v)}</span>
+                    <div key={k} style={{ display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
+                      <span style={{ color:"var(--muted)", fontFamily:"ui-monospace,monospace" }}>{k}:</span>
+                      <span style={{ fontFamily:"ui-monospace,monospace", color:"var(--strong)" }}>{typeof v === "number" ? v.toFixed(4) : String(v)}</span>
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-3">
+                <div style={{ display:"flex", gap:12 }}>
                   <input type="number" step="any" placeholder="Your objective value" value={stepValue}
                     onChange={e => setStepValue(e.target.value)}
-                    className="flex-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-indigo-700 text-sm" />
-                  <button onClick={step} disabled={loading || !stepValue}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">
-                    Submit & Iterate
+                    style={{ flex:1, background:"var(--surface)", color:"var(--text)", fontFamily:"ui-monospace,monospace", padding:"8px 12px", borderRadius:6, border:"1px solid var(--strong)", fontSize:13 }} />
+                  <button onClick={step} disabled={loading || !stepValue} className="button"
+                    style={{ opacity: (loading || !stepValue) ? 0.5 : 1, cursor: (loading || !stepValue) ? "not-allowed" : "pointer" }}>
+                    Submit &amp; Iterate
                   </button>
                 </div>
               </div>
             )}
 
-            {active.iterations.length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4">
-                <h3 className="font-medium text-sm mb-3">Iteration History</h3>
-                <div className="flex items-end gap-1 h-20">
+            {(active.iterations ?? []).length > 0 && (
+              <div style={{ background:"var(--surface)", borderRadius:8, padding:16 }}>
+                <h3 style={{ fontWeight:500, fontSize:13, marginBottom:12 }}>Iteration History</h3>
+                <div style={{ display:"flex", alignItems:"flex-end", gap:4, height:80 }}>
                   {(active.iterations as { value: number }[]).map((it, i) => {
                     const vals = (active.iterations as { value: number }[]).map(x => x.value);
                     const mn = Math.min(...vals); const mx = Math.max(...vals);
                     const pct = mx === mn ? 50 : ((it.value - mn) / (mx - mn)) * 100;
-                    return <div key={i} className="flex-1 bg-indigo-500 rounded-t" style={{ height: `${Math.max(4, pct)}%` }} title={`iter ${i + 1}: ${it.value.toFixed(4)}`} />;
+                    return <div key={i} style={{ flex:1, background:"var(--strong)", borderRadius:"4px 4px 0 0", height:`${Math.max(4, pct)}%` }} title={`iter ${i + 1}: ${it.value.toFixed(4)}`} />;
                   })}
                 </div>
               </div>
             )}
 
-            {active.decision_log.length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 space-y-2 max-h-48 overflow-y-auto">
-                <h3 className="font-medium text-sm">Decision Log</h3>
+            {(active.decision_log ?? []).length > 0 && (
+              <div style={{ background:"var(--surface)", borderRadius:8, padding:16, display:"flex", flexDirection:"column", gap:8, maxHeight:192, overflowY:"auto" }}>
+                <h3 style={{ fontWeight:500, fontSize:13 }}>Decision Log</h3>
                 {(active.decision_log as { iteration: number; decision: string }[]).slice(-5).map((d, i) => (
-                  <div key={i} className="text-xs text-gray-400">
-                    <span className="text-indigo-400 font-mono">iter {d.iteration}:</span> {d.decision}
+                  <div key={i} style={{ fontSize:12, color:"var(--muted)" }}>
+                    <span style={{ color:"var(--strong)", fontFamily:"ui-monospace,monospace" }}>iter {d.iteration}:</span> {d.decision}
                   </div>
                 ))}
               </div>

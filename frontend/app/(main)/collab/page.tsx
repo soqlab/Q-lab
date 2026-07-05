@@ -71,65 +71,65 @@ export default function CollabPage() {
   const participants = active?.participants as { username: string; role?: string }[] | undefined;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ padding: 24, maxWidth: 1152, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-2xl font-bold">Collaboration Rooms</h1>
-          <p className="text-gray-400 text-sm">Real-time shared workspaces for quantum experiments. Share parameters, discuss results, annotate circuits together.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Collaboration Rooms</h1>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Real-time shared workspaces for quantum experiments. Share parameters, discuss results, annotate circuits together.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Username:</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>Username:</span>
             <input value={username} onChange={e => setUsername(e.target.value)}
-              className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 w-36" />
+              style={{ background: "var(--surface)", color: "var(--text)", fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--line)", width: 144 }} />
           </div>
           <button onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+            style={{ padding: "8px 16px", background: "var(--strong)", borderRadius: 6, fontWeight: 500, cursor: "pointer" }}>
             + Create Room
           </button>
         </div>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {showCreate && (
-        <div className="bg-gray-900 rounded-lg p-4 flex gap-3 items-end">
-          <div className="flex-1">
-            <label className="text-sm text-gray-400">Room Name</label>
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", gap: 12, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 13, color: "var(--muted)" }}>Room Name</label>
             <input value={roomName} onChange={e => setRoomName(e.target.value)}
-              className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }} />
           </div>
-          <button onClick={create} disabled={loading} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">Create</button>
-          <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+          <button onClick={create} disabled={loading} style={{ padding: "8px 16px", background: "var(--ok)", borderRadius: 6, fontSize: 13, opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>Create</button>
+          <button onClick={() => setShowCreate(false)} style={{ padding: "8px 16px", background: "var(--line)", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-400 uppercase">Rooms</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 3fr", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase" }}>Rooms</h2>
           {rooms.map(r => (
             <div key={r.room_id} onClick={() => join(r)}
-              className={`bg-gray-900 rounded-lg p-3 cursor-pointer border transition-colors ${active?.room_id === r.room_id ? "border-indigo-500" : "border-transparent hover:border-gray-600"}`}>
-              <div className="flex justify-between items-start">
-                <div className="font-medium text-sm">{r.name}</div>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${r.status === "active" ? "bg-green-400" : "bg-gray-600"}`} />
+              style={{ background: "var(--surface)", borderRadius: 8, padding: 12, cursor: "pointer", border: active?.room_id === r.room_id ? "1px solid var(--strong)" : "1px solid transparent" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 500, fontSize: 13 }}>{r.name}</div>
+                <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, marginTop: 4, background: r.status === "active" ? "var(--ok)" : "var(--line)", display: "inline-block" }} />
               </div>
-              <div className="text-xs text-gray-500 mt-1">{r.experiment_name}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{r.experiment_name}</div>
             </div>
           ))}
         </div>
 
         {active && (
-          <div className="lg:col-span-3 space-y-4">
-            <div className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <h2 className="font-bold">{active.name}</h2>
-                <div className="text-xs text-gray-500">{active.experiment_name} · room {active.room_id.slice(0, 8)}</div>
+                <h2 style={{ fontWeight: 700 }}>{active.name}</h2>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{active.experiment_name} · room {active.room_id.slice(0, 8)}</div>
               </div>
               {participants && participants.length > 0 && (
-                <div className="flex gap-1">
-                  {participants.slice(0, 5).map((p, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-medium"
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(participants ?? []).slice(0, 5).map((p, i) => (
+                    <div key={i} style={{ width: 28, height: 28, borderRadius: 999, background: "var(--strong)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500 }}
                       title={p.username}>{p.username.slice(0, 2).toUpperCase()}</div>
                   ))}
                 </div>
@@ -137,12 +137,12 @@ export default function CollabPage() {
             </div>
 
             {active.current_params && Object.keys(active.current_params).length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-3">
-                <div className="text-xs text-gray-400 mb-2">Shared Parameters</div>
-                <div className="flex gap-3 flex-wrap">
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Shared Parameters</div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {Object.entries(active.current_params).map(([k, v]) => (
-                    <div key={k} className="bg-gray-800 rounded px-2 py-1 text-xs font-mono">
-                      <span className="text-gray-400">{k}: </span><span className="text-indigo-300">{String(v)}</span>
+                    <div key={k} style={{ background: "var(--surface)", borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "ui-monospace,monospace", border: "1px solid var(--line)" }}>
+                      <span style={{ color: "var(--muted)" }}>{k}: </span><span style={{ color: "var(--strong)" }}>{String(v)}</span>
                     </div>
                   ))}
                 </div>
@@ -150,46 +150,46 @@ export default function CollabPage() {
             )}
 
             {annotations && annotations.length > 0 && (
-              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 space-y-1">
-                <div className="text-xs text-yellow-400 mb-2">📌 Annotations</div>
-                {annotations.map((a, i) => (
-                  <div key={i} className="text-xs text-yellow-200">
-                    <span className="text-yellow-500">{a.username}: </span>{a.text}
+              <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(161,98,7,0.5)", borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>📌 Annotations</div>
+                {(annotations ?? []).map((a, i) => (
+                  <div key={i} style={{ fontSize: 12, color: "#f59e0b" }}>
+                    <span style={{ color: "#f59e0b" }}>{a.username}: </span>{a.text}
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="bg-gray-900 rounded-lg flex flex-col h-72">
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {chatMessages && chatMessages.map((m, i) => (
-                  <div key={i} className={`flex gap-2 ${m.username === username ? "justify-end" : "justify-start"}`}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, display: "flex", flexDirection: "column", height: 288 }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                {chatMessages && (chatMessages ?? []).map((m, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, justifyContent: m.username === username ? "flex-end" : "flex-start" }}>
                     {m.username !== username && (
-                      <div className="w-6 h-6 rounded-full bg-indigo-700 flex items-center justify-center text-xs flex-shrink-0 mt-1">{m.username.slice(0, 2).toUpperCase()}</div>
+                      <div style={{ width: 24, height: 24, borderRadius: 999, background: "var(--strong)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0, marginTop: 4 }}>{m.username.slice(0, 2).toUpperCase()}</div>
                     )}
-                    <div className={`max-w-xs rounded-xl px-3 py-2 text-sm ${m.username === username ? "bg-indigo-600" : "bg-gray-700"}`}>
-                      {m.username !== username && <div className="text-xs text-gray-400 mb-0.5">{m.username}</div>}
+                    <div style={{ maxWidth: 280, borderRadius: 12, padding: "8px 12px", fontSize: 13, background: m.username === username ? "var(--strong)" : "var(--line)" }}>
+                      {m.username !== username && <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>{m.username}</div>}
                       {m.message}
-                      <div className="text-xs opacity-50 mt-0.5">{new Date(m.timestamp).toLocaleTimeString()}</div>
+                      <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{new Date(m.timestamp).toLocaleTimeString()}</div>
                     </div>
                   </div>
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <div className="border-t border-gray-700 p-3 space-y-2">
-                <div className="flex gap-2">
+              <div style={{ borderTop: "1px solid var(--line)", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <input value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
                     placeholder="Type a message..."
-                    className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-700" />
+                    style={{ flex: 1, background: "var(--surface)", color: "var(--text)", fontSize: 13, padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)" }} />
                   <button onClick={send} disabled={!message.trim() || loading}
-                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">Send</button>
+                    style={{ padding: "8px 12px", background: "var(--strong)", borderRadius: 6, fontSize: 13, opacity: (!message.trim() || loading) ? 0.5 : 1, cursor: (!message.trim() || loading) ? "not-allowed" : "pointer" }}>Send</button>
                 </div>
-                <div className="flex gap-2">
+                <div style={{ display: "flex", gap: 8 }}>
                   <input value={annotation} onChange={e => setAnnotation(e.target.value)} onKeyDown={e => e.key === "Enter" && addNote()}
                     placeholder="Add annotation..."
-                    className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded border border-yellow-700/50" />
+                    style={{ flex: 1, background: "var(--surface)", color: "var(--text)", fontSize: 13, padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(161,98,7,0.5)" }} />
                   <button onClick={addNote} disabled={!annotation.trim() || loading}
-                    className="px-3 py-2 bg-yellow-800 hover:bg-yellow-700 rounded text-sm disabled:opacity-50">📌 Pin</button>
+                    style={{ padding: "8px 12px", background: "rgba(245,158,11,0.15)", borderRadius: 6, fontSize: 13, opacity: (!annotation.trim() || loading) ? 0.5 : 1, cursor: (!annotation.trim() || loading) ? "not-allowed" : "pointer" }}>📌 Pin</button>
                 </div>
               </div>
             </div>

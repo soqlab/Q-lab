@@ -19,14 +19,14 @@ type CertListItem = {
 
 function CertifiedBanner({ certified }: { certified: boolean }) {
   return certified ? (
-    <div className="rounded-2xl bg-emerald-950 border border-emerald-700 p-6 text-center">
-      <div className="text-5xl font-black text-emerald-400 mb-1">CERTIFIED</div>
-      <div className="text-emerald-500 text-2xl">&#10003;</div>
+    <div style={{ borderRadius: 16, background: "rgba(2,44,34,0.9)", border: "1px solid var(--ok)", padding: 24, textAlign: "center" }}>
+      <div style={{ fontSize: 48, fontWeight: 900, color: "var(--ok)", marginBottom: 4 }}>CERTIFIED</div>
+      <div style={{ color: "var(--ok)", fontSize: 24 }}>&#10003;</div>
     </div>
   ) : (
-    <div className="rounded-2xl bg-red-950 border border-red-800 p-6 text-center">
-      <div className="text-5xl font-black text-red-400 mb-1">NOT CERTIFIED</div>
-      <div className="text-red-500 text-2xl">&#10007;</div>
+    <div style={{ borderRadius: 16, background: "rgba(69,10,10,0.9)", border: "1px solid var(--danger)", padding: 24, textAlign: "center" }}>
+      <div style={{ fontSize: 48, fontWeight: 900, color: "var(--danger)", marginBottom: 4 }}>NOT CERTIFIED</div>
+      <div style={{ color: "var(--danger)", fontSize: 24 }}>&#10007;</div>
     </div>
   );
 }
@@ -39,72 +39,72 @@ function CertDetailPanel({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between p-5 border-b border-gray-800">
+    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", padding: 16 }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 16, width: "100%", maxWidth: 672, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 20, borderBottom: "1px solid var(--line)" }}>
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               {cert.certified ? (
-                <span className="text-xs bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">
+                <span style={{ fontSize: 12, background: "rgba(6,78,59,0.6)", color: "var(--ok)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
                   Certified
                 </span>
               ) : (
-                <span className="text-xs bg-red-900/60 text-red-300 px-2 py-0.5 rounded-full font-semibold">
+                <span style={{ fontSize: 12, background: "rgba(127,29,29,0.6)", color: "var(--danger)", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>
                   Not Certified
                 </span>
               )}
-              <span className="text-xs text-gray-500 capitalize">{cert.claim_type.replace(/_/g, " ")}</span>
+              <span style={{ fontSize: 12, color: "var(--muted)", textTransform: "capitalize" }}>{cert.claim_type.replace(/_/g, " ")}</span>
             </div>
-            <h2 className="text-gray-100 font-semibold text-lg">{cert.name}</h2>
-            <p className="text-gray-500 text-xs mt-0.5">
+            <h2 style={{ color: "var(--text)", fontWeight: 600, fontSize: 18 }}>{cert.name}</h2>
+            <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
               {cert.backend} &middot; {cert.n_qubits} qubits &middot; {cert.statistical_test}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-200 text-xl leading-none ml-4">
+          <button onClick={onClose} style={{ color: "var(--muted)", fontSize: 20, lineHeight: 1, marginLeft: 16, background: "none", border: "none", cursor: "pointer" }}>
             &times;
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Key metrics */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-900 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-indigo-400">{cert.speedup_factor.toFixed(2)}x</p>
-              <p className="text-xs text-gray-500 mt-1">Speedup Factor</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+            <div style={{ background: "var(--surface)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+              <p style={{ fontSize: 24, fontWeight: 700, color: "var(--strong)" }}>{cert.speedup_factor.toFixed(2)}x</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Speedup Factor</p>
             </div>
-            <div className="bg-gray-900 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-gray-100">{cert.p_value.toExponential(2)}</p>
-              <p className="text-xs text-gray-500 mt-1">p-value</p>
+            <div style={{ background: "var(--surface)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+              <p style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{cert.p_value.toExponential(2)}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>p-value</p>
             </div>
-            <div className="bg-gray-900 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-gray-100">{cert.test_statistic.toFixed(4)}</p>
-              <p className="text-xs text-gray-500 mt-1">Test Statistic</p>
+            <div style={{ background: "var(--surface)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+              <p style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{cert.test_statistic.toFixed(4)}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Test Statistic</p>
             </div>
           </div>
 
           {/* Runtimes */}
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-3">Runtime Comparison</h3>
-            <div className="grid grid-cols-2 gap-4 text-center">
+          <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16 }}>
+            <h3 style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Runtime Comparison</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, textAlign: "center" }}>
               <div>
-                <p className="text-lg font-bold text-gray-200">{cert.classical_runtime_sec}s</p>
-                <p className="text-xs text-gray-500">Classical Runtime</p>
+                <p style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{cert.classical_runtime_sec}s</p>
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>Classical Runtime</p>
               </div>
               <div>
-                <p className="text-lg font-bold text-indigo-400">{cert.quantum_runtime_sec}s</p>
-                <p className="text-xs text-gray-500">Quantum Runtime</p>
+                <p style={{ fontSize: 18, fontWeight: 700, color: "var(--strong)" }}>{cert.quantum_runtime_sec}s</p>
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>Quantum Runtime</p>
               </div>
             </div>
           </div>
 
           {/* Methodology notes */}
-          {cert.methodology_notes.length > 0 && (
+          {(cert.methodology_notes ?? []).length > 0 && (
             <div>
-              <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-2">Methodology Notes</h3>
-              <ul className="space-y-1">
-                {cert.methodology_notes.map((note, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-300">
-                    <span className="text-gray-600 flex-shrink-0">•</span>
+              <h3 style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Methodology Notes</h3>
+              <ul style={{ display: "flex", flexDirection: "column", gap: 4, listStyle: "none", padding: 0, margin: 0 }}>
+                {(cert.methodology_notes ?? []).map((note, i) => (
+                  <li key={i} style={{ display: "flex", gap: 8, fontSize: 13, color: "var(--text)" }}>
+                    <span style={{ color: "var(--muted)", flexShrink: 0 }}>•</span>
                     <span>{note}</span>
                   </li>
                 ))}
@@ -118,7 +118,7 @@ function CertDetailPanel({
               href={cert.certificate_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#059669", color: "white", fontSize: 13, padding: "8px 16px", borderRadius: 8, fontWeight: 500, textDecoration: "none" }}
             >
               Download Certificate
             </a>
@@ -233,45 +233,43 @@ export default function CertifyPage() {
     }
   }
 
-  const inputCls = "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500";
-
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-6">
+    <main style={{ minHeight: "100vh", color: "var(--text)", padding: 24 }}>
       {selectedCert && (
         <CertDetailPanel cert={selectedCert} onClose={() => setSelectedCert(null)} />
       )}
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-100">Quantum Advantage Certifier</h1>
-        <p className="text-gray-500 text-sm mt-1">
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>Quantum Advantage Certifier</h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
           Rigorous statistical certification of quantum computational advantage.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-10">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 32, marginBottom: 40 }}>
         {/* Certification form */}
         <div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-gray-100 mb-5">New Certification</h2>
-            <form onSubmit={handleCertify} className="space-y-4">
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 16, padding: 24 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 20 }}>New Certification</h2>
+            <form onSubmit={handleCertify} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Experiment Name</label>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Experiment Name</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Bell State Supremacy Claim"
-                  className={inputCls}
+                  className="input"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Claim Type</label>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Claim Type</label>
                   <select
                     value={claimType}
                     onChange={(e) => setClaimType(e.target.value as typeof claimType)}
-                    className={inputCls}
+                    className="input"
                   >
                     <option value="speedup">Speedup</option>
                     <option value="sampling_advantage">Sampling Advantage</option>
@@ -279,8 +277,8 @@ export default function CertifyPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Backend</label>
-                  <select value={backend} onChange={(e) => setBackend(e.target.value)} className={inputCls}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Backend</label>
+                  <select value={backend} onChange={(e) => setBackend(e.target.value)} className="input">
                     <option value="ibmq_manila">ibmq_manila</option>
                     <option value="ibmq_nairobi">ibmq_nairobi</option>
                     <option value="ibmq_kyoto">ibmq_kyoto</option>
@@ -291,8 +289,8 @@ export default function CertifyPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">
-                  Number of Qubits: <span className="text-indigo-400 font-semibold">{nQubits}</span>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Number of Qubits: <span style={{ color: "var(--strong)", fontWeight: 600 }}>{nQubits}</span>
                 </label>
                 <input
                   type="range"
@@ -300,14 +298,14 @@ export default function CertifyPage() {
                   max={127}
                   value={nQubits}
                   onChange={(e) => setNQubits(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  style={{ width: "100%", accentColor: "var(--strong)" }}
                 />
-                <div className="flex justify-between text-xs text-gray-600 mt-0.5"><span>1</span><span>127</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}><span>1</span><span>127</span></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Classical Runtime (sec)</label>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Classical Runtime (sec)</label>
                   <input
                     type="number"
                     min={0}
@@ -315,12 +313,12 @@ export default function CertifyPage() {
                     value={classicalRuntime}
                     onChange={(e) => setClassicalRuntime(e.target.value === "" ? "" : Number(e.target.value))}
                     placeholder="3600"
-                    className={inputCls}
+                    className="input"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Quantum Runtime (sec)</label>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Quantum Runtime (sec)</label>
                   <input
                     type="number"
                     min={0}
@@ -328,7 +326,7 @@ export default function CertifyPage() {
                     value={quantumRuntime}
                     onChange={(e) => setQuantumRuntime(e.target.value === "" ? "" : Number(e.target.value))}
                     placeholder="1.2"
-                    className={inputCls}
+                    className="input"
                     required
                   />
                 </div>
@@ -336,19 +334,19 @@ export default function CertifyPage() {
 
               {/* Live speedup */}
               {speedupFactor !== null && (
-                <div className="bg-indigo-950/40 border border-indigo-800 rounded-xl p-3 text-center">
-                  <span className="text-gray-400 text-sm">Speedup Factor: </span>
-                  <span className="text-indigo-400 text-2xl font-bold">{speedupFactor}x</span>
+                <div style={{ background: "rgba(49,46,129,0.4)", border: "1px solid var(--strong)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                  <span style={{ color: "var(--muted)", fontSize: 13 }}>Speedup Factor: </span>
+                  <span style={{ color: "var(--strong)", fontSize: 24, fontWeight: 700 }}>{speedupFactor}x</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Statistical Test</label>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Statistical Test</label>
                   <select
                     value={statisticalTest}
                     onChange={(e) => setStatisticalTest(e.target.value as typeof statisticalTest)}
-                    className={inputCls}
+                    className="input"
                   >
                     <option value="cross_entropy">Cross Entropy</option>
                     <option value="total_variation">Total Variation</option>
@@ -356,8 +354,8 @@ export default function CertifyPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">
-                    Confidence: <span className="text-indigo-400 font-semibold">{(confidenceLevel * 100).toFixed(1)}%</span>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Confidence: <span style={{ color: "var(--strong)", fontWeight: 600 }}>{(confidenceLevel * 100).toFixed(1)}%</span>
                   </label>
                   <input
                     type="range"
@@ -366,24 +364,24 @@ export default function CertifyPage() {
                     step={0.001}
                     value={confidenceLevel}
                     onChange={(e) => setConfidenceLevel(Number(e.target.value))}
-                    className="w-full accent-indigo-500 mt-2"
+                    style={{ width: "100%", accentColor: "var(--strong)", marginTop: 8 }}
                   />
-                  <div className="flex justify-between text-xs text-gray-600 mt-0.5"><span>90.0%</span><span>99.9%</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 2 }}><span>90.0%</span><span>99.9%</span></div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide">Evidence Run IDs (comma-separated)</label>
+                <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Evidence Run IDs (comma-separated)</label>
                 <input
                   value={evidenceRunIds}
                   onChange={(e) => setEvidenceRunIds(e.target.value)}
                   placeholder="run-001, run-002, run-003"
-                  className={inputCls}
+                  className="input"
                 />
               </div>
 
               {certError && (
-                <div className="bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+                <div style={{ background: "rgba(69,10,10,0.9)", border: "1px solid var(--danger)", color: "var(--danger)", borderRadius: 8, padding: "12px 16px", fontSize: 13 }}>
                   {certError}
                 </div>
               )}
@@ -391,7 +389,7 @@ export default function CertifyPage() {
               <button
                 type="submit"
                 disabled={certifying}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                style={{ width: "100%", background: "var(--strong)", color: "white", fontWeight: 600, padding: "12px 0", borderRadius: 12, fontSize: 13, border: "none", cursor: certifying ? "not-allowed" : "pointer", opacity: certifying ? 0.5 : 1 }}
               >
                 {certifying ? "Certifying…" : "Certify Advantage"}
               </button>
@@ -402,31 +400,31 @@ export default function CertifyPage() {
         {/* Result panel */}
         <div>
           {certResult ? (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CertifiedBanner certified={certResult.certified} />
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-                  <p className="text-3xl font-bold text-indigo-400">{certResult.speedup_factor.toFixed(2)}x</p>
-                  <p className="text-xs text-gray-500 mt-1">Speedup Factor</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                  <p style={{ fontSize: 30, fontWeight: 700, color: "var(--strong)" }}>{certResult.speedup_factor.toFixed(2)}x</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Speedup Factor</p>
                 </div>
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-                  <p className="text-xl font-bold text-gray-100">{certResult.p_value.toExponential(2)}</p>
-                  <p className="text-xs text-gray-500 mt-1">p-value</p>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{certResult.p_value.toExponential(2)}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>p-value</p>
                 </div>
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-                  <p className="text-xl font-bold text-gray-100">{certResult.test_statistic.toFixed(4)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Test Statistic</p>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{certResult.test_statistic.toFixed(4)}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Test Statistic</p>
                 </div>
               </div>
 
-              {certResult.methodology_notes.length > 0 && (
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                  <h3 className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">Methodology Notes</h3>
-                  <ul className="space-y-1">
-                    {certResult.methodology_notes.map((note, i) => (
-                      <li key={i} className="text-sm text-gray-300 flex gap-2">
-                        <span className="text-gray-600">•</span>
+              {(certResult.methodology_notes ?? []).length > 0 && (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
+                  <h3 style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Methodology Notes</h3>
+                  <ul style={{ display: "flex", flexDirection: "column", gap: 4, listStyle: "none", padding: 0, margin: 0 }}>
+                    {(certResult.methodology_notes ?? []).map((note, i) => (
+                      <li key={i} style={{ fontSize: 13, color: "var(--text)", display: "flex", gap: 8 }}>
+                        <span style={{ color: "var(--muted)" }}>•</span>
                         <span>{note}</span>
                       </li>
                     ))}
@@ -439,17 +437,17 @@ export default function CertifyPage() {
                   href={certResult.certificate_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-xl font-medium transition-colors w-full justify-center"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#059669", color: "white", fontSize: 13, padding: "10px 16px", borderRadius: 12, fontWeight: 500, textDecoration: "none", width: "100%", justifyContent: "center", boxSizing: "border-box" }}
                 >
                   Download Certificate
                 </a>
               )}
             </div>
           ) : (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-5xl mb-4 text-gray-700">⚛</div>
-                <p className="text-gray-600 text-sm">
+            <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 16, padding: 32, height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 16, color: "var(--muted)" }}>⚛</div>
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>
                   Submit a certification request to see results here.
                 </p>
               </div>
@@ -460,66 +458,66 @@ export default function CertifyPage() {
 
       {/* Certifications table */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-100 mb-3">All Certifications</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>All Certifications</h2>
         {certsError && (
-          <div className="mb-4 bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3 text-sm">
+          <div style={{ marginBottom: 16, background: "rgba(69,10,10,0.9)", border: "1px solid var(--danger)", color: "var(--danger)", borderRadius: 8, padding: "12px 16px", fontSize: 13 }}>
             {certsError}
           </div>
         )}
         {certsLoading ? (
-          <div className="text-gray-500 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+          <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
             Loading certifications…
           </div>
         ) : certsList.length === 0 ? (
-          <div className="text-gray-600 text-sm py-8 text-center bg-gray-900 rounded-xl border border-gray-800">
+          <div style={{ color: "var(--muted)", fontSize: 13, padding: "32px 0", textAlign: "center", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--line)" }}>
             No certifications yet.
           </div>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
               <thead>
-                <tr className="text-xs text-gray-500 font-semibold uppercase tracking-wide border-b border-gray-800">
-                  <th className="text-left px-4 py-3">Name</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Speedup</th>
-                  <th className="text-right px-4 py-3">p-value</th>
-                  <th className="text-left px-4 py-3">Created</th>
-                  <th className="px-4 py-3"></th>
+                <tr style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ textAlign: "left", padding: "12px 16px" }}>Name</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px" }}>Status</th>
+                  <th style={{ textAlign: "right", padding: "12px 16px" }}>Speedup</th>
+                  <th style={{ textAlign: "right", padding: "12px 16px" }}>p-value</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px" }}>Created</th>
+                  <th style={{ padding: "12px 16px" }}></th>
                 </tr>
               </thead>
               <tbody>
                 {certsList.map((cert) => (
                   <tr
                     key={cert.cert_id}
-                    className="border-b border-gray-800 last:border-0 hover:bg-gray-800/40 transition-colors cursor-pointer"
+                    style={{ borderBottom: "1px solid var(--line)", cursor: "pointer" }}
                     onClick={() => handleSelectCert(cert.cert_id)}
                   >
-                    <td className="px-4 py-3 text-gray-100 font-medium">{cert.name}</td>
-                    <td className="px-4 py-3">
+                    <td style={{ padding: "12px 16px", color: "var(--text)", fontWeight: 500 }}>{cert.name}</td>
+                    <td style={{ padding: "12px 16px" }}>
                       {cert.certified ? (
-                        <span className="inline-block bg-emerald-900/60 text-emerald-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                        <span style={{ display: "inline-block", background: "rgba(6,78,59,0.6)", color: "var(--ok)", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 999 }}>
                           Certified
                         </span>
                       ) : (
-                        <span className="inline-block bg-red-900/60 text-red-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                        <span style={{ display: "inline-block", background: "rgba(127,29,29,0.6)", color: "var(--danger)", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 999 }}>
                           Not Certified
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-indigo-400 font-bold tabular-nums">
+                    <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--strong)", fontWeight: 700 }}>
                       {cert.speedup_factor.toFixed(2)}x
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-400 font-mono tabular-nums">
+                    <td style={{ padding: "12px 16px", textAlign: "right", color: "var(--muted)", fontFamily: "ui-monospace,monospace" }}>
                       {cert.p_value.toExponential(2)}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
+                    <td style={{ padding: "12px 16px", color: "var(--muted)", fontSize: 12 }}>
                       {new Date(cert.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td style={{ padding: "12px 16px", textAlign: "right" }}>
                       {detailLoading ? (
-                        <span className="text-xs text-gray-600">…</span>
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>…</span>
                       ) : (
-                        <span className="text-xs text-indigo-400 hover:text-indigo-300">View</span>
+                        <span style={{ fontSize: 12, color: "var(--strong)" }}>View</span>
                       )}
                     </td>
                   </tr>

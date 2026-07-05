@@ -13,7 +13,7 @@ function DecayCurve({ lengths, probs }: { lengths: number[]; probs: number[] }) 
   const ys = probs.map(p => H - PY - p * (H - PY - 10));
   const d = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
   return (
-    <svg width={W} height={H} className="mt-2">
+    <svg width={W} height={H} style={{ marginTop: 8 }}>
       <line x1={PX} y1={10} x2={PX} y2={H - PY} stroke="#374151" strokeWidth={1} />
       <line x1={PX} y1={H - PY} x2={W - 5} y2={H - PY} stroke="#374151" strokeWidth={1} />
       <path d={d} fill="none" stroke="#6366f1" strokeWidth={2} />
@@ -95,135 +95,135 @@ export default function RBGSTPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-end gap-4 flex-wrap">
+    <div style={{ padding: 24, maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <h1 className="text-2xl font-bold">RB / GST / SPAM Suite</h1>
-          <p className="text-gray-400 text-sm">Full hardware characterization: Randomized Benchmarking, SPAM analysis, and Cross-Entropy Benchmarking.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700 }}>RB / GST / SPAM Suite</h1>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Full hardware characterization: Randomized Benchmarking, SPAM analysis, and Cross-Entropy Benchmarking.</p>
         </div>
-        <div className="ml-auto flex items-end gap-3">
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "flex-end", gap: 12 }}>
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Backend</label>
+            <label style={{ fontSize: 12, color: "var(--muted)", display: "block", marginBottom: 4 }}>Backend</label>
             <select value={backend} onChange={e => setBackend(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 text-sm">
+              style={{ background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }}>
               {BACKENDS.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
           <button onClick={loadReport} disabled={reportLoading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">
+            style={{ padding: "8px 16px", background: "var(--strong)", borderRadius: 6, fontSize: 13, opacity: reportLoading ? 0.5 : 1, cursor: reportLoading ? "not-allowed" : "pointer", border: "none", color: "var(--text)" }}>
             {reportLoading ? "Loading..." : "Load Full Report"}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
         {/* RB */}
-        <div className="bg-gray-900 rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold text-indigo-400">Randomized Benchmarking</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontWeight: 600, color: "var(--strong)" }}>Randomized Benchmarking</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="text-xs text-gray-400">Qubit</label>
+              <label style={{ fontSize: 12, color: "var(--muted)" }}>Qubit</label>
               <input type="number" min={0} max={9} value={rbQubit} onChange={e => setRbQubit(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
             </div>
             <div>
-              <label className="text-xs text-gray-400">Max Seq Length</label>
+              <label style={{ fontSize: 12, color: "var(--muted)" }}>Max Seq Length</label>
               <input type="number" value={rbMaxLen} onChange={e => setRbMaxLen(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
             </div>
           </div>
           <button onClick={doRB} disabled={rbLoading}
-            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">
+            style={{ width: "100%", padding: "8px 0", background: "var(--strong)", borderRadius: 6, fontSize: 13, opacity: rbLoading ? 0.5 : 1, cursor: rbLoading ? "not-allowed" : "pointer", border: "none", color: "var(--text)" }}>
             {rbLoading ? "Running..." : "Run RB"}
           </button>
-          {rbErr && <div className="text-red-400 text-xs">{rbErr}</div>}
+          {rbErr && <div style={{ color: "var(--danger)", fontSize: 12 }}>{rbErr}</div>}
           {rbResult && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {[["EPC", rbResult.error_per_clifford.toExponential(3)], ["EPG", rbResult.error_per_gate.toExponential(3)], ["T-infidelity", rbResult.t_gate_infidelity.toExponential(3)], ["R²", rbResult.fit_r_squared.toFixed(4)]].map(([l, v]) => (
-                  <div key={l} className="bg-gray-800 rounded p-2 text-center">
-                    <div className="text-xs text-gray-400">{l}</div>
-                    <div className="text-xs font-mono font-bold text-indigo-300">{v}</div>
+                  <div key={l} style={{ background: "var(--surface)", borderRadius: 6, padding: 8, textAlign: "center", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                    <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--strong)" }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-xs text-gray-500">95% CI: [{rbResult.confidence_interval[0].toExponential(2)}, {rbResult.confidence_interval[1].toExponential(2)}]</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>95% CI: [{rbResult.confidence_interval[0].toExponential(2)}, {rbResult.confidence_interval[1].toExponential(2)}]</div>
               <DecayCurve lengths={rbResult.sequence_lengths} probs={rbResult.survival_probabilities} />
             </div>
           )}
         </div>
 
         {/* SPAM */}
-        <div className="bg-gray-900 rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold text-purple-400">SPAM Characterization</h2>
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontWeight: 600, color: "#a78bfa" }}>SPAM Characterization</h2>
           <div>
-            <label className="text-xs text-gray-400">Qubits</label>
+            <label style={{ fontSize: 12, color: "var(--muted)" }}>Qubits</label>
             <input type="number" min={1} max={4} value={spamQubits} onChange={e => setSpamQubits(Number(e.target.value))}
-              className="w-full mt-1 bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+              style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
           </div>
           <button onClick={doSPAM} disabled={spamLoading}
-            className="w-full py-2 bg-purple-700 hover:bg-purple-600 rounded text-sm disabled:opacity-50">
+            style={{ width: "100%", padding: "8px 0", background: "#7c3aed", borderRadius: 6, fontSize: 13, opacity: spamLoading ? 0.5 : 1, cursor: spamLoading ? "not-allowed" : "pointer", border: "none", color: "white" }}>
             {spamLoading ? "Running..." : "Run SPAM"}
           </button>
-          {spamErr && <div className="text-red-400 text-xs">{spamErr}</div>}
+          {spamErr && <div style={{ color: "var(--danger)", fontSize: 12 }}>{spamErr}</div>}
           {spamResult && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
                 {[["Prep ε", spamResult.state_prep_error.toExponential(3)], ["Meas ε", spamResult.measurement_error.toExponential(3)], ["F_SPAM", (spamResult.f_spam * 100).toFixed(2) + "%"]].map(([l, v]) => (
-                  <div key={l} className="bg-gray-800 rounded p-2 text-center">
-                    <div className="text-xs text-gray-400">{l}</div>
-                    <div className="text-xs font-mono font-bold text-purple-300">{v}</div>
+                  <div key={l} style={{ background: "var(--surface)", borderRadius: 6, padding: 8, textAlign: "center", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                    <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "#a78bfa" }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-xs text-gray-400 mb-1">Confusion Matrix</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Confusion Matrix</div>
               <ConfusionMatrix matrix={spamResult.confusion_matrix} />
-              <div className="space-y-1">
-                {spamResult.recommendations.map((r, i) => <div key={i} className="text-xs text-gray-300">• {r}</div>)}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(spamResult.recommendations ?? []).map((r, i) => <div key={i} style={{ fontSize: 12, color: "var(--text)" }}>• {r}</div>)}
               </div>
             </div>
           )}
         </div>
 
         {/* XEB */}
-        <div className="bg-gray-900 rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold text-green-400">Cross-Entropy Benchmarking</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontWeight: 600, color: "var(--ok)" }}>Cross-Entropy Benchmarking</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="text-xs text-gray-400">Qubits</label>
+              <label style={{ fontSize: 12, color: "var(--muted)" }}>Qubits</label>
               <input type="number" min={1} max={6} value={xebQubits} onChange={e => setXebQubits(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
             </div>
             <div>
-              <label className="text-xs text-gray-400">Max Depth</label>
+              <label style={{ fontSize: 12, color: "var(--muted)" }}>Max Depth</label>
               <input type="number" value={xebDepth} onChange={e => setXebDepth(Number(e.target.value))}
-                className="w-full mt-1 bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-700 text-sm" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13 }} />
             </div>
           </div>
           <button onClick={doXEB} disabled={xebLoading}
-            className="w-full py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">
+            style={{ width: "100%", padding: "8px 0", background: "#15803d", borderRadius: 6, fontSize: 13, opacity: xebLoading ? 0.5 : 1, cursor: xebLoading ? "not-allowed" : "pointer", border: "none", color: "white" }}>
             {xebLoading ? "Running..." : "Run XEB"}
           </button>
-          {xebErr && <div className="text-red-400 text-xs">{xebErr}</div>}
+          {xebErr && <div style={{ color: "var(--danger)", fontSize: 12 }}>{xebErr}</div>}
           {xebResult && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {[["Linear XEB/cycle", xebResult.linear_xeb_per_cycle.toFixed(5)], ["R²", xebResult.fit_r_squared.toFixed(4)]].map(([l, v]) => (
-                  <div key={l} className="bg-gray-800 rounded p-2 text-center">
-                    <div className="text-xs text-gray-400">{l}</div>
-                    <div className="text-xs font-mono font-bold text-green-300">{v}</div>
+                  <div key={l} style={{ background: "var(--surface)", borderRadius: 6, padding: 8, textAlign: "center", border: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{l}</div>
+                    <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--ok)" }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-xs text-gray-400 mb-1">XEB Fidelity by Depth</div>
-              <div className="space-y-1">
-                {xebResult.circuit_depths.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="w-8 text-gray-500 text-right font-mono">{d}</span>
-                    <div className="flex-1 h-3 bg-gray-800 rounded overflow-hidden">
-                      <div className="h-3 bg-green-600 rounded" style={{ width: `${(xebResult.xeb_fidelities[i] ?? 0) * 100}%` }} />
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>XEB Fidelity by Depth</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(xebResult.circuit_depths ?? []).map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span style={{ width: 32, color: "var(--muted)", textAlign: "right", fontFamily: "ui-monospace,monospace" }}>{d}</span>
+                    <div style={{ flex: 1, height: 12, background: "var(--line)", borderRadius: 6, overflow: "hidden" }}>
+                      <div style={{ height: 12, background: "#16a34a", borderRadius: 6, width: `${(xebResult.xeb_fidelities[i] ?? 0) * 100}%` }} />
                     </div>
-                    <span className="w-12 font-mono text-green-300">{((xebResult.xeb_fidelities[i] ?? 0) * 100).toFixed(1)}%</span>
+                    <span style={{ width: 48, fontFamily: "ui-monospace,monospace", color: "var(--ok)" }}>{((xebResult.xeb_fidelities[i] ?? 0) * 100).toFixed(1)}%</span>
                   </div>
                 ))}
               </div>

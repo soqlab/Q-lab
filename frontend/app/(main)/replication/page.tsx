@@ -2,6 +2,20 @@
 import { useState, useEffect } from "react";
 import { submitReplicationClaim, attemptReplication, listReplicationClaims, ReplicationClaim } from "@/lib/api";
 
+const badgeStyle: Record<string, Record<string, string>> = {
+  gold: { background: "#eab308", color: "#713f12" },
+  silver: { background: "#9ca3af", color: "#111827" },
+  contested: { background: "rgba(239,68,68,0.1)", color: "var(--danger)" },
+  pending: { background: "var(--line)", color: "var(--text)" },
+};
+
+const statusColorMap: Record<string, string> = {
+  open: "var(--info-text)",
+  replicated: "var(--ok)",
+  contested: "var(--danger)",
+  failed: "#f97316",
+};
+
 export default function ReplicationPage() {
   const [claims, setClaims] = useState<ReplicationClaim[]>([]);
   const [selected, setSelected] = useState<ReplicationClaim | null>(null);
@@ -40,128 +54,126 @@ export default function ReplicationPage() {
     finally { setLoading(false); }
   }
 
-  const badgeColor: Record<string, string> = {
-    gold: "bg-yellow-500 text-yellow-900",
-    silver: "bg-gray-400 text-gray-900",
-    contested: "bg-red-700 text-red-100",
-    pending: "bg-gray-700 text-gray-300",
-  };
-
-  const statusColor: Record<string, string> = {
-    open: "text-blue-400",
-    replicated: "text-green-400",
-    contested: "text-red-400",
-    failed: "text-orange-400",
-  };
-
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-2xl font-bold">Replication Market</h1>
-          <p className="text-gray-400 text-sm">Track replication attempts for quantum results. Claims earn Gold/Silver/Contested badges based on independent reproductions.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Replication Market</h1>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Track replication attempts for quantum results. Claims earn Gold/Silver/Contested badges based on independent reproductions.</p>
         </div>
         <button onClick={() => setShowClaim(!showClaim)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-medium">
+          style={{ padding: "8px 16px", background: "var(--strong)", borderRadius: 6, fontWeight: 500, border: "none", color: "var(--text)", cursor: "pointer" }}>
           + New Claim
         </button>
       </div>
 
-      {error && <div className="text-red-400 bg-red-900/20 rounded p-3">{error}</div>}
+      {error && <div style={{ color: "var(--danger)", background: "rgba(239,68,68,0.1)", borderRadius: 6, padding: 12 }}>{error}</div>}
 
       {showClaim && (
-        <div className="bg-gray-900 rounded-lg p-5 space-y-4">
-          <h2 className="font-semibold">New Replication Claim</h2>
-          <div className="grid grid-cols-2 gap-4">
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 style={{ fontWeight: 600 }}>New Replication Claim</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <label className="text-sm text-gray-400">Claim Title</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Claim Title</label>
               <input value={claimForm.title} onChange={e => setClaimForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
             </div>
             <div>
-              <label className="text-sm text-gray-400">Metric</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Metric</label>
               <select value={claimForm.metric} onChange={e => setClaimForm(f => ({ ...f, metric: e.target.value }))}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700">
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }}>
                 {["fidelity", "energy", "approximation_ratio", "error_rate", "t2_us"].map(m => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-sm text-gray-400">Original Value</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Original Value</label>
               <input type="number" step="any" value={claimForm.original_value} onChange={e => setClaimForm(f => ({ ...f, original_value: Number(e.target.value) }))}
-                className="w-full mt-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", fontFamily: "ui-monospace,monospace", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
             </div>
             <div>
-              <label className="text-sm text-gray-400">Backend</label>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Backend</label>
               <input value={claimForm.backend} onChange={e => setClaimForm(f => ({ ...f, backend: e.target.value }))}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
             </div>
-            <div className="col-span-2">
-              <label className="text-sm text-gray-400">Description</label>
+            <div style={{ gridColumn: "span 2" }}>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>Description</label>
               <textarea value={claimForm.description} onChange={e => setClaimForm(f => ({ ...f, description: e.target.value }))} rows={2}
-                className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700" />
+                style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", boxSizing: "border-box" }} />
             </div>
           </div>
-          <div className="flex gap-3">
-            <button onClick={submitClaim} disabled={loading || !claimForm.title} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-sm disabled:opacity-50">Submit</button>
-            <button onClick={() => setShowClaim(false)} className="px-4 py-2 bg-gray-700 rounded text-sm">Cancel</button>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={submitClaim} disabled={loading || !claimForm.title}
+              style={{ padding: "8px 16px", background: "rgba(16,185,129,0.1)", borderRadius: 6, fontSize: 13, opacity: (loading || !claimForm.title) ? 0.5 : 1, border: "1px solid var(--ok)", color: "var(--ok)", cursor: (loading || !claimForm.title) ? "not-allowed" : "pointer" }}>
+              Submit
+            </button>
+            <button onClick={() => setShowClaim(false)}
+              style={{ padding: "8px 16px", background: "var(--line)", borderRadius: 6, fontSize: 13, border: "none", color: "var(--text)", cursor: "pointer" }}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-400 uppercase">Claims</h2>
-          {claims.map(c => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase" }}>Claims</h2>
+          {(claims ?? []).map(c => (
             <div key={c.claim_id} onClick={() => setSelected(c)}
-              className={`bg-gray-900 rounded-lg p-3 cursor-pointer border transition-colors ${selected?.claim_id === c.claim_id ? "border-indigo-500" : "border-transparent hover:border-gray-600"}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-medium text-sm truncate">{c.title}</div>
-                {c.badge && <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${badgeColor[c.badge] ?? "bg-gray-700 text-gray-300"}`}>{c.badge}</span>}
+              style={{ background: "var(--surface)", borderRadius: 8, padding: 12, cursor: "pointer", border: selected?.claim_id === c.claim_id ? "1px solid var(--strong)" : "1px solid transparent" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontWeight: 500, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+                {c.badge && (
+                  <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 999, fontWeight: 500, flexShrink: 0, ...(badgeStyle[c.badge] ?? { background: "var(--line)", color: "var(--text)" }) }}>
+                    {c.badge}
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-gray-400 mt-1 font-mono">
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, fontFamily: "ui-monospace,monospace" }}>
                 {c.metric}: {c.original_value.toFixed(4)} → {c.consensus_value !== null ? c.consensus_value.toFixed(4) : "—"}
               </div>
-              <div className={`text-xs mt-1 ${statusColor[c.status] ?? "text-gray-400"}`}>{c.status} · {c.replication_count} attempt{c.replication_count !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize: 12, marginTop: 4, color: statusColorMap[c.status] ?? "var(--muted)" }}>
+                {c.status} · {c.replication_count} attempt{c.replication_count !== 1 ? "s" : ""}
+              </div>
             </div>
           ))}
         </div>
 
         {selected && (
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-gray-900 rounded-lg p-5 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <h2 className="font-bold text-lg">{selected.title}</h2>
+          <div style={{ gridColumn: "span 2", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                <h2 style={{ fontWeight: 700, fontSize: 18 }}>{selected.title}</h2>
                 {selected.badge && (
-                  <span className={`text-sm px-3 py-1 rounded-full font-bold flex-shrink-0 ${badgeColor[selected.badge] ?? "bg-gray-700"}`}>
+                  <span style={{ fontSize: 13, padding: "4px 12px", borderRadius: 999, fontWeight: 700, flexShrink: 0, ...(badgeStyle[selected.badge] ?? { background: "var(--line)" }) }}>
                     {selected.badge.toUpperCase()} BADGE
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div className="bg-gray-800 rounded p-3 text-center">
-                  <div className="text-gray-400 text-xs">Original</div>
-                  <div className="font-mono font-bold text-white">{selected.original_value.toFixed(4)}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, fontSize: 13 }}>
+                <div style={{ background: "var(--surface)", borderRadius: 6, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ color: "var(--muted)", fontSize: 12 }}>Original</div>
+                  <div style={{ fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--text)" }}>{selected.original_value.toFixed(4)}</div>
                 </div>
-                <div className="bg-gray-800 rounded p-3 text-center">
-                  <div className="text-gray-400 text-xs">Consensus</div>
-                  <div className="font-mono font-bold text-indigo-400">{selected.consensus_value !== null ? selected.consensus_value.toFixed(4) : "—"}</div>
+                <div style={{ background: "var(--surface)", borderRadius: 6, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ color: "var(--muted)", fontSize: 12 }}>Consensus</div>
+                  <div style={{ fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--strong)" }}>{selected.consensus_value !== null ? selected.consensus_value.toFixed(4) : "—"}</div>
                 </div>
-                <div className="bg-gray-800 rounded p-3 text-center">
-                  <div className="text-gray-400 text-xs">Replication Rate</div>
-                  <div className={`font-medium ${selected.replication_rate > 0.7 ? "text-green-400" : "text-red-400"}`}>{(selected.replication_rate * 100).toFixed(0)}%</div>
+                <div style={{ background: "var(--surface)", borderRadius: 6, padding: 12, textAlign: "center", border: "1px solid var(--line)" }}>
+                  <div style={{ color: "var(--muted)", fontSize: 12 }}>Replication Rate</div>
+                  <div style={{ fontWeight: 500, color: selected.replication_rate > 0.7 ? "var(--ok)" : "var(--danger)" }}>{(selected.replication_rate * 100).toFixed(0)}%</div>
                 </div>
               </div>
-              {selected.description && <div className="text-sm text-gray-300">{selected.description}</div>}
-              <div className="text-xs text-gray-500">{selected.backend} · {selected.n_qubits} qubits · {selected.metric}</div>
+              {selected.description && <div style={{ fontSize: 13, color: "var(--text)" }}>{selected.description}</div>}
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>{selected.backend} · {selected.n_qubits} qubits · {selected.metric}</div>
 
               {selected.attempts && (selected.attempts as { your_value?: number; notes?: string }[]).length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm">Replication Attempts ({selected.replication_count})</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <h3 style={{ fontWeight: 600, fontSize: 13 }}>Replication Attempts ({selected.replication_count})</h3>
                   {(selected.attempts as { your_value?: number; notes?: string; backend?: string }[]).map((a, i) => (
-                    <div key={i} className="bg-gray-800 rounded p-3 flex items-center justify-between">
+                    <div key={i} style={{ background: "var(--surface)", borderRadius: 6, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid var(--line)" }}>
                       <div>
-                        <div className="font-mono text-sm text-white">{a.your_value?.toFixed(4) ?? "—"}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{a.backend} · {a.notes}</div>
+                        <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 13, color: "var(--text)" }}>{a.your_value?.toFixed(4) ?? "—"}</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{a.backend} · {a.notes}</div>
                       </div>
                     </div>
                   ))}
@@ -169,22 +181,22 @@ export default function ReplicationPage() {
               )}
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold text-sm">Submit Replication Attempt</h3>
-              <div className="grid grid-cols-2 gap-3">
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h3 style={{ fontWeight: 600, fontSize: 13 }}>Submit Replication Attempt</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="text-xs text-gray-400">Your Value ({selected.metric})</label>
+                  <label style={{ fontSize: 12, color: "var(--muted)" }}>Your Value ({selected.metric})</label>
                   <input type="number" step="any" value={attemptForm.your_value} onChange={e => setAttemptForm(f => ({ ...f, your_value: Number(e.target.value) }))}
-                    className="w-full mt-1 bg-gray-800 text-white font-mono px-3 py-2 rounded border border-gray-700 text-sm" />
+                    style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", fontFamily: "ui-monospace,monospace", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400">Notes</label>
+                  <label style={{ fontSize: 12, color: "var(--muted)" }}>Notes</label>
                   <input value={attemptForm.notes} onChange={e => setAttemptForm(f => ({ ...f, notes: e.target.value }))}
-                    className="w-full mt-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 text-sm" />
+                    style={{ width: "100%", marginTop: 4, background: "var(--surface)", color: "var(--text)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
               </div>
               <button onClick={attempt} disabled={loading}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-sm disabled:opacity-50">
+                style={{ padding: "8px 16px", background: "var(--strong)", borderRadius: 6, fontSize: 13, opacity: loading ? 0.5 : 1, border: "none", color: "var(--text)", cursor: loading ? "not-allowed" : "pointer" }}>
                 Submit Attempt
               </button>
             </div>
