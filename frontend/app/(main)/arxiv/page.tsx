@@ -6,9 +6,10 @@ import { BookOpen, Search, ExternalLink, Star } from "lucide-react";
 
 function PaperCard({ paper }: { paper: ArxivPaper }) {
   const [showBibtex, setShowBibtex] = useState(false);
-  const displayAuthors = paper.authors.length > 3
-    ? paper.authors.slice(0, 3).join(", ") + " et al."
-    : paper.authors.join(", ");
+  const authors = paper.authors ?? [];
+  const displayAuthors = authors.length > 3
+    ? authors.slice(0, 3).join(", ") + " et al."
+    : authors.join(", ");
   const relevanceColor = paper.relevance_score > 0.7 ? "#10b981" : paper.relevance_score > 0.4 ? "#f59e0b" : "#64748b";
 
   return (
@@ -24,7 +25,7 @@ function PaperCard({ paper }: { paper: ArxivPaper }) {
       <div style={{ color: "#94a3b8", fontSize: "0.8rem", marginBottom: "0.4rem" }}>{displayAuthors}</div>
       <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
         <span style={{ background: "#1d3a6b", color: "#3b82f6", borderRadius: 12, padding: "0.1rem 0.5rem", fontSize: "0.75rem" }}>{paper.year}</span>
-        {paper.categories.map((cat) => (
+        {(paper.categories ?? []).map((cat) => (
           <span key={cat} style={{ background: "#1d3a6b", color: "#3b82f6", borderRadius: 12, padding: "0.1rem 0.5rem", fontSize: "0.75rem" }}>{cat}</span>
         ))}
         <span style={{ color: relevanceColor, fontSize: "0.75rem", fontWeight: 600 }}>
@@ -86,7 +87,7 @@ export default function ArxivPage() {
   };
 
   return (
-    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "2rem", color: "#e2e8f0" }}>
+    <main className="page">
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
           <BookOpen size={28} color="#3b82f6" />
@@ -196,10 +197,10 @@ export default function ArxivPage() {
                 Clear
               </button>
             </div>
-            {result.related_topics.length > 0 && (
+            {(result.related_topics ?? []).length > 0 && (
               <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1rem" }}>
                 <span style={{ color: "#64748b", fontSize: "0.82rem", alignSelf: "center" }}>Related:</span>
-                {result.related_topics.map((topic) => (
+                {(result.related_topics ?? []).map((topic) => (
                   <span
                     key={topic}
                     onClick={() => { setQuery(topic); handleSearch(); }}
@@ -210,17 +211,17 @@ export default function ArxivPage() {
                 ))}
               </div>
             )}
-            {result.results.length === 0 ? (
+            {(result.results ?? []).length === 0 ? (
               <div style={{ textAlign: "center", height: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
                 <Search size={40} color="#334155" />
                 <p style={{ marginTop: "1rem" }}>No papers found. Try a different query.</p>
               </div>
             ) : (
-              result.results.map((paper) => <PaperCard key={paper.arxiv_id} paper={paper} />)
+              (result.results ?? []).map((paper) => <PaperCard key={paper.arxiv_id} paper={paper} />)
             )}
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
