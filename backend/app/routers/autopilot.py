@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -166,7 +166,7 @@ def get_mission(mission_id: str, db: Session = Depends(get_db)):
     data = {k: v for k, v in record.items() if not k.startswith("_")}
     return AutopilotMission(**data)
 
-@router.get("/")
+@router.get("")
 def list_missions(db: Session = Depends(get_db)):
     records = store_list(db, NS)
     return {"missions": [{"mission_id": r["mission_id"], "name": r["name"], "status": r["status"], "current_iteration": r["current_iteration"], "best_value": r["best_value"], "estimated_completion_pct": r["estimated_completion_pct"]} for r in records]}
@@ -181,3 +181,4 @@ def stop_mission(mission_id: str, db: Session = Depends(get_db)):
     record["convergence_reason"] = "Manually stopped"
     store_put(db, NS, mission_id, record)
     return {"stopped": True, "best_value": record["best_value"], "total_runs": record["total_runs"]}
+

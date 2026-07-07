@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -216,7 +216,8 @@ def stop_optimization(opt_id: str, db: Session = Depends(get_db)):
     store_put(db, NS_SESSIONS, opt_id, data)
     return {"stopped": True, "best_value": data["best_value"], "best_params": data["best_params"]}
 
-@router.get("/")
+@router.get("")
 def list_sessions(db: Session = Depends(get_db)):
     sessions = store_list(db, NS_SESSIONS)
     return {"sessions": [{"opt_id": s["opt_id"], "name": s["name"], "status": s["status"], "current_iteration": s["current_iteration"], "best_value": s["best_value"], "created_at": s["created_at"]} for s in sessions]}
+

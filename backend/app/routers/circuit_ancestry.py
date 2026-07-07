@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, difflib
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -217,8 +217,9 @@ def diff_versions(circuit_id: str, version_a: str, version_b: str, db: Session =
         similarity_score=round(sim, 4),
     )
 
-@router.get("/")
+@router.get("")
 def list_circuits(db: Session = Depends(get_db)):
     _seed_db(db)
     circuits = store_list(db, NS_CIRCUITS)
     return {"circuits": [{"circuit_id": c["circuit_id"], "name": c["name"], "versions": len(c["version_ids"]), "created_at": c["created_at"], "head": c["head"]} for c in circuits]}
+

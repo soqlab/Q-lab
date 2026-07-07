@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, hashlib, platform, sys
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
@@ -132,7 +132,8 @@ def diff_environments(req: DiffRequest, db: Session = Depends(get_db)):
         risk_level=risk, warnings=warnings,
     )
 
-@router.get("/")
+@router.get("")
 def list_snapshots(db: Session = Depends(get_db)):
     snaps = store_list(db, NS)
     return {"snapshots": [{"env_id": s["env_id"], "captured_at": s["captured_at"], "env_hash": s["env_hash"], "python_version": s["python_version"], "run_id": s.get("run_id")} for s in snaps]}
+

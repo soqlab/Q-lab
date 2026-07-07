@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -127,7 +127,8 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "job not found")
     return MitigationJob(**data)
 
-@router.get("/")
+@router.get("")
 def list_jobs(db: Session = Depends(get_db)):
     jobs = [MitigationJob(**r) for r in store_list(db, NS)]
     return {"jobs": [{"job_id": j.job_id, "method": j.method, "noisy_value": j.noisy_value, "mitigated_value": j.mitigated_value} for j in jobs]}
+

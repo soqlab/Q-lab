@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -78,7 +78,8 @@ def get_draft(draft_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "not found")
     return PaperDraft(**data)
 
-@router.get("/")
+@router.get("")
 def list_drafts(db: Session = Depends(get_db)):
     drafts = store_list(db, NS_DRAFTS)
     return {"drafts": [{"draft_id": d["draft_id"], "title": d["title"], "word_count": d["word_count"], "novelty_score": d["novelty_score"]} for d in drafts]}
+

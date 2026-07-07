@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -72,7 +72,7 @@ def _seed_db(db: Session):
     store_seed(db, NS_CLAIMS, seed_claims)
     store_seed(db, NS_ATTEMPTS, seed_attempts)
 
-@router.get("/")
+@router.get("")
 def list_claims(status: str | None = None, badge: str | None = None, db: Session = Depends(get_db)):
     _seed_db(db)
     claims = [ReplicationClaim(**r) for r in store_list(db, NS_CLAIMS)]
@@ -114,3 +114,4 @@ def publish_claim(req: dict, db: Session = Depends(get_db)):
     claim = ReplicationClaim(claim_id=cid, submitted_at=datetime.now(timezone.utc).isoformat(), replication_count=0, success_count=0, failure_count=0, partial_count=0, consensus_value=None, consensus_uncertainty=None, replication_rate=0.0, badge="awaiting_replication", attempts=[], status="published", **{k:v for k,v in req.items() if k not in ("claim_id","submitted_at","replication_count","success_count","failure_count","partial_count","consensus_value","consensus_uncertainty","replication_rate","badge","attempts","status")})
     store_put(db, NS_CLAIMS, cid, claim.model_dump())
     return claim
+

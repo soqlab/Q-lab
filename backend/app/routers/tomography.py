@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -139,7 +139,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "job not found")
     return TomographyJob(**data)
 
-@router.get("/")
+@router.get("")
 def list_jobs(db: Session = Depends(get_db)):
     jobs = store_list(db, NS_JOBS)
     return {"jobs": [{"job_id": j["job_id"], "method": j["method"], "n_qubits": j["n_qubits"], "fidelity": j["fidelity"], "created_at": j["created_at"]} for j in jobs]}
@@ -153,3 +153,4 @@ def list_methods():
         {"id": "bayesian", "name": "Bayesian Tomography", "description": "Full posterior distribution over density matrices", "best_for": "Uncertainty quantification"},
         {"id": "shadow", "name": "Classical Shadows", "description": "O(log d) measurements for many observables", "best_for": "Expectation values of many Paulis simultaneously"},
     ]}
+

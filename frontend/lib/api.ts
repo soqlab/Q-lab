@@ -6587,7 +6587,7 @@ export async function submitToProviders(req: { qasm: string; provider_ids?: stri
   return res.json();
 }
 export async function listProviders(): Promise<{ providers: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/providers/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/providers"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List providers failed");
   return res.json();
 }
@@ -6643,7 +6643,7 @@ export interface Hypothesis {
   p_value: number | null; effect_size: number | null;
 }
 export async function createHypothesis(req: { title: string; statement: string; background?: string; prediction?: string; null_hypothesis?: string; tags?: string[] }): Promise<Hypothesis> {
-  const res = await fetch(apiUrl("/api/v1/hypotheses/"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
+  const res = await fetch(apiUrl("/api/v1/hypotheses"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -6686,7 +6686,7 @@ export interface AncestryCircuitDiffResult {
   depth_delta: number; gate_count_delta: number; similarity_score: number;
 }
 export async function createCircuit(req: { name: string; qasm: string; commit_message?: string; tags?: string[] }): Promise<AncestryCircuitVersion> {
-  const res = await fetch(apiUrl("/api/v1/circuit-ancestry/"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
+  const res = await fetch(apiUrl("/api/v1/circuit-ancestry"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -6696,7 +6696,7 @@ export async function getCircuitTree(circuitId: string): Promise<AncestryCircuit
   return res.json();
 }
 export async function listCircuits(): Promise<{ circuits: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/circuit-ancestry/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/circuit-ancestry"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List circuits failed");
   return res.json();
 }
@@ -6774,7 +6774,7 @@ export async function getCalibrationHistory(backend: string, n?: number): Promis
   return res.json();
 }
 export async function listCalibrationBackends(): Promise<{ backends: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/calibration-oracle/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/calibration-oracle"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List calibration backends failed");
   return res.json();
 }
@@ -6791,7 +6791,7 @@ export interface RegistryEntry {
   forked_from: string | null; reproducibility_badge: boolean;
 }
 export async function publishExperiment(req: { title: string; description: string; experiment_type?: string; n_qubits?: number; backend?: string; tags?: string[]; run_ids?: string[]; author?: string; institution?: string; doi?: string; license?: string }): Promise<RegistryEntry> {
-  const res = await fetch(apiUrl("/api/v1/registry/"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
+  const res = await fetch(apiUrl("/api/v1/registry"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -6888,7 +6888,7 @@ export async function getBayesSession(optId: string): Promise<BayesOptSession> {
   return res.json();
 }
 export async function listBayesSessions(): Promise<{ sessions: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/bayes-opt/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/bayes-opt"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List sessions failed");
   return res.json();
 }
@@ -6911,7 +6911,7 @@ export interface ResearchGraph {
   stats: { n_nodes: number; n_edges: number; node_types: Record<string, number> };
 }
 export async function getResearchGraph(): Promise<ResearchGraph> {
-  const res = await fetch(apiUrl("/api/v1/research-graph/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/research-graph"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Get research graph failed");
   return res.json();
 }
@@ -7009,7 +7009,7 @@ export async function getAutopilotMission(missionId: string): Promise<AutopilotM
   return res.json();
 }
 export async function listAutopilotMissions(): Promise<{ missions: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/autopilot/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/autopilot"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List missions failed");
   return res.json();
 }
@@ -7024,7 +7024,7 @@ export async function runTomography(req: { method?: string; n_qubits?: number; n
   return res.json();
 }
 export async function listTomographyJobs(): Promise<{ jobs: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/tomography/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/tomography"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List jobs failed");
   return res.json();
 }
@@ -7040,7 +7040,7 @@ export async function runMitigation(req: { method?: string; circuit_name?: strin
   return res.json();
 }
 export async function listMitigationJobs(): Promise<{ jobs: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/zne-pec/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/zne-pec"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List jobs failed");
   return res.json();
 }
@@ -7129,7 +7129,7 @@ export async function addCollabAnnotation(req: { room_id: string; username: stri
   return res.json();
 }
 export async function listCollabRooms(): Promise<{ rooms: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/collab/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/collab"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List rooms failed");
   return res.json();
 }
@@ -7191,7 +7191,7 @@ export async function getPaperDraft(draftId: string): Promise<PaperDraft> {
   return res.json();
 }
 export async function listPaperDrafts(): Promise<{ drafts: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/paper-draft/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/paper-draft"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List drafts failed");
   return res.json();
 }
@@ -7351,7 +7351,7 @@ export async function compareCalibration(req: { backend: string; your_t1: number
 // ─────────────────────────────────────────────────────────
 export interface LeaderboardEntry { backend: string; qaoa_ratio: number; vqe_fidelity: number; qft_fidelity: number; ghz_fidelity: number; mirror_fidelity: number; overall_score: number; rank: number; last_updated: string; trend: string; }
 export async function getBenchmarkLeaderboard(): Promise<{ benchmarks: LeaderboardEntry[]; last_run: string; total_backends: number }> {
-  const res = await fetch(apiUrl("/api/v1/benchmark-leaderboard/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/benchmark-leaderboard"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7422,7 +7422,7 @@ export async function getPaperReplicationJob(replicationId: string): Promise<Pap
   return res.json();
 }
 export async function listPaperReplications(): Promise<{ replications: PaperReplicationJob[] }> {
-  const res = await fetch(apiUrl("/api/v1/paper-replication/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/paper-replication"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7487,7 +7487,7 @@ export async function getFAIRRecord(recordId: string): Promise<FAIRRecord> {
   return res.json();
 }
 export async function listFAIRRecords(): Promise<{ records: FAIRRecord[] }> {
-  const res = await fetch(apiUrl("/api/v1/fair-data/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/fair-data"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7528,7 +7528,7 @@ export async function getResearchPipeline(pipelineId: string): Promise<ResearchP
   return res.json();
 }
 export async function listResearchPipelines(): Promise<{ pipelines: ResearchPipeline[] }> {
-  const res = await fetch(apiUrl("/api/v1/research-pipeline/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/research-pipeline"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7548,7 +7548,7 @@ export async function getGrantProposal(proposalId: string): Promise<GrantProposa
   return res.json();
 }
 export async function listGrantProposals(): Promise<{ proposals: GrantProposal[] }> {
-  const res = await fetch(apiUrl("/api/v1/grant-proposal/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/grant-proposal"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7685,7 +7685,7 @@ export async function logInstituteActivity(req: { institute_id: string; member: 
   return res.json();
 }
 export async function listInstitutes(): Promise<{ institutes: Institute[] }> {
-  const res = await fetch(apiUrl("/api/v1/institute/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/institute"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -8193,7 +8193,7 @@ export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleEntry
 export interface QMLDatasetEntry { dataset_id: string; name: string; description: string; task: string; n_samples: number; n_features: number; n_qubits: number; encoding: string; benchmark_accuracy: number; size_mb: number; license: string; authors: string[]; paper_doi?: string; tags: string[]; download_url: string; created_at: string; }
 export interface QMLBenchmarkRun { run_id: string; dataset_id: string; model_type: string; n_params: number; accuracy: number; f1_score: number; training_time_sec: number; n_qubits_used: number; optimizer: string; created_at: string; }
 export async function listQMLDatasetHub(): Promise<QMLDatasetEntry[]> {
-  const res = await fetch(apiUrl("/api/v1/qml-datasets/"), { cache: "no-store", headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/v1/qml-datasets"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -8572,3 +8572,4 @@ export async function getOverleafLink(runId: string): Promise<OverleafLinkRespon
   if (!res.ok) throw new Error("Failed to generate Overleaf link");
   return res.json();
 }
+
