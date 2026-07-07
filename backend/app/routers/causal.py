@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 import random
 import math
@@ -185,7 +185,7 @@ def identify_confounders(req: ConfounderRequest):
     }
 
 
-@router.get("/")
+@router.get("")
 def list_analyses():
     return [
         {
@@ -198,3 +198,4 @@ def list_analyses():
         }
         for a in _analyses.values()
     ]
+

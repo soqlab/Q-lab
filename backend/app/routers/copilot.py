@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -121,7 +121,8 @@ def clear_session(session_id: str, db: Session = Depends(get_db)):
     store_delete(db, NS_SESSIONS, session_id)
     return {"cleared": True}
 
-@router.get("/")
+@router.get("")
 def list_sessions(db: Session = Depends(get_db)):
     sessions = store_list(db, NS_SESSIONS)
     return {"sessions": [{"session_id": s["session_id"], "created_at": s["created_at"], "message_count": len(s["messages"])} for s in sessions]}
+

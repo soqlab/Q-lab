@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 import math
@@ -94,7 +94,7 @@ class SubmitPayload(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/")
+@router.get("")
 def get_leaderboard():
     entries = sorted(_leaderboard.values(), key=lambda x: x["rank"])
     return {
@@ -206,3 +206,4 @@ def submit_result(payload: SubmitPayload):
         "overall_score":        _leaderboard[payload.backend]["overall_score"],
         "trend":                trend,
     }
+

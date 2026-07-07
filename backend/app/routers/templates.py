@@ -1,4 +1,4 @@
-"""Experiment Template Marketplace — a GitHub-for-quantum-circuits.
+﻿"""Experiment Template Marketplace — a GitHub-for-quantum-circuits.
 
 Researchers share, fork, star, and run experiment templates containing
 real QASM 2.0 circuits and Qiskit Python code.
@@ -846,7 +846,7 @@ def run_template(template_id: str, body: RunTemplateRequest, db: Session = Depen
     }
 
 
-@router.get("/")
+@router.get("")
 def list_templates(
     category: Optional[str] = Query(None),
     algorithm: Optional[str] = Query(None),
@@ -926,3 +926,4 @@ def create_template(payload: TemplateCreate, db: Session = Depends(get_db)):
     }
     store_put(db, _NS, tid, data)
     return data
+

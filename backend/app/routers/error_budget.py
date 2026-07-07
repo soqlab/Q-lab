@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -94,7 +94,8 @@ def get_report(report_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "report not found")
     return ErrorBudgetReport(**data)
 
-@router.get("/")
+@router.get("")
 def list_reports(db: Session = Depends(get_db)):
     reports = store_list(db, NS)
     return {"reports": [{"report_id": r["report_id"], "circuit_name": r["circuit_name"], "infidelity": r["infidelity"], "dominant_error": r["dominant_error"]} for r in reports]}
+

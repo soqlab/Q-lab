@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
@@ -198,6 +198,7 @@ def get_alerts(n: int = 50, db: Session = Depends(get_db)):
     alerts = store_list(db, NS_ALERTS)[-n:]
     return {"alerts": alerts, "total": len(store_list(db, NS_ALERTS))}
 
-@router.get("/")
+@router.get("")
 def list_backends():
     return {"backends": [{"backend": b, **{k: v[k] for k in ["n_qubits","provider","location","processor"]}} for b, v in BACKENDS.items()]}
+

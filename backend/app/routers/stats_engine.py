@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -156,7 +156,8 @@ def get_analysis(analysis_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "analysis not found")
     return StatAnalysisResult(**data)
 
-@router.get("/")
+@router.get("")
 def list_analyses(db: Session = Depends(get_db)):
     analyses = store_list(db, NS_ANALYSES)
     return {"analyses": [{"analysis_id": a["analysis_id"], "created_at": a["created_at"], "fidelity_mean": a["fidelity_mean"], "is_significant": a["is_significant"]} for a in analyses]}
+

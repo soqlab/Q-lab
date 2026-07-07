@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 import random
 from datetime import datetime, timezone
@@ -152,7 +152,8 @@ def explain_anomaly(req: AnomalyRequest):
         "similar_cases": [f"run_{str(uuid.uuid4())[:8]}", f"run_{str(uuid.uuid4())[:8]}"],
     }
 
-@router.get("/")
+@router.get("")
 def list_sessions(db: Session = Depends(get_db)):
     sessions = store_list(db, NS)
     return {"sessions": [{"session_id": s["session_id"], "n_turns": len(s.get("turns", []))} for s in sessions]}
+
