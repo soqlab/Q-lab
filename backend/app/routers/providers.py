@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
@@ -166,7 +166,7 @@ def submit_to_providers(req: ProviderSubmitRequest, db: Session = Depends(get_db
     store_put(db, NS, batch_id, result.model_dump())
     return result
 
-@router.get("/")
+@router.get("")
 def list_providers():
     return {"providers": [{"id": k, **{x: v[x] for x in ["name","max_qubits","backends","cost_per_shot","free_tier","avg_queue_min","two_q_fidelity","native_gates"]}} for k, v in PROVIDERS.items()]}
 
@@ -176,3 +176,4 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
     if data is None:
         return {"error": "batch not found"}
     return data
+

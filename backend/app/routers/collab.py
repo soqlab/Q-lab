@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, random
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -121,8 +121,9 @@ def get_room(room_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "room not found")
     return CollabRoom(**room_data)
 
-@router.get("/")
+@router.get("")
 def list_rooms(db: Session = Depends(get_db)):
     store_seed(db, NS_ROOMS, _build_seed_records())
     rooms = store_list(db, NS_ROOMS)
     return {"rooms": [{"room_id": r["room_id"], "name": r["name"], "status": r["status"], "participants": len(r["participants"])} for r in rooms]}
+

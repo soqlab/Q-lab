@@ -1,4 +1,4 @@
-"""Researcher Profile Pages — public GitHub-style profiles for quantum researchers.
+﻿"""Researcher Profile Pages — public GitHub-style profiles for quantum researchers.
 
 Endpoints:
   GET  /api/v1/profiles/me              — own profile (auth required)
@@ -381,7 +381,7 @@ def upsert_my_profile(
     return record
 
 
-@router.get("/")
+@router.get("")
 def list_profiles(
     institution: Optional[str] = Query(default=None),
     research_interest: Optional[str] = Query(default=None),
@@ -629,3 +629,4 @@ def get_profile(username: str, db: Session = Depends(get_db)):
     result["algorithm_distribution"] = stats["algorithm_distribution"]
 
     return result
+

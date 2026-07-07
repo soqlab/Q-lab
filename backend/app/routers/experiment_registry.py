@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, hashlib
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -161,9 +161,10 @@ def fork_entry(registry_id: str, new_title: str = "", author: str = "anonymous",
     store_put(db, NS_REGISTRY, registry_id, src)
     return RegistryEntry(**data)
 
-@router.get("/")
+@router.get("")
 def list_experiments(limit: int = 20, sort_by: str = "stars", db: Session = Depends(get_db)):
     store_seed(db, NS_REGISTRY, _build_seed_records())
     all_entries = [RegistryEntry(**r) for r in store_list(db, NS_REGISTRY)]
     results = sorted(all_entries, key=lambda r: r.stars if sort_by == "stars" else r.published_at, reverse=True)[:limit]
     return {"experiments": results, "total": len(all_entries)}
+

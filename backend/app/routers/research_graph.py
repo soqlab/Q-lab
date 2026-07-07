@@ -114,12 +114,16 @@ def _seed_db(db: Session):
             edge_seeds.append((eid, edge.model_dump()))
     store_seed(db, NS_EDGES, edge_seeds)
 
-@router.get("/")
+@router.get("")
 def get_graph(db: Session = Depends(get_db)):
     _seed_db(db)
     nodes = [GraphNode(**r) for r in store_list(db, NS_NODES)]
     edges = store_list(db, NS_EDGES)
-    return {"nodes": nodes, "edges": edges, "stats": {"n_nodes": len(nodes), "n_edges": len(edges), "node_types": {t: sum(1 for n in nodes if n.node_type == t) for t in NODE_TYPES}}}
+    return {
+        "nodes": [n.model_dump() for n in nodes],
+        "edges": edges,
+        "stats": {"n_nodes": len(nodes), "n_edges": len(edges), "node_types": {t: sum(1 for n in nodes if n.node_type == t) for t in NODE_TYPES}},
+    }
 
 @router.post("/nodes", response_model=GraphNode)
 def add_node(req: AddNodeRequest, db: Session = Depends(get_db)):

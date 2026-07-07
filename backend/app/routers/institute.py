@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 import random
 from datetime import datetime, timezone, timedelta
@@ -190,6 +190,7 @@ def get_members(institute_id: str):
     return result
 
 
-@router.get("/")
+@router.get("")
 def list_institutes():
     return list(institutes_store.values())
+

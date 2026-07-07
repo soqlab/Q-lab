@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 import random
 from datetime import datetime, timezone
@@ -194,7 +194,7 @@ def get_pipeline(pipeline_id: str):
     return _pipelines[pipeline_id]
 
 
-@router.get("/")
+@router.get("")
 def list_pipelines():
     return [
         {
@@ -206,3 +206,4 @@ def list_pipelines():
         }
         for p in _pipelines.values()
     ]
+

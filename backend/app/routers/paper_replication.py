@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 import random
@@ -107,7 +107,7 @@ class StartPayload(BaseModel):
 class PublishPayload(BaseModel):
     notes: Optional[str] = None
 
-@router.get("/")
+@router.get("")
 def list_replications(db: Session = Depends(get_db)):
     _seed_db(db)
     items = sorted(store_list(db, NS), key=lambda x: x["started_at"], reverse=True)
@@ -147,3 +147,4 @@ def publish_verdict(replication_id: str, payload: PublishPayload = PublishPayloa
     r.update(published=True, published_at=datetime.now(timezone.utc).isoformat(), publish_notes=payload.notes)
     store_put(db, NS, replication_id, r)
     return {"published": True, "replication_id": replication_id, "verdict": r["verdict"]}
+

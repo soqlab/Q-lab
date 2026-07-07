@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 import random
 from datetime import datetime, timezone
@@ -213,7 +213,7 @@ def get_proposal(proposal_id: str):
     return _proposals[proposal_id]
 
 
-@router.get("/")
+@router.get("")
 def list_proposals():
     return [
         {
@@ -227,3 +227,4 @@ def list_proposals():
         }
         for p in _proposals.values()
     ]
+

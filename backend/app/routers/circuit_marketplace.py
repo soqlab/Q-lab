@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -97,7 +97,7 @@ def create_listing(req: ListingRequest, db: Session = Depends(get_db)):
     return listing
 
 
-@router.get("/")
+@router.get("")
 def browse_listings(category: Optional[str] = None, tags: Optional[str] = None,
                     max_price: Optional[float] = None, sort: Optional[str] = "rating",
                     db: Session = Depends(get_db)):
@@ -189,3 +189,4 @@ def add_review(listing_id: str, req: ReviewRequest, db: Session = Depends(get_db
     listing["review_count"] = len(all_ratings)
     store_put(db, NS_LISTINGS, listing_id, listing)
     return review
+

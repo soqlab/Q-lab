@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import uuid, math, random
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
@@ -92,7 +92,8 @@ def get_schedule(schedule_id: str, db: Session = Depends(get_db)):
     if not data: raise HTTPException(404, "not found")
     return OptScheduleResult(**data)
 
-@router.get("/")
+@router.get("")
 def list_schedules(db: Session = Depends(get_db)):
     schedules = store_list(db, NS_SCHEDULES)
     return {"schedules": [{"schedule_id": s["schedule_id"], "n_circuits": s["n_circuits"], "total_cost_usd": s["total_cost_usd"], "created_at": s["created_at"]} for s in schedules]}
+
