@@ -559,6 +559,24 @@ function RunsInner() {
         ))}
       </section>
 
+      {/* Loading indicator */}
+      {loading && (
+        <div className="empty" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5"
+            style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="var(--strong)"/>
+          </svg>
+          <span style={{ color: "var(--muted)", fontSize: 14 }}>Loading runs…</span>
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className="empty" style={{ color: "var(--danger)" }}>{error}</div>
+      )}
+
       {/* Chart — only when there's data */}
       {chartData.length > 0 && (
         <section className="panel">
@@ -570,7 +588,7 @@ function RunsInner() {
       )}
 
       {/* Empty state */}
-      {!loading && !runs.length && <QuickStart />}
+      {!loading && !error && !runs.length && <QuickStart />}
 
       {/* Live routing fabric — real backend usage from loaded runs */}
       {!loading && runs.length > 0 && <DashFabric runs={runs} />}
