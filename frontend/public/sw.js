@@ -1,37 +1,58 @@
-const CACHE_NAME = 'qlab-v1';
-const STATIC_ASSETS = ['/', '/runs', '/live-monitor'];
+const CACHE_NAME = 'qlab-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS).catch(() => {}))
-  );
+  // Don't pre-cache HTML pages — they must always come from the network
+  // so users get the latest JS chunk references after each deployment.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first for API calls
-  if (event.request.url.includes('/api/')) {
+  const url = new URL(event.request.url);
+
+  // API calls — always network, never cache
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/qlab-api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => new Response(JSON.stringify({ error: 'offline' }), { headers: { 'Content-Type': 'application/json' } }))
+      fetch(event.request).catch(
+        () => new Response(JSON.stringify({ error: 'offline' }), {
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
     );
     return;
   }
-  // Cache-first for static assets
+
+  // Hashed static assets (_next/static/) — safe to cache forever,
+  // filename changes on every build so stale content is impossible.
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(event.request).then(
+        (cached) =>
+          cached ||
+          fetch(event.request).then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return response;
+          })
+      )
+    );
+    return;
+  }
+
+  // Everything else (HTML pages, public files) — network-first so users
+  // always get the latest deployment without needing a hard refresh.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      if (response.ok) {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-      }
-      return response;
-    }))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
@@ -43,7 +64,7 @@ self.addEventListener('push', (event) => {
       body: data.body || 'Your quantum job has completed',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      data: { url: data.url || '/runs' }
+      data: { url: data.url || '/runs' },
     })
   );
 });
