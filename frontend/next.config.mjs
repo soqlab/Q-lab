@@ -25,14 +25,16 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // HTML pages — never cache so users always get the latest deploy
-        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        // All routes: no caching by default
+        source: "/:path*",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Pragma", value: "no-cache" },
         ],
       },
       {
-        // Hashed static assets — cache forever (filename changes on each build)
+        // Hashed static assets override the above — cache forever
+        // (safe because _next/static filenames change on every build)
         source: "/_next/static/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
