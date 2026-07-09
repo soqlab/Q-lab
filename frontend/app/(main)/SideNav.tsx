@@ -236,6 +236,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
     label: "Settings",
     defaultOpen: false,
     items: [
+      { href: "/feedback", icon: MessageSquare, label: "Send Feedback" },
       { href: "/settings", icon: Settings, label: "Settings" },
       { href: "/settings/policy", icon: Shield, label: "Policy Gates" },
       { href: "/settings/rbac", icon: Lock, label: "RBAC" },
