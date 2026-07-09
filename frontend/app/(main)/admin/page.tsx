@@ -492,7 +492,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) { router.push("/login"); return; }
+    if (!token) { router.push("/login?next=/admin"); return; }
     if (user && user.role !== "owner" && user.role !== "admin") return;
     void Promise.all([
       fetch("/qlab-api/api/v1/admin/stats", { headers: { Authorization: `Bearer ${token}` } })

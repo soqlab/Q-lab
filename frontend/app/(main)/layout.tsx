@@ -6,6 +6,19 @@ import UserMenu from "./UserMenu";
 import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
 
+function SWUpdater() {
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }, []);
+  return null;
+}
+
 function WarmupBanner() {
   const [visible, setVisible] = useState(false);
   const [done, setDone] = useState(false);
@@ -84,6 +97,7 @@ function WarmupBanner() {
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
+      <SWUpdater />
       <WarmupBanner />
       <aside className="sidebar">
         <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
