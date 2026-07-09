@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Atom, Eye, EyeOff } from "lucide-react";
 import { login } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
@@ -10,6 +10,8 @@ import { useAuth } from "../../../lib/auth";
 export default function LoginPage() {
   const { setSession } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/runs";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function LoginPage() {
     try {
       const resp = await login(email, password);
       setSession(resp.access_token, resp.user);
-      router.push("/runs");
+      router.push(next);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
       if (msg === "email_not_verified") {
