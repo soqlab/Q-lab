@@ -3,6 +3,7 @@
 import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
+import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
 
 function WarmupBanner() {
@@ -113,6 +114,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: "#475569" }}>Privacy</a>
         </footer>
       </div>
+      <NPSWidget />
     </div>
   );
 }

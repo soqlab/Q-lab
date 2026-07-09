@@ -1,12 +1,15 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import Identity, require_role
 from ..models import APIKey, AuditLog, Benchmark, Organization, Run, User, Webhook
+
+VALID_ROLES = {"owner", "admin", "researcher", "viewer"}
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -144,6 +147,47 @@ def remove_user(
     user.is_active = False
     db.commit()
     return {"message": f"User {user.email} has been deactivated"}
+
+
+class RolePayload(BaseModel):
+    role: str
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: int,
+    body: RolePayload,
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=422, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == identity.user_id:
+        raise HTTPException(status_code=400, detail="You cannot change your own role")
+    if body.role == "owner" and identity.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can grant owner role")
+    if user.role == "owner" and identity.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can change an owner's role")
+    user.role = body.role
+    db.commit()
+    return {"id": user.id, "email": user.email, "role": user.role}
+
+
+@router.patch("/users/{user_id}/reactivate")
+def reactivate_user(
+    user_id: int,
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = True
+    db.commit()
+    return {"message": f"User {user.email} has been reactivated"}
 
 
 @router.delete("/users/{user_id}/purge")
