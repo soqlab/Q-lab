@@ -9,12 +9,45 @@ import { useEffect, useState } from "react";
 function SWUpdater() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    // Auto-reload when a new SW version takes over (fires when sw.js changes)
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshing) return;
       refreshing = true;
       window.location.reload();
     });
+
+    // Version checker: compare __NEXT_DATA__.buildId against what the server
+    // is currently serving. Fires on tab focus and every 3 minutes. When the
+    // build ID differs (new deploy) the page reloads silently.
+    const currentBuildId = (window as Record<string, unknown>).__NEXT_DATA__ &&
+      ((window as Record<string, unknown>).__NEXT_DATA__ as Record<string, unknown>).buildId as string | undefined;
+
+    if (!currentBuildId) return;
+
+    async function checkVersion() {
+      try {
+        const res = await fetch(window.location.pathname, {
+          cache: "no-store",
+          headers: { Accept: "text/html" },
+        });
+        const html = await res.text();
+        const match = html.match(/"buildId":"([^"]+)"/);
+        const deployedId = match?.[1];
+        if (deployedId && deployedId !== currentBuildId) {
+          window.location.reload();
+        }
+      } catch {
+        // Network error — ignore, try again next time
+      }
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void checkVersion();
+    });
+
+    const interval = setInterval(() => void checkVersion(), 3 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
   return null;
 }

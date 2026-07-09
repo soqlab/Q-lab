@@ -483,7 +483,7 @@ function NPSTab({ token }: { token: string }) {
 type Tab = "overview" | "users" | "feedback" | "nps";
 
 export default function AdminPage() {
-  const { token, user } = useAuth();
+  const { token, user, loading } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
@@ -492,23 +492,24 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Don't act until auth has finished reading from localStorage
+    if (loading) return;
     if (!token) { router.push("/login?next=/admin"); return; }
-    // Wait until user is resolved before doing anything
-    if (!user) return;
-    // Non-admin: don't fetch, just show the guard
-    if (user.role !== "owner" && user.role !== "admin") return;
+    // Non-admin: don't fetch, just let render show the guard
+    if (!user || (user.role !== "owner" && user.role !== "admin")) return;
     void Promise.all([
       fetch("/qlab-api/api/v1/admin/stats", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(setStats).catch(() => setError("Failed to load stats")),
       fetch("/qlab-api/api/v1/admin/audit-logs?limit=50", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(d => { setLogs(d.items); setLogTotal(d.total); }).catch(() => {}),
     ]);
-  }, [token, user]); // eslint-disable-line
+  }, [loading, token, user]); // eslint-disable-line
 
-  // Still resolving auth
-  if (!user) return <main className="page"><div className="empty">Loading…</div></main>;
+  // Auth still initialising (token is read from localStorage in a useEffect, so
+  // it starts null even for logged-in users — don't redirect until loading=false)
+  if (loading) return <main className="page"><div className="empty">Loading…</div></main>;
   // Unauthorised — show the robot guard
-  if (user.role !== "owner" && user.role !== "admin") return <Unauthorized />;
+  if (!user || (user.role !== "owner" && user.role !== "admin")) return <Unauthorized />;
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger)" }}>{error}</div></main>;
   if (!stats) return <main className="page"><div className="empty">Loading…</div></main>;
 
