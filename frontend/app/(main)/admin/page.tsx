@@ -493,16 +493,22 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!token) { router.push("/login?next=/admin"); return; }
-    if (user && user.role !== "owner" && user.role !== "admin") return;
+    // Wait until user is resolved before doing anything
+    if (!user) return;
+    // Non-admin: don't fetch, just show the guard
+    if (user.role !== "owner" && user.role !== "admin") return;
     void Promise.all([
       fetch("/qlab-api/api/v1/admin/stats", { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(setStats).catch(() => setError("Failed to load stats")),
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(setStats).catch(() => setError("Failed to load stats")),
       fetch("/qlab-api/api/v1/admin/audit-logs?limit=50", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(d => { setLogs(d.items); setLogTotal(d.total); }).catch(() => {}),
     ]);
   }, [token, user]); // eslint-disable-line
 
-  if (user && user.role !== "owner" && user.role !== "admin") return <Unauthorized />;
+  // Still resolving auth
+  if (!user) return <main className="page"><div className="empty">Loading…</div></main>;
+  // Unauthorised — show the robot guard
+  if (user.role !== "owner" && user.role !== "admin") return <Unauthorized />;
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger)" }}>{error}</div></main>;
   if (!stats) return <main className="page"><div className="empty">Loading…</div></main>;
 
