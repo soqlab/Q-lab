@@ -160,33 +160,42 @@ function UsersTab({ token }: { token: string }) {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/qlab-api/api/v1/admin/users", { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) setUsers(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch("/qlab-api/api/v1/admin/users", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setUsers(await res.json());
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { void load(); }, []); // eslint-disable-line
 
   async function changeRole(userId: number, role: string) {
     setWorking(userId);
-    await fetch(`/qlab-api/api/v1/admin/users/${userId}/role`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role }),
-    });
-    await load();
-    setWorking(null);
+    try {
+      await fetch(`/qlab-api/api/v1/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role }),
+      });
+      await load();
+    } finally {
+      setWorking(null);
+    }
   }
 
   async function toggleActive(user: AdminUser) {
     setWorking(user.id);
-    if (user.is_active) {
-      await fetch(`/qlab-api/api/v1/admin/users/${user.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    } else {
-      await fetch(`/qlab-api/api/v1/admin/users/${user.id}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    try {
+      if (user.is_active) {
+        await fetch(`/qlab-api/api/v1/admin/users/${user.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      } else {
+        await fetch(`/qlab-api/api/v1/admin/users/${user.id}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+      }
+      await load();
+    } finally {
+      setWorking(null);
     }
-    await load();
-    setWorking(null);
   }
 
   if (loading) return <div className="empty">Loading users…</div>;
@@ -268,9 +277,12 @@ function FeedbackTab({ token }: { token: string }) {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/qlab-api/api/v1/user-feedback", { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { const d = await res.json(); setItems(d.items); }
-    setLoading(false);
+    try {
+      const res = await fetch("/qlab-api/api/v1/user-feedback", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const d = await res.json(); setItems(d.items); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { void load(); }, []); // eslint-disable-line
@@ -392,7 +404,7 @@ function NPSTab({ token }: { token: string }) {
 
   useEffect(() => {
     fetch("/qlab-api/api/v1/nps", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(setData).finally(() => setLoading(false));
+      .then(r => r.ok ? r.json() : null).then(d => { if (d) setData(d); }).finally(() => setLoading(false));
   }, []); // eslint-disable-line
 
   if (loading) return <div className="empty">Loading NPS data…</div>;

@@ -42,12 +42,16 @@ function SWUpdater() {
       }
     }
 
-    document.addEventListener("visibilitychange", () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === "visible") void checkVersion();
-    });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     const interval = setInterval(() => void checkVersion(), 3 * 60 * 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
   return null;
 }

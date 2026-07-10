@@ -77,6 +77,7 @@ def system_stats(
             "completed": completed,
             "failed": failed,
             "completion_rate": round(completed / run_count, 3) if run_count else 0,
+            "failure_rate": round(failed / run_count, 3) if run_count else 0,
         },
         "users": user_count,
         "organizations": org_count,
@@ -185,6 +186,8 @@ def reactivate_user(
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.role == "owner" and identity.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can reactivate an owner account")
     user.is_active = True
     db.commit()
     return {"message": f"User {user.email} has been reactivated"}

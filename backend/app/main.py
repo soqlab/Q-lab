@@ -28,6 +28,7 @@ from .health_score import compute_health_score, health_breakdown
 from .models import Project, Run, RunAssertion, RunMetric
 from .rate_limit import auth_limiter, read_limiter, write_limiter
 from .routers import auth_routes, users, benchmarks, webhooks, admin, team
+from .routers import oauth as oauth_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
 from .routers import sweeps as sweeps_router
@@ -272,6 +273,7 @@ app = FastAPI(
 # Routers
 # ------------------------------------------------------------------
 app.include_router(auth_routes.router)
+app.include_router(oauth_router.router)
 app.include_router(users.router)
 app.include_router(benchmarks.router)
 app.include_router(webhooks.router)
