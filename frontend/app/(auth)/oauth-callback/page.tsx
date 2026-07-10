@@ -13,6 +13,7 @@ function OAuthCallback() {
   useEffect(() => {
     const token = searchParams.get("token");
     const error = searchParams.get("error");
+    const next = searchParams.get("next") || "/runs";
 
     if (error || !token) {
       router.push("/login?error=oauth_failed");
@@ -22,7 +23,7 @@ function OAuthCallback() {
     fetchMe(token)
       .then(user => {
         setSession(token, user);
-        router.push("/runs");
+        router.push(next);
       })
       .catch(() => router.push("/login?error=oauth_failed"));
   }, []); // eslint-disable-line
