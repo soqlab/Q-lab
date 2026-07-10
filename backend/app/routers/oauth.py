@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import create_access_token
 from ..database import get_db
+from ..email_service import send_welcome_email
 from ..models import User
 
 router = APIRouter(prefix="/auth", tags=["oauth"])
@@ -137,6 +138,10 @@ def _upsert_user(db: Session, email: str, name: str) -> tuple[User, bool]:
                       key_hash=key_hash, key_prefix=key_prefix))
         db.commit()
         db.refresh(user)
+        try:
+            send_welcome_email(to_email=email, user_name=name)
+        except Exception:
+            pass
         return user, True
     elif not user.email_verified:
         user.email_verified = True

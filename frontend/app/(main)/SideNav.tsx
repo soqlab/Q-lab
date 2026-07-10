@@ -356,12 +356,47 @@ function AIQuotaBar() {
   );
 }
 
+function GetStartedBanner() {
+  const { token } = useAuth();
+  const [hasRuns, setHasRuns] = useState<boolean | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("qlab_gs_dismissed")) { setDismissed(true); return; }
+    if (!token) return;
+    fetch("/qlab-api/api/v1/runs?limit=1", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setHasRuns(d && d.items ? d.items.length > 0 : (Array.isArray(d) ? d.length > 0 : null)))
+      .catch(() => {});
+  }, [token]);
+
+  function dismiss() {
+    localStorage.setItem("qlab_gs_dismissed", "1");
+    setDismissed(true);
+  }
+
+  if (dismissed || hasRuns === null || hasRuns === true) return null;
+
+  return (
+    <div style={{ margin: "8px 8px 4px", background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, padding: "12px 14px", position: "relative" }}>
+      <button onClick={dismiss} style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 14, lineHeight: 1, padding: 2 }}>×</button>
+      <div style={{ fontSize: 18, marginBottom: 6 }}>🚀</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Ready to track your first run?</div>
+      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginBottom: 10 }}>Set up the SDK in under 2 minutes.</div>
+      <a href="/onboarding" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#fff", background: "#6366f1", padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+        Get Started →
+      </a>
+    </div>
+  );
+}
+
 export default function SideNav() {
   const pathname = usePathname();
   const { user } = useAuth();
 
   return (
     <nav className="nav" aria-label="Primary">
+      <GetStartedBanner />
       {GROUPS.map((group) => (
         <NavGroup
           key={group.label}
