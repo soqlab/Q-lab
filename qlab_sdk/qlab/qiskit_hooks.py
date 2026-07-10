@@ -1192,6 +1192,25 @@ def init(
     _INITIALIZED = True
 
 
+def auto_track(api_key: Optional[str] = None, project: Optional[str] = None) -> None:
+    """One-liner setup: initialise Q-Lab and auto-patch Qiskit so every circuit
+    execution is logged without any further code changes.
+
+    Example::
+
+        import qlab
+        qlab.auto_track(api_key="qlab_abc123...")
+
+        # All subsequent Qiskit Sampler/Estimator/backend.run() calls are
+        # automatically captured and sent to Q-Lab.
+    """
+    init(
+        api_key=api_key or os.getenv("QLAB_API_KEY"),
+        api_url=os.getenv("QLAB_API_URL", "https://www.soqlab.com/qlab-api"),
+        project=project,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Policy helpers
 # ---------------------------------------------------------------------------

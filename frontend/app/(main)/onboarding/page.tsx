@@ -86,47 +86,61 @@ export default function OnboardingPage() {
     }
   }
 
-  const displayKey = newKey || "qlab_YOUR_API_KEY";
+  const displayKey = newKey || apiKeys[0]?.prefix?.replace("…", "...") || "qlab_YOUR_API_KEY";
 
   const installCode = `pip install qlab-sdk`;
 
-  const basicCode = `from qlab import QLabTracker
+  const autoTrackCode = `import qlab
 
-tracker = QLabTracker(
-    api_key="${displayKey}",
-    url="${apiUrl}",
-)
+# One line — patches Qiskit automatically
+qlab.auto_track(api_key="${displayKey}")
 
-# One-shot: log a completed run
-tracker.log_run(
-    circuit_name="bell-state",
-    backend="ibm_brisbane",
-    results={"00": 512, "11": 512},
-    status="completed",
-)`;
-
-  const qiskitCode = `from qlab import QLabTracker
+# Now just use Qiskit normally — every run is logged automatically
 from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
-tracker = QLabTracker(api_key="${displayKey}", url="${apiUrl}")
+qc = QuantumCircuit(2)
+qc.h(0)
+qc.cx(0, 1)
+qc.measure_all()
+
+sim = AerSimulator()
+job = sim.run(qc, shots=1024)   # ← captured automatically
+result = job.result()`;
+
+  const basicCode = `import qlab
+
+qlab.init(
+    api_key="${displayKey}",
+    api_url="${apiUrl}",
+)
+
+# Manually log a completed run
+qlab.log_result(
+    run_id=qlab.track(qc, backend="ibm_brisbane"),
+    result={"00": 512, "11": 512},
+    status="completed",
+)`;
+
+  const qiskitCode = `import qlab
+from qiskit import QuantumCircuit
+from qiskit_aer import AerSimulator
+
+qlab.auto_track(api_key="${displayKey}")
 sim = AerSimulator()
 
-with tracker.run("bell-circuit", project="my-project") as run:
+with qlab.RunContext("bell-circuit", project="my-project") as run:
     qc = QuantumCircuit(2)
     qc.h(0)
     qc.cx(0, 1)
     qc.measure_all()
-
-    run.capture_circuit(qc)              # captures QASM + depth + gate count
-    run.log(parameters={"shots": 1024})
 
     job = sim.run(qc, shots=1024)
     result = job.result()
     counts = result.get_counts()
 
     run.log(results=counts, status="completed")
-    # run auto-submits on exit`;
+    # submits automatically on context exit`;
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 64px" }}>
@@ -174,30 +188,30 @@ with tracker.run("bell-circuit", project="my-project") as run:
         )}
         {apiKeys.length > 0 && (
           <div style={{ fontSize: 12, color: "#475569" }}>
-            Existing keys: {apiKeys.map(k => <code key={k.prefix} style={{ marginRight: 8, color: "#64748b", background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>{k.name}</code>)}
-            <a href="/credentials" style={{ color: "#6366f1", marginLeft: 4 }}>Manage →</a>
+            Your key: <code style={{ marginRight: 8, color: "#86efac", background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>{apiKeys[0].prefix}</code>
+            <a href="/credentials" style={{ color: "#6366f1", marginLeft: 4 }}>Manage all keys →</a>
           </div>
         )}
       </Step>
 
       <Step n={2} title="Install the SDK">
-        <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>No dependencies — works in any Python 3.9+ environment.</p>
+        <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>Works in any Python 3.9+ environment.</p>
         <CodeBlock code={installCode} lang="bash" />
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>
           With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install qlab-sdk qiskit qiskit-aer</code>
         </p>
       </Step>
 
-      <Step n={3} title="Log your first run">
+      <Step n={3} title="Enable auto-tracking — one line">
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>
-          Paste your API key into the code below and run it.
+          Call <code style={{ background: "#1e293b", padding: "1px 6px", borderRadius: 4 }}>qlab.auto_track()</code> once and every Qiskit run is captured automatically — no other code changes needed.
         </p>
-        <CodeBlock code={basicCode} lang="python" />
+        <CodeBlock code={autoTrackCode} lang="python" />
       </Step>
 
-      <Step n={4} title="Track a real Qiskit circuit (auto-capture)">
+      <Step n={4} title="Or use the context manager for full control">
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>
-          Use the context manager to automatically capture circuit metadata and submit on exit.
+          Attach results, tags, and project metadata explicitly with <code style={{ background: "#1e293b", padding: "1px 6px", borderRadius: 4 }}>RunContext</code>.
         </p>
         <CodeBlock code={qiskitCode} lang="python" />
       </Step>

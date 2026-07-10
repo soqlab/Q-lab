@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Atom, Eye, EyeOff } from "lucide-react";
+import { Atom, Eye, EyeOff, Copy, CheckCircle2 } from "lucide-react";
 import { register } from "../../../lib/api";
 
 const pwRules = [
@@ -27,8 +27,14 @@ export default function RegisterPage() {
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const [pwFocused, setPwFocused] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const pwValid = pwRules.every(r => r.test(password));
+
+  function copyKey(key: string) {
+    navigator.clipboard.writeText(key).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +43,8 @@ export default function RegisterPage() {
     if (password !== confirm) { setError("Passwords do not match"); return; }
     setLoading(true);
     try {
-      await register(email, name, password, org || undefined);
+      const resp = await register(email, name, password, org || undefined);
+      if (resp.api_key) setApiKey(resp.api_key);
       setRegistered(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -77,13 +84,34 @@ export default function RegisterPage() {
 
           <div style={{ fontSize: 48, margin: "24px 0 16px" }}>✉️</div>
           <h1 className="auth-title">Check your inbox</h1>
-          <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, margin: "8px 0 24px" }}>
+          <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, margin: "8px 0 16px" }}>
             We sent a verification link to<br />
             <strong style={{ color: "var(--text)" }}>{email}</strong>
           </p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 24px" }}>
-            Click the link in the email to verify your account. You cannot sign in until your email is confirmed.
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px" }}>
+            Click the link in the email to verify your account, then sign in.
           </p>
+
+          {apiKey && (
+            <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: 16, marginBottom: 20, textAlign: "left" }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#10b981", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Your API key — save it now
+              </p>
+              <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 10px" }}>
+                We created one for you automatically. It won&apos;t be shown again.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", borderRadius: 6, padding: "8px 12px", border: "1px solid var(--line)" }}>
+                <code style={{ flex: 1, fontSize: 12, color: "var(--text)", wordBreak: "break-all" }}>{apiKey}</code>
+                <button onClick={() => copyKey(apiKey)} style={{ background: "none", border: "none", cursor: "pointer", color: copied ? "#10b981" : "var(--muted)", padding: 0, display: "flex", alignItems: "center", gap: 4, fontSize: 12, flexShrink: 0 }}>
+                  {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: "8px 0 0" }}>
+                Use this in the SDK: <code style={{ color: "var(--text)" }}>qlab.init(api_key=&quot;{apiKey.slice(0,14)}…&quot;)</code>
+              </p>
+            </div>
+          )}
 
           <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
             <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
