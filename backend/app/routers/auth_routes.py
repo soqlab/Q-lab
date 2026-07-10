@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..auth import create_access_token, hash_password, verify_password
+from ..auth import create_access_token, generate_api_key, hash_password, verify_password
 from ..database import get_db
 from ..deps import Identity, log_audit, require_auth
 from ..email_service import (
@@ -17,7 +17,7 @@ from ..email_service import (
     send_verification_email,
     send_account_deleted_email,
 )
-from ..models import Organization, User
+from ..models import APIKey, Organization, User
 from ..rate_limit import auth_limiter
 
 _RESET_TTL_SECONDS = 15 * 60       # 15 minutes
@@ -92,6 +92,17 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     db.commit()
     db.refresh(user)
 
+    # Auto-create a default API key so the user can start immediately
+    full_key, key_hash, key_prefix = generate_api_key()
+    db.add(APIKey(
+        user_id=user.id,
+        org_id=user.org_id,
+        name="Default key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+    ))
+    db.commit()
+
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.register", "user", str(user.id), request=request)
 
@@ -107,7 +118,9 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     except Exception:
         pass
 
-    return _user_response(user, token)
+    resp = _user_response(user, token)
+    resp["api_key"] = full_key  # returned once — shown on the onboarding screen
+    return resp
 
 
 @router.post("/login", dependencies=[Depends(auth_limiter)])

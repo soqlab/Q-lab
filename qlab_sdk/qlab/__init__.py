@@ -21,6 +21,7 @@ except Exception:
     qsharp = None  # type: ignore[assignment]
 
 from .qiskit_hooks import (
+    auto_track,
     benchmark,
     campaign_combinations,
     check_policy,
@@ -42,6 +43,7 @@ from .qiskit_hooks import (
 from .jupyter import display, watch, runs_table
 
 __all__ = [
+    "auto_track",
     "benchmark",
     "campaign_combinations",
     "check_policy",

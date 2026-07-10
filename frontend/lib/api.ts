@@ -188,6 +188,7 @@ export type AuthResponse = {
   access_token: string;
   token_type: string;
   user: AuthUser;
+  api_key?: string;  // returned once on registration
 };
 
 export type APIKeyInfo = {
