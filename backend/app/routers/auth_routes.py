@@ -17,6 +17,8 @@ from ..email_service import (
     send_verification_email,
     send_account_deleted_email,
 )
+
+OAUTH_HINT = "oauth_account"  # returned when an OAuth-only account tries password login
 from ..models import APIKey, Organization, User
 from ..rate_limit import auth_limiter
 
@@ -126,6 +128,9 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
 @router.post("/login", dependencies=[Depends(auth_limiter)])
 def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
+    # OAuth-only accounts have an empty password_hash — give a helpful hint
+    if user and not user.password_hash:
+        raise HTTPException(status_code=401, detail=OAUTH_HINT)
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:

@@ -19,6 +19,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [unverified, setUnverified] = useState(false);
+  const [isOAuthAccount, setIsOAuthAccount] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -27,6 +28,7 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
     setUnverified(false);
+    setIsOAuthAccount(false);
     setLoading(true);
     try {
       const resp = await login(email, password);
@@ -36,6 +38,8 @@ function LoginForm() {
       const msg = err instanceof Error ? err.message : "Login failed";
       if (msg === "email_not_verified") {
         setUnverified(true);
+      } else if (msg === "oauth_account") {
+        setIsOAuthAccount(true);
       } else {
         setError(msg);
       }
@@ -106,6 +110,12 @@ function LoginForm() {
               </button>
             </div>
             {error && <div className="auth-error">{error}</div>}
+            {isOAuthAccount && (
+              <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+                This account was created with Google or GitHub — it has no password.<br />
+                <span style={{ color: "var(--muted)" }}>Use one of the buttons below to sign in.</span>
+              </div>
+            )}
             <button className="button" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
               {loading ? "Signing in…" : "Sign in"}
             </button>
