@@ -452,7 +452,10 @@ export default function InsightsPanel({ runId }: { runId: string }) {
 
       {/* Grade + Summary */}
       <div style={{ padding: "16px 20px", display: "flex", gap: 18, alignItems: "flex-start", borderBottom: "1px solid var(--line)" }}>
-        <GradeBadge grade={data.performance_grade} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <GradeBadge grade={data.performance_grade} />
+          <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", maxWidth: 60, lineHeight: 1.3 }}>AI assessment — not a certification</div>
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{data.grade_rationale}</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, margin: 0, color: "var(--text)" }}>{data.summary}</p>
@@ -476,7 +479,7 @@ export default function InsightsPanel({ runId }: { runId: string }) {
         {/* Primary bottleneck */}
         <div style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)" }}>
-            <AlertTriangle size={13} /> Primary Bottleneck
+            <AlertTriangle size={13} /> Suggested Bottleneck
           </div>
           <p style={{ fontSize: 13, lineHeight: 1.6, margin: "0 0 10px", fontWeight: 600, color: "#dc2626" }}>
             {data.primary_bottleneck}

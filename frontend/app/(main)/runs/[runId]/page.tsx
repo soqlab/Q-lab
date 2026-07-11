@@ -159,7 +159,7 @@ function ScoreGauge({ score }: { score: number | null | undefined }) {
       <div style={{ width: "100%", height: 8, background: "var(--line)", borderRadius: 4, marginTop: 8 }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 4, transition: "width .5s" }} />
       </div>
-      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>out of 100</div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>out of 100 (estimated)</div>
     </div>
   );
 }
@@ -815,7 +815,7 @@ export default function RunDetailPage({ params }: { params: { runId: string } })
           <div className="metric-value">{(((run.fingerprint.non_clifford_ratio ?? 0) * 100)).toFixed(1)}%</div>
         </div>
         <div className="metric" style={{ borderColor: hc }}>
-          <div className="metric-label">Health Score</div>
+          <div className="metric-label">Execution Quality</div>
           <div className="metric-value" style={{ color: hc }}>{run.health_score ?? "—"}</div>
         </div>
       </section>
@@ -853,9 +853,12 @@ export default function RunDetailPage({ params }: { params: { runId: string } })
       <AssertionsPanel runId={run.run_id} />
 
       <section className="panel">
-        <div className="panel-header"><h2>Health Score</h2></div>
+        <div className="panel-header"><h2>Execution Quality Score</h2></div>
         <div style={{ padding: "12px 16px" }}>
           <ScoreGauge score={run.health_score} />
+          <div style={{ margin: "10px 0 12px", padding: "8px 12px", background: "var(--panel-2)", borderRadius: 6, fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            Weighted heuristic: success probability 40% + gate fidelity 30% + readout fidelity 20% + circuit efficiency 10%. Weights may not reflect the dominant noise source for all workload types.
+          </div>
           <div style={{ marginTop: 12 }}>
             {Object.entries(health).filter(([k]) => k !== "overall").map(([k, v]) => (
               <KeyValue key={k} label={k.replace(/_/g, " ")} value={v !== null ? String(v) : "—"} />

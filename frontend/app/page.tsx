@@ -889,7 +889,7 @@ export default function LandingPage() {
           <ul className="lp-nav-links">
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How it works</a></li>
-            <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            <li><a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a></li>
             <li><button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>Contact</button></li>
           </ul>
 
@@ -1029,7 +1029,7 @@ export default function LandingPage() {
             Up and running in under 60 seconds
           </h2>
           <p className="lp-section-sub">
-            No configuration files. No YAML. Just three lines and you&apos;re tracking.
+            No configuration files. No YAML. Just one line and you&apos;re tracking.
           </p>
 
           <div className="lp-steps">
@@ -1042,9 +1042,9 @@ export default function LandingPage() {
               },
               {
                 num: "2",
-                title: "Initialise once",
-                desc: "Call qlab.init() at the top of your script or notebook. Q-Lab patches Qiskit's QuantumCircuit transparently.",
-                code: "qlab.init()",
+                title: "Enable auto-tracking",
+                desc: "Call qlab.auto_track() once. Q-Lab automatically patches Qiskit's Sampler and Estimator — no other code changes needed.",
+                code: `qlab.auto_track(api_key="YOUR_API_KEY")`,
               },
               {
                 num: "3",
@@ -1093,7 +1093,7 @@ export default function LandingPage() {
             © {new Date().getFullYear()} Q-Lab. Quantum experiment tracking for research teams.
           </span>
           <div className="lp-footer-links">
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
             <button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>
