@@ -14,9 +14,9 @@ const PROBLEMS = [
 ];
 
 const VERDICT_STYLE: Record<string, { color: string; label: string; icon: string }> = {
-  quantum_wins:   { color: "#3b82f6", label: "Quantum Wins", icon: "⚛️" },
-  classical_wins: { color: "#f59e0b", label: "Classical Wins", icon: "💻" },
-  tie:            { color: "#64748b", label: "Tie", icon: "⚖️" },
+  quantum_wins:   { color: "#3b82f6", label: "Quantum Faster (Benchmark)", icon: "⚛️" },
+  classical_wins: { color: "#f59e0b", label: "Classical Faster", icon: "💻" },
+  tie:            { color: "#64748b", label: "Comparable", icon: "⚖️" },
 };
 
 function SweepChart({ sweep }: { sweep: AdvantageSweepPoint[] }) {
@@ -95,10 +95,10 @@ type AnalyzerResult = {
 };
 
 const VERDICT_META = {
-  strong_advantage:   { bg: "#052e16", border: "#166534", text: "#4ade80", label: "Strong Quantum Advantage" },
-  potential_advantage:{ bg: "#1c1400", border: "#854d0e", text: "#fbbf24", label: "Potential Advantage" },
-  limited_advantage:  { bg: "#1f1300", border: "#9a3412", text: "#fb923c", label: "Limited Advantage" },
-  no_advantage:       { bg: "#1f0000", border: "#991b1b", text: "#f87171", label: "No Advantage" },
+  strong_advantage:   { bg: "#052e16", border: "#166534", text: "#4ade80", label: "Strong Quantum Speedup" },
+  potential_advantage:{ bg: "#1c1400", border: "#854d0e", text: "#fbbf24", label: "Potential Quantum Speedup" },
+  limited_advantage:  { bg: "#1f1300", border: "#9a3412", text: "#fb923c", label: "Limited Speedup" },
+  no_advantage:       { bg: "#1f0000", border: "#991b1b", text: "#f87171", label: "No Speedup Detected" },
 } as const;
 
 function ScoreGauge({ score }: { score: number }) {
@@ -404,10 +404,10 @@ export default function AdvantagePage() {
       {/* Header */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 10 }}>
-          <Zap size={28} color="#3b82f6" /> Quantum Advantage
+          <Zap size={28} color="#3b82f6" /> Quantum-Classical Benchmark
         </h1>
         <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-          Detect and analyze quantum advantage — from problem benchmarks to AI-powered run analysis.
+          Compare quantum circuit performance against classical baselines. Results reflect benchmark comparisons on specific problem instances — not a general proof of quantum advantage.
         </p>
       </div>
 
