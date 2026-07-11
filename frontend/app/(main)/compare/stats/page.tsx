@@ -144,7 +144,7 @@ export default function StatsComparePage() {
         <div style={{ padding: "16px 18px" }}>
           <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--muted, #5f6f80)", lineHeight: 1.6 }}>
             Compare two groups of runs using Welch&apos;s t-test, Cohen&apos;s d effect size, and bootstrap 95% confidence intervals.
-            Suitable for publication-quality significance testing between experimental configurations.
+            Note: Welch&apos;s t-test assumes approximately normal distributions and independent samples. Verify these assumptions hold for your data — shot-noise distributions, repeated runs, and correlated measurements may require different tests. Apply multiple-hypothesis corrections when comparing many configurations.
           </p>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>

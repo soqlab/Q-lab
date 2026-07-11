@@ -30,14 +30,14 @@ function QVDisplay({ qv, log2qv }: { qv: number; log2qv: number }) {
   return (
     <div style={{ textAlign: "center", padding: "8px 0" }}>
       <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-        Estimated Quantum Volume
+        Calibration-Derived Capacity Score
       </div>
       <div style={{ fontSize: 52, fontWeight: 800, color: "var(--strong)", lineHeight: 1 }}>
         {qv >= 1024 ? `2^${log2qv}` : qv}
       </div>
       {log2qv > 0 && (
         <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
-          log₂(QV) = {log2qv}
+          log₂(score) = {log2qv}
         </div>
       )}
     </div>
@@ -112,7 +112,7 @@ export default function QuantumVolumePanel({ runId }: { runId: string }) {
   if (error) return null;
   if (!data) return (
     <section className="panel">
-      <div className="panel-header"><h2>Quantum Volume</h2></div>
+      <div className="panel-header"><h2>Calibration-Derived Capacity</h2></div>
       <div className="empty" style={{ padding: 24 }}>Estimating QV…</div>
     </section>
   );
@@ -123,12 +123,16 @@ export default function QuantumVolumePanel({ runId }: { runId: string }) {
     <section className="panel">
       <div className="panel-header">
         <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Cpu size={16} aria-hidden="true" /> Quantum Volume
+          <Cpu size={16} aria-hidden="true" /> Calibration-Derived Capacity
         </h2>
         <GradeBadge grade={data.grade} />
         {!data.has_calibration && (
           <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>(estimated defaults)</span>
         )}
+      </div>
+
+      <div style={{ margin: "0 16px 0", padding: "8px 12px", background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+        This score is derived from calibration properties (T1/T2, gate errors, readout errors) and is not an empirically measured Quantum Volume. Empirical QV requires dedicated randomized benchmarking circuits per the IBM standard.
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
