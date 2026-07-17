@@ -69,6 +69,13 @@ const STYLES = `
     transition: color 0.15s;
   }
   .lp-nav-links a:hover { color: #f1f5f9; }
+  .lp-nav-links button {
+    font-size: 14px;
+    font-weight: 500;
+    color: #94a3b8;
+    transition: color 0.15s;
+  }
+  .lp-nav-links button:hover { color: #f1f5f9; }
 
   .lp-nav-actions {
     display: flex;
