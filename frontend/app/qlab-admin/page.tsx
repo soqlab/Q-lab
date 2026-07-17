@@ -56,6 +56,7 @@ export default function QLabAdminPage() {
   useEffect(() => {
     if (loading) return;
     if (!token) { router.push("/login"); return; }
+    if (!user || (user.role !== "owner" && user.role !== "admin")) { router.push("/runs"); return; }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, loading]);
