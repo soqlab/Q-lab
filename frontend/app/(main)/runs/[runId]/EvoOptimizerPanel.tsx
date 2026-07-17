@@ -66,7 +66,7 @@ function CandidateCard({ cand, rank, baseline }: { cand: EvoCandidate; rank: num
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: "#fff" }}>
+        <div style={{ padding: "12px 14px", background: "var(--panel-2)" }}>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
             <DeltaChip label="depth"    delta={cand.deltas.depth} />
             <DeltaChip label="gates"    delta={cand.deltas.size} />

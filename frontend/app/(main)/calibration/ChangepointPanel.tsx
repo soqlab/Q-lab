@@ -79,8 +79,8 @@ function ChangepointCard({ cp }: { cp: Changepoint }) {
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: "#fff" }}>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+        <div style={{ padding: "12px 14px", background: "var(--panel-2)" }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
             {cp.runs_before} runs before · {cp.runs_after} runs after this changepoint
           </div>
           {Object.entries(cp.metric_shifts).map(([key, shift]) => (

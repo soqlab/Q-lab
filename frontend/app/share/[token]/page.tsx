@@ -6,7 +6,7 @@ import { fetchPublicRun, healthColor, qlabApiPath, type QLabRun } from "../../..
 
 function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f0f3f7", fontSize: 14 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--line)", fontSize: 14 }}>
       <span style={{ color: "#5f6f80" }}>{label}</span>
       <span style={{ fontWeight: 500, maxWidth: "60%", textAlign: "right", wordBreak: "break-all" }}>{value ?? "—"}</span>
     </div>
@@ -28,7 +28,7 @@ export default function PublicSharePage({ params }: { params: { token: string } 
   const hc = healthColor(run?.health_score);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f8fa", fontFamily: "Inter, Segoe UI, Arial, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", fontFamily: "Inter, Segoe UI, Arial, sans-serif" }}>
       {/* Top bar */}
       <header style={{
         background: "#0d1b2a", color: "#fff", padding: "14px 28px",
@@ -60,7 +60,7 @@ export default function PublicSharePage({ params }: { params: { token: string } 
         {run && (
           <>
             {/* Header card */}
-            <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
                 <div>
                   <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
@@ -94,8 +94,8 @@ export default function PublicSharePage({ params }: { params: { token: string } 
             {/* Two-column grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {/* Fingerprint */}
-              <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "20px 24px" }}>
-                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#374151" }}>Circuit Fingerprint</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 24px" }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Circuit Fingerprint</h2>
                 <StatRow label="Qubits" value={fp.num_qubits} />
                 <StatRow label="Classical bits" value={fp.num_clbits} />
                 <StatRow label="Depth" value={fp.depth} />
@@ -104,8 +104,8 @@ export default function PublicSharePage({ params }: { params: { token: string } 
               </div>
 
               {/* Results */}
-              <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "20px 24px" }}>
-                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#374151" }}>Results</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 24px" }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Results</h2>
                 {Object.keys(run.results).length === 0 ? (
                   <div style={{ color: "#9aa8b6", fontSize: 13 }}>No results recorded.</div>
                 ) : (
@@ -117,8 +117,8 @@ export default function PublicSharePage({ params }: { params: { token: string } 
 
               {/* Health breakdown */}
               {run.health_breakdown && Object.keys(run.health_breakdown).length > 0 && (
-                <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "20px 24px" }}>
-                  <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#374151" }}>Health Breakdown</h2>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 24px" }}>
+                  <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Health Breakdown</h2>
                   {Object.entries(run.health_breakdown).map(([k, v]) => (
                     <StatRow key={k} label={k} value={v !== null ? String(v) : "—"} />
                   ))}
@@ -127,8 +127,8 @@ export default function PublicSharePage({ params }: { params: { token: string } 
 
               {/* Timing */}
               {Object.keys(run.timing).length > 0 && (
-                <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "20px 24px" }}>
-                  <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#374151" }}>Timing</h2>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 24px" }}>
+                  <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Timing</h2>
                   {Object.entries(run.timing).map(([k, v]) => (
                     <StatRow key={k} label={k} value={typeof v === "string" ? v : JSON.stringify(v)} />
                   ))}
@@ -138,8 +138,8 @@ export default function PublicSharePage({ params }: { params: { token: string } 
 
             {/* Circuit diagram */}
             {run.qasm && (
-              <div style={{ background: "#fff", border: "1px solid #dfe4ea", borderRadius: 12, padding: "20px 24px", marginTop: 16 }}>
-                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#374151" }}>Circuit Diagram</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 24px", marginTop: 16 }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Circuit Diagram</h2>
                 <div style={{ overflow: "auto", maxHeight: 360, background: "#f7f8fa", borderRadius: 8 }}>
                   <img
                     src={qlabApiPath(`/api/v1/runs/${run.run_id}/circuit.svg`)}

@@ -235,59 +235,59 @@ export default function NetworkPage() {
     <>
       <style>{`
         .net-page { padding: 24px 32px; max-width: 1100px; }
-        h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
-        .subtitle { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
-        .section { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        .section-title { font-size: 15px; font-weight: 600; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+        .net-page h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; color: var(--text); }
+        .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        .section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section-title { font-size: 15px; font-weight: 600; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; color: var(--text); }
         .section-title .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 500; }
         .on-badge { background: #dcfce7; color: #16a34a; }
         .off-badge { background: #fee2e2; color: #dc2626; }
         .row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .field-label { font-size: 13px; color: #374151; font-weight: 500; min-width: 120px; }
-        .mono { font-family: monospace; font-size: 12px; background: #f3f4f6; padding: 3px 8px; border-radius: 4px; }
-        input[type=text], input[type=url] { border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 14px; width: 280px; }
+        .field-label { font-size: 13px; color: var(--muted); font-weight: 500; min-width: 120px; }
+        .mono { font-family: monospace; font-size: 12px; background: var(--panel-2); color: var(--text); padding: 3px 8px; border-radius: 4px; }
+        input[type=text], input[type=url] { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 14px; width: 280px; background: var(--panel); color: var(--text); }
         input[type=text]:focus, input[type=url]:focus { outline: 2px solid #6366f1; }
         .btn { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: opacity 0.15s; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: #6366f1; color: #fff; }
-        .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
-        .btn-danger { background: #fee2e2; color: #dc2626; }
-        .btn-green { background: #dcfce7; color: #16a34a; }
+        .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+        .btn-danger { background: rgba(239,68,68,0.12); color: #dc2626; }
+        .btn-green { background: rgba(34,197,94,0.12); color: #16a34a; }
         .toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
         .toggle input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #d1d5db; border-radius: 24px; transition: .3s; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--line); border-radius: 24px; transition: .3s; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s; }
         input:checked + .slider { background: #6366f1; }
         input:checked + .slider:before { transform: translateX(20px); }
         .peer-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-        .peer-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
+        .peer-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; color: var(--text); }
         .peer-item .peer-label { font-weight: 500; flex: 1; }
-        .peer-item .peer-url { color: #6b7280; font-family: monospace; font-size: 11px; }
+        .peer-item .peer-url { color: var(--muted); font-family: monospace; font-size: 11px; }
         .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .dot-green { background: #22c55e; }
         .dot-red { background: #ef4444; }
         .dot-gray { background: #9ca3af; }
-        .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+        .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
         .peer-error { color: #dc2626; font-size: 12px; margin-top: 6px; }
-        .backend-select { border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 14px; min-width: 220px; }
+        .backend-select { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 14px; min-width: 220px; background: var(--panel); color: var(--text); }
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
-        .metric-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; }
-        .metric-label { font-size: 11px; color: #6b7280; font-weight: 500; text-transform: uppercase; margin-bottom: 4px; }
-        .metric-val { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
-        .metric-sub { font-size: 11px; color: #6b7280; }
-        .metric-range { font-size: 10px; color: #9ca3af; margin-top: 2px; }
-        .summary-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #1d4ed8; margin-bottom: 12px; }
-        .source-row { border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
-        .source-hdr { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f9fafb; border: none; cursor: pointer; font-size: 13px; text-align: left; }
-        .source-hdr:hover { background: #f3f4f6; }
+        .metric-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+        .metric-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; margin-bottom: 4px; }
+        .metric-val { font-size: 22px; font-weight: 700; margin-bottom: 2px; color: var(--text); }
+        .metric-sub { font-size: 11px; color: var(--muted); }
+        .metric-range { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .summary-box { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #60a5fa; margin-bottom: 12px; }
+        .source-row { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+        .source-hdr { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel-2); border: none; cursor: pointer; font-size: 13px; text-align: left; color: var(--text); }
+        .source-hdr:hover { background: var(--line); }
         .source-label { font-weight: 600; flex: 1; }
-        .source-tag { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #e5e7eb; color: #374151; }
-        .source-snaps { font-size: 11px; color: #6b7280; }
-        .chevron { font-size: 11px; color: #9ca3af; }
-        .source-metrics { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 14px; background: #fff; }
-        .no-backends { color: #6b7280; font-size: 13px; font-style: italic; padding: 8px 0; }
+        .source-tag { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: var(--line); color: var(--muted); }
+        .source-snaps { font-size: 11px; color: var(--muted); }
+        .chevron { font-size: 11px; color: var(--muted); }
+        .source-metrics { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 14px; background: var(--panel); }
+        .no-backends { color: var(--muted); font-size: 13px; font-style: italic; padding: 8px 0; }
         .instance-id-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .info-row { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+        .info-row { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
       `}</style>
 
       <div className="net-page">

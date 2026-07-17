@@ -68,7 +68,7 @@ function PredictionCard({ pred, rank }: { pred: TransferPrediction; rank: number
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: "#fff" }}>
+        <div style={{ padding: "12px 14px", background: "var(--panel-2)" }}>
           <div style={{ marginBottom: 10 }}>
             <ComponentRow label="Calibration similarity" value={pred.component_scores.calibration_similarity} color="#6366f1" />
             <ComponentRow label="Gate compatibility"     value={pred.component_scores.gate_compatibility}     color="#22c55e" />
