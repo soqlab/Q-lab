@@ -980,6 +980,7 @@ export default function PreregisterPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const items = await api.list(statusFilter ? { status: statusFilter } : undefined);
       setList(items);

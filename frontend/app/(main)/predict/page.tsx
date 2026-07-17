@@ -275,7 +275,7 @@ function OutcomePredictor() {
                             left: `${result.predicted_health}%`,
                             transform: "translateX(-50%)",
                             width: 3, height: "100%",
-                            background: "#fff",
+                            background: "var(--panel)",
                           }} />
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#888", marginTop: 2 }}>
