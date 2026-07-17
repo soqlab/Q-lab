@@ -557,6 +557,8 @@ const STYLES = `
     transition: color 0.15s;
   }
   .lp-footer-links a:hover { color: #94a3b8; }
+  .lp-footer-links button { font-size: 13px; color: #475569; transition: color 0.15s; }
+  .lp-footer-links button:hover { color: #94a3b8; }
 
   /* ── Divider ── */
   .lp-divider {
