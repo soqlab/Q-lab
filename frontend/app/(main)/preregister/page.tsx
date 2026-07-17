@@ -59,7 +59,7 @@ interface Prereg {
 // API helpers (inline fetch — no api.ts)
 // ---------------------------------------------------------------------------
 
-const BASE = "/api/v1/prereg";
+const BASE = "/qlab-api/api/v1/prereg";
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
