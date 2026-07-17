@@ -83,8 +83,8 @@ function BugCard({ bug, runId }: { bug: BugMatch; runId: string }) {
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: "#fff" }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
+        <div style={{ padding: "12px 14px", background: "var(--panel-2)" }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
             {bug.description}
           </p>
 

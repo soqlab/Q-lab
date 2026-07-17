@@ -93,8 +93,8 @@ function FraudCard({ flag }: { flag: FraudFlag }) {
         <span style={{ fontSize: 11, color: "#9ca3af" }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ padding: "10px 14px", background: "#fff" }}>
-          <p style={{ margin: "0 0 8px", fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
+        <div style={{ padding: "10px 14px", background: "var(--panel-2)" }}>
+          <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
             {flag.description}
           </p>
           {Object.keys(flag.evidence).length > 0 && (

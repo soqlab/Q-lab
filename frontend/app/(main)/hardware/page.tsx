@@ -36,7 +36,7 @@ function BackendCard({ rec, rank }: { rec: BackendRecommendation; rank: number }
 
   if (rec.ineligible) {
     return (
-      <div style={{ border: "1px solid #f0d0d0", borderRadius: 10, padding: "14px 18px", background: "#fff8f8", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ border: "1px solid rgba(231,76,60,0.3)", borderRadius: 10, padding: "14px 18px", background: "rgba(231,76,60,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
         <XCircle size={18} color="#e74c3c" />
         <div>
           <span style={{ fontWeight: 600, fontSize: 14 }}>{rec.backend}</span>
@@ -52,8 +52,8 @@ function BackendCard({ rec, rank }: { rec: BackendRecommendation; rank: number }
 
   return (
     <div style={{
-      border: rank === 1 ? "2px solid #27ae60" : "1px solid #dfe4ea",
-      borderRadius: 10, background: "#fff", overflow: "hidden",
+      border: rank === 1 ? "2px solid #27ae60" : "1px solid var(--line)",
+      borderRadius: 10, background: "var(--panel)", overflow: "hidden",
     }}>
       <button
         style={{ width: "100%", padding: "14px 18px", background: "none", border: "none", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}

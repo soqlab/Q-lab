@@ -47,8 +47,8 @@ function ResultCard({ r, rank }: { r: NLQResult; rank: number }) {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 14,
-      padding: "12px 16px", background: "#fff",
-      border: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 8,
+      padding: "12px 16px", background: "var(--panel)",
+      border: "1px solid var(--line)", borderRadius: 8, marginBottom: 8,
     }}>
       <span style={{
         width: 24, height: 24, borderRadius: "50%", background: rank < 3 ? "#6366f1" : "#e5e7eb",

@@ -70,7 +70,7 @@ function AnsatzCard({
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: "#fff" }}>
+        <div style={{ padding: "12px 14px", background: "var(--panel-2)" }}>
           <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5, margin: "0 0 12px" }}>
             {rec.description}
           </p>
