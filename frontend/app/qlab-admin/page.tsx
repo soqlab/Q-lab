@@ -57,7 +57,7 @@ export default function QLabAdminPage() {
     if (loading) return;
     if (!token) { router.push("/login"); return; }
     if (!user) return;
-    if (user.role !== "owner" && user.role !== "admin") { router.push("/runs"); return; }
+    if (user.role !== "owner" && user.role !== "admin") return;
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, loading, user]);
@@ -136,10 +136,40 @@ export default function QLabAdminPage() {
     }
   }
 
-  if (loading || (!stats && !err)) {
+  if (loading || (!stats && !err && (!user || (user.role === "owner" || user.role === "admin")))) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui, sans-serif", color: "#5f6f80" }}>
         Loading…
+      </div>
+    );
+  }
+
+  if (!user || (user.role !== "owner" && user.role !== "admin")) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        height: "100vh", fontFamily: "system-ui, sans-serif", background: "#0d1b2a",
+        gap: 16, textAlign: "center", padding: 24,
+      }}>
+        <div style={{
+          width: 80, height: 80, borderRadius: "50%",
+          background: "linear-gradient(135deg, #6366f1, #1d4e6f)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 36, marginBottom: 8,
+          boxShadow: "0 0 40px rgba(99,102,241,0.4)",
+        }}>
+          🔒
+        </div>
+        <div style={{ color: "#fff", fontWeight: 800, fontSize: 24 }}>Access Restricted</div>
+        <div style={{ color: "#64748b", fontSize: 14, maxWidth: 320, lineHeight: 1.6 }}>
+          This area is for Q-Lab administrators only. Your account does not have the required permissions.
+        </div>
+        <a href="/runs" style={{
+          marginTop: 12, background: "#6366f1", color: "#fff", padding: "10px 24px",
+          borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 14,
+        }}>
+          Back to Q-Lab →
+        </a>
       </div>
     );
   }
