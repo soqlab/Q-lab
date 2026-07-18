@@ -48,7 +48,7 @@ def _featurize_run(run: Run, all_backends: list[str], all_categories: list[str])
     for b in all_backends:
         features.append(1.0 if run.backend == b else 0.0)
     # Category one-hot (derive from circuit_qasm keyword heuristic)
-    qasm = (run.circuit_qasm or "").lower()
+    qasm = (run.circuit_name or "").lower()
     category = "unknown"
     if any(k in qasm for k in ["qaoa", "maxcut"]): category = "optimization"
     elif any(k in qasm for k in ["vqe", "ansatz"]): category = "simulation"
@@ -84,8 +84,8 @@ def _get_recommendations(db: Session, run_id: Optional[str], limit: int) -> dict
                        "characterization", "error-correction", "communication", "search", "unknown"]
 
     # --- Strategy 1: Popular templates not yet run ---
-    run_qasms = {(r.circuit_qasm or "")[:200] for r in recent_runs}
-    not_yet_run = [t for t in templates if t.qasm[:200] not in run_qasms]
+    run_qasms = {(r.circuit_name or "")[:200] for r in recent_runs}
+    not_yet_run = [t for t in templates if t.name[:200] not in run_qasms]
 
     by_popularity = sorted(not_yet_run, key=lambda t: -t.use_count)[:3]
 
@@ -186,8 +186,8 @@ def get_similar_runs(run_id: str, limit: int = 5, db: Session = Depends(get_db))
     for r in recent:
         score = 0.0
         if r.backend == focus.backend: score += 0.4
-        focus_qasm = (focus.circuit_qasm or "").lower()
-        run_qasm = (r.circuit_qasm or "").lower()
+        focus_qasm = (focus.circuit_name or "").lower()
+        run_qasm = (r.circuit_name or "").lower()
         common_words = set(focus_qasm.split()) & set(run_qasm.split())
         score += min(0.4, len(common_words) * 0.05)
         if abs((r.shots or 1024) - (focus.shots or 1024)) < 200: score += 0.2
