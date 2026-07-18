@@ -899,7 +899,7 @@ export default function LandingPage() {
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-            <li><button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>Contact</button></li>
+            <li><button onClick={openContact} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>Contact</button></li>
           </ul>
 
           <div className="lp-nav-actions">
@@ -1105,7 +1105,7 @@ export default function LandingPage() {
             <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
-            <button onClick={openContact} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}>
+            <button onClick={openContact} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
               Contact
             </button>
             {!isAuthed && (
