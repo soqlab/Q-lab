@@ -58,7 +58,7 @@ def _featurize_run(run: Run, all_backends: list[str], all_categories: list[str])
     for c in all_categories:
         features.append(1.0 if category == c else 0.0)
     # Normalized n_qubits
-    nq = run.result.get("n_qubits", 2) if run.result and isinstance(run.result, dict) else 2
+    nq = run.results.get("n_qubits", 2) if run.results and isinstance(run.results, dict) else 2
     features.append(min(nq, 20) / 20.0)
     return features
 
@@ -128,7 +128,7 @@ def _get_recommendations(db: Session, run_id: Optional[str], limit: int) -> dict
     # --- Strategy 4: Parameter scaling ---
     param_suggestions: list[dict] = []
     if recent_runs:
-        avg_qubits = sum((r.result or {}).get("n_qubits", 2) if r.result else 2 for r in recent_runs[:5]) / min(5, len(recent_runs))
+        avg_qubits = sum((r.results or {}).get("n_qubits", 2) if r.results else 2 for r in recent_runs[:5]) / min(5, len(recent_runs))
         next_n = int(avg_qubits) + 2
         scaling_templates = [t for t in templates if t.n_qubits == next_n]
         if scaling_templates:
