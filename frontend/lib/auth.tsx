@@ -65,6 +65,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  // Intercept all fetch calls — auto sign-out on any 401
+  useEffect(() => {
+    const origFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const res = await origFetch(...args);
+      if (res.status === 401) {
+        const url = typeof args[0] === "string" ? args[0] : (args[0] as Request).url;
+        // Don't intercept the login/register endpoints themselves
+        if (!url.includes("/auth/login") && !url.includes("/auth/register")) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setToken(null);
+          setUser(null);
+          window.location.href = "/login";
+        }
+      }
+      return res;
+    };
+    return () => { window.fetch = origFetch; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const t = localStorage.getItem(TOKEN_KEY);
     if (t) {
