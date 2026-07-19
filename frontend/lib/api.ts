@@ -231,6 +231,7 @@ function apiUrl(path: string): string {
   return `${API_PREFIX}${path}`;
 }
 
+
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("qlab_token");
