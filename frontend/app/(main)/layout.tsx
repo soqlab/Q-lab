@@ -5,6 +5,8 @@ import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
 import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
+import { useAuth } from "../../lib/auth";
+import { useRouter } from "next/navigation";
 
 function SWUpdater() {
   useEffect(() => {
@@ -131,8 +133,21 @@ function WarmupBanner() {
   );
 }
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { token, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !token) router.replace("/login");
+  }, [token, loading, router]);
+
+  if (loading || !token) return null;
+  return <>{children}</>;
+}
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
+    <AuthGuard>
     <div className="app-shell">
       <SWUpdater />
       <WarmupBanner />
@@ -167,5 +182,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </div>
       <NPSWidget />
     </div>
+    </AuthGuard>
   );
 }
