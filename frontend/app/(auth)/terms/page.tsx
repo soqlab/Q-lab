@@ -57,7 +57,7 @@ export default function TermsPage() {
 
       <section style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>10. Contact</h2>
-        <p>Questions? Email <a href="mailto:stateofquantumlab@gmail.com" style={{ color: "#38bdf8" }}>stateofquantumlab@gmail.com</a> or use the contact form on soqlab.com.</p>
+        <p>Questions? Email <a href="mailto:contact@soqlab.com" style={{ color: "#38bdf8" }}>contact@soqlab.com</a> or use the contact form on soqlab.com.</p>
       </section>
 
       <p style={{ color: "#475569", fontSize: 13, marginTop: 40, borderTop: "1px solid #1e293b", paddingTop: 16 }}>
