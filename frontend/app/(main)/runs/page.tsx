@@ -58,12 +58,37 @@ function SortTh({
 
 // ------------------------------------------------------------------
 // ─── Dashboard routing fabric ─────────────────────────────────────────────────
-function DashFabric({ runs }: { runs: QLabRun[] }) {
+function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const { token } = useAuth();
+  const [liveRuns, setLiveRuns] = useState<QLabRun[]>(initialRuns);
+
+  // Poll for fresh backend stats every 30 seconds
+  useEffect(() => {
+    setLiveRuns(initialRuns);
+  }, [initialRuns]);
+
+  useEffect(() => {
+    if (!token) return;
+    const poll = async () => {
+      try {
+        const res = await fetch("/qlab-api/api/v1/runs?limit=50", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLiveRuns(Array.isArray(data) ? data : data.items ?? []);
+        }
+      } catch {}
+    };
+    const id = setInterval(poll, 30_000);
+    return () => clearInterval(id);
+  }, [token]);
 
   // Derive active backends from real runs
   const activeBackends = useMemo(() => {
-    const recent = runs.slice(0, 10);
+    const recent = liveRuns.slice(0, 20);
     const counts: Record<string, number> = {};
     recent.forEach(r => {
       const b = (r.backend || "").toLowerCase();
@@ -73,9 +98,9 @@ function DashFabric({ runs }: { runs: QLabRun[] }) {
       if (b.includes("aer") || b.includes("sim") || b === "") counts.aer = (counts.aer || 0) + 1;
     });
     return counts;
-  }, [runs]);
+  }, [liveRuns]);
 
-  const latestCircuit = runs[0]?.circuit_name || runs[0]?.run_id?.slice(0, 8) || "experiment";
+  const latestCircuit = liveRuns[0]?.circuit_name || liveRuns[0]?.run_id?.slice(0, 8) || "experiment";
 
   // Ref keeps animation loop reading fresh data without restarting the rAF loop
   const dataRef = useRef({ activeBackends, latestCircuit });
@@ -225,7 +250,7 @@ function DashFabric({ runs }: { runs: QLabRun[] }) {
         position:"absolute", bottom:8, left:14,
         fontFamily:"ui-monospace,monospace", fontSize:9.5,
         letterSpacing:"0.15em", textTransform:"uppercase", color:"var(--muted)", opacity:0.5,
-      }}>live routing fabric</span>
+      }}>live routing fabric · {liveRuns.length} runs · refreshes every 30s</span>
     </div>
   );
 }
