@@ -234,7 +234,7 @@ function PlanCard({
           ) : (
             <>
               <a
-                href={`mailto:stateofquantumlab@gmail.com?subject=Interested in Q-Lab ${plan.name} Plan`}
+                href={`mailto:contact@soqlab.com?subject=Interested in Q-Lab ${plan.name} Plan`}
                 className="btn"
                 style={{ display: "flex", justifyContent: "center", textDecoration: "none", background: accentColor, borderColor: accentColor, color: "#fff", width: "100%", boxSizing: "border-box" }}
               >
@@ -662,7 +662,7 @@ function BillingPageInner() {
               </div>
             </div>
             <a
-              href="mailto:stateofquantumlab@gmail.com?subject=Q-Lab Premium Waitlist"
+              href="mailto:contact@soqlab.com?subject=Q-Lab Premium Waitlist"
               className="button"
               style={{
                 background: "#6366f1",
