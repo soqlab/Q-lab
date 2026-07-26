@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -54,6 +55,19 @@ def list_audit_logs(
             for lg in logs
         ],
     }
+
+
+@router.delete("/audit-logs/purge")
+def purge_old_audit_logs(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner")),
+    db: Session = Depends(get_db),
+):
+    """Delete audit logs older than `days` days. Owner only."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = db.execute(delete(AuditLog).where(AuditLog.created_at < cutoff))
+    db.commit()
+    return {"deleted": result.rowcount, "older_than_days": days}
 
 
 @router.get("/stats")
