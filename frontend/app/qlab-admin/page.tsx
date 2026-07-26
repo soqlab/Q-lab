@@ -361,10 +361,22 @@ export default function QLabAdminPage() {
         {/* Activity tab */}
         {activeTab === "activity" && (
           <div style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f3f5" }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Recent Activity</h3>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f3f5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Recent Activity ({logs.length})</h3>
+              <button
+                onClick={async () => {
+                  if (!confirm("Delete all audit logs older than 30 days?")) return;
+                  await fetch("/qlab-api/api/v1/admin/audit-logs/purge?days=30", {
+                    method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+                  });
+                  void load();
+                }}
+                style={{ background: "transparent", border: "1px solid #fecaca", color: "#e74c3c", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+              >
+                Purge &gt;30 days
+              </button>
             </div>
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 480 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f8f9fb" }}>
