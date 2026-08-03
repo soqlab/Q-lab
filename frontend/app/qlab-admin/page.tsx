@@ -234,6 +234,7 @@ export default function QLabAdminPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ color: "#64748b", fontSize: 13 }}>Signed in as <strong style={{ color: "#94a3b8" }}>{user?.email}</strong></span>
+          <button onClick={() => void load()} style={{ background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>↻ Refresh</button>
           <a href="/runs" style={{ color: "#6366f1", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>← Back to Q-Lab</a>
         </div>
       </div>
