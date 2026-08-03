@@ -50,6 +50,8 @@ class User(Base):
     reset_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reset_token_expires: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    login_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     org: Mapped["Organization | None"] = relationship(back_populates="users")
     api_keys: Mapped[list["APIKey"]] = relationship(back_populates="user")
