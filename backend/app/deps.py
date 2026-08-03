@@ -126,12 +126,14 @@ def log_audit(
     identity: Identity | None = None,
     request: Request | None = None,
     meta: dict | None = None,
+    user_id: int | None = None,
+    org_id: int | None = None,
 ) -> None:
     from .models import AuditLog
     try:
         entry = AuditLog(
-            org_id=identity.org_id if identity else None,
-            user_id=identity.user_id if identity else None,
+            org_id=(identity.org_id if identity else None) or org_id,
+            user_id=(identity.user_id if identity else None) or user_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
