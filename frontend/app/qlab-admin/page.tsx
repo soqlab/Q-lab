@@ -12,6 +12,18 @@ interface User {
   is_active: boolean;
   created_at: string | null;
   run_count: number;
+  last_login_at: string | null;
+  login_count: number;
+}
+
+interface UserActivity {
+  user_id: number;
+  email: string;
+  last_login_at: string | null;
+  login_count: number;
+  run_count: number;
+  api_key_count: number;
+  recent_actions: { action: string; resource_type: string; created_at: string }[];
 }
 
 interface Stats {
@@ -52,6 +64,20 @@ export default function QLabAdminPage() {
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [purgeConfirmId, setPurgeConfirmId] = useState<number | null>(null);
   const [purgingId, setPurgingId] = useState<number | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<UserActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  async function loadUserActivity(userId: number) {
+    setActivityLoading(true);
+    try {
+      const res = await fetch(`/qlab-api/api/v1/admin/users/${userId}/activity`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setSelectedActivity(await res.json());
+    } finally {
+      setActivityLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (loading) return;
@@ -279,7 +305,7 @@ export default function QLabAdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f8f9fb" }}>
-                    {["Name", "Email", "Role", "Runs", "Signed Up", "Status", ""].map((h) => (
+                    {["Name", "Email", "Role", "Runs", "Logins", "Last Login", "Status", ""].map((h) => (
                       <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5f6f80", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -295,15 +321,23 @@ export default function QLabAdminPage() {
                         </span>
                       </td>
                       <td style={{ padding: "12px 16px", fontWeight: 700, color: "#1d6f8f" }}>{u.run_count}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 700, color: u.login_count > 1 ? "#10b981" : "#f59e0b" }}>{u.login_count}</td>
                       <td style={{ padding: "12px 16px", color: "#9aa8b6", fontSize: 12 }}>
-                        {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
+                        {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}
                       </td>
                       <td style={{ padding: "12px 16px" }}>
-                        <span style={{ color: u.is_active ? "#10b981" : "#e74c3c", fontWeight: 600, fontSize: 12 }}>
-                          {u.is_active ? "Active" : "Disabled"}
-                        </span>
+                        {(() => {
+                          const daysSince = u.last_login_at ? (Date.now() - new Date(u.last_login_at).getTime()) / 86400000 : null;
+                          const label = !u.is_active ? "Disabled" : !u.last_login_at ? "Never logged in" : u.login_count === 1 ? "One-time" : daysSince !== null && daysSince < 7 ? "Active" : "Inactive";
+                          const color = !u.is_active ? "#e74c3c" : !u.last_login_at ? "#9aa8b6" : u.login_count === 1 ? "#f59e0b" : daysSince !== null && daysSince < 7 ? "#10b981" : "#9aa8b6";
+                          return <span style={{ color, fontWeight: 600, fontSize: 12 }}>{label}</span>;
+                        })()}
                       </td>
                       <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                        <button onClick={() => { setSelectedActivity(null); void loadUserActivity(u.id); }}
+                          style={{ background: "#f1f5f9", border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#374151", marginBottom: 4 }}>
+                          View
+                        </button>
                         {u.id !== user?.id && (
                           <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {/* Deactivate (soft delete) */}
@@ -356,6 +390,49 @@ export default function QLabAdminPage() {
               )}
             </div>
           </div>
+
+          {/* User activity panel */}
+          {(selectedActivity || activityLoading) && (
+            <div style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", padding: "20px 24px", marginTop: 16 }}>
+              {activityLoading ? (
+                <div style={{ color: "#9aa8b6", fontSize: 13 }}>Loading activity…</div>
+              ) : selectedActivity && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Activity: {selectedActivity.email}</h3>
+                    <button onClick={() => setSelectedActivity(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa8b6", fontSize: 18 }}>×</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+                    {[
+                      { label: "Total Logins", value: selectedActivity.login_count, color: "#6366f1" },
+                      { label: "Runs", value: selectedActivity.run_count, color: "#1d6f8f" },
+                      { label: "API Keys", value: selectedActivity.api_key_count, color: "#10b981" },
+                      { label: "Last Login", value: selectedActivity.last_login_at ? new Date(selectedActivity.last_login_at).toLocaleDateString() : "Never", color: "#f59e0b" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ background: "#f8f9fb", borderRadius: 8, padding: "12px 16px" }}>
+                        <div style={{ fontSize: 11, color: "#9aa8b6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Recent Actions</div>
+                  {selectedActivity.recent_actions.length === 0 ? (
+                    <div style={{ color: "#9aa8b6", fontSize: 13 }}>No recorded actions.</div>
+                  ) : (
+                    <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                      {selectedActivity.recent_actions.map((a, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f3f5", fontSize: 13 }}>
+                          <code style={{ background: "#f1f3f5", padding: "2px 6px", borderRadius: 4, fontSize: 12 }}>{a.action}</code>
+                          <span style={{ color: "#5f6f80", fontSize: 12 }}>{a.resource_type ?? "—"}</span>
+                          <span style={{ color: "#9aa8b6", fontSize: 12 }}>{new Date(a.created_at).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         )}
 
         {/* Activity tab */}

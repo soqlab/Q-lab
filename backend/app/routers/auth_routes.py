@@ -138,6 +138,10 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
     if not getattr(user, "email_verified", True):
         raise HTTPException(status_code=403, detail="email_not_verified")
 
+    from datetime import datetime, timezone
+    user.last_login_at = datetime.now(timezone.utc)
+    user.login_count = (user.login_count or 0) + 1
+    db.commit()
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.login", "user", str(user.id), request=request)
     return _user_response(user, token)
