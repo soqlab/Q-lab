@@ -66,6 +66,12 @@ def _ensure_compat_columns() -> None:
                 conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(128)"))
             if "reset_token_expires" not in user_cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires REAL"))
+            if "last_login_at" not in user_cols:
+                ts_type = "TIMESTAMPTZ" if not DATABASE_URL.startswith("sqlite") else "DATETIME"
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN last_login_at {ts_type}"))
+            if "login_count" not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0"))
+                conn.execute(text("UPDATE users SET login_count = 0 WHERE login_count IS NULL"))
             # Any user without a pending verify token was created before the
             # verification feature — mark them as already verified.
             conn.execute(text(
