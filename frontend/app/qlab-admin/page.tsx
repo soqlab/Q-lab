@@ -296,6 +296,7 @@ export default function QLabAdminPage() {
 
         {/* Users tab */}
         {activeTab === "users" && (
+          <>
           <div style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", overflow: "hidden" }}>
             <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f3f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>All Users</h3>
@@ -433,6 +434,7 @@ export default function QLabAdminPage() {
               )}
             </div>
           )}
+          </>
         )}
 
         {/* Activity tab */}
