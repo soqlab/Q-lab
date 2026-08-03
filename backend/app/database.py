@@ -78,6 +78,17 @@ def _ensure_compat_columns() -> None:
                 "UPDATE users SET email_verified = TRUE WHERE verify_token IS NULL AND email_verified = FALSE"
             ))
 
+    if "audit_logs" in tables:
+        audit_cols = {c["name"] for c in inspector.get_columns("audit_logs")}
+        with engine.begin() as conn:
+            if "user_agent" not in audit_cols:
+                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN user_agent VARCHAR(500)"))
+            if "meta" not in audit_cols:
+                if DATABASE_URL.startswith("sqlite"):
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN meta JSON"))
+                else:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN meta JSONB DEFAULT '{}'"))
+
     if "runs" not in tables:
         return
 
