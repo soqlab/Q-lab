@@ -69,11 +69,19 @@ export default function QLabAdminPage() {
 
   async function loadUserActivity(userId: number) {
     setActivityLoading(true);
+    setSelectedActivity(null);
     try {
       const res = await fetch(`/qlab-api/api/v1/admin/users/${userId}/activity`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) setSelectedActivity(await res.json());
+      if (res.ok) {
+        setSelectedActivity(await res.json());
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.detail ?? `Activity fetch failed (${res.status})`);
+      }
+    } catch (e) {
+      setErr(`Activity fetch failed: ${String(e)}`);
     } finally {
       setActivityLoading(false);
     }
