@@ -123,6 +123,8 @@ def list_users(
             "org_id": u.org_id,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "run_count": user_run_counts.get(u.id, 0),
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "login_count": u.login_count or 0,
         }
         for u in users
     ]
@@ -144,6 +146,35 @@ def list_organizations(
         }
         for o in orgs
     ]
+
+
+@router.get("/users/{user_id}/activity")
+def user_activity(
+    user_id: int,
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    run_count = db.scalar(select(func.count()).select_from(Run).where(Run.user_id == user_id)) or 0
+    api_key_count = db.scalar(select(func.count()).select_from(APIKey).where(APIKey.user_id == user_id)) or 0
+    logs = db.scalars(
+        select(AuditLog).where(AuditLog.user_id == user_id)
+        .order_by(AuditLog.created_at.desc()).limit(20)
+    ).all()
+    return {
+        "user_id": user_id,
+        "email": user.email,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "login_count": user.login_count or 0,
+        "run_count": run_count,
+        "api_key_count": api_key_count,
+        "recent_actions": [
+            {"action": lg.action, "resource_type": lg.resource_type, "created_at": lg.created_at.isoformat()}
+            for lg in logs
+        ],
+    }
 
 
 @router.delete("/users/{user_id}")
