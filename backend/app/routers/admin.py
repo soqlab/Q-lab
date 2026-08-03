@@ -113,24 +113,6 @@ def list_users(
             .group_by(Run.created_by_user_id)
         ).all()
     )
-    # Derive login counts from audit log — this is the ground truth since
-    # the login_count column only tracks logins after it was added.
-    user_login_counts = dict(
-        db.execute(
-            select(AuditLog.user_id, func.count(AuditLog.id))
-            .where(AuditLog.action == "auth.login")
-            .group_by(AuditLog.user_id)
-        ).all()
-    )
-    # Last login from audit log
-    from sqlalchemy import and_
-    last_login_rows = db.execute(
-        select(AuditLog.user_id, func.max(AuditLog.created_at))
-        .where(AuditLog.action == "auth.login")
-        .group_by(AuditLog.user_id)
-    ).all()
-    user_last_login = {row[0]: row[1] for row in last_login_rows}
-
     return [
         {
             "id": u.id,
@@ -141,11 +123,8 @@ def list_users(
             "org_id": u.org_id,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "run_count": user_run_counts.get(u.id, 0),
-            "last_login_at": (
-                user_last_login[u.id].isoformat() if u.id in user_last_login
-                else (u.last_login_at.isoformat() if u.last_login_at else None)
-            ),
-            "login_count": user_login_counts.get(u.id, 0),
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "login_count": u.login_count or 0,
         }
         for u in users
     ]
@@ -184,25 +163,11 @@ def user_activity(
         select(AuditLog).where(AuditLog.user_id == user_id)
         .order_by(AuditLog.created_at.desc()).limit(20)
     ).all()
-    # Count logins from audit log — ground truth regardless of when login_count column was added
-    login_count = db.scalar(
-        select(func.count()).select_from(AuditLog)
-        .where(AuditLog.user_id == user_id, AuditLog.action == "auth.login")
-    ) or 0
-    last_login_log = db.scalar(
-        select(AuditLog.created_at)
-        .where(AuditLog.user_id == user_id, AuditLog.action == "auth.login")
-        .order_by(AuditLog.created_at.desc())
-    )
-    last_login_at = (
-        last_login_log.isoformat() if last_login_log
-        else (user.last_login_at.isoformat() if user.last_login_at else None)
-    )
     return {
         "user_id": user_id,
         "email": user.email,
-        "last_login_at": last_login_at,
-        "login_count": login_count,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "login_count": user.login_count or 0,
         "run_count": run_count,
         "api_key_count": api_key_count,
         "recent_actions": [
