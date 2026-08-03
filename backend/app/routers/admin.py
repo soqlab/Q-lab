@@ -157,7 +157,7 @@ def user_activity(
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    run_count = db.scalar(select(func.count()).select_from(Run).where(Run.user_id == user_id)) or 0
+    run_count = db.scalar(select(func.count()).select_from(Run).where(Run.created_by_user_id == user_id)) or 0
     api_key_count = db.scalar(select(func.count()).select_from(APIKey).where(APIKey.user_id == user_id)) or 0
     logs = db.scalars(
         select(AuditLog).where(AuditLog.user_id == user_id)
