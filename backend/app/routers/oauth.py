@@ -118,8 +118,10 @@ def github_callback(code: str, db: Session = Depends(get_db)):
 
 def _upsert_user(db: Session, email: str, name: str) -> tuple[User, bool]:
     """Returns (user, is_new)."""
+    from datetime import datetime, timezone
     user = db.scalar(select(User).where(User.email == email))
-    if not user:
+    is_new = user is None
+    if is_new:
         user = User(
             email=email,
             name=name,
@@ -136,14 +138,17 @@ def _upsert_user(db: Session, email: str, name: str) -> tuple[User, bool]:
         _, key_hash, key_prefix = generate_api_key()
         db.add(APIKey(user_id=user.id, org_id=None, name="Default key",
                       key_hash=key_hash, key_prefix=key_prefix))
-        db.commit()
-        db.refresh(user)
+    else:
+        if not user.email_verified:
+            user.email_verified = True
+    # Track every login (new and returning)
+    user.last_login_at = datetime.now(timezone.utc)
+    user.login_count = (user.login_count or 0) + 1
+    db.commit()
+    db.refresh(user)
+    if is_new:
         try:
             send_welcome_email(to_email=email, user_name=name)
         except Exception:
             pass
-        return user, True
-    elif not user.email_verified:
-        user.email_verified = True
-        db.commit()
-    return user, False
+    return user, is_new
