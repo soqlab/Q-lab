@@ -106,7 +106,7 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     db.commit()
 
     token = create_access_token(user.id, user.org_id, user.role)
-    log_audit(db, "auth.register", "user", str(user.id), request=request)
+    log_audit(db, "auth.register", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
 
     # Send verification email — token stored in DB so it survives redeploys
     try:
@@ -143,7 +143,7 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
     user.login_count = (user.login_count or 0) + 1
     db.commit()
     token = create_access_token(user.id, user.org_id, user.role)
-    log_audit(db, "auth.login", "user", str(user.id), request=request)
+    log_audit(db, "auth.login", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
     return _user_response(user, token)
 
 
