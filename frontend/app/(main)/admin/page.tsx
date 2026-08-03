@@ -8,6 +8,12 @@ import { useAuth } from "../../../lib/auth";
 interface AdminUser {
   id: number; email: string; name: string; role: string;
   is_active: boolean; org_id: number | null; created_at: string | null; run_count: number;
+  login_count: number; last_login_at: string | null;
+}
+interface UserActivity {
+  user_id: number; email: string; last_login_at: string | null; login_count: number;
+  run_count: number; api_key_count: number;
+  recent_actions: { action: string; resource_type: string; created_at: string }[];
 }
 interface AuditLog {
   id: number; action: string; resource_type: string | null; resource_id: string | null;
@@ -157,6 +163,8 @@ function UsersTab({ token }: { token: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<number | null>(null);
+  const [activity, setActivity] = useState<UserActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -169,6 +177,17 @@ function UsersTab({ token }: { token: string }) {
   }
 
   useEffect(() => { void load(); }, []); // eslint-disable-line
+
+  async function loadActivity(userId: number) {
+    setActivityLoading(true);
+    setActivity(null);
+    try {
+      const res = await fetch(`/qlab-api/api/v1/admin/users/${userId}/activity`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setActivity(await res.json());
+    } finally {
+      setActivityLoading(false);
+    }
+  }
 
   async function changeRole(userId: number, role: string) {
     setWorking(userId);
@@ -184,13 +203,13 @@ function UsersTab({ token }: { token: string }) {
     }
   }
 
-  async function toggleActive(user: AdminUser) {
-    setWorking(user.id);
+  async function toggleActive(u: AdminUser) {
+    setWorking(u.id);
     try {
-      if (user.is_active) {
-        await fetch(`/qlab-api/api/v1/admin/users/${user.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (u.is_active) {
+        await fetch(`/qlab-api/api/v1/admin/users/${u.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       } else {
-        await fetch(`/qlab-api/api/v1/admin/users/${user.id}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`/qlab-api/api/v1/admin/users/${u.id}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
       }
       await load();
     } finally {
@@ -201,70 +220,123 @@ function UsersTab({ token }: { token: string }) {
   if (loading) return <div className="empty">Loading users…</div>;
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Users</h2>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>{users.length} total</span>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr><th>User</th><th>Role</th><th>Runs</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.5 }}>
-                <td>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{u.email}</div>
-                </td>
-                <td>
-                  <select
-                    value={u.role}
-                    disabled={working === u.id}
-                    onChange={e => changeRole(u.id, e.target.value)}
-                    style={{
-                      background: "var(--surface)", color: ROLE_COLOR[u.role] ?? "var(--text)",
-                      border: "1px solid var(--line)", borderRadius: 4, padding: "3px 8px",
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}
-                  >
-                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </td>
-                <td style={{ fontSize: 13 }}>{u.run_count}</td>
-                <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
-                </td>
-                <td>
-                  <span style={{
-                    fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                    background: u.is_active ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.12)",
-                    color: u.is_active ? "#10b981" : "var(--danger)",
-                  }}>
-                    {u.is_active ? "Active" : "Deactivated"}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    className="button secondary"
-                    style={{
-                      height: 28, fontSize: 11,
-                      color: u.is_active ? "var(--danger)" : "#10b981",
-                      borderColor: u.is_active ? "var(--danger)" : "#10b981",
-                    }}
-                    disabled={working === u.id}
-                    onClick={() => toggleActive(u)}
-                  >
-                    {working === u.id ? "…" : u.is_active ? "Deactivate" : "Reactivate"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <>
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Users</h2>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>{users.length} total</span>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>User</th><th>Role</th><th>Runs</th><th>Logins</th><th>Last Login</th><th>Joined</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {users.map(u => {
+                const daysSince = u.last_login_at ? (Date.now() - new Date(u.last_login_at).getTime()) / 86400000 : null;
+                const statusLabel = !u.is_active ? "Disabled" : !u.last_login_at ? "Never logged in" : u.login_count === 1 ? "One-time" : daysSince !== null && daysSince < 7 ? "Active" : "Inactive";
+                const statusColor = !u.is_active ? "var(--danger)" : !u.last_login_at ? "var(--muted)" : u.login_count === 1 ? "#f59e0b" : daysSince !== null && daysSince < 7 ? "#10b981" : "var(--muted)";
+                return (
+                  <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.5 }}>
+                    <td>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--muted)" }}>{u.email}</div>
+                    </td>
+                    <td>
+                      <select
+                        value={u.role}
+                        disabled={working === u.id}
+                        onChange={e => changeRole(u.id, e.target.value)}
+                        style={{
+                          background: "var(--surface)", color: ROLE_COLOR[u.role] ?? "var(--text)",
+                          border: "1px solid var(--line)", borderRadius: 4, padding: "3px 8px",
+                          fontSize: 12, fontWeight: 600, cursor: "pointer",
+                        }}
+                      >
+                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ fontSize: 13, fontWeight: 600 }}>{u.run_count}</td>
+                    <td style={{ fontSize: 13, fontWeight: 700, color: u.login_count > 0 ? "var(--strong)" : "var(--muted)" }}>{u.login_count}</td>
+                    <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}
+                    </td>
+                    <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button className="button secondary" style={{ height: 28, fontSize: 11 }}
+                          onClick={() => loadActivity(u.id)}>
+                          View
+                        </button>
+                        <button
+                          className="button secondary"
+                          style={{ height: 28, fontSize: 11, color: u.is_active ? "var(--danger)" : "#10b981", borderColor: u.is_active ? "var(--danger)" : "#10b981" }}
+                          disabled={working === u.id}
+                          onClick={() => toggleActive(u)}
+                        >
+                          {working === u.id ? "…" : u.is_active ? "Disable" : "Enable"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {(activityLoading || activity) && (
+        <section className="panel">
+          {activityLoading ? (
+            <div className="empty">Loading activity…</div>
+          ) : activity && (
+            <>
+              <div className="panel-header">
+                <h2>Activity: {activity.email}</h2>
+                <button onClick={() => setActivity(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 20, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, padding: "16px 18px" }}>
+                {[
+                  ["Logins", activity.login_count],
+                  ["Runs", activity.run_count],
+                  ["API Keys", activity.api_key_count],
+                  ["Last Login", activity.last_login_at ? new Date(activity.last_login_at).toLocaleDateString() : "Never"],
+                ].map(([label, value]) => (
+                  <div className="metric" key={String(label)} style={{ padding: "12px 14px" }}>
+                    <div className="metric-label">{String(label)}</div>
+                    <div className="metric-value" style={{ fontSize: 18 }}>{String(value)}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="table-wrap" style={{ maxHeight: 260, overflowY: "auto" }}>
+                {activity.recent_actions.length === 0 ? (
+                  <div className="empty">No recorded actions.</div>
+                ) : (
+                  <table>
+                    <thead><tr><th>Action</th><th>Resource</th><th>Time</th></tr></thead>
+                    <tbody>
+                      {activity.recent_actions.map((a, i) => (
+                        <tr key={i}>
+                          <td><code style={{ fontSize: 12 }}>{a.action}</code></td>
+                          <td style={{ fontSize: 12, color: "var(--muted)" }}>{a.resource_type ?? "—"}</td>
+                          <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{new Date(a.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+    </>
   );
 }
 
