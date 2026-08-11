@@ -232,18 +232,20 @@ function PlanCard({
               {upgrading ? "Processing…" : `Upgrade to ${plan.name}`}
             </button>
           ) : (
-            <>
-              <a
-                href={`mailto:contact@soqlab.com?subject=Interested in Q-Lab ${plan.name} Plan`}
-                className="btn"
-                style={{ display: "flex", justifyContent: "center", textDecoration: "none", background: accentColor, borderColor: accentColor, color: "#fff", width: "100%", boxSizing: "border-box" }}
-              >
-                Join the Waitlist
-              </a>
-              <p style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", margin: "8px 0 0" }}>
-                Premium plans coming soon — we&apos;ll be in touch.
-              </p>
-            </>
+            <div style={{
+              textAlign: "center",
+              padding: "10px 0",
+              borderRadius: 6,
+              border: `1px dashed ${accentColor}55`,
+              background: `${accentColor}08`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: accentColor, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Coming Soon
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                Payments launching shortly
+              </div>
+            </div>
           )
         )}
         {isCurrent && (
