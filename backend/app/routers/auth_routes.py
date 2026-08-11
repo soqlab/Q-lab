@@ -105,6 +105,11 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     ))
     db.commit()
 
+    from datetime import datetime, timezone
+    user.last_login_at = datetime.now(timezone.utc)
+    user.login_count = 1
+    db.commit()
+
     token = create_access_token(user.id, user.org_id, user.role)
     log_audit(db, "auth.register", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
 
