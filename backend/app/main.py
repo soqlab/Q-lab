@@ -1034,6 +1034,7 @@ def create_run(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    is_new_run = db.scalar(select(Run).where(Run.run_id == payload.run_id)) is None
     run = _upsert_run(db, payload, identity)
     run_dict = _run_to_dict(run, include_health=True)
 
@@ -1045,6 +1046,14 @@ def create_run(
 
     # Audit
     log_audit(db, "run.created", "run", run.run_id, identity=identity, request=request)
+
+    # Billing — count only new run_ids, never upsert retries
+    if is_new_run and identity and identity.user_id:
+        try:
+            from .routers.billing import track_run as _billing_track_run
+            _billing_track_run(db, identity.user_id)
+        except Exception:
+            pass
 
     return {"status": "received", "run_id": run.run_id, "dashboard_url": run_dict["dashboard_url"]}
 
