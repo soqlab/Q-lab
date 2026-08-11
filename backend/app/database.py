@@ -89,6 +89,40 @@ def _ensure_compat_columns() -> None:
                 else:
                     conn.execute(text("ALTER TABLE audit_logs ADD COLUMN meta JSONB DEFAULT '{}'"))
 
+    # Ensure generic_records exists — billing, store, and feature routers depend on it.
+    # create_all() should handle this, but if the table was added after the DB was
+    # first provisioned and that deploy failed, it may be missing.
+    if "generic_records" not in tables:
+        with engine.begin() as conn:
+            if DATABASE_URL.startswith("sqlite"):
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS generic_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        namespace VARCHAR(120) NOT NULL,
+                        record_id VARCHAR(64) NOT NULL,
+                        data JSON DEFAULT '{}',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT uq_generic_ns_rid UNIQUE (namespace, record_id)
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_namespace ON generic_records (namespace)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_record_id ON generic_records (record_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_created_at ON generic_records (created_at)"))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS generic_records (
+                        id SERIAL PRIMARY KEY,
+                        namespace VARCHAR(120) NOT NULL,
+                        record_id VARCHAR(64) NOT NULL,
+                        data JSONB DEFAULT '{}',
+                        created_at TIMESTAMPTZ DEFAULT NOW(),
+                        CONSTRAINT uq_generic_ns_rid UNIQUE (namespace, record_id)
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_namespace ON generic_records (namespace)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_record_id ON generic_records (record_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_generic_records_created_at ON generic_records (created_at)"))
+
     if "runs" not in tables:
         return
 
