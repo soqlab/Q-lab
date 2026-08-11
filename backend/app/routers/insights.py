@@ -497,6 +497,12 @@ def generate_insights(
 
     _save_cached(db, run_id, _MODEL, result)
 
+    try:
+        from .billing import track_ai_insight
+        track_ai_insight(db, identity.user_id)
+    except Exception:
+        pass
+
     return {"cached": False, "model": _MODEL, "created_at": datetime.now(timezone.utc).isoformat(), **result}
 
 
@@ -560,6 +566,12 @@ def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Ident
         raise HTTPException(status_code=502, detail=f"AI returned invalid JSON: {e}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Circuit analysis failed: {e}")
+
+    try:
+        from .billing import track_ai_insight
+        track_ai_insight(db, identity.user_id)
+    except Exception:
+        pass
 
     return {
         "run_id": run_id,
