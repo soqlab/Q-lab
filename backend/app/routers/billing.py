@@ -257,39 +257,56 @@ def get_usage(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Current-month usage stats for the authenticated user."""
+    import logging, traceback
     uid = identity.user_id or 0
     month = _current_month()
-    usage = _get_or_create_usage(db, uid, month)
-    sub = _get_or_create_subscription(db, uid)
-    limits = _plan_limits(sub["plan"])
     billing_on = _billing_enabled()
 
-    def meter(key: str, limit_key: str) -> dict[str, Any]:
-        used = usage.get(key, 0)
-        lim = limits[limit_key]
+    def _zero_meter(lim: int) -> dict[str, Any]:
+        return {"used": 0, "limit": lim, "unlimited": lim == -1, "pct": 0.0}
+
+    try:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        usage = _get_or_create_usage(db, uid, month)
+        sub = _get_or_create_subscription(db, uid)
+        limits = _plan_limits(sub["plan"])
+        plan = sub["plan"]
+
+        def meter(key: str, limit_key: str) -> dict[str, Any]:
+            used = usage.get(key, 0)
+            lim = limits[limit_key]
+            return {"used": used, "limit": lim, "unlimited": lim == -1, "pct": _pct(used, lim)}
+
         return {
-            "used": used,
-            "limit": lim,
-            "unlimited": lim == -1,
-            "pct": _pct(used, lim),
+            "billing_enabled": billing_on,
+            "stripe_configured": _stripe_configured(),
+            "month": month,
+            "plan": plan,
+            "runs": meter("runs_this_month", "runs"),
+            "api_calls": meter("api_calls_this_month", "api_calls"),
+            "qpu_seconds": meter("qpu_seconds_this_month", "qpu_seconds"),
+            "storage_mb": {"used": usage.get("storage_mb", 0.0), "limit": -1, "unlimited": True, "pct": 0.0},
+            "ai_insights": meter("ai_insights_this_month", "ai_insights"),
         }
 
-    return {
-        "billing_enabled": billing_on,
-        "stripe_configured": _stripe_configured(),
-        "month": month,
-        "plan": sub["plan"],
-        "runs": meter("runs_this_month", "runs"),
-        "api_calls": meter("api_calls_this_month", "api_calls"),
-        "qpu_seconds": meter("qpu_seconds_this_month", "qpu_seconds"),
-        "storage_mb": {
-            "used": usage.get("storage_mb", 0.0),
-            "limit": -1,
-            "unlimited": True,
-            "pct": 0.0,
-        },
-        "ai_insights": meter("ai_insights_this_month", "ai_insights"),
-    }
+    except Exception as exc:
+        logging.getLogger("billing").error("get_usage failed for uid=%s: %s\n%s", uid, exc, traceback.format_exc())
+        free = PLANS["free"]
+        return {
+            "billing_enabled": billing_on,
+            "stripe_configured": _stripe_configured(),
+            "month": month,
+            "plan": "free",
+            "runs": _zero_meter(free["runs"]),
+            "api_calls": _zero_meter(free["api_calls"]),
+            "qpu_seconds": _zero_meter(free["qpu_seconds"]),
+            "storage_mb": {"used": 0.0, "limit": -1, "unlimited": True, "pct": 0.0},
+            "ai_insights": _zero_meter(free["ai_insights"]),
+        }
 
 
 @router.get("/plans")
