@@ -852,8 +852,6 @@ def search_runs(
     db: Session = Depends(get_db),
 ):
     query = select(Run)
-    if identity and identity.org_id:
-        query = query.where(Run.org_id == identity.org_id)
 
     if backend:
         query = query.where(Run.backend == backend)
@@ -1071,8 +1069,6 @@ def list_runs(
     db: Session = Depends(get_db),
 ):
     query = _filtered_runs_query(backend=backend, status=status, project=project)
-    if identity and identity.org_id:
-        query = query.where(Run.org_id == identity.org_id)
     if benchmark_id:
         query = query.where(Run.benchmark_id == benchmark_id)
     runs = db.scalars(query.order_by(Run.created_at.desc()).limit(limit * 4)).all()
