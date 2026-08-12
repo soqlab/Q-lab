@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
-from ..deps import get_identity, Identity
+from ..deps import get_identity, log_audit, Identity
 from ..models import Run
 from ..health_score import compute_health_score
 
@@ -150,6 +150,7 @@ def _fetch_runs(db: Session, body: AskRequest, identity: Optional[Identity]) -> 
 @router.post("")
 def ask(
     body: AskRequest,
+    request: Request,
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
@@ -167,9 +168,10 @@ def ask(
     prompt = _build_prompt(body.question, summaries, {"project": body.project, "backend": body.backend, "days": body.days})
     answer = _call_claude(prompt)
 
-    # Extract cited run IDs from answer
     cited = [r["run_id"] for r in summaries if r["run_id"] in answer]
-
+    if identity and identity.user_id:
+        log_audit(db, "assistant.queried", "ask", None, identity=identity, request=request,
+                  meta={"question_len": len(body.question), "run_count": len(runs)})
     return {
         "answer": answer,
         "cited_run_ids": cited,

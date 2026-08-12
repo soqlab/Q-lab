@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import Identity, get_identity, require_auth
+from ..deps import Identity, get_identity, log_audit, require_auth
 from ..store import store_delete, store_get, store_list, store_put  # noqa: F401
 
 router = APIRouter(prefix="/api/v1/billing", tags=["billing"])
@@ -253,6 +253,7 @@ class CheckoutRequest(BaseModel):
 
 @router.get("/usage")
 def get_usage(
+    request: Request,
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -281,6 +282,7 @@ def get_usage(
             lim = limits[limit_key]
             return {"used": used, "limit": lim, "unlimited": lim == -1, "pct": _pct(used, lim)}
 
+        log_audit(db, "billing.viewed", "billing", None, identity=identity, request=request, meta={"plan": plan})
         return {
             "billing_enabled": billing_on,
             "stripe_configured": _stripe_configured(),

@@ -1,12 +1,13 @@
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select, delete
+from sqlalchemy import func, select, delete, text
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_db, DATABASE_URL
 from ..deps import Identity, require_role
 from ..models import APIKey, AuditLog, Benchmark, Organization, Run, User, Webhook
 
@@ -279,6 +280,67 @@ def reactivate_user(
     user.is_active = True
     db.commit()
     return {"message": f"User {user.email} has been reactivated"}
+
+
+@router.get("/analytics")
+def platform_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Aggregated platform analytics: action breakdown, daily active users, top users, top pages."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    logs = db.scalars(select(AuditLog).where(AuditLog.created_at >= since)).all()
+
+    # Action breakdown
+    action_counts: Counter = Counter(lg.action for lg in logs)
+
+    # Daily active users
+    dau: defaultdict = defaultdict(set)
+    daily_events: defaultdict = defaultdict(int)
+    for lg in logs:
+        day = lg.created_at.date().isoformat()
+        if lg.user_id:
+            dau[day].add(lg.user_id)
+        daily_events[day] += 1
+
+    # Top users by event count
+    user_counts: Counter = Counter(lg.user_id for lg in logs if lg.user_id)
+    top_user_ids = [uid for uid, _ in user_counts.most_common(10)]
+    users_map = {u.id: u for u in db.scalars(select(User).where(User.id.in_(top_user_ids))).all()} if top_user_ids else {}
+    top_users = [
+        {"user_id": uid, "email": users_map[uid].email if uid in users_map else str(uid), "events": cnt}
+        for uid, cnt in user_counts.most_common(10)
+    ]
+
+    # Top pages (from page.view events)
+    page_logs = [lg for lg in logs if lg.action == "page.view" and lg.resource_id]
+    page_counts: Counter = Counter(lg.resource_id for lg in page_logs)
+
+    # Signup trend (daily new users)
+    is_sqlite = DATABASE_URL.startswith("sqlite")
+    date_fn = "strftime('%Y-%m-%d', created_at)" if is_sqlite else "TO_CHAR(created_at, 'YYYY-MM-DD')"
+    signup_rows = db.execute(
+        text(f"SELECT {date_fn} AS day, COUNT(*) FROM users WHERE created_at >= :since GROUP BY day ORDER BY day"),
+        {"since": since},
+    ).all()
+    signup_trend = [{"day": row[0], "count": row[1]} for row in signup_rows]
+
+    # Sort daily timeline
+    all_days = sorted(set(list(dau.keys()) + list(daily_events.keys())))
+
+    return {
+        "period_days": days,
+        "total_events": len(logs),
+        "action_breakdown": [{"action": k, "count": v} for k, v in action_counts.most_common()],
+        "daily_timeline": [
+            {"day": d, "active_users": len(dau.get(d, set())), "events": daily_events.get(d, 0)}
+            for d in all_days
+        ],
+        "top_users": top_users,
+        "top_pages": [{"page": p, "views": c} for p, c in page_counts.most_common(15)],
+        "signup_trend": signup_trend,
+    }
 
 
 @router.delete("/users/{user_id}/purge")

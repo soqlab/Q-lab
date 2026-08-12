@@ -563,6 +563,252 @@ function NPSTab({ token }: { token: string }) {
   );
 }
 
+// ─── Analytics Tab ───────────────────────────────────────────────────────────
+interface AnalyticsData {
+  period_days: number; total_events: number;
+  action_breakdown: { action: string; count: number }[];
+  daily_timeline: { day: string; active_users: number; events: number }[];
+  top_users: { user_id: number; email: string; events: number }[];
+  top_pages: { page: string; views: number }[];
+  signup_trend: { day: string; count: number }[];
+}
+
+function MiniBar({ value, max, color = "#6366f1" }: { value: number; max: number; color?: string }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.4s" }} />
+      </div>
+      <span style={{ fontSize: 12, color: "var(--muted)", minWidth: 32, textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
+function AnalyticsTab({ token }: { token: string }) {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/analytics?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading analytics…</div>;
+  if (!data) return <div className="empty">Failed to load analytics.</div>;
+
+  const maxAction = data.action_breakdown[0]?.count ?? 1;
+  const maxPage = data.top_pages[0]?.views ?? 1;
+  const maxUser = data.top_users[0]?.events ?? 1;
+
+  const ACTION_COLOR_MAP: Record<string, string> = {
+    "page.view": "#64748b", "auth.login": "#10b981", "auth.register": "#6366f1",
+    "run.created": "#6366f1", "run.viewed": "#a78bfa", "run.deleted": "#ef4444",
+    "insight.generated": "#f59e0b", "assistant.queried": "#f59e0b",
+    "cost_oracle.queried": "#10b981", "billing.viewed": "#06b6d4",
+  };
+
+  return (
+    <>
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[7, 14, 30, 90].map(d => (
+          <button key={d} onClick={() => setDays(d)} style={{
+            padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            background: days === d ? "var(--strong)" : "var(--surface)",
+            color: days === d ? "#fff" : "var(--muted)",
+            border: `1px solid ${days === d ? "var(--strong)" : "var(--line)"}`,
+          }}>Last {d}d</button>
+        ))}
+        <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--muted)", alignSelf: "center" }}>
+          {data.total_events.toLocaleString()} events
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* Action breakdown */}
+        <section className="panel">
+          <div className="panel-header"><h2>Action Breakdown</h2></div>
+          <div style={{ padding: "0 20px 20px" }}>
+            {data.action_breakdown.slice(0, 12).map(a => (
+              <div key={a.action} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, color: ACTION_COLOR_MAP[a.action] ?? "var(--text)", fontWeight: 600 }}>
+                    {ACTION_ICON[a.action] ?? "•"} {a.action}
+                  </span>
+                </div>
+                <MiniBar value={a.count} max={maxAction} color={ACTION_COLOR_MAP[a.action] ?? "#6366f1"} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Top users */}
+        <section className="panel">
+          <div className="panel-header"><h2>Most Active Users</h2></div>
+          <div style={{ padding: "0 20px 20px" }}>
+            {data.top_users.map((u, i) => (
+              <div key={u.user_id} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", maxWidth: "75%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    #{i + 1} {u.email}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{u.events} events</span>
+                </div>
+                <MiniBar value={u.events} max={maxUser} color="#6366f1" />
+              </div>
+            ))}
+            {data.top_users.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No activity yet in this period.</div>}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Top pages */}
+        <section className="panel">
+          <div className="panel-header"><h2>Top Pages Visited</h2></div>
+          <div style={{ padding: "0 20px 20px" }}>
+            {data.top_pages.map(p => (
+              <div key={p.page} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, color: "var(--text)", fontFamily: "monospace" }}>{p.page}</span>
+                </div>
+                <MiniBar value={p.views} max={maxPage} color="#a78bfa" />
+              </div>
+            ))}
+            {data.top_pages.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No page views tracked yet.</div>}
+          </div>
+        </section>
+
+        {/* Signup trend */}
+        <section className="panel">
+          <div className="panel-header"><h2>New Signups per Day</h2></div>
+          <div style={{ padding: "0 20px 20px" }}>
+            {data.signup_trend.length === 0 ? (
+              <div style={{ color: "var(--muted)", fontSize: 13 }}>No new signups in this period.</div>
+            ) : (
+              data.signup_trend.map(s => (
+                <div key={s.day} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{s.day}</span>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>+{s.count}</span>
+                  </div>
+                  <MiniBar value={s.count} max={Math.max(...data.signup_trend.map(x => x.count), 1)} color="#10b981" />
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// ─── Reach Tab (web self-promotion tools) ─────────────────────────────────────
+function ReachTab({ token }: { token: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const [galleryCount, setGalleryCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/qlab-api/api/v1/public/gallery?limit=1", {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).then(d => setGalleryCount(d.total ?? 0)).catch(() => {});
+  }, [token]);
+
+  function copy(text: string, key: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
+
+  const badgeMarkdown = `[![Tracked on Q-Lab](https://www.soqlab.com/api/v1/badge/runs.svg)](https://www.soqlab.com)`;
+  const badgeHtml = `<a href="https://www.soqlab.com"><img src="https://www.soqlab.com/api/v1/badge/runs.svg" alt="Tracked on Q-Lab"></a>`;
+
+  function CodeBox({ label, code, copyKey }: { label: string; code: string; copyKey: string }) {
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{label}</span>
+          <button
+            onClick={() => copy(code, copyKey)}
+            style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", color: "var(--muted)" }}
+          >
+            {copied === copyKey ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <pre style={{ margin: 0, padding: "10px 14px", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--line)", fontSize: 12, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+          {code}
+        </pre>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Stats */}
+        <section className="panel">
+          <div className="panel-header"><h2>Organic Reach</h2></div>
+          <div style={{ padding: "8px 20px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Public shared experiments</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: "#6366f1" }}>{galleryCount ?? "…"}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Public gallery page</span>
+              <a href="/gallery" target="_blank" style={{ fontSize: 13, color: "#6366f1" }}>soqlab.com/gallery →</a>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>RSS feed (for aggregators)</span>
+              <a href="/feed.xml" target="_blank" style={{ fontSize: 13, color: "#6366f1" }}>feed.xml →</a>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Live badge (updates with run count)</span>
+              <img src="/api/v1/badge/runs.svg" alt="badge preview" style={{ height: 20 }} />
+            </div>
+          </div>
+        </section>
+
+        {/* How it spreads */}
+        <section className="panel">
+          <div className="panel-header"><h2>How Q-Lab Spreads</h2></div>
+          <div style={{ padding: "8px 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {[
+              { icon: "⚛️", title: "GitHub badge", desc: "Users embed it in Qiskit repos — every repo is a permanent backlink" },
+              { icon: "🌐", title: "Public gallery", desc: "Each shared experiment is an SEO page: 'Grover algorithm IBM 14 qubits'" },
+              { icon: "📡", title: "RSS feed", desc: "Quantum computing blogs aggregate it — free recurring exposure" },
+              { icon: "🔗", title: "Share links", desc: "Every /share/token page has a 'Get started free' CTA at the bottom" },
+              { icon: "📄", title: "JSON-LD + OG tags", desc: "Google indexes Q-Lab as a SoftwareApplication; rich link previews on Twitter/LinkedIn" },
+            ].map(item => (
+              <div key={item.title} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{item.title}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* Embed codes */}
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-header"><h2>Embed Codes — put these in GitHub READMEs &amp; Notebooks</h2></div>
+        <div style={{ padding: "8px 20px 20px" }}>
+          <CodeBox label="Markdown badge (GitHub README)" code={badgeMarkdown} copyKey="md" />
+          <CodeBox label="HTML badge (notebooks, websites)" code={badgeHtml} copyKey="html" />
+          <CodeBox label="RSS feed URL (submit to Feedly, quantum aggregators)" code="https://www.soqlab.com/feed.xml" copyKey="rss" />
+        </div>
+      </section>
+    </>
+  );
+}
+
 // ─── Activity Feed Tab ────────────────────────────────────────────────────────
 interface ActivityEvent {
   id: number; action: string; resource_type: string | null; resource_id: string | null;
@@ -684,7 +930,7 @@ function ActivityFeedTab({ token }: { token: string }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-type Tab = "overview" | "users" | "feedback" | "nps" | "activity";
+type Tab = "overview" | "users" | "activity" | "analytics" | "reach" | "feedback" | "nps";
 
 export default function AdminPage() {
   const { token, user, loading } = useAuth();
@@ -721,6 +967,8 @@ export default function AdminPage() {
     { key: "overview",  label: "Overview" },
     { key: "users",     label: "Users" },
     { key: "activity",  label: "Activity" },
+    { key: "analytics", label: "Analytics" },
+    { key: "reach",     label: "Reach" },
     { key: "feedback",  label: "Feedback" },
     { key: "nps",       label: "NPS" },
   ];
@@ -748,6 +996,8 @@ export default function AdminPage() {
       {tab === "overview"  && <Overview stats={stats} logs={logs} logTotal={logTotal} />}
       {tab === "users"     && <UsersTab token={token!} />}
       {tab === "activity"  && <ActivityFeedTab token={token!} />}
+      {tab === "analytics" && <AnalyticsTab token={token!} />}
+      {tab === "reach"     && <ReachTab token={token!} />}
       {tab === "feedback"  && <FeedbackTab token={token!} />}
       {tab === "nps"       && <NPSTab token={token!} />}
     </main>

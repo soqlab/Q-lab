@@ -7,13 +7,13 @@ import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import Identity, get_identity, require_auth
+from ..deps import Identity, get_identity, log_audit, require_auth
 from ..models import BudgetAlert, JobSubmission, Run
 
 router = APIRouter(prefix="/api/v1/costs", tags=["costs"])
@@ -203,9 +203,18 @@ def cost_timeline(days: int = Query(30, ge=1, le=365), db: Session = Depends(get
 
 
 @router.get("/estimate")
-def estimate_cost(provider: str, backend: str, shots: int = Query(1024, ge=1), depth: int = Query(1, ge=1), qubits: int = Query(1, ge=1)):
+def estimate_cost(
+    provider: str, backend: str,
+    shots: int = Query(1024, ge=1), depth: int = Query(1, ge=1), qubits: int = Query(1, ge=1),
+    request: Request = None,
+    identity: Optional[Identity] = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
     p = _provider(provider or backend)
     estimated = round((shots / 1024.0) * (0.03 + depth * 0.0015 + qubits * 0.004) * _PROVIDER_RATE.get(p, 1.0), 4)
+    if identity and identity.user_id:
+        log_audit(db, "cost_oracle.queried", "cost", p, identity=identity, request=request,
+                  meta={"provider": p, "backend": backend, "shots": shots, "depth": depth, "qubits": qubits})
     return {
         "provider": p,
         "backend": backend,
