@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Filter, RefreshCw, Wifi, Terminal, Key, Zap, ChevronUp, ChevronDown, Trash2, Download, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
@@ -9,10 +8,6 @@ import { createRunStream, deleteRun, healthColor, qlabApiPath, QLabRun, searchRu
 import { useAuth } from "../../../lib/auth";
 import { useToast } from "../../../lib/toast";
 
-const GateDepthChart = dynamic(() => import("../GateDepthChart"), {
-  ssr: false,
-  loading: () => <div style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: 13 }}>Loading chart…</div>,
-});
 
 // ------------------------------------------------------------------
 // Sorting
@@ -174,26 +169,26 @@ function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
       const hasAny = hasIbm || hasIonq || hasRigetti || hasAer;
       const chosen = Object.entries(ab).sort((a,b)=>b[1]-a[1])[0]?.[0] || "ibm";
 
-      // passive edges to unused backends
-      if (!hasIonq || !hasAny)    edge(N.qlab,N.ionq,"#1e2d45",1,0.5);
-      if (!hasRigetti || !hasAny) edge(N.qlab,N.rigetti,"#1e2d45",1,0.5);
-      if (!hasAer || !hasAny)     edge(N.qlab,N.aer,"#1e2d45",1,0.5);
-      if (!hasIbm || !hasAny)     edge(N.qlab,N.ibm,"#1e2d45",1,0.5);
+      // passive edges — always shown as faint infrastructure
+      edge(N.qlab,N.ionq,"#1e2d45",1,hasIonq?0.3:0.5);
+      edge(N.qlab,N.rigetti,"#1e2d45",1,hasRigetti?0.3:0.5);
+      edge(N.qlab,N.aer,"#1e2d45",1,hasAer?0.3:0.5);
+      edge(N.qlab,N.ibm,"#1e2d45",1,hasIbm?0.3:0.5);
 
-      // active edges to used backends
-      if (hasIbm     || !hasAny) edge(N.qlab,N.ibm,"#6366f1",hasIbm?1.8:1,hasIbm?0.6:0.3);
-      if (hasIonq)               edge(N.qlab,N.ionq,"#a78bfa",1.5,0.5);
-      if (hasRigetti)            edge(N.qlab,N.rigetti,"#a78bfa",1.5,0.5);
-      if (hasAer)                edge(N.qlab,N.aer,"#33e0c6",1.5,0.5);
-      edge(N.exp,N.qlab,"#6366f1",1.6,0.55);
+      // active edges — only for backends with real run data
+      if (hasIbm)     edge(N.qlab,N.ibm,"#6366f1",1.8,0.6);
+      if (hasIonq)    edge(N.qlab,N.ionq,"#a78bfa",1.5,0.5);
+      if (hasRigetti) edge(N.qlab,N.rigetti,"#a78bfa",1.5,0.5);
+      if (hasAer)     edge(N.qlab,N.aer,"#33e0c6",1.5,0.5);
+      if (hasAny)     edge(N.exp,N.qlab,"#6366f1",1.6,0.55);
 
-      if (!reduce) {
-        // particles to chosen/active backends
+      if (!reduce && hasAny) {
+        // particles only to backends that have real runs
         const activePaths: [typeof N.exp, typeof N.ibm, number][] = [[N.exp,N.qlab,2.2]];
-        if (chosen==="ibm"     || !hasAny) activePaths.push([N.qlab,N.ibm,2.8]);
-        if (chosen==="ionq")              activePaths.push([N.qlab,N.ionq,3.0]);
-        if (chosen==="rigetti")           activePaths.push([N.qlab,N.rigetti,3.0]);
-        if (chosen==="aer")               activePaths.push([N.qlab,N.aer,2.6]);
+        if (chosen==="ibm")     activePaths.push([N.qlab,N.ibm,2.8]);
+        if (chosen==="ionq")    activePaths.push([N.qlab,N.ionq,3.0]);
+        if (chosen==="rigetti") activePaths.push([N.qlab,N.rigetti,3.0]);
+        if (chosen==="aer")     activePaths.push([N.qlab,N.aer,2.6]);
 
         (activePaths as any[]).forEach(([a,b,cyc])=>{
           for(let k=0;k<3;k++){
@@ -212,7 +207,7 @@ function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
         ctx.globalAlpha=1;
       }
 
-      const ibmActive=chosen==="ibm"||!hasAny;
+      const ibmActive=chosen==="ibm" && hasAny;
       circle(P(N.ionq),N.ionq.r,"var(--surface)",hasIonq?"#a78bfa":"#1e2d45",hasIonq?1.6:1.2);
       circle(P(N.rigetti),N.rigetti.r,"var(--surface)",hasRigetti?"#a78bfa":"#1e2d45",hasRigetti?1.6:1.2);
       circle(P(N.aer),N.aer.r,"var(--surface)",hasAer?"#33e0c6":"#1e2d45",hasAer?1.6:1.2);
@@ -506,12 +501,6 @@ function RunsInner() {
     return Math.round(scored.reduce((s, r) => s + (r.health_score ?? 0), 0) / scored.length);
   })();
 
-  const chartData = runs.slice().reverse().slice(-20).map(r => ({
-    name: (r.circuit_name || r.run_id).slice(0, 10),
-    depth: r.fingerprint.depth ?? 0,
-    qubits: r.fingerprint.num_qubits ?? 0,
-    health: r.health_score ?? 0,
-  }));
 
   const exportUrl = qlabApiPath(`/api/v1/exports/runs.csv`);
 
@@ -600,16 +589,6 @@ function RunsInner() {
       {/* Error state */}
       {!loading && error && (
         <div className="empty" style={{ color: "var(--danger)" }}>{error}</div>
-      )}
-
-      {/* Chart — only when there's data */}
-      {chartData.length > 0 && (
-        <section className="panel">
-          <div className="panel-header"><h2>Gate Depth — Last 20 Runs</h2></div>
-          <div style={{ height: 240, padding: "8px 16px" }}>
-            <GateDepthChart data={chartData} />
-          </div>
-        </section>
       )}
 
       {/* Empty state */}
