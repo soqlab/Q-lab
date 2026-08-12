@@ -1,55 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Filter, RefreshCw, Wifi, Terminal, Key, Zap, ChevronUp, ChevronDown, Trash2, Download, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { createRunStream, deleteRun, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
+import { Filter, RefreshCw, Wifi, Download } from "lucide-react";
+import { createRunStream, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { useToast } from "../../../lib/toast";
 
-
-// ------------------------------------------------------------------
-// Sorting
-// ------------------------------------------------------------------
-type SortCol = "run" | "project" | "backend" | "status" | "qubits" | "depth" | "ncr" | "health" | "created";
-
-const SORTERS: Record<SortCol, (a: QLabRun, b: QLabRun) => number> = {
-  run:     (a, b) => (a.circuit_name || a.run_id).localeCompare(b.circuit_name || b.run_id),
-  project: (a, b) => (a.project || "").localeCompare(b.project || ""),
-  backend: (a, b) => (a.backend || "").localeCompare(b.backend || ""),
-  status:  (a, b) => a.status.localeCompare(b.status),
-  qubits:  (a, b) => (a.fingerprint.num_qubits ?? 0) - (b.fingerprint.num_qubits ?? 0),
-  depth:   (a, b) => (a.fingerprint.depth ?? 0) - (b.fingerprint.depth ?? 0),
-  ncr:     (a, b) => (a.fingerprint.non_clifford_ratio ?? 0) - (b.fingerprint.non_clifford_ratio ?? 0),
-  health:  (a, b) => (a.health_score ?? -1) - (b.health_score ?? -1),
-  created: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-};
-
-function SortTh({
-  col, label, sortCol, sortDir, onSort, style,
-}: {
-  col: SortCol; label: string;
-  sortCol: SortCol | null; sortDir: "asc" | "desc";
-  onSort: (c: SortCol) => void;
-  style?: React.CSSProperties;
-}) {
-  const active = sortCol === col;
-  return (
-    <th
-      onClick={() => onSort(col)}
-      style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}
-    >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-        {label}
-        {active
-          ? (sortDir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />)
-          : <ChevronDown size={13} style={{ opacity: 0.25 }} />
-        }
-      </span>
-    </th>
-  );
-}
 
 // ------------------------------------------------------------------
 // ─── Dashboard routing fabric ─────────────────────────────────────────────────
@@ -327,7 +284,6 @@ function HealthBadge({ score }: { score: number | null | undefined }) {
   return <span style={{ fontWeight: 700, color: healthColor(score), fontSize: 13 }}>{score}</span>;
 }
 
-const PAGE_SIZE = 50;
 
 // ------------------------------------------------------------------
 // Smart query parser
@@ -385,24 +341,11 @@ function RunsInner() {
   const [minQubits, setMinQubits] = useState(searchParams.get("min_qubits") ?? "");
   const [maxDepth, setMaxDepth] = useState(searchParams.get("max_depth") ?? "");
 
-  // Sorting
-  const [sortCol, setSortCol] = useState<SortCol | null>("created");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  // Pagination
-  const [page, setPage] = useState(1);
-
-  // Selection
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [bulkConfirm, setBulkConfirm] = useState(false);
-
   const esCleanup = useRef<(() => void) | null>(null);
 
   async function loadRuns() {
     setLoading(true);
     setError(null);
-    setSelected(new Set());
     try {
       const params: Record<string, string | number> = { page_size: 500 };
       if (q) params.q = q;
@@ -413,7 +356,6 @@ function RunsInner() {
       if (maxDepth) params.max_depth = Number(maxDepth);
       const result = await searchRuns(params);
       setRuns(result.items);
-      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load runs");
     } finally {
@@ -437,63 +379,6 @@ function RunsInner() {
     return () => { if (esCleanup.current) esCleanup.current(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Sort
-  const sorted = useMemo(() => {
-    if (!sortCol) return runs;
-    const fn = SORTERS[sortCol];
-    const arr = [...runs].sort(fn);
-    return sortDir === "desc" ? arr.reverse() : arr;
-  }, [runs, sortCol, sortDir]);
-
-  // Paginate
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageRuns = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  function handleSort(col: SortCol) {
-    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("desc"); }
-    setPage(1);
-  }
-
-  // Selection helpers
-  const allPageSelected = pageRuns.length > 0 && pageRuns.every(r => selected.has(r.run_id));
-  const someSelected = selected.size > 0;
-
-  function toggleSelectAll() {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (allPageSelected) pageRuns.forEach(r => next.delete(r.run_id));
-      else pageRuns.forEach(r => next.add(r.run_id));
-      return next;
-    });
-  }
-
-  function toggleSelect(id: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  async function bulkDelete() {
-    if (!token || !selected.size) return;
-    setBulkDeleting(true);
-    const ids = [...selected];
-    try {
-      await Promise.allSettled(ids.map(id => deleteRun(token, id)));
-      setRuns(prev => prev.filter(r => !selected.has(r.run_id)));
-      setSelected(new Set());
-      setBulkConfirm(false);
-      toast(`Deleted ${ids.length} run${ids.length > 1 ? "s" : ""}`, "success");
-    } catch {
-      toast("Some runs could not be deleted", "error");
-    } finally {
-      setBulkDeleting(false);
-    }
-  }
 
   // KPI metrics
   const total = runs.length;
@@ -608,151 +493,6 @@ function RunsInner() {
         </section>
       )}
 
-      {/* Runs table */}
-      {(!loading && runs.length > 0) && (
-        <section className="panel">
-          {/* Panel header */}
-          <div className="panel-header" style={{ flexWrap: "wrap", gap: 10 }}>
-            <h2>Experiments ({total.toLocaleString()})</h2>
-            {someSelected && !bulkConfirm && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
-                <span style={{ fontSize: 13, color: "var(--muted)" }}>{selected.size} selected</span>
-                <button
-                  className="button secondary"
-                  style={{ height: 30, fontSize: 12, color: "var(--danger)", borderColor: "var(--danger)" }}
-                  onClick={() => setBulkConfirm(true)}
-                  type="button"
-                >
-                  <Trash2 size={13} /> Delete {selected.size}
-                </button>
-                <button className="button secondary" style={{ height: 30, fontSize: 12 }}
-                  onClick={() => setSelected(new Set())} type="button">
-                  Clear
-                </button>
-              </div>
-            )}
-            {bulkConfirm && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
-                <span style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600 }}>
-                  Delete {selected.size} runs permanently?
-                </span>
-                <button
-                  className="button"
-                  style={{ height: 30, fontSize: 12, background: "var(--danger)", borderColor: "var(--danger)" }}
-                  disabled={bulkDeleting}
-                  onClick={() => void bulkDelete()}
-                  type="button"
-                >
-                  {bulkDeleting ? "Deleting…" : "Yes, delete"}
-                </button>
-                <button className="button secondary" style={{ height: 30, fontSize: 12 }}
-                  onClick={() => setBulkConfirm(false)} type="button">
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-
-          {error && <div className="empty">{error}</div>}
-
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  {/* Select-all checkbox */}
-                  <th style={{ width: 40, textAlign: "center", padding: "12px 8px" }}>
-                    <input
-                      type="checkbox"
-                      checked={allPageSelected}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all on this page"
-                      style={{ cursor: "pointer", width: 15, height: 15 }}
-                    />
-                  </th>
-                  <SortTh col="run"     label="Run"         sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="project" label="Project"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="backend" label="Backend"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="status"  label="Status"      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="qubits"  label="Qubits"      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="depth"   label="Depth"       sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="ncr"     label="Non-Clifford" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="health"  label="Health"      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <SortTh col="created" label="Created"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  <th>Tags</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRuns.map(run => (
-                  <tr key={run.run_id} style={{ background: selected.has(run.run_id) ? "var(--info-bg)" : undefined }}>
-                    <td style={{ textAlign: "center", padding: "12px 8px" }}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(run.run_id)}
-                        onChange={() => toggleSelect(run.run_id)}
-                        aria-label={`Select run ${run.run_id}`}
-                        style={{ cursor: "pointer", width: 15, height: 15 }}
-                      />
-                    </td>
-                    <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
-                      <Link href={`/runs/${run.run_id}`} style={{ color: "var(--strong)", fontWeight: 500 }}>
-                        {run.circuit_name || run.run_id.slice(0, 12)}
-                      </Link>
-                    </td>
-                    <td style={{ fontSize: 13 }}>{run.project || <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                    <td style={{ fontSize: 13 }}>{run.backend || <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                    <td><span className={statusClass(run.status)}>{run.status}</span></td>
-                    <td style={{ fontVariantNumeric: "tabular-nums" }}>{run.fingerprint.num_qubits ?? "—"}</td>
-                    <td style={{ fontVariantNumeric: "tabular-nums" }}>{run.fingerprint.depth ?? "—"}</td>
-                    <td style={{ fontVariantNumeric: "tabular-nums" }}>{((run.fingerprint.non_clifford_ratio ?? 0) * 100).toFixed(1)}%</td>
-                    <td><HealthBadge score={run.health_score} /></td>
-                    <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                      {new Date(run.created_at).toLocaleString()}
-                    </td>
-                    <td style={{ fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {(run.tags ?? []).length
-                        ? (run.tags ?? []).map(t => (
-                          <span key={t} style={{ display: "inline-block", background: "var(--info-bg)", color: "var(--info-text)", borderRadius: 999, padding: "1px 7px", marginRight: 4, fontWeight: 600 }}>{t}</span>
-                        ))
-                        : <span style={{ color: "var(--muted)" }}>—</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                Showing {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(safePage * PAGE_SIZE, sorted.length).toLocaleString()} of {sorted.length.toLocaleString()} runs
-              </span>
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <button className="button secondary" style={{ height: 30, width: 30, padding: 0 }}
-                  disabled={safePage === 1} onClick={() => setPage(1)} aria-label="First page" type="button">
-                  <ChevronsLeft size={14} />
-                </button>
-                <button className="button secondary" style={{ height: 30, width: 30, padding: 0 }}
-                  disabled={safePage === 1} onClick={() => setPage(p => p - 1)} aria-label="Previous page" type="button">
-                  <ChevronLeft size={14} />
-                </button>
-                <span style={{ fontSize: 13, padding: "0 10px", color: "var(--text)" }}>
-                  Page {safePage} of {totalPages}
-                </span>
-                <button className="button secondary" style={{ height: 30, width: 30, padding: 0 }}
-                  disabled={safePage === totalPages} onClick={() => setPage(p => p + 1)} aria-label="Next page" type="button">
-                  <ChevronRight size={14} />
-                </button>
-                <button className="button secondary" style={{ height: 30, width: 30, padding: 0 }}
-                  disabled={safePage === totalPages} onClick={() => setPage(totalPages)} aria-label="Last page" type="button">
-                  <ChevronsRight size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
     </main>
   );
 }
