@@ -343,6 +343,323 @@ def platform_analytics(
     }
 
 
+def _parse_ua(ua: Optional[str]) -> dict:
+    if not ua:
+        return {"browser": "Unknown", "os": "Unknown", "device": "Desktop"}
+    u = ua.lower()
+    if "edg" in u:
+        browser = "Edge"
+    elif "opr" in u or "opera" in u:
+        browser = "Opera"
+    elif "chrome" in u:
+        browser = "Chrome"
+    elif "firefox" in u:
+        browser = "Firefox"
+    elif "safari" in u:
+        browser = "Safari"
+    else:
+        browser = "Other"
+    if "windows" in u:
+        os_name = "Windows"
+    elif "mac os" in u or "macos" in u:
+        os_name = "macOS"
+    elif "android" in u:
+        os_name = "Android"
+    elif "iphone" in u or "ipad" in u:
+        os_name = "iOS"
+    elif "linux" in u:
+        os_name = "Linux"
+    else:
+        os_name = "Other"
+    device = "Mobile" if any(x in u for x in ["mobile", "android", "iphone", "ipad"]) else "Desktop"
+    return {"browser": browser, "os": os_name, "device": device}
+
+
+@router.get("/traffic-stats")
+def traffic_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Traffic analytics: page views, hourly heatmap, browser/OS/device breakdown."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    logs = db.scalars(
+        select(AuditLog).where(AuditLog.action == "page.view").where(AuditLog.created_at >= since)
+    ).all()
+
+    heatmap: defaultdict = defaultdict(int)
+    hourly: defaultdict = defaultdict(int)
+    daily_views: defaultdict = defaultdict(int)
+    unique_daily: defaultdict = defaultdict(set)
+    browser_c: Counter = Counter()
+    os_c: Counter = Counter()
+    device_c: Counter = Counter()
+    page_c: Counter = Counter()
+
+    for lg in logs:
+        dt = lg.created_at
+        heatmap[f"{dt.weekday()}:{dt.hour}"] += 1
+        hourly[dt.hour] += 1
+        day = dt.date().isoformat()
+        daily_views[day] += 1
+        if lg.user_id:
+            unique_daily[day].add(lg.user_id)
+        ua = _parse_ua(lg.user_agent)
+        browser_c[ua["browser"]] += 1
+        os_c[ua["os"]] += 1
+        device_c[ua["device"]] += 1
+        if lg.resource_id:
+            page_c[lg.resource_id] += 1
+
+    heatmap_list = []
+    for key, count in heatmap.items():
+        dow, hr = key.split(":")
+        heatmap_list.append({"day": int(dow), "hour": int(hr), "count": count})
+
+    return {
+        "period_days": days,
+        "total_page_views": len(logs),
+        "heatmap": heatmap_list,
+        "hourly_breakdown": [{"hour": h, "views": hourly.get(h, 0)} for h in range(24)],
+        "daily_views": [
+            {"day": d, "views": daily_views[d], "unique_visitors": len(unique_daily.get(d, set()))}
+            for d in sorted(daily_views.keys())
+        ],
+        "browsers": [{"browser": k, "count": v} for k, v in browser_c.most_common()],
+        "os_breakdown": [{"os": k, "count": v} for k, v in os_c.most_common()],
+        "devices": [{"device": k, "count": v} for k, v in device_c.most_common()],
+        "top_pages": [{"page": k, "views": v} for k, v in page_c.most_common(20)],
+    }
+
+
+@router.get("/runs-stats")
+def runs_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Run analytics: backend distribution, status, daily trends, qubit distribution."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    runs = db.scalars(select(Run).where(Run.created_at >= since)).all()
+
+    backend_c: Counter = Counter()
+    status_c: Counter = Counter()
+    daily_c: defaultdict = defaultdict(int)
+    qubit_b: defaultdict = defaultdict(int)
+    project_c: Counter = Counter()
+    depth_sum = 0
+    depth_count = 0
+
+    for r in runs:
+        backend_c[r.backend or "unknown"] += 1
+        status_c[r.status or "unknown"] += 1
+        if r.created_at:
+            daily_c[r.created_at.date().isoformat()] += 1
+        fp = r.fingerprint or {}
+        q = fp.get("num_qubits")
+        if q is not None:
+            if q <= 5:
+                qubit_b["1-5"] += 1
+            elif q <= 10:
+                qubit_b["6-10"] += 1
+            elif q <= 20:
+                qubit_b["11-20"] += 1
+            else:
+                qubit_b["21+"] += 1
+        d = fp.get("depth")
+        if d is not None:
+            depth_sum += d
+            depth_count += 1
+        if r.project_slug:
+            project_c[r.project_slug] += 1
+
+    all_days = sorted(daily_c.keys())
+    total = len(runs)
+    completed = status_c.get("completed", 0)
+    failed = status_c.get("failed", 0)
+
+    return {
+        "period_days": days,
+        "total_runs": total,
+        "completion_rate": round(completed / total, 3) if total else 0,
+        "failure_rate": round(failed / total, 3) if total else 0,
+        "avg_circuit_depth": round(depth_sum / depth_count, 1) if depth_count else None,
+        "backends": [{"backend": k, "count": v} for k, v in backend_c.most_common()],
+        "statuses": [{"status": k, "count": v} for k, v in status_c.most_common()],
+        "daily_runs": [{"day": d, "count": daily_c[d]} for d in all_days],
+        "qubit_distribution": [{"bucket": k, "count": qubit_b[k]} for k in ["1-5", "6-10", "11-20", "21+"] if qubit_b[k]],
+        "top_projects": [{"project": k, "runs": v} for k, v in project_c.most_common(10)],
+    }
+
+
+@router.get("/ai-stats")
+def ai_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """AI feature usage: insights generated, assistant queries, cost oracle."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    AI_ACTIONS = ["insight.generated", "assistant.queried", "cost_oracle.queried"]
+    logs = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.action.in_(AI_ACTIONS))
+        .where(AuditLog.created_at >= since)
+    ).all()
+
+    type_c: Counter = Counter(lg.action for lg in logs)
+    hourly: defaultdict = defaultdict(int)
+    daily: defaultdict = defaultdict(int)
+    user_c: Counter = Counter(lg.user_id for lg in logs if lg.user_id)
+
+    for lg in logs:
+        hourly[lg.created_at.hour] += 1
+        daily[lg.created_at.date().isoformat()] += 1
+
+    top_uids = [uid for uid, _ in user_c.most_common(10)]
+    users_map = {u.id: u for u in db.scalars(select(User).where(User.id.in_(top_uids))).all()} if top_uids else {}
+
+    return {
+        "period_days": days,
+        "total_ai_requests": len(logs),
+        "by_type": [{"action": k, "count": v} for k, v in type_c.most_common()],
+        "hourly_usage": [{"hour": h, "count": hourly.get(h, 0)} for h in range(24)],
+        "daily_usage": [{"day": d, "count": daily[d]} for d in sorted(daily.keys())],
+        "top_users": [
+            {"user_id": uid, "email": users_map[uid].email if uid in users_map else str(uid), "requests": cnt}
+            for uid, cnt in user_c.most_common(10)
+        ],
+    }
+
+
+@router.get("/sessions-stats")
+def sessions_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Session analysis: group page.view events into user sessions."""
+    SESSION_GAP = 1800  # 30 min gap = new session
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    page_logs = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.action == "page.view")
+        .where(AuditLog.created_at >= since)
+        .order_by(AuditLog.created_at)
+    ).all()
+
+    user_events: defaultdict = defaultdict(list)
+    for lg in page_logs:
+        uid = str(lg.user_id) if lg.user_id else f"anon_{lg.ip_address or 'x'}"
+        user_events[uid].append(lg.created_at)
+
+    total_sessions = 0
+    bounce_sessions = 0
+    total_duration = 0.0
+    total_pages = 0
+    daily_sessions: defaultdict = defaultdict(int)
+
+    for uid, times in user_events.items():
+        times.sort()
+        start = times[0]
+        pages = 1
+        prev = times[0]
+        daily_sessions[start.date().isoformat()] += 1
+
+        for t in times[1:]:
+            gap = (t - prev).total_seconds()
+            if gap > SESSION_GAP:
+                duration = (prev - start).total_seconds()
+                total_sessions += 1
+                total_duration += duration
+                total_pages += pages
+                if pages == 1:
+                    bounce_sessions += 1
+                start = t
+                pages = 1
+                daily_sessions[t.date().isoformat()] += 1
+            else:
+                pages += 1
+            prev = t
+
+        duration = (prev - start).total_seconds()
+        total_sessions += 1
+        total_duration += duration
+        total_pages += pages
+        if pages == 1:
+            bounce_sessions += 1
+
+    avg_duration = total_duration / total_sessions if total_sessions else 0
+    avg_pages = total_pages / total_sessions if total_sessions else 0
+    bounce_rate = bounce_sessions / total_sessions if total_sessions else 0
+
+    return {
+        "period_days": days,
+        "total_sessions": total_sessions,
+        "avg_session_duration_seconds": round(avg_duration),
+        "avg_pages_per_session": round(avg_pages, 1),
+        "bounce_rate": round(bounce_rate * 100, 1),
+        "bounce_sessions": bounce_sessions,
+        "daily_sessions": [{"day": d, "sessions": daily_sessions[d]} for d in sorted(daily_sessions.keys())],
+    }
+
+
+@router.get("/security-stats")
+def security_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    identity: Identity = Depends(require_role("owner")),
+    db: Session = Depends(get_db),
+):
+    """Security overview: login patterns, multi-IP users, suspicious IPs."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    logs = db.scalars(select(AuditLog).where(AuditLog.created_at >= since)).all()
+
+    login_logs = [lg for lg in logs if lg.action == "auth.login"]
+    reg_logs = [lg for lg in logs if lg.action == "auth.register"]
+
+    ip_users: defaultdict = defaultdict(set)
+    ip_action_c: Counter = Counter()
+    user_ips: defaultdict = defaultdict(set)
+
+    for lg in logs:
+        if lg.ip_address:
+            if lg.user_id:
+                ip_users[lg.ip_address].add(lg.user_id)
+            ip_action_c[lg.ip_address] += 1
+        if lg.action == "auth.login" and lg.user_id and lg.ip_address:
+            user_ips[lg.user_id].add(lg.ip_address)
+
+    suspicious_ips = sorted(
+        [{"ip": ip, "users": len(us), "actions": ip_action_c[ip]} for ip, us in ip_users.items() if len(us) > 1],
+        key=lambda x: x["users"], reverse=True
+    )[:15]
+
+    multi_ip = [(uid, ips) for uid, ips in user_ips.items() if len(ips) > 2]
+    uid_set = {uid for uid, _ in multi_ip}
+    users_map = {u.id: u for u in db.scalars(select(User).where(User.id.in_(uid_set))).all()} if uid_set else {}
+
+    return {
+        "period_days": days,
+        "total_logins": len(login_logs),
+        "new_registrations": len(reg_logs),
+        "unique_ips": len(ip_users),
+        "suspicious_ips": suspicious_ips,
+        "users_multiple_ips": sorted(
+            [{"user_id": uid, "email": users_map[uid].email if uid in users_map else str(uid), "ip_count": len(ips)}
+             for uid, ips in multi_ip],
+            key=lambda x: x["ip_count"], reverse=True
+        )[:10],
+        "top_login_ips": [
+            {"ip": ip, "count": cnt}
+            for ip, cnt in Counter(lg.ip_address for lg in login_logs if lg.ip_address).most_common(15)
+        ],
+        "recent_registrations": [
+            {"created_at": lg.created_at.isoformat(), "ip_address": lg.ip_address, "user_agent": (lg.user_agent or "")[:80]}
+            for lg in sorted(reg_logs, key=lambda x: x.created_at, reverse=True)[:20]
+        ],
+    }
+
+
 @router.delete("/users/{user_id}/purge")
 def purge_user(
     user_id: int,

@@ -929,8 +929,636 @@ function ActivityFeedTab({ token }: { token: string }) {
   );
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
+  return (
+    <div className="metric" style={{ padding: "14px 18px" }}>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value" style={{ fontSize: 22, color: color ?? "var(--text)" }}>{String(value)}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Bar({ value, max, color = "#6366f1", label }: { value: number; max: number; color?: string; label: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div style={{ marginBottom: 9 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+        <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>{label}</span>
+        <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{value.toLocaleString()}</span>
+      </div>
+      <div style={{ height: 5, background: "var(--line)", borderRadius: 3 }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.4s" }} />
+      </div>
+    </div>
+  );
+}
+
+function DaySelector({ days, setDays }: { days: number; setDays: (d: number) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+      {[7, 14, 30, 90].map(d => (
+        <button key={d} onClick={() => setDays(d)} style={{
+          padding: "5px 12px", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          background: days === d ? "var(--strong)" : "var(--surface)",
+          color: days === d ? "#fff" : "var(--muted)",
+          border: `1px solid ${days === d ? "var(--strong)" : "var(--line)"}`,
+        }}>Last {d}d</button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Traffic Tab ──────────────────────────────────────────────────────────────
+interface TrafficData {
+  period_days: number; total_page_views: number;
+  heatmap: { day: number; hour: number; count: number }[];
+  hourly_breakdown: { hour: number; views: number }[];
+  daily_views: { day: string; views: number; unique_visitors: number }[];
+  browsers: { browser: string; count: number }[];
+  os_breakdown: { os: string; count: number }[];
+  devices: { device: string; count: number }[];
+  top_pages: { page: string; views: number }[];
+}
+
+const DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function TrafficTab({ token }: { token: string }) {
+  const [data, setData] = useState<TrafficData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/traffic-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading traffic data…</div>;
+  if (!data) return <div className="empty">Failed to load traffic data.</div>;
+
+  // Build 7×24 heatmap grid
+  const hmap: Record<string, number> = {};
+  let hmapMax = 0;
+  data.heatmap.forEach(h => { hmap[`${h.day}:${h.hour}`] = h.count; hmapMax = Math.max(hmapMax, h.count); });
+
+  const peakHour = data.hourly_breakdown.reduce((a, b) => b.views > a.views ? b : a, { hour: 0, views: 0 });
+  const totalUnique = data.daily_views.reduce((s, d) => s + d.unique_visitors, 0);
+  const maxPage = data.top_pages[0]?.views ?? 1;
+  const maxBrowser = data.browsers[0]?.count ?? 1;
+  const maxOS = data.os_breakdown[0]?.count ?? 1;
+  const maxViews = Math.max(...data.daily_views.map(d => d.views), 1);
+  const mobile = data.devices.find(d => d.device === "Mobile")?.count ?? 0;
+  const mobilePct = data.total_page_views > 0 ? Math.round(mobile / data.total_page_views * 100) : 0;
+
+  return (
+    <>
+      <DaySelector days={days} setDays={setDays} />
+
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 16 }}>
+        <StatCard label="Total Page Views" value={data.total_page_views.toLocaleString()} />
+        <StatCard label="Peak Hour" value={`${peakHour.hour}:00`} sub={`${peakHour.views} views`} color="#6366f1" />
+        <StatCard label="Unique Visitors" value={totalUnique.toLocaleString()} sub="by user ID" />
+        <StatCard label="Mobile Traffic" value={`${mobilePct}%`} sub={`${mobile} sessions`} />
+      </div>
+
+      {/* Heatmap */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-header"><h2>Traffic Heatmap — Day × Hour</h2><span style={{ fontSize: 12, color: "var(--muted)" }}>darker = more views</span></div>
+        <div style={{ padding: "12px 18px 18px", overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "40px repeat(24,1fr)", gap: 2, minWidth: 600 }}>
+            {/* Hour labels */}
+            <div />
+            {Array.from({ length: 24 }, (_, h) => (
+              <div key={h} style={{ fontSize: 9, color: "var(--muted)", textAlign: "center" }}>{h}</div>
+            ))}
+            {DAYS_SHORT.map((dayLabel, dow) => (
+              <>
+                <div key={`l${dow}`} style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center" }}>{dayLabel}</div>
+                {Array.from({ length: 24 }, (_, h) => {
+                  const cnt = hmap[`${dow}:${h}`] ?? 0;
+                  const intensity = hmapMax > 0 ? cnt / hmapMax : 0;
+                  const alpha = intensity > 0 ? 0.12 + intensity * 0.78 : 0.04;
+                  return (
+                    <div key={h} title={`${dayLabel} ${h}:00 — ${cnt} views`} style={{
+                      height: 16, borderRadius: 2,
+                      background: `rgba(99,102,241,${alpha.toFixed(2)})`,
+                      cursor: "default",
+                    }} />
+                  );
+                })}
+              </>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* Daily trend */}
+        <section className="panel">
+          <div className="panel-header"><h2>Daily Page Views</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.daily_views.slice(-30).map(d => (
+              <div key={d.day} style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.day.slice(5)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.views}</span>
+                </div>
+                <div style={{ height: 4, background: "var(--line)", borderRadius: 2 }}>
+                  <div style={{ width: `${maxViews > 0 ? Math.round(d.views / maxViews * 100) : 0}%`, height: "100%", background: "#6366f1", borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+            {data.daily_views.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No page views in this period.</div>}
+          </div>
+        </section>
+
+        {/* Top pages */}
+        <section className="panel">
+          <div className="panel-header"><h2>Top Pages</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.top_pages.map(p => <Bar key={p.page} label={p.page} value={p.views} max={maxPage} color="#a78bfa" />)}
+            {data.top_pages.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No data yet.</div>}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <section className="panel">
+          <div className="panel-header"><h2>Browsers</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.browsers.map(b => <Bar key={b.browser} label={b.browser} value={b.count} max={maxBrowser} />)}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Operating Systems</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.os_breakdown.map(o => <Bar key={o.os} label={o.os} value={o.count} max={maxOS} color="#10b981" />)}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Device Type</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.devices.map(d => (
+              <div key={d.device} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{d.device}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{data.total_page_views > 0 ? Math.round(d.count / data.total_page_views * 100) : 0}%</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--strong)" }}>{d.count.toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// ─── Runs Analytics Tab ───────────────────────────────────────────────────────
+interface RunsStatsData {
+  period_days: number; total_runs: number; completion_rate: number; failure_rate: number;
+  avg_circuit_depth: number | null;
+  backends: { backend: string; count: number }[];
+  statuses: { status: string; count: number }[];
+  daily_runs: { day: string; count: number }[];
+  qubit_distribution: { bucket: string; count: number }[];
+  top_projects: { project: string; runs: number }[];
+}
+
+const BACKEND_COLOR: Record<string, string> = {
+  ibm: "#6366f1", ionq: "#f59e0b", rigetti: "#ef4444", aer: "#10b981",
+  "ibm_nairobi": "#6366f1", "ibm_jakarta": "#6366f1",
+};
+const STATUS_COLOR: Record<string, string> = {
+  completed: "#10b981", failed: "#ef4444", running: "#f59e0b", submitted: "#64748b",
+};
+
+function RunsAnalyticsTab({ token }: { token: string }) {
+  const [data, setData] = useState<RunsStatsData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/runs-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading run analytics…</div>;
+  if (!data) return <div className="empty">Failed to load run data.</div>;
+
+  const maxBackend = data.backends[0]?.count ?? 1;
+  const maxStatus = data.statuses[0]?.count ?? 1;
+  const maxQubit = Math.max(...data.qubit_distribution.map(q => q.count), 1);
+  const maxProject = data.top_projects[0]?.runs ?? 1;
+  const maxDaily = Math.max(...data.daily_runs.map(d => d.count), 1);
+
+  return (
+    <>
+      <DaySelector days={days} setDays={setDays} />
+
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 16 }}>
+        <StatCard label="Total Runs" value={data.total_runs.toLocaleString()} />
+        <StatCard label="Completion Rate" value={`${(data.completion_rate * 100).toFixed(1)}%`} color="#10b981" />
+        <StatCard label="Failure Rate" value={`${(data.failure_rate * 100).toFixed(1)}%`} color={data.failure_rate > 0.2 ? "#ef4444" : "var(--text)"} />
+        <StatCard label="Avg Circuit Depth" value={data.avg_circuit_depth ?? "—"} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <section className="panel">
+          <div className="panel-header"><h2>Backend Distribution</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.backends.map(b => {
+              const key = b.backend.toLowerCase();
+              const color = Object.entries(BACKEND_COLOR).find(([k]) => key.includes(k))?.[1] ?? "#64748b";
+              return <Bar key={b.backend} label={b.backend} value={b.count} max={maxBackend} color={color} />;
+            })}
+            {data.backends.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No runs in this period.</div>}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Status Breakdown</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.statuses.map(s => <Bar key={s.status} label={s.status} value={s.count} max={maxStatus} color={STATUS_COLOR[s.status] ?? "#64748b"} />)}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <section className="panel">
+          <div className="panel-header"><h2>Daily Runs</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.daily_runs.slice(-30).map(d => (
+              <div key={d.day} style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.day.slice(5)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.count}</span>
+                </div>
+                <div style={{ height: 4, background: "var(--line)", borderRadius: 2 }}>
+                  <div style={{ width: `${maxDaily > 0 ? Math.round(d.count / maxDaily * 100) : 0}%`, height: "100%", background: "#6366f1", borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+            {data.daily_runs.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No runs yet.</div>}
+          </div>
+        </section>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <section className="panel">
+            <div className="panel-header"><h2>Qubit Distribution</h2></div>
+            <div style={{ padding: "8px 18px 18px" }}>
+              {data.qubit_distribution.map(q => <Bar key={q.bucket} label={`${q.bucket} qubits`} value={q.count} max={maxQubit} color="#f59e0b" />)}
+              {data.qubit_distribution.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No qubit data.</div>}
+            </div>
+          </section>
+          {data.top_projects.length > 0 && (
+            <section className="panel">
+              <div className="panel-header"><h2>Top Projects</h2></div>
+              <div style={{ padding: "8px 18px 18px" }}>
+                {data.top_projects.map(p => <Bar key={p.project} label={p.project} value={p.runs} max={maxProject} color="#a78bfa" />)}
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── AI Usage Tab ─────────────────────────────────────────────────────────────
+interface AIStatsData {
+  period_days: number; total_ai_requests: number;
+  by_type: { action: string; count: number }[];
+  hourly_usage: { hour: number; count: number }[];
+  daily_usage: { day: string; count: number }[];
+  top_users: { user_id: number; email: string; requests: number }[];
+}
+
+const AI_LABEL: Record<string, string> = {
+  "insight.generated": "AI Insights",
+  "assistant.queried": "Lab Assistant",
+  "cost_oracle.queried": "Cost Oracle",
+};
+const AI_COLOR: Record<string, string> = {
+  "insight.generated": "#f59e0b",
+  "assistant.queried": "#6366f1",
+  "cost_oracle.queried": "#10b981",
+};
+
+function AIUsageTab({ token }: { token: string }) {
+  const [data, setData] = useState<AIStatsData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/ai-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading AI analytics…</div>;
+  if (!data) return <div className="empty">Failed to load AI data.</div>;
+
+  const maxType = data.by_type[0]?.count ?? 1;
+  const maxHourly = Math.max(...data.hourly_usage.map(h => h.count), 1);
+  const maxDaily = Math.max(...data.daily_usage.map(d => d.count), 1);
+  const maxUser = data.top_users[0]?.requests ?? 1;
+
+  return (
+    <>
+      <DaySelector days={days} setDays={setDays} />
+
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 16 }}>
+        <StatCard label="Total AI Requests" value={data.total_ai_requests.toLocaleString()} color="#f59e0b" />
+        {data.by_type.slice(0, 3).map(t => (
+          <StatCard key={t.action} label={AI_LABEL[t.action] ?? t.action} value={t.count} color={AI_COLOR[t.action] ?? "var(--text)"} />
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <section className="panel">
+          <div className="panel-header"><h2>By Feature</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.by_type.map(t => (
+              <Bar key={t.action} label={AI_LABEL[t.action] ?? t.action} value={t.count} max={maxType} color={AI_COLOR[t.action] ?? "#6366f1"} />
+            ))}
+            {data.by_type.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No AI requests in this period.</div>}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Top AI Users</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.top_users.map((u, i) => (
+              <div key={u.user_id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, color: "var(--text)", maxWidth: "80%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>#{i + 1} {u.email}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{u.requests}</span>
+                </div>
+                <MiniBar value={u.requests} max={maxUser} color="#f59e0b" />
+              </div>
+            ))}
+            {data.top_users.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No users yet.</div>}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Hourly bar chart */}
+        <section className="panel">
+          <div className="panel-header"><h2>Usage by Hour of Day</h2></div>
+          <div style={{ padding: "16px 18px 14px", display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
+            {data.hourly_usage.map(h => {
+              const pct = maxHourly > 0 ? Math.max(h.count > 0 ? 6 : 2, Math.round(h.count / maxHourly * 88)) : 2;
+              return (
+                <div key={h.hour} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }} title={`${h.hour}:00 — ${h.count} requests`}>
+                  <div style={{ width: "100%", height: pct, background: "#f59e0b", borderRadius: "2px 2px 0 0", opacity: 0.8 }} />
+                  {h.hour % 6 === 0 && <span style={{ fontSize: 8, color: "var(--muted)" }}>{h.hour}h</span>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Daily AI Usage</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.daily_usage.slice(-21).map(d => (
+              <div key={d.day} style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.day.slice(5)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.count}</span>
+                </div>
+                <div style={{ height: 4, background: "var(--line)", borderRadius: 2 }}>
+                  <div style={{ width: `${maxDaily > 0 ? Math.round(d.count / maxDaily * 100) : 0}%`, height: "100%", background: "#f59e0b", borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+            {data.daily_usage.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No AI usage yet.</div>}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// ─── Sessions Tab ─────────────────────────────────────────────────────────────
+interface SessionsData {
+  period_days: number; total_sessions: number; avg_session_duration_seconds: number;
+  avg_pages_per_session: number; bounce_rate: number; bounce_sessions: number;
+  daily_sessions: { day: string; sessions: number }[];
+}
+
+function SessionsTab({ token }: { token: string }) {
+  const [data, setData] = useState<SessionsData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/sessions-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading session data…</div>;
+  if (!data) return <div className="empty">Failed to load session data.</div>;
+
+  const fmtDuration = (s: number) => {
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+  };
+
+  const maxSessions = Math.max(...data.daily_sessions.map(d => d.sessions), 1);
+  const bounceColor = data.bounce_rate > 60 ? "#ef4444" : data.bounce_rate > 40 ? "#f59e0b" : "#10b981";
+
+  return (
+    <>
+      <DaySelector days={days} setDays={setDays} />
+
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 16 }}>
+        <StatCard label="Total Sessions" value={data.total_sessions.toLocaleString()} />
+        <StatCard label="Avg Duration" value={fmtDuration(data.avg_session_duration_seconds)} sub="per session" color="#6366f1" />
+        <StatCard label="Pages / Session" value={data.avg_pages_per_session} />
+        <StatCard label="Bounce Rate" value={`${data.bounce_rate}%`} sub={`${data.bounce_sessions} 1-page sessions`} color={bounceColor} />
+      </div>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Daily Sessions</h2>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Sessions where a user visited at least one page</span>
+        </div>
+        <div style={{ padding: "8px 20px 20px" }}>
+          {data.daily_sessions.slice(-30).map(d => (
+            <div key={d.day} style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>{d.day}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>{d.sessions} sessions</span>
+              </div>
+              <div style={{ height: 5, background: "var(--line)", borderRadius: 3 }}>
+                <div style={{ width: `${Math.round(d.sessions / maxSessions * 100)}%`, height: "100%", background: "#6366f1", borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+          {data.daily_sessions.length === 0 && (
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>No session data yet. Sessions are derived from page.view events — make sure usePageTracker is wired up.</div>
+          )}
+        </div>
+      </section>
+
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-header"><h2>How Sessions Are Calculated</h2></div>
+        <div style={{ padding: "12px 20px 16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+          {[
+            { icon: "⏱️", label: "Session Gap", value: "30 minutes", desc: "A gap of 30+ min between page views starts a new session" },
+            { icon: "📄", label: "Bounce Definition", value: "1 page only", desc: "Sessions with a single page view count as bounced" },
+            { icon: "👤", label: "Identity", value: "User ID / IP", desc: "Authenticated users tracked by ID; anonymous by IP" },
+          ].map(item => (
+            <div key={item.label} style={{ padding: 14, background: "var(--surface)", borderRadius: 8, border: "1px solid var(--line)" }}>
+              <div style={{ fontSize: 20, marginBottom: 6 }}>{item.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>{item.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#6366f1", marginBottom: 4 }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.4 }}>{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+// ─── Security Tab ─────────────────────────────────────────────────────────────
+interface SecurityData {
+  period_days: number; total_logins: number; new_registrations: number; unique_ips: number;
+  suspicious_ips: { ip: string; users: number; actions: number }[];
+  users_multiple_ips: { user_id: number; email: string; ip_count: number }[];
+  top_login_ips: { ip: string; count: number }[];
+  recent_registrations: { created_at: string; ip_address: string | null; user_agent: string | null }[];
+}
+
+function SecurityTab({ token }: { token: string }) {
+  const [data, setData] = useState<SecurityData | null>(null);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/qlab-api/api/v1/admin/security-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [token, days]);
+
+  if (loading) return <div className="empty">Loading security data…</div>;
+  if (!data) return <div className="empty">Failed to load security data. (Owner role required)</div>;
+
+  const maxLoginIp = data.top_login_ips[0]?.count ?? 1;
+
+  return (
+    <>
+      <DaySelector days={days} setDays={setDays} />
+
+      <div className="summary-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 16 }}>
+        <StatCard label="Total Logins" value={data.total_logins.toLocaleString()} color="#10b981" />
+        <StatCard label="New Registrations" value={data.new_registrations} color="#6366f1" />
+        <StatCard label="Unique IPs" value={data.unique_ips} />
+        <StatCard label="Suspicious IPs" value={data.suspicious_ips.length} color={data.suspicious_ips.length > 0 ? "#ef4444" : "var(--text)"} sub="shared by 2+ users" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Suspicious IPs</h2>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>IPs used by multiple accounts</span>
+          </div>
+          {data.suspicious_ips.length === 0 ? (
+            <div className="empty" style={{ color: "#10b981" }}>No suspicious IPs detected.</div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>IP Address</th><th>Accounts</th><th>Total Actions</th><th>Risk</th></tr></thead>
+                <tbody>
+                  {data.suspicious_ips.map(ip => (
+                    <tr key={ip.ip}>
+                      <td><code style={{ fontSize: 12 }}>{ip.ip}</code></td>
+                      <td style={{ fontWeight: 700, color: ip.users > 3 ? "#ef4444" : "#f59e0b" }}>{ip.users}</td>
+                      <td style={{ color: "var(--muted)", fontSize: 13 }}>{ip.actions}</td>
+                      <td>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                          background: ip.users > 5 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
+                          color: ip.users > 5 ? "#ef4444" : "#f59e0b",
+                        }}>
+                          {ip.users > 5 ? "HIGH" : "MEDIUM"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header"><h2>Top Login IPs</h2></div>
+          <div style={{ padding: "8px 18px 18px" }}>
+            {data.top_login_ips.map(ip => <Bar key={ip.ip} label={ip.ip} value={ip.count} max={maxLoginIp} color="#6366f1" />)}
+            {data.top_login_ips.length === 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>No logins recorded yet.</div>}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Users with Many IPs</h2>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>> 2 IPs used to login</span>
+          </div>
+          {data.users_multiple_ips.length === 0 ? (
+            <div className="empty" style={{ color: "#10b981" }}>All users login from consistent IPs.</div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>User</th><th>IPs Used</th></tr></thead>
+                <tbody>
+                  {data.users_multiple_ips.map(u => (
+                    <tr key={u.user_id}>
+                      <td style={{ fontSize: 13 }}>{u.email}</td>
+                      <td style={{ fontWeight: 700, color: u.ip_count > 5 ? "#ef4444" : "#f59e0b" }}>{u.ip_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header"><h2>Recent Registrations</h2></div>
+          <div style={{ maxHeight: 300, overflowY: "auto" }}>
+            {data.recent_registrations.length === 0 ? (
+              <div className="empty">No new registrations.</div>
+            ) : (
+              data.recent_registrations.map((r, i) => (
+                <div key={i} style={{ padding: "10px 18px", borderBottom: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{new Date(r.created_at).toLocaleString()}</span>
+                    <code style={{ fontSize: 11, color: "var(--text)" }}>{r.ip_address ?? "—"}</code>
+                  </div>
+                  {r.user_agent && (
+                    <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.user_agent}</div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
-type Tab = "overview" | "users" | "activity" | "analytics" | "reach" | "feedback" | "nps";
+type Tab = "overview" | "users" | "activity" | "analytics" | "traffic" | "runs" | "ai" | "sessions" | "security" | "reach" | "feedback" | "nps";
 
 export default function AdminPage() {
   const { token, user, loading } = useAuth();
@@ -940,6 +1568,7 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [logTotal, setLogTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     // Don't act until auth has finished reading from localStorage
@@ -963,40 +1592,93 @@ export default function AdminPage() {
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger)" }}>{error}</div></main>;
   if (!stats) return <main className="page"><div className="empty">Loading…</div></main>;
 
-  const TABS: { key: Tab; label: string }[] = [
+  const PRIMARY_TABS: { key: Tab; label: string }[] = [
     { key: "overview",  label: "Overview" },
     { key: "users",     label: "Users" },
     { key: "activity",  label: "Activity" },
     { key: "analytics", label: "Analytics" },
+    { key: "traffic",   label: "Traffic" },
+    { key: "runs",      label: "Runs" },
+    { key: "ai",        label: "AI Usage" },
+  ];
+
+  const MORE_TABS: { key: Tab; label: string }[] = [
+    { key: "sessions",  label: "Sessions" },
+    { key: "security",  label: "Security" },
     { key: "reach",     label: "Reach" },
     { key: "feedback",  label: "Feedback" },
     { key: "nps",       label: "NPS" },
   ];
 
+  const activeInMore = MORE_TABS.some(t => t.key === tab);
+
   return (
     <main className="page">
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--line)" }}>
-        {TABS.map(t => (
+      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid var(--line)", flexWrap: "wrap", position: "relative" }}>
+        {PRIMARY_TABS.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); setMoreOpen(false); }}
             style={{
-              padding: "8px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer",
+              padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
               background: "none", border: "none",
               color: tab === t.key ? "var(--text)" : "var(--muted)",
               borderBottom: tab === t.key ? "2px solid var(--strong)" : "2px solid transparent",
-              marginBottom: -1,
+              marginBottom: -1, whiteSpace: "nowrap",
             }}
           >
             {t.label}
           </button>
         ))}
+        {/* More dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setMoreOpen(o => !o)}
+            style={{
+              padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              background: "none", border: "none",
+              color: activeInMore ? "var(--text)" : "var(--muted)",
+              borderBottom: activeInMore ? "2px solid var(--strong)" : "2px solid transparent",
+              marginBottom: -1, whiteSpace: "nowrap",
+            }}
+          >
+            {activeInMore ? MORE_TABS.find(t => t.key === tab)?.label : "More"} ▾
+          </button>
+          {moreOpen && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 2px)", left: 0, zIndex: 100,
+              background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.18)", minWidth: 160, overflow: "hidden",
+            }}>
+              {MORE_TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => { setTab(t.key); setMoreOpen(false); }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    background: tab === t.key ? "rgba(99,102,241,0.1)" : "transparent",
+                    color: tab === t.key ? "var(--strong)" : "var(--text)",
+                    border: "none", borderBottom: "1px solid var(--line)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {tab === "overview"  && <Overview stats={stats} logs={logs} logTotal={logTotal} />}
       {tab === "users"     && <UsersTab token={token!} />}
       {tab === "activity"  && <ActivityFeedTab token={token!} />}
       {tab === "analytics" && <AnalyticsTab token={token!} />}
+      {tab === "traffic"   && <TrafficTab token={token!} />}
+      {tab === "runs"      && <RunsAnalyticsTab token={token!} />}
+      {tab === "ai"        && <AIUsageTab token={token!} />}
+      {tab === "sessions"  && <SessionsTab token={token!} />}
+      {tab === "security"  && <SecurityTab token={token!} />}
       {tab === "reach"     && <ReachTab token={token!} />}
       {tab === "feedback"  && <FeedbackTab token={token!} />}
       {tab === "nps"       && <NPSTab token={token!} />}
