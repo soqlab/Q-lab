@@ -250,35 +250,56 @@ function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
   );
 }
 
-// Welcome workflow picker (empty state)
-// ------------------------------------------------------------------
+const QUICK_ACTIONS = [
+  {
+    emoji: "⚗️",
+    title: "Track my experiments",
+    desc: "Install the SDK, connect your API key, and every Qiskit circuit you run is captured automatically.",
+    cta: "Set up the SDK",
+    href: "/onboarding",
+    accent: "#6366f1",
+  },
+  {
+    emoji: "💰",
+    title: "Find the cheapest QPU",
+    desc: "Enter your circuit parameters and get an instant cost comparison across IBM, IonQ, Rigetti, and more.",
+    cta: "Open Cost Oracle",
+    href: "/cost-oracle",
+    accent: "#10b981",
+  },
+  {
+    emoji: "🤖",
+    title: "Ask the Lab Assistant",
+    desc: "Ask questions in plain English. The AI reads your experiment history and can execute cost estimates and searches for you.",
+    cta: "Open Lab Assistant",
+    href: "/assistant",
+    accent: "#f59e0b",
+  },
+];
+
+function QuickActions() {
+  return (
+    <div style={{ padding: "4px 20px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+      {QUICK_ACTIONS.map((w) => (
+        <a key={w.href} href={w.href} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, background: "var(--surface)", border: `1px solid ${w.accent}30`, borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s, transform 0.15s" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = w.accent; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = `${w.accent}30`; (e.currentTarget as HTMLElement).style.transform = ""; }}>
+          <div style={{ fontSize: 32 }}>{w.emoji}</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 6 }}>{w.title}</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{w.desc}</div>
+          </div>
+          <div style={{ marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: w.accent }}>
+            {w.cta} →
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// Empty state — no runs yet
 function QuickStart() {
-  const workflows = [
-    {
-      emoji: "⚗️",
-      title: "Track my experiments",
-      desc: "Install the SDK, connect your API key, and every Qiskit circuit you run is captured automatically.",
-      cta: "Set up the SDK",
-      href: "/onboarding",
-      accent: "#6366f1",
-    },
-    {
-      emoji: "💰",
-      title: "Find the cheapest QPU",
-      desc: "Enter your circuit parameters and get an instant cost comparison across IBM, IonQ, Rigetti, and more.",
-      cta: "Open Cost Oracle",
-      href: "/cost-oracle",
-      accent: "#10b981",
-    },
-    {
-      emoji: "🤖",
-      title: "Ask the Lab Assistant",
-      desc: "Ask questions in plain English. The AI reads your experiment history and can execute cost estimates and searches for you.",
-      cta: "Open Lab Assistant",
-      href: "/assistant",
-      accent: "#f59e0b",
-    },
-  ];
   return (
     <section className="panel">
       <div className="panel-header">
@@ -288,22 +309,7 @@ function QuickStart() {
       <div style={{ padding: "20px 20px 0" }}>
         <DashFabric runs={[]} />
       </div>
-      <div style={{ padding: "4px 20px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-        {workflows.map((w) => (
-          <a key={w.href} href={w.href} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, background: "var(--surface)", border: `1px solid ${w.accent}30`, borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s, transform 0.15s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = w.accent; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = `${w.accent}30`; (e.currentTarget as HTMLElement).style.transform = ""; }}>
-            <div style={{ fontSize: 32 }}>{w.emoji}</div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 6 }}>{w.title}</div>
-              <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{w.desc}</div>
-            </div>
-            <div style={{ marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: w.accent }}>
-              {w.cta} →
-            </div>
-          </a>
-        ))}
-      </div>
+      <QuickActions />
     </section>
   );
 }
@@ -594,8 +600,13 @@ function RunsInner() {
       {/* Empty state */}
       {!loading && !error && !runs.length && <QuickStart />}
 
-      {/* Live routing fabric — real backend usage from loaded runs */}
-      {!loading && runs.length > 0 && <DashFabric runs={runs} />}
+      {/* Live routing fabric + quick action cards */}
+      {!loading && runs.length > 0 && (
+        <section className="panel">
+          <DashFabric runs={runs} />
+          <QuickActions />
+        </section>
+      )}
 
       {/* Runs table */}
       {(!loading && runs.length > 0) && (
