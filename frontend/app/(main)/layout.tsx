@@ -6,6 +6,7 @@ import UserMenu from "./UserMenu";
 import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../lib/auth";
+import { usePageTracker } from "../../lib/usePageTracker";
 import { useRouter } from "next/navigation";
 
 function SWUpdater() {
@@ -136,6 +137,7 @@ function WarmupBanner() {
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
   const router = useRouter();
+  usePageTracker(token);
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");

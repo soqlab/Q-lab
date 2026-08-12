@@ -563,8 +563,128 @@ function NPSTab({ token }: { token: string }) {
   );
 }
 
+// ─── Activity Feed Tab ────────────────────────────────────────────────────────
+interface ActivityEvent {
+  id: number; action: string; resource_type: string | null; resource_id: string | null;
+  user_id: number | null; user_email: string | null; ip_address: string | null;
+  user_agent: string | null; meta: Record<string, unknown>; created_at: string;
+}
+
+const ACTION_ICON: Record<string, string> = {
+  "auth.login": "🔑",
+  "auth.register": "✨",
+  "auth.logout": "🚪",
+  "run.created": "⚛️",
+  "run.updated": "✏️",
+  "run.deleted": "🗑️",
+  "run.viewed": "👁️",
+  "insight.generated": "🤖",
+  "insight.requested": "💡",
+  "cost_oracle.queried": "💰",
+  "assistant.queried": "🤖",
+  "billing.viewed": "💳",
+  "page.view": "📄",
+};
+const ACTION_COLOR: Record<string, string> = {
+  "auth.login": "#10b981", "auth.register": "#6366f1",
+  "run.created": "#6366f1", "run.deleted": "#ef4444",
+  "insight.generated": "#f59e0b",
+  "page.view": "#64748b",
+};
+
+function ActivityFeedTab({ token }: { token: string }) {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch("/qlab-api/api/v1/admin/activity-feed?limit=200", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(data => { setEvents(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [token]);
+
+  const filtered = filter
+    ? events.filter(e =>
+        e.action.includes(filter) ||
+        (e.user_email ?? "").includes(filter) ||
+        (e.resource_id ?? "").includes(filter)
+      )
+    : events;
+
+  function fmt(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" });
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header" style={{ gap: 12 }}>
+        <h2>Live Activity Feed</h2>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>{filtered.length} events</span>
+        <input
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder="Filter by action, email, or resource…"
+          style={{
+            marginLeft: "auto", height: 32, padding: "0 12px", borderRadius: 6,
+            border: "1px solid var(--line)", background: "var(--surface)",
+            color: "var(--text)", fontSize: 13, width: 280,
+          }}
+        />
+      </div>
+      {loading ? (
+        <div className="empty">Loading activity…</div>
+      ) : filtered.length === 0 ? (
+        <div className="empty">No events yet — activity appears here as users interact with Q-Lab.</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left" }}>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Time</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>User</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Action</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Resource</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(e => (
+                <tr key={e.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", whiteSpace: "nowrap" }}>{fmt(e.created_at)}</td>
+                  <td style={{ padding: "7px 12px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.user_email ?? <span style={{ color: "var(--muted)" }}>anonymous</span>}
+                  </td>
+                  <td style={{ padding: "7px 12px" }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      background: `${ACTION_COLOR[e.action] ?? "#64748b"}18`,
+                      color: ACTION_COLOR[e.action] ?? "var(--muted)",
+                      borderRadius: 999, padding: "2px 9px", fontWeight: 600, fontSize: 12,
+                    }}>
+                      {ACTION_ICON[e.action] ?? "•"} {e.action}
+                    </span>
+                  </td>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.resource_id ?? "—"}
+                  </td>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", fontSize: 12 }}>{e.ip_address ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
-type Tab = "overview" | "users" | "feedback" | "nps";
+type Tab = "overview" | "users" | "feedback" | "nps" | "activity";
 
 export default function AdminPage() {
   const { token, user, loading } = useAuth();
@@ -598,10 +718,11 @@ export default function AdminPage() {
   if (!stats) return <main className="page"><div className="empty">Loading…</div></main>;
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: "overview", label: "Overview" },
-    { key: "users",    label: "Users" },
-    { key: "feedback", label: "Feedback" },
-    { key: "nps",      label: "NPS" },
+    { key: "overview",  label: "Overview" },
+    { key: "users",     label: "Users" },
+    { key: "activity",  label: "Activity" },
+    { key: "feedback",  label: "Feedback" },
+    { key: "nps",       label: "NPS" },
   ];
 
   return (
@@ -624,10 +745,11 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {tab === "overview" && <Overview stats={stats} logs={logs} logTotal={logTotal} />}
-      {tab === "users"    && <UsersTab token={token!} />}
-      {tab === "feedback" && <FeedbackTab token={token!} />}
-      {tab === "nps"      && <NPSTab token={token!} />}
+      {tab === "overview"  && <Overview stats={stats} logs={logs} logTotal={logTotal} />}
+      {tab === "users"     && <UsersTab token={token!} />}
+      {tab === "activity"  && <ActivityFeedTab token={token!} />}
+      {tab === "feedback"  && <FeedbackTab token={token!} />}
+      {tab === "nps"       && <NPSTab token={token!} />}
     </main>
   );
 }

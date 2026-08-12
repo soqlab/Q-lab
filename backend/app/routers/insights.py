@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
-from ..deps import Identity, require_auth
+from ..deps import Identity, log_audit, require_auth
 from ..health_score import compute_health_score, health_breakdown
 from ..models import Run, RunMetric
 
@@ -503,6 +503,7 @@ def generate_insights(
     except Exception:
         pass
 
+    log_audit(db, "insight.generated", "run", run_id, identity=identity, meta={"model": _MODEL})
     return {"cached": False, "model": _MODEL, "created_at": datetime.now(timezone.utc).isoformat(), **result}
 
 
