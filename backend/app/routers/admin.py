@@ -148,9 +148,44 @@ def list_organizations(
     ]
 
 
+@router.get("/activity-feed")
+def activity_feed(
+    limit: int = Query(default=100, ge=1, le=500),
+    action: Optional[str] = None,
+    user_id: Optional[int] = None,
+    identity: Identity = Depends(require_role("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Live activity feed across all users, newest first with user email resolved."""
+    query = select(AuditLog).order_by(AuditLog.created_at.desc())
+    if action:
+        query = query.where(AuditLog.action == action)
+    if user_id:
+        query = query.where(AuditLog.user_id == user_id)
+    logs = db.scalars(query.limit(limit)).all()
+    uids = {lg.user_id for lg in logs if lg.user_id}
+    users_map = {u.id: u for u in db.scalars(select(User).where(User.id.in_(uids))).all()} if uids else {}
+    return [
+        {
+            "id": lg.id,
+            "action": lg.action,
+            "resource_type": lg.resource_type,
+            "resource_id": lg.resource_id,
+            "user_id": lg.user_id,
+            "user_email": users_map[lg.user_id].email if lg.user_id and lg.user_id in users_map else None,
+            "ip_address": lg.ip_address,
+            "user_agent": lg.user_agent,
+            "meta": lg.meta or {},
+            "created_at": lg.created_at.isoformat(),
+        }
+        for lg in logs
+    ]
+
+
 @router.get("/users/{user_id}/activity")
 def user_activity(
     user_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
     identity: Identity = Depends(require_role("owner", "admin")),
     db: Session = Depends(get_db),
 ):
@@ -161,7 +196,7 @@ def user_activity(
     api_key_count = db.scalar(select(func.count()).select_from(APIKey).where(APIKey.user_id == user_id)) or 0
     logs = db.scalars(
         select(AuditLog).where(AuditLog.user_id == user_id)
-        .order_by(AuditLog.created_at.desc()).limit(20)
+        .order_by(AuditLog.created_at.desc()).limit(limit)
     ).all()
     return {
         "user_id": user_id,
@@ -171,7 +206,15 @@ def user_activity(
         "run_count": run_count,
         "api_key_count": api_key_count,
         "recent_actions": [
-            {"action": lg.action, "resource_type": lg.resource_type, "created_at": lg.created_at.isoformat()}
+            {
+                "action": lg.action,
+                "resource_type": lg.resource_type,
+                "resource_id": lg.resource_id,
+                "ip_address": lg.ip_address,
+                "user_agent": lg.user_agent,
+                "meta": lg.meta or {},
+                "created_at": lg.created_at.isoformat(),
+            }
             for lg in logs
         ],
     }
