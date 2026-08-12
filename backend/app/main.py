@@ -27,7 +27,7 @@ from .events import event_stream, publish_sync, set_event_loop
 from .health_score import compute_health_score, health_breakdown
 from .models import Project, Run, RunAssertion, RunMetric
 from .rate_limit import auth_limiter, read_limiter, write_limiter
-from .routers import auth_routes, users, benchmarks, webhooks, admin, team
+from .routers import auth_routes, users, benchmarks, webhooks, admin, team, activity as activity_router
 from .routers import oauth as oauth_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
@@ -278,6 +278,7 @@ app.include_router(users.router)
 app.include_router(benchmarks.router)
 app.include_router(webhooks.router)
 app.include_router(admin.router)
+app.include_router(activity_router.router)
 app.include_router(team.router)
 app.include_router(run_notes_router)
 app.include_router(notes_router)
