@@ -28,6 +28,7 @@ from .health_score import compute_health_score, health_breakdown
 from .models import Project, Run, RunAssertion, RunMetric
 from .rate_limit import auth_limiter, read_limiter, write_limiter
 from .routers import auth_routes, users, benchmarks, webhooks, admin, team, activity as activity_router
+from .routers import public_reach as public_reach_router
 from .routers import oauth as oauth_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
@@ -279,6 +280,7 @@ app.include_router(benchmarks.router)
 app.include_router(webhooks.router)
 app.include_router(admin.router)
 app.include_router(activity_router.router)
+app.include_router(public_reach_router.router)
 app.include_router(team.router)
 app.include_router(run_notes_router)
 app.include_router(notes_router)
@@ -1084,12 +1086,14 @@ def list_runs(
 
 
 @app.get("/api/v1/runs/{run_id}")
-def get_run(run_id: str, identity: Optional[Identity] = Depends(get_identity), db: Session = Depends(get_db)):
+def get_run(run_id: str, request: Request, identity: Optional[Identity] = Depends(get_identity), db: Session = Depends(get_db)):
     run = _find_run(db, run_id)
     if identity and identity.org_id and run.org_id and run.org_id != identity.org_id:
         raise HTTPException(status_code=403, detail="Access denied")
     d = _run_to_dict(run, include_health=True)
     d["health_breakdown"] = health_breakdown(d)
+    if identity and identity.user_id:
+        log_audit(db, "run.viewed", "run", run_id, identity=identity, request=request)
     return d
 
 
