@@ -1034,8 +1034,8 @@ function TrafficTab({ token }: { token: string }) {
               <div key={h} style={{ fontSize: 9, color: "var(--muted)", textAlign: "center" }}>{h}</div>
             ))}
             {DAYS_SHORT.map((dayLabel, dow) => (
-              <>
-                <div key={`l${dow}`} style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center" }}>{dayLabel}</div>
+              <div key={dow} style={{ display: "contents" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center" }}>{dayLabel}</div>
                 {Array.from({ length: 24 }, (_, h) => {
                   const cnt = hmap[`${dow}:${h}`] ?? 0;
                   const intensity = hmapMax > 0 ? cnt / hmapMax : 0;
@@ -1048,7 +1048,7 @@ function TrafficTab({ token }: { token: string }) {
                     }} />
                   );
                 })}
-              </>
+              </div>
             ))}
           </div>
         </div>
