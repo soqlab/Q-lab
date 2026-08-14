@@ -725,8 +725,9 @@ function ReachTab({ token }: { token: string }) {
     });
   }
 
-  const badgeMarkdown = `[![Tracked on Q-Lab](https://www.soqlab.com/api/v1/badge/runs.svg)](https://www.soqlab.com)`;
-  const badgeHtml = `<a href="https://www.soqlab.com"><img src="https://www.soqlab.com/api/v1/badge/runs.svg" alt="Tracked on Q-Lab"></a>`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const badgeMarkdown = `[![Tracked on Q-Lab](${origin}/api/v1/badge/runs.svg)](${origin})`;
+  const badgeHtml = `<a href="${origin}"><img src="${origin}/api/v1/badge/runs.svg" alt="Tracked on Q-Lab"></a>`;
 
   function CodeBox({ label, code, copyKey }: { label: string; code: string; copyKey: string }) {
     return (
@@ -760,7 +761,7 @@ function ReachTab({ token }: { token: string }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
               <span style={{ fontSize: 13, color: "var(--muted)" }}>Public gallery page</span>
-              <a href="/gallery" target="_blank" style={{ fontSize: 13, color: "#6366f1" }}>soqlab.com/gallery →</a>
+              <a href="/gallery" target="_blank" style={{ fontSize: 13, color: "#6366f1" }}>{origin}/gallery →</a>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
               <span style={{ fontSize: 13, color: "var(--muted)" }}>RSS feed (for aggregators)</span>
@@ -768,7 +769,7 @@ function ReachTab({ token }: { token: string }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0" }}>
               <span style={{ fontSize: 13, color: "var(--muted)" }}>Live badge (updates with run count)</span>
-              <img src="/api/v1/badge/runs.svg" alt="badge preview" style={{ height: 20 }} />
+              <img src={`${origin}/api/v1/badge/runs.svg`} alt="badge preview" style={{ height: 20 }} />
             </div>
           </div>
         </section>
@@ -802,7 +803,7 @@ function ReachTab({ token }: { token: string }) {
         <div style={{ padding: "8px 20px 20px" }}>
           <CodeBox label="Markdown badge (GitHub README)" code={badgeMarkdown} copyKey="md" />
           <CodeBox label="HTML badge (notebooks, websites)" code={badgeHtml} copyKey="html" />
-          <CodeBox label="RSS feed URL (submit to Feedly, quantum aggregators)" code="https://www.soqlab.com/feed.xml" copyKey="rss" />
+          <CodeBox label="RSS feed URL (submit to Feedly, quantum aggregators)" code={`${origin}/feed.xml`} copyKey="rss" />
         </div>
       </section>
     </>
