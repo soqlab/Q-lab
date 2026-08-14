@@ -1,3 +1,4 @@
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -11,6 +12,8 @@ from ..database import get_db
 from ..deps import Identity, require_auth, require_role
 from ..email_service import send_invite_email
 from ..models import OrgInvite, Organization, User
+
+APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
 
 router = APIRouter(prefix="/api/v1/team", tags=["team"])
 
@@ -117,7 +120,7 @@ def invite_member(
     if existing and existing.expires_at > datetime.now(timezone.utc):
         return {
             "invite_token": existing.token,
-            "invite_url": f"http://localhost:3000/join?token={existing.token}",
+            "invite_url": f"{APP_URL}/join?token={existing.token}",
             "email": existing.email,
             "role": existing.role,
             "expires_at": existing.expires_at.isoformat(),
@@ -142,7 +145,7 @@ def invite_member(
         org = db.get(Organization, identity.org_id)
         send_invite_email(
             to_email=payload.email,
-            invite_url=f"http://localhost:3000/join?token={token}",
+            invite_url=f"{APP_URL}/join?token={token}",
             org_name=org.name if org else "Q-Lab",
             invited_by=(identity.user.email if identity.user else None) or "a teammate",
         )
@@ -151,7 +154,7 @@ def invite_member(
 
     return {
         "invite_token": token,
-        "invite_url": f"http://localhost:3000/join?token={token}",
+        "invite_url": f"{APP_URL}/join?token={token}",
         "email": payload.email,
         "role": payload.role,
         "expires_at": expires.isoformat(),
@@ -178,7 +181,7 @@ def list_invites(
             "accepted_at": i.accepted_at.isoformat() if i.accepted_at else None,
             "expires_at": i.expires_at.isoformat(),
             "created_at": i.created_at.isoformat(),
-            "invite_url": f"http://localhost:3000/join?token={i.token}" if not i.accepted_at else None,
+            "invite_url": f"{APP_URL}/join?token={i.token}" if not i.accepted_at else None,
             "token": i.token if not i.accepted_at else None,
         }
         for i in invites

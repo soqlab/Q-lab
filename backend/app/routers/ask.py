@@ -25,7 +25,7 @@ from ..health_score import compute_health_score
 
 router = APIRouter(prefix="/api/v1/ask", tags=["ask"])
 
-_MODEL = os.getenv("QLAB_INSIGHT_MODEL", "claude-haiku-4-5-20251001")
+_MODEL = os.getenv("QLAB_INSIGHT_MODEL", "claude-haiku-4-5")
 _MAX_CONTEXT_RUNS = 60
 
 

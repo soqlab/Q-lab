@@ -23,6 +23,8 @@ from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..store import store_delete, store_get, store_list, store_put
 
+APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+
 router = APIRouter(prefix="/api/v1/github", tags=["github"])
 
 _NAMESPACE = "github_configs"
@@ -102,7 +104,7 @@ def _build_pr_comment(runs: list) -> str:
         lines.append(
             f"| {r.circuit_name or 'unnamed'} | {r.backend or '?'} "
             f"| {health_emoji} {health} | {r.status} "
-            f"| [View](http://localhost:3000/runs/{r.run_id}) |"
+            f"| [View]({APP_URL}/runs/{r.run_id}) |"
         )
 
     if total > 10:
@@ -131,7 +133,7 @@ def _build_single_run_comment(run: Run) -> str:
         f"| Health Score | {emoji} {health} |",
         f"| Created | {run.created_at.isoformat() if run.created_at else '?'} |",
         "",
-        f"[View in Q-Lab](http://localhost:3000/runs/{run.run_id})",
+        f"[View in Q-Lab]({APP_URL}/runs/{run.run_id})",
         "",
         "_Posted by [Q-Lab](https://github.com/qlab)_",
     ]

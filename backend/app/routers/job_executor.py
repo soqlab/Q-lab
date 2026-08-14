@@ -296,10 +296,9 @@ def _ionq_status(job_id: str, api_key: str) -> dict[str, Any]:
 _BRAKET_BASE = "https://braket.{region}.amazonaws.com"
 
 def _braket_submit(qasm: str, backend: str, shots: int) -> str:
-    # Without boto3 signing, we return a placeholder.
-    # Full Braket support requires AWS SigV4 signing — too complex without boto3.
-    # Return a prefixed fake ID so the user knows it needs the boto3 integration.
-    return f"braket-stub-{uuid.uuid4().hex[:12]}"
+    raise NotImplementedError("AWS Braket requires boto3 with SigV4 signing. "
+                              "Install boto3, configure AWS credentials, and implement "
+                              "_braket_submit() with boto3.client('braket').create_quantum_task().")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -448,8 +447,12 @@ def submit_job(
             raise HTTPException(502, f"IonQ submission failed: {e}")
 
     elif req.provider == "braket":
-        provider_job_id = _braket_submit(req.qasm, req.backend, req.shots)
-        status = "queued"
+        raise HTTPException(
+            status_code=501,
+            detail="AWS Braket submission is not yet implemented. "
+                   "It requires boto3 with SigV4 signing and AWS credentials. "
+                   "Use IBM or IonQ providers for real QPU submission.",
+        )
 
     elif req.provider == "simulator":
         status = "queued"  # will be processed by background task immediately
