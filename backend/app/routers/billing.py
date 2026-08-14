@@ -26,6 +26,8 @@ from ..database import get_db
 from ..deps import Identity, get_identity, log_audit, require_auth
 from ..store import store_delete, store_get, store_list, store_put  # noqa: F401
 
+APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+
 router = APIRouter(prefix="/api/v1/billing", tags=["billing"])
 
 # ---------------------------------------------------------------------------
@@ -502,7 +504,7 @@ def create_checkout_session(
         sub["stripe_customer_id"] = customer_id
         store_put(db, _NS_SUBSCRIPTION, _sub_key(uid), sub)
 
-    app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+    app_url = APP_URL
     session = stripe_lib.checkout.Session.create(
         customer=customer_id,
         payment_method_types=["card"],
@@ -537,7 +539,7 @@ def create_portal_session(
     if not customer_id:
         raise HTTPException(status_code=400, detail="No Stripe customer found. Upgrade first to create a subscription.")
 
-    app_url = os.getenv("QLAB_APP_URL", "http://localhost:3000")
+    app_url = APP_URL
     portal = stripe_lib.billing_portal.Session.create(
         customer=customer_id,
         return_url=f"{app_url}/billing",

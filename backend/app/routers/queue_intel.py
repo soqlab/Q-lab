@@ -23,6 +23,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..health_score import compute_health_score
 from ..models import Run
 
 router = APIRouter(prefix="/api/v1/queue", tags=["queue_intel"])
@@ -64,28 +65,18 @@ def _fetch_ibm_backends(token: str) -> list[dict]:
         return []
 
 
-def _mock_backends() -> list[dict]:
-    """Synthetic backend data when IBM token is unavailable."""
-    import random
-    rng = random.Random(42)
-    backends = [
-        ("ibm_brisbane", 127), ("ibm_kyoto", 127), ("ibm_osaka", 127),
-        ("ibm_sherbrooke", 127), ("ibm_eagle", 127),
-        ("simulator_statevector", 32), ("simulator_mps", 100),
-    ]
-    return [
-        {
-            "name": name,
-            "status": "active" if rng.random() > 0.1 else "maintenance",
-            "queue_length": rng.randint(0, 300),
-            "operational": rng.random() > 0.1,
-            "n_qubits": n,
-            "basis_gates": ["cx", "id", "rz", "sx", "x"],
-            "provider": "ibm",
-            "estimated_wait_minutes": rng.randint(0, 120),
-        }
-        for name, n in backends
-    ]
+def _no_token_error() -> dict:
+    """Raise a clear error when IBM_QUANTUM_TOKEN is not configured."""
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "error": "IBM_QUANTUM_TOKEN not configured",
+            "message": "Real queue data requires an IBM Quantum API token. "
+                       "Set the IBM_QUANTUM_TOKEN environment variable to enable live backend status.",
+            "docs": "https://docs.quantum.ibm.com/api/runtime",
+        },
+    )
 
 
 def _estimate_wait(queue_length: int, avg_job_minutes: float = 2.5) -> int:
@@ -117,7 +108,7 @@ def _backend_run_stats(db: Session, backend: str, days: int = 30) -> dict:
         "best_hour": best_h,
         "worst_hour": worst_h,
         "total_runs": len(runs),
-        "avg_health": round(sum(r.health_score or 0 for r in runs) / max(1, len(runs)), 2),
+        "avg_health": round(sum(compute_health_score({"results": r.results, "calibration": r.calibration, "fingerprint": r.fingerprint}) or 0 for r in runs) / max(1, len(runs)), 2),
     }
 
 
@@ -132,8 +123,8 @@ def get_all_queue_status():
         backends = _fetch_ibm_backends(IBM_TOKEN)
         source = "ibm_api"
     else:
-        backends = _mock_backends()
-        source = "simulated"
+        _no_token_error()
+        source = "ibm_api"  # unreachable
 
     for b in backends:
         if "estimated_wait_minutes" not in b:
@@ -155,7 +146,8 @@ def get_backend_queue(backend: str, db: Session = Depends(get_db)):
         all_backends = _fetch_ibm_backends(IBM_TOKEN)
         info = next((b for b in all_backends if b["name"] == backend), None)
     else:
-        info = next((b for b in _mock_backends() if b["name"] == backend), None)
+        _no_token_error()
+        info = None  # unreachable
 
     stats = _backend_run_stats(db, backend)
     return {
@@ -175,10 +167,9 @@ def recommend_backend(
     db: Session = Depends(get_db),
 ):
     """Recommend the best backend for an n-qubit job based on queue depth and historical health."""
-    if IBM_TOKEN:
-        backends = _fetch_ibm_backends(IBM_TOKEN)
-    else:
-        backends = _mock_backends()
+    if not IBM_TOKEN:
+        _no_token_error()
+    backends = _fetch_ibm_backends(IBM_TOKEN)
 
     candidates = [
         b for b in backends

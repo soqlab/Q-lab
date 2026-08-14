@@ -260,6 +260,9 @@ from .routers import billing as billing_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
+APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+API_URL = os.getenv("QLAB_API_URL", "https://www.soqlab.com")
+
 # Run DB init at import time — avoids the lifespan merging stack-depth issue
 # that occurs when 200+ routers are included with a lifespan= parameter set.
 init_db()
@@ -599,9 +602,9 @@ def _run_to_dict(run: Run, include_health: bool = False) -> Dict[str, Any]:
         "created_by_user_id": run.created_by_user_id,
         "created_at": run.created_at.isoformat(),
         "received_at": run.received_at.isoformat() if run.received_at else None,
-        "dashboard_url": f"http://localhost:8000/runs/{run.run_id}",
+        "dashboard_url": f"{API_URL}/runs/{run.run_id}",
         "is_shared": bool(run.share_token),
-        "share_page_url": f"http://localhost:3000/share/{run.share_token}" if run.share_token else None,
+        "share_page_url": f"{APP_URL}/share/{run.share_token}" if run.share_token else None,
     }
     if include_health:
         d["health_score"] = compute_health_score(d)
@@ -1342,7 +1345,7 @@ def run_provenance(run_id: str, db: Session = Depends(get_db)):
         "reproducibility": {
             "instructions": "Run the QASM circuit above on the specified backend with the given parameters.",
             "sdk_snippet": f'import qlab\nqlab.init()\n# Circuit is in provenance["run"]["qasm"]\n# Backend: {run.backend}\n# Parameters: see provenance["parameters"]',
-            "verification_url": f"http://localhost:3000/verify/{run.run_id}",
+            "verification_url": f"{APP_URL}/verify/{run.run_id}",
         },
     }
 
@@ -1515,7 +1518,7 @@ def generate_share_token(
         db.refresh(run)
     return {
         "share_token": run.share_token,
-        "share_url": f"http://localhost:3000/share/{run.share_token}",
+        "share_url": f"{APP_URL}/share/{run.share_token}",
     }
 
 
@@ -1603,7 +1606,7 @@ def export_runs_report(
 
 def _rerun_script(run_id: str) -> str:
     return f"""from qiskit import qasm3
-QASM_URL = "http://localhost:8000/api/v1/runs/{run_id}/qasm"
+QASM_URL = "{API_URL}/api/v1/runs/{run_id}/qasm"
 # Download QASM from Q-Lab then re-submit to your chosen backend.
 """
 
