@@ -56,21 +56,23 @@ export default function CalibrationMonitorPage() {
         {cal && (
           <span style={{
             fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, letterSpacing: "0.04em",
-            background: cal.data_source === "ibm_api" ? "var(--ok-bg)" : "var(--panel-2)",
-            color: cal.data_source === "ibm_api" ? "var(--ok)" : "var(--muted)",
-            border: `1px solid ${cal.data_source === "ibm_api" ? "var(--ok)" : "var(--border)"}`,
+            background: cal.data_source !== "simulated" && cal.data_source ? "var(--ok-bg)" : "var(--panel-2)",
+            color: cal.data_source !== "simulated" && cal.data_source ? "var(--ok)" : "var(--muted)",
+            border: `1px solid ${cal.data_source !== "simulated" && cal.data_source ? "var(--ok)" : "var(--border)"}`,
           }}>
-            {cal.data_source === "ibm_api" ? "Live IBM data" : "Simulated"}
+            {cal.data_source === "ibm_api" ? "Live IBM data"
+             : cal.data_source === "ionq_api" ? "Live IonQ data"
+             : "Simulated"}
           </span>
         )}
       </div>
       <p style={{ color: "var(--muted)" }}>
         Real-time T1, T2, gate error, and readout fidelity tracking across all major backends.
-        {!cal || cal.data_source !== "ibm_api" ? (
+        {(!cal || cal.data_source === "simulated" || !cal.data_source) ? (
           <span style={{ color: "var(--muted)", fontSize: 13 }}>
-            {" "}To see live IBM calibration,{" "}
+            {" "}To see live calibration data,{" "}
             <a href="/settings" style={{ color: "var(--info-text, #60a5fa)", textDecoration: "underline" }}>
-              connect your IBM account in Settings
+              connect your IBM or IonQ account in Settings
             </a>.
           </span>
         ) : null}
