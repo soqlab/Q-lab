@@ -2,9 +2,214 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Brain, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Brain, Copy, Cpu, KeyRound, Plus, Trash2 } from "lucide-react";
 import { changePassword, checkInsightsAvailable, createAPIKey, deleteAPIKey, listAPIKeys, deleteAccount, type APIKeyInfo } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+
+// ── Provider credential types ─────────────────────────────────────────────────
+
+type ProviderCred = {
+  cred_id: string;
+  provider: string;
+  label: string;
+  key_hint: string;
+  is_active: boolean;
+  last_used_at: string | null;
+};
+
+const PROVIDERS = [
+  {
+    id: "ibm",
+    name: "IBM Quantum",
+    desc: "Access IBM quantum computers for live queue data, real calibration, and direct job submission.",
+    placeholder: "Your IBM Quantum API token",
+  },
+  {
+    id: "ionq",
+    name: "IonQ",
+    desc: "Run circuits on IonQ trapped-ion quantum computers via the IonQ Cloud.",
+    placeholder: "Your IonQ API key",
+  },
+] as const;
+
+async function listProviderCreds(token: string): Promise<ProviderCred[]> {
+  const r = await fetch("/qlab-api/api/v1/credentials", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+async function saveProviderCred(
+  token: string,
+  provider: string,
+  label: string,
+  apiKey: string,
+): Promise<ProviderCred> {
+  const r = await fetch("/qlab-api/api/v1/credentials", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, label, api_key: apiKey }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(err.detail ?? "Save failed");
+  }
+  return r.json();
+}
+
+async function testProviderCred(
+  token: string,
+  credId: string,
+): Promise<{ status: string; error?: string }> {
+  const r = await fetch(`/qlab-api/api/v1/credentials/${credId}/test`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return r.json();
+}
+
+async function deleteProviderCred(token: string, credId: string): Promise<void> {
+  await fetch(`/qlab-api/api/v1/credentials/${credId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ── ProviderCard component ────────────────────────────────────────────────────
+
+function ProviderCard({
+  provider,
+  cred,
+  token,
+  onRefresh,
+}: {
+  provider: typeof PROVIDERS[number];
+  cred: ProviderCred | null;
+  token: string;
+  onRefresh: () => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [label, setLabel] = useState(provider.name);
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: string; error?: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setErr(null);
+    try {
+      await saveProviderCred(token, provider.id, label || provider.name, apiKey);
+      setApiKey("");
+      setShowForm(false);
+      onRefresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    if (!cred) return;
+    setTesting(true); setTestResult(null);
+    const result = await testProviderCred(token, cred.cred_id);
+    setTestResult(result);
+    setTesting(false);
+  }
+
+  async function handleRemove() {
+    if (!cred) return;
+    await deleteProviderCred(token, cred.cred_id);
+    setTestResult(null);
+    onRefresh();
+  }
+
+  return (
+    <div style={{
+      border: "1px solid var(--border)", borderRadius: 10,
+      padding: "14px 18px", display: "grid", gap: 10,
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{provider.name}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, lineHeight: 1.5 }}>{provider.desc}</div>
+        </div>
+        <span style={{
+          flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999,
+          background: cred ? "var(--ok-bg)" : "var(--panel-2)",
+          color: cred ? "var(--ok)" : "var(--muted)",
+        }}>
+          {cred ? `Connected · …${cred.key_hint}` : "Not connected"}
+        </span>
+      </div>
+
+      {cred ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button className="button secondary" style={{ height: 30, fontSize: 12 }} onClick={handleTest} disabled={testing}>
+            {testing ? "Testing…" : "Test connection"}
+          </button>
+          <button className="button secondary" style={{ height: 30, fontSize: 12 }} onClick={handleRemove}>
+            <Trash2 size={13} aria-hidden="true" /> Remove
+          </button>
+          {testResult && (
+            <span style={{
+              fontSize: 12, fontWeight: 600,
+              color: testResult.status === "valid" ? "var(--ok)" : "var(--danger)",
+            }}>
+              {testResult.status === "valid"
+                ? "✓ Valid"
+                : `✗ ${testResult.status}${testResult.error ? `: ${testResult.error}` : ""}`}
+            </span>
+          )}
+        </div>
+      ) : showForm ? (
+        <form onSubmit={handleSave} style={{ display: "grid", gap: 8, maxWidth: 440 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, color: "var(--muted)" }}>Label</label>
+            <input
+              className="input"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder={provider.name}
+            />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, color: "var(--muted)" }}>API Token / Key</label>
+            <input
+              className="input"
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={provider.placeholder}
+              required
+              style={{ fontFamily: "monospace", fontSize: 13 }}
+            />
+          </div>
+          {err && <div style={{ fontSize: 12, color: "var(--danger)" }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="button" type="submit" disabled={saving || !apiKey}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button className="button secondary" type="button" onClick={() => { setShowForm(false); setErr(null); }}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          className="button secondary"
+          style={{ height: 32, fontSize: 13, width: "fit-content" }}
+          onClick={() => setShowForm(true)}
+        >
+          <Plus size={14} aria-hidden="true" /> Add token
+        </button>
+      )}
+    </div>
+  );
+}
 
 function KeyRow({ k, onRevoke }: { k: APIKeyInfo; onRevoke: (id: number) => void }) {
   const [confirming, setConfirming] = useState(false);
@@ -118,10 +323,12 @@ export default function SettingsPage() {
   const [insightsStatus, setInsightsStatus] = useState<{ available: boolean; model: string | null } | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [providerCreds, setProviderCreds] = useState<ProviderCred[]>([]);
 
   useEffect(() => {
     if (!token) { router.push("/login"); return; }
     void load();
+    void loadProviderCreds();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -136,6 +343,11 @@ export default function SettingsPage() {
     } catch {
       setError("Failed to load API keys");
     }
+  }
+
+  async function loadProviderCreds() {
+    const list = await listProviderCreds(token!).catch(() => []);
+    setProviderCreds(list);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -257,6 +469,30 @@ export default function SettingsPage() {
             </table>
           </div>
         )}
+      </section>
+
+      {/* Provider Connections */}
+      <section className="panel">
+        <div className="panel-header">
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Cpu size={16} aria-hidden="true" /> Provider Connections
+          </h2>
+        </div>
+        <div style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
+            Connect your quantum provider accounts to unlock live queue data, real device calibration,
+            and direct job submission from Q-Lab. Tokens are stored encrypted and never shared.
+          </p>
+          {PROVIDERS.map(p => (
+            <ProviderCard
+              key={p.id}
+              provider={p}
+              cred={providerCreds.find(c => c.provider === p.id) ?? null}
+              token={token!}
+              onRefresh={loadProviderCreds}
+            />
+          ))}
+        </div>
       </section>
 
       {/* AI Insights status */}
