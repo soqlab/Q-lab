@@ -51,8 +51,30 @@ export default function CalibrationMonitorPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700 }}>Calibration Monitor</h1>
-      <p style={{ color: "var(--muted)" }}>Real-time T1, T2, gate error, and readout fidelity tracking across all major backends.</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Calibration Monitor</h1>
+        {cal && (
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, letterSpacing: "0.04em",
+            background: cal.data_source === "ibm_api" ? "var(--ok-bg)" : "var(--panel-2)",
+            color: cal.data_source === "ibm_api" ? "var(--ok)" : "var(--muted)",
+            border: `1px solid ${cal.data_source === "ibm_api" ? "var(--ok)" : "var(--border)"}`,
+          }}>
+            {cal.data_source === "ibm_api" ? "Live IBM data" : "Simulated"}
+          </span>
+        )}
+      </div>
+      <p style={{ color: "var(--muted)" }}>
+        Real-time T1, T2, gate error, and readout fidelity tracking across all major backends.
+        {!cal || cal.data_source !== "ibm_api" ? (
+          <span style={{ color: "var(--muted)", fontSize: 13 }}>
+            {" "}To see live IBM calibration,{" "}
+            <a href="/settings" style={{ color: "var(--info-text, #60a5fa)", textDecoration: "underline" }}>
+              connect your IBM account in Settings
+            </a>.
+          </span>
+        ) : null}
+      </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {(backends ?? []).map(b => (
