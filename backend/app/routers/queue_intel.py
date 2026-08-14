@@ -23,6 +23,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, get_identity
 from ..health_score import compute_health_score
 from ..models import Run
 
@@ -30,6 +31,16 @@ router = APIRouter(prefix="/api/v1/queue", tags=["queue_intel"])
 
 IBM_TOKEN = os.environ.get("IBM_QUANTUM_TOKEN", "")
 IBM_BASE = "https://api.quantum-computing.ibm.com/runtime"
+
+
+def _resolve_ibm_token(db, identity: Optional[Identity]) -> str:
+    """Return the best available IBM token: user credential > env var > empty."""
+    if identity and identity.user_id:
+        from .credentials import get_active_key_for_user
+        t = get_active_key_for_user(db, "ibm", identity.user_id)
+        if t:
+            return t
+    return IBM_TOKEN
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -117,14 +128,15 @@ def _backend_run_stats(db: Session, backend: str, days: int = 30) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/status")
-def get_all_queue_status():
+def get_all_queue_status(
+    db: Session = Depends(get_db),
+    identity: Optional[Identity] = Depends(get_identity),
+):
     """Return queue status for all known backends."""
-    if IBM_TOKEN:
-        backends = _fetch_ibm_backends(IBM_TOKEN)
-        source = "ibm_api"
-    else:
+    token = _resolve_ibm_token(db, identity)
+    if not token:
         _no_token_error()
-        source = "ibm_api"  # unreachable
+    backends = _fetch_ibm_backends(token)
 
     for b in backends:
         if "estimated_wait_minutes" not in b:
@@ -133,17 +145,22 @@ def get_all_queue_status():
     backends.sort(key=lambda b: b.get("queue_length", 9999))
     return {
         "backends": backends,
-        "source": source,
+        "source": "ibm_api",
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "recommendation": backends[0]["name"] if backends else None,
     }
 
 
 @router.get("/status/{backend}")
-def get_backend_queue(backend: str, db: Session = Depends(get_db)):
+def get_backend_queue(
+    backend: str,
+    db: Session = Depends(get_db),
+    identity: Optional[Identity] = Depends(get_identity),
+):
     """Queue status + our run history analytics for a specific backend."""
-    if IBM_TOKEN:
-        all_backends = _fetch_ibm_backends(IBM_TOKEN)
+    token = _resolve_ibm_token(db, identity)
+    if token:
+        all_backends = _fetch_ibm_backends(token)
         info = next((b for b in all_backends if b["name"] == backend), None)
     else:
         _no_token_error()
@@ -165,11 +182,13 @@ def recommend_backend(
     n_qubits: int = Query(default=2, ge=1, le=127),
     max_queue: int = Query(default=100, description="Max acceptable queue length"),
     db: Session = Depends(get_db),
+    identity: Optional[Identity] = Depends(get_identity),
 ):
     """Recommend the best backend for an n-qubit job based on queue depth and historical health."""
-    if not IBM_TOKEN:
+    token = _resolve_ibm_token(db, identity)
+    if not token:
         _no_token_error()
-    backends = _fetch_ibm_backends(IBM_TOKEN)
+    backends = _fetch_ibm_backends(token)
 
     candidates = [
         b for b in backends

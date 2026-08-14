@@ -1,16 +1,121 @@
 ﻿from __future__ import annotations
-import uuid, math, random
+import json
+import math
+import random
+import urllib.error
+import urllib.request
+import uuid
 from datetime import datetime, timezone
+from typing import Optional
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, get_identity
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/calibration-oracle", tags=["calibration-oracle"])
 
+IBM_RUNTIME_BASE = "https://api.quantum-computing.ibm.com/runtime"
+
 _rng = random.Random(0)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Real IBM Quantum calibration fetcher
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _ibm_prop(qubit_props: list, name: str) -> Optional[float]:
+    for p in qubit_props:
+        if p.get("name") == name:
+            val = p.get("value")
+            return float(val) if val is not None else None
+    return None
+
+
+def _fetch_ibm_calibration(backend: str, token: str) -> Optional[dict]:
+    """Call IBM Quantum API for live backend calibration data.
+
+    Returns a dict matching BackendCalibration shape, or None on any failure.
+    """
+    try:
+        req = urllib.request.Request(
+            f"{IBM_RUNTIME_BASE}/backends/{backend}/properties",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+    qubits_raw = data.get("qubits", [])
+    gates_raw = data.get("gates", [])
+
+    qubit_cals: list[dict] = []
+    t1s, t2s, readouts, one_q_errors, two_q_errors = [], [], [], [], []
+
+    for i, q_props in enumerate(qubits_raw[:20]):
+        t1 = _ibm_prop(q_props, "T1") or 100.0
+        t2 = _ibm_prop(q_props, "T2") or 60.0
+        freq = _ibm_prop(q_props, "frequency") or 5.0
+        ro_err = _ibm_prop(q_props, "readout_error") or 0.01
+        t1s.append(t1)
+        t2s.append(t2)
+        readouts.append(ro_err)
+        qubit_cals.append({
+            "qubit_id": i,
+            "t1_us": round(t1, 1),
+            "t2_us": round(t2, 1),
+            "single_q_error": 0.001,  # populated from gate data below
+            "readout_error": round(ro_err, 6),
+            "frequency_ghz": round(freq, 6),
+        })
+
+    for g in gates_raw:
+        gate_name = g.get("gate", "")
+        qubits = g.get("qubits", [])
+        params = g.get("parameters", [])
+        err_val = next((p.get("value") for p in params if p.get("name") == "gate_error"), None)
+        if err_val is None:
+            continue
+        if gate_name in ("sx", "x", "id") and len(qubits) == 1:
+            q_idx = qubits[0]
+            if q_idx < len(qubit_cals):
+                qubit_cals[q_idx]["single_q_error"] = round(float(err_val), 6)
+                one_q_errors.append(float(err_val))
+        elif gate_name in ("ecr", "cx", "cz") and len(qubits) == 2:
+            two_q_errors.append(float(err_val))
+
+    n_q = len(qubits_raw)
+    med_t1 = round(sum(t1s) / len(t1s), 1) if t1s else 100.0
+    med_t2 = round(sum(t2s) / len(t2s), 1) if t2s else 60.0
+    med_ro = round(sum(readouts) / len(readouts), 6) if readouts else 0.01
+    med_1q = round(sum(one_q_errors) / len(one_q_errors), 6) if one_q_errors else 0.001
+    med_2q = round(sum(two_q_errors) / len(two_q_errors), 6) if two_q_errors else 0.005
+    health = max(0.0, min(100.0, 100.0 - med_2q * 5000 - med_ro * 1000))
+
+    return {
+        "cal_id": str(uuid.uuid4()),
+        "backend": backend,
+        "timestamp": data.get("last_update_date") or datetime.now(timezone.utc).isoformat(),
+        "n_qubits": n_q,
+        "median_t1_us": med_t1,
+        "median_t2_us": med_t2,
+        "median_1q_error": med_1q,
+        "median_2q_error": med_2q,
+        "median_readout_error": med_ro,
+        "min_t1_us": round(min(t1s), 1) if t1s else 0.0,
+        "max_t1_us": round(max(t1s), 1) if t1s else 0.0,
+        "qv": 2 ** min(7, int(math.log2(max(n_q, 1)))),
+        "clops": 2000,
+        "qubits": qubit_cals,
+        "health_score": round(health, 1),
+        "trend": "stable",
+        "firmware_version": "ibm_api",
+        "data_source": "ibm_api",
+    }
 
 BACKENDS: dict = {
     "ibm_brisbane": {"n_qubits": 127, "provider": "ibm_quantum", "location": "US-East", "processor": "Eagle r3", "basis_gates": ["ecr","id","rz","sx","x"]},
@@ -159,11 +264,27 @@ def _check_alerts(db: Session, backend: str, cal: dict):
                 store_put(db, NS_ALERTS, alert["alert_id"], alert)
 
 
-@router.get("/{backend}", response_model=BackendCalibration)
-def get_calibration(backend: str, db: Session = Depends(get_db)):
+@router.get("/{backend}")
+def get_calibration(
+    backend: str,
+    db: Session = Depends(get_db),
+    identity: Optional[Identity] = Depends(get_identity),
+):
     if backend not in BACKENDS:
         from fastapi import HTTPException
         raise HTTPException(404, f"Backend {backend} not found")
+
+    # Attempt real IBM data when user has a stored token
+    if identity and identity.user_id and backend.startswith("ibm"):
+        from .credentials import get_active_key_for_user
+        token = get_active_key_for_user(db, "ibm", identity.user_id)
+        if token:
+            cal = _fetch_ibm_calibration(backend, token)
+            if cal:
+                _check_alerts(db, backend, cal)
+                return {**BackendCalibration(**{k: v for k, v in cal.items() if k != "data_source"}).model_dump(), "data_source": "ibm_api"}
+
+    # Fall back to simulated data
     _seed_calibrations(db)
     ns = f"{NS_CALIBRATIONS}_{backend}"
     history = store_list(db, ns)
@@ -172,7 +293,7 @@ def get_calibration(backend: str, db: Session = Depends(get_db)):
     cal = _gen_calibration(backend, len(history), history)
     store_put(db, ns, cal["cal_id"], cal)
     _check_alerts(db, backend, cal)
-    return BackendCalibration(**cal)
+    return {**BackendCalibration(**cal).model_dump(), "data_source": "simulated"}
 
 @router.get("/{backend}/history")
 def get_history(backend: str, n: int = 20, db: Session = Depends(get_db)):
