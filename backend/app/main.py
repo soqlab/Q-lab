@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -271,6 +272,15 @@ app = FastAPI(
     title="Q-Lab API",
     version="1.0.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
+)
+
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "https://www.soqlab.com,https://soqlab.com").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ------------------------------------------------------------------
@@ -1106,7 +1116,7 @@ def update_run(
     payload: RunUpdatePayload,
     request: Request,
     background_tasks: BackgroundTasks,
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
     run = _find_run(db, run_id)
@@ -1546,6 +1556,7 @@ def export_runs_csv(
     status: Optional[str] = None,
     project: Optional[str] = None,
     db: Session = Depends(get_db),
+    _identity: Identity = Depends(require_auth),
 ):
     runs = db.scalars(
         _filtered_runs_query(backend=backend, status=status, project=project).order_by(Run.created_at.desc())
@@ -1569,6 +1580,7 @@ def export_runs_jsonl(
     status: Optional[str] = None,
     project: Optional[str] = None,
     db: Session = Depends(get_db),
+    _identity: Identity = Depends(require_auth),
 ):
     runs = db.scalars(
         _filtered_runs_query(backend=backend, status=status, project=project).order_by(Run.created_at.desc())
@@ -1587,6 +1599,7 @@ def export_runs_report(
     status: Optional[str] = None,
     project: Optional[str] = None,
     db: Session = Depends(get_db),
+    _identity: Identity = Depends(require_auth),
 ):
     runs = [_run_to_dict(r, include_health=True) for r in
             db.scalars(_filtered_runs_query(backend=backend, status=status, project=project)

@@ -149,9 +149,20 @@ def _clickhouse_backend_stats():
 
 def _clickhouse_kpis(org_id):
     client = _clickhouse_client()
-    cond = f"WHERE org_id = {org_id}" if org_id else ""
-    result = client.query(f"SELECT count(), countIf(status='completed'), avg(health_score) FROM qlab_runs {cond}")
-    r = result.result_rows[0]
-    total, success, avg_h = r[0], r[1], r[2]
-    projects = client.query(f"SELECT uniq(project_slug) FROM qlab_runs {cond}").result_rows[0][0]
+    if org_id:
+        result = client.query(
+            "SELECT count(), countIf(status='completed'), avg(health_score) FROM qlab_runs WHERE org_id = {org_id:Int64}",
+            parameters={"org_id": int(org_id)},
+        )
+        r = result.result_rows[0]
+        total, success, avg_h = r[0], r[1], r[2]
+        projects = client.query(
+            "SELECT uniq(project_slug) FROM qlab_runs WHERE org_id = {org_id:Int64}",
+            parameters={"org_id": int(org_id)},
+        ).result_rows[0][0]
+    else:
+        result = client.query("SELECT count(), countIf(status='completed'), avg(health_score) FROM qlab_runs")
+        r = result.result_rows[0]
+        total, success, avg_h = r[0], r[1], r[2]
+        projects = client.query("SELECT uniq(project_slug) FROM qlab_runs").result_rows[0][0]
     return {"total_runs": total, "success_rate": round(success / max(total, 1), 3), "avg_health": round(avg_h or 0, 2), "active_projects": projects}
