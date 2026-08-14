@@ -240,7 +240,7 @@ def resend_verification_by_email(payload: ResendByEmailPayload, db: Session = De
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
     return {"message": "Verification email sent"}
 
 
@@ -262,7 +262,7 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
 
     return {"message": "Verification email sent"}
 
