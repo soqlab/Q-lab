@@ -25,7 +25,9 @@ export default function HardwareJobsPage() {
 
   useEffect(() => {
     listHardwareBackends().then(r => setBackends(r.backends)).catch(() => {});
-    listHardwareJobs().then(r => setJobs(r.jobs)).catch(() => {});
+    listHardwareJobs()
+      .then(r => setJobs(r.jobs))
+      .catch(e => setError(e instanceof Error ? e.message : "Failed to load jobs"));
   }, []);
 
   async function submit() {
@@ -49,6 +51,11 @@ export default function HardwareJobsPage() {
   const statusColor = (s: string) => s === "completed" ? "#34d399" : s === "running" ? "#fbbf24" : s === "failed" ? "#f87171" : "#94a3b8";
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: "#451a0320", border: "1px solid #f59e0b50", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#fbbf24" }}>
+        <strong>Simulation mode</strong> — jobs run locally with random bitstring counts (no real QPU).
+        Real IBM job submission is coming soon. Results transition queued → running → completed over ~12 seconds.
+      </div>
     <div style={{ display: "flex", gap: 24 }}>
       <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
@@ -121,6 +128,7 @@ export default function HardwareJobsPage() {
         ))}
         {jobs.length === 0 && <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>No jobs yet — submit a circuit above</div>}
       </div>
+    </div>
     </div>
   );
 }
