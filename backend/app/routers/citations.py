@@ -140,9 +140,9 @@ def add_citation(run_id: str, payload: CitationPayload, db: Session = Depends(ge
             {"id": result.lastrowid},
         ).mappings().one()
         return _row_to_dict(dict(row))
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to save citation.")
 
 
 @router.delete("/{run_id}/citations/{citation_id}")
@@ -154,9 +154,9 @@ def delete_citation(run_id: str, citation_id: int, db: Session = Depends(get_db)
         )
         db.commit()
         return {"deleted": True, "id": citation_id}
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete citation.")
 
 
 @router.get("/{run_id}/citations/export.bib")
