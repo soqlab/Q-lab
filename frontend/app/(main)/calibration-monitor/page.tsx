@@ -62,6 +62,7 @@ export default function CalibrationMonitorPage() {
           }}>
             {cal.data_source === "ibm_api" ? "Live IBM data"
              : cal.data_source === "ionq_api" ? "Live IonQ data"
+             : cal.data_source === "rigetti_api" ? "Live Rigetti data"
              : "Simulated"}
           </span>
         )}
@@ -72,7 +73,7 @@ export default function CalibrationMonitorPage() {
           <span style={{ color: "var(--muted)", fontSize: 13 }}>
             {" "}To see live calibration data,{" "}
             <a href="/settings" style={{ color: "var(--info-text, #60a5fa)", textDecoration: "underline" }}>
-              connect your IBM or IonQ account in Settings
+              connect your IBM, IonQ, or Rigetti account in Settings
             </a>.
           </span>
         ) : null}
