@@ -90,7 +90,15 @@ export default function QueuePage() {
           </h1>
           <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
             Real-time backend status, queue depths, and smart scheduling recommendations.
-            {source === "simulated" && <span style={{ marginLeft: 8, color: "#f59e0b", fontSize: "0.8rem" }}>(simulated data — add IBM_QUANTUM_TOKEN for live data)</span>}
+            {source === "simulated" && (
+              <span style={{ marginLeft: 8, color: "#f59e0b", fontSize: "0.8rem" }}>
+                Simulated —{" "}
+                <a href="/settings" style={{ color: "#f59e0b", textDecoration: "underline" }}>
+                  connect your IBM account in Settings
+                </a>{" "}
+                for live queue data
+              </span>
+            )}
           </p>
         </div>
         <button onClick={load} disabled={refreshing}
@@ -99,7 +107,19 @@ export default function QueuePage() {
         </button>
       </div>
 
-      {error && <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>{error}</div>}
+      {error && (
+        <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>
+          {error === "NO_IBM_TOKEN" ? (
+            <>
+              No IBM Quantum token found.{" "}
+              <a href="/settings" style={{ color: "#93c5fd", textDecoration: "underline" }}>
+                Connect your account in Settings → Provider Connections
+              </a>{" "}
+              to see live queue data.
+            </>
+          ) : error}
+        </div>
+      )}
 
       {recommendation && (
         <div style={{ background: "linear-gradient(135deg, #1d3a6b 0%, #1e293b 100%)", borderRadius: 12, border: "1px solid #3b82f6", padding: "1.25rem", marginBottom: "1.5rem" }}>

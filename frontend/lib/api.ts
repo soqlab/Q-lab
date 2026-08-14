@@ -4259,12 +4259,14 @@ export type QueueRecommendation = {
 
 export async function getQueueStatus(): Promise<QueueStatusResponse> {
   const res = await fetch(apiUrl("/api/v1/queue/status"), { cache: "no-store", headers: authHeaders() });
+  if (res.status === 503) throw new Error("NO_IBM_TOKEN");
   if (!res.ok) throw new Error("Queue status failed");
   return res.json();
 }
 
 export async function getBackendQueueStatus(backend: string): Promise<{ backend: string; queue_info: BackendQueueStatus; our_analytics: Record<string, unknown>; best_submit_hour_utc: number; worst_submit_hour_utc: number }> {
   const res = await fetch(apiUrl(`/api/v1/queue/status/${encodeURIComponent(backend)}`), { cache: "no-store", headers: authHeaders() });
+  if (res.status === 503) throw new Error("NO_IBM_TOKEN");
   if (!res.ok) throw new Error("Queue status failed");
   return res.json();
 }
@@ -4274,6 +4276,7 @@ export async function recommendBackend(nQubits?: number, maxQueue?: number): Pro
   if (nQubits) qs.set("n_qubits", String(nQubits));
   if (maxQueue) qs.set("max_queue", String(maxQueue));
   const res = await fetch(apiUrl(`/api/v1/queue/recommend?${qs}`), { cache: "no-store", headers: authHeaders() });
+  if (res.status === 503) throw new Error("NO_IBM_TOKEN");
   if (!res.ok) throw new Error("Recommend failed");
   return res.json();
 }
@@ -6764,6 +6767,7 @@ export interface BackendCalibration {
   median_2q_error: number; median_readout_error: number;
   min_t1_us: number; max_t1_us: number; qv: number; clops: number;
   qubits: QubitCalibration[]; health_score: number; trend: string; firmware_version: string;
+  data_source?: "ibm_api" | "simulated";
 }
 export async function getCalibration(backend: string): Promise<BackendCalibration> {
   const res = await fetch(apiUrl(`/api/v1/calibration-oracle/${backend}`), { cache: "no-store", headers: authHeaders() });
