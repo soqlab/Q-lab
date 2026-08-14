@@ -65,6 +65,15 @@ _BACKEND_GATE_SETS: dict[str, list[str]] = {
 
 _WEIGHTS = {"cal": 0.45, "struct": 0.35, "noise": 0.20}
 
+# Known qubit counts for common backends — fallback when DB has no run history
+_KNOWN_BACKEND_QUBITS: dict[str, int] = {
+    "ibm_brisbane": 127, "ibm_kyoto": 127, "ibm_osaka": 127, "ibm_sherbrooke": 127,
+    "ibm_nairobi": 7, "ibm_perth": 7, "ibm_lagos": 7, "ibm_cairo": 27,
+    "ionq_aria_1": 25, "ionq_aria_2": 25, "ionq_forte": 36,
+    "rigetti_ankaa_2": 84, "rigetti_aspen_m_3": 79,
+    "quantinuum_h1": 20, "quantinuum_h2": 32,
+}
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Helpers
@@ -154,12 +163,19 @@ def _get_latest_cal(backend: str, db: Session) -> dict | None:
 
 
 def _get_backend_n_qubits(backend: str, db: Session) -> int:
-    """Estimate max qubits of a backend from its run history."""
-    row = db.execute(
-        select(sqlfunc.max(Run.fingerprint))
-        .where(Run.backend == backend)
-    ).scalar_one_or_none()
-    return 0  # fallback — fingerprint is JSON, hard to query; use 0 = unknown
+    """Estimate max qubits of a backend from run history, with a static fallback."""
+    runs = db.scalars(
+        select(Run)
+        .where(Run.backend == backend, Run.fingerprint.isnot(None))
+        .order_by(Run.created_at.desc())
+        .limit(20)
+    ).all()
+    from_runs = max(
+        (int((r.fingerprint or {}).get("num_qubits") or 0) for r in runs), default=0
+    )
+    if from_runs > 0:
+        return from_runs
+    return _KNOWN_BACKEND_QUBITS.get(backend, 0)
 
 
 def _get_target_backends(source_backend: str, db: Session) -> list[str]:
@@ -209,13 +225,7 @@ def transfer_prediction(run_id: str, db: Session = Depends(get_db)):
         gate_compat = _gate_set_compat(circuit_gc, target_family)
         noise_c    = _noise_compat(source_cal, target_cal)
 
-        # Struct compat — use max qubits seen for this target backend
-        target_runs = db.execute(
-            select(Run).where(Run.backend == target).order_by(Run.created_at.desc()).limit(20)
-        ).scalars().all()
-        target_n = max(
-            (int((r.fingerprint or {}).get("num_qubits") or 0) for r in target_runs), default=0
-        )
+        target_n = _get_backend_n_qubits(target, db)
         struct_c = _struct_compat(fp, target_n)
 
         transfer_score = round(
