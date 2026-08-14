@@ -6767,7 +6767,7 @@ export interface BackendCalibration {
   median_2q_error: number; median_readout_error: number;
   min_t1_us: number; max_t1_us: number; qv: number; clops: number;
   qubits: QubitCalibration[]; health_score: number; trend: string; firmware_version: string;
-  data_source?: "ibm_api" | "simulated";
+  data_source?: "ibm_api" | "ionq_api" | "rigetti_api" | "simulated";
 }
 export async function getCalibration(backend: string): Promise<BackendCalibration> {
   const res = await fetch(apiUrl(`/api/v1/calibration-oracle/${backend}`), { cache: "no-store", headers: authHeaders() });
