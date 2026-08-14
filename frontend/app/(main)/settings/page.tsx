@@ -30,6 +30,12 @@ const PROVIDERS = [
     desc: "Run circuits on IonQ trapped-ion quantum computers via the IonQ Cloud.",
     placeholder: "Your IonQ API key",
   },
+  {
+    id: "rigetti",
+    name: "Rigetti QCS",
+    desc: "Access Rigetti superconducting QPUs via the Quantum Cloud Services (QCS) platform.",
+    placeholder: "Your Rigetti QCS API key",
+  },
 ] as const;
 
 async function listProviderCreds(token: string): Promise<ProviderCred[]> {

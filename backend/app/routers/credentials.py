@@ -3,7 +3,7 @@
 Keys are XOR-obfuscated with a site secret before storage.  In production
 replace _encrypt / _decrypt with Fernet (cryptography package) or AWS KMS.
 
-Supported providers: ibm | ionq | braket | custom
+Supported providers: ibm | ionq | rigetti | braket | custom
 """
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def get_active_key_for_user(db: Session, provider: str, user_id: int) -> Optiona
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CredentialCreate(BaseModel):
-    provider: str = Field(..., description="ibm | ionq | braket | custom")
+    provider: str = Field(..., description="ibm | ionq | rigetti | braket | custom")
     label: str
     api_key: str
     expires_at: Optional[str] = None  # ISO datetime string
@@ -137,7 +137,7 @@ def create_credential(
     identity: Identity = Depends(require_auth),
 ):
     """Store a new API key for a provider."""
-    if req.provider not in {"ibm", "ionq", "braket", "custom"}:
+    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "custom"}:
         raise HTTPException(422, f"Unknown provider '{req.provider}'")
     expires = None
     if req.expires_at:
@@ -248,6 +248,13 @@ def test_credential(
             req = urllib.request.Request(
                 "https://api.ionq.co/v0.3/backends",
                 headers={"Authorization": f"apiKey {key}"},
+            )
+            urllib.request.urlopen(req, timeout=10)
+            result["status"] = "valid"
+        elif c.provider == "rigetti":
+            req = urllib.request.Request(
+                "https://api.qcs.rigetti.com/v1/quantum-processors",
+                headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
             )
             urllib.request.urlopen(req, timeout=10)
             result["status"] = "valid"
