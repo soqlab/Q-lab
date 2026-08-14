@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
 _METRICS = {"health_score", "success_probability", "depth", "size", "num_qubits", "non_clifford_ratio", "tvd"}
 _OPERATORS = {"lt", "gt", "lte", "gte", "eq"}
-_MODEL = os.getenv("QLAB_INSIGHT_MODEL", "claude-haiku-4-5-20251001")
+_MODEL = os.getenv("QLAB_INSIGHT_MODEL", "claude-haiku-4-5")
 
 
 # ---------------------------------------------------------------------------

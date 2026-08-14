@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -21,6 +22,8 @@ from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..store import store_delete, store_get, store_list, store_put
+
+APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
 
 router = APIRouter(prefix="/api/v1/slack", tags=["slack"])
 
@@ -154,7 +157,7 @@ async def _handle_run(db: Session, run_id: str) -> dict:
         f"*Status:* {run.status}\n"
         f"*Health:* {emoji} {health}\n"
         f"*Created:* {run.created_at.isoformat() if run.created_at else '?'}\n"
-        f"<http://localhost:3000/runs/{run.run_id}|View in Q-Lab>"
+        f"<{APP_URL}/runs/{run.run_id}|View in Q-Lab>"
     )
     return _make_blocks(f"⚛️ Run Details", text)
 
@@ -346,7 +349,7 @@ async def slack_notify(
                     {
                         "type": "button",
                         "text": {"type": "plain_text", "text": "View Run"},
-                        "url": f"http://localhost:3000/runs/{body.run_id}",
+                        "url": f"{APP_URL}/runs/{body.run_id}",
                     }
                 ],
             },
