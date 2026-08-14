@@ -22,6 +22,11 @@ IBM_RUNTIME_BASE = "https://api.quantum-computing.ibm.com/runtime"
 
 _rng = random.Random(0)
 
+# Rigetti backend name → QCS processor ID (e.g. rigetti_ankaa_2 → Ankaa-2)
+def _rigetti_processor_id(backend: str) -> str:
+    tail = backend[len("rigetti_"):]          # e.g. "ankaa_2"
+    return "-".join(p.capitalize() for p in tail.split("_"))  # → "Ankaa-2"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Real IBM Quantum calibration fetcher
@@ -257,6 +262,128 @@ class WatchRequest(BaseModel):
     threshold_pct_change: float = 5.0
     alert_on: str = "degradation"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Rigetti QCS calibration fetcher
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fetch_rigetti_calibration(backend: str, token: str) -> Optional[dict]:
+    """Fetch real Rigetti calibration from the QCS REST API.
+
+    Endpoint: GET /v1/quantum-processors/{id}/specifications
+    Auth: Authorization: Bearer {api_key}
+    T1/T2 values are in seconds; we convert to microseconds.
+    """
+    proc_id = _rigetti_processor_id(backend)
+
+    data = None
+    # Try specifications endpoint first, fall back to processor details
+    for path in [
+        f"/v1/quantum-processors/{proc_id}/specifications",
+        f"/v1/quantum-processors/{proc_id.lower()}/specifications",
+        f"/v1/quantum-processors/{proc_id}",
+    ]:
+        try:
+            req = urllib.request.Request(
+                f"https://api.qcs.rigetti.com{path}",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+            break
+        except Exception:
+            continue
+
+    if not data:
+        return None
+
+    # Rigetti response shape varies by version — normalise here
+    # Newer QCS: {"qubitSpecs": {"0": {T1, T2, fRO, f1QRB}}, "gateSpecs": {...}}
+    # Older QCS: {"specs": {"1Q": {"0": {T1, T2, ...}}, "2Q": {...}}}
+    qubit_specs: dict = (
+        data.get("qubitSpecs")
+        or (data.get("specs") or {}).get("1Q")
+        or {}
+    )
+    gate_specs: dict = (
+        data.get("gateSpecs")
+        or (data.get("specs") or {}).get("2Q")
+        or {}
+    )
+
+    qubit_cals: list = []
+    t1s, t2s, readouts, one_q_errors, two_q_errors = [], [], [], [], []
+
+    for qubit_str, qspec in qubit_specs.items():
+        if not isinstance(qspec, dict):
+            continue
+        try:
+            qubit_idx = int(qubit_str)
+        except ValueError:
+            continue
+
+        t1 = float(qspec.get("T1") or 50e-6) * 1e6   # s → µs
+        t2 = float(qspec.get("T2") or 30e-6) * 1e6
+        fro = float(qspec.get("fRO") or qspec.get("fActiveReset") or 0.93)
+        f1q = float(qspec.get("f1QRB") or qspec.get("f1Q") or 0.998)
+
+        ro_err = round(1.0 - fro, 6)
+        q1_err = round(1.0 - f1q, 6)
+
+        t1s.append(t1); t2s.append(t2)
+        readouts.append(ro_err); one_q_errors.append(q1_err)
+
+        if len(qubit_cals) < 20:
+            qubit_cals.append({
+                "qubit_id": qubit_idx,
+                "t1_us": round(t1, 1),
+                "t2_us": round(t2, 1),
+                "single_q_error": q1_err,
+                "readout_error": ro_err,
+                "frequency_ghz": 0.0,
+            })
+
+    # Parse 2Q gate errors — gate_specs is dict of pair → gate → fidelity
+    for pair_val in gate_specs.values():
+        if isinstance(pair_val, dict):
+            for k, v in pair_val.items():
+                if k.lower().startswith("f") and isinstance(v, (int, float)):
+                    two_q_errors.append(round(1.0 - float(v), 6))
+                    break
+
+    if not qubit_cals:
+        return None
+
+    n_q = len(qubit_specs)
+    med_t1  = round(sum(t1s) / len(t1s), 1) if t1s else 28.0
+    med_t2  = round(sum(t2s) / len(t2s), 1) if t2s else 18.0
+    med_ro  = round(sum(readouts) / len(readouts), 6) if readouts else 0.05
+    med_1q  = round(sum(one_q_errors) / len(one_q_errors), 6) if one_q_errors else 0.002
+    med_2q  = round(sum(two_q_errors) / len(two_q_errors), 6) if two_q_errors else 0.008
+
+    health = max(0.0, min(100.0, 100.0 - med_2q * 5000 - med_ro * 1000))
+
+    return {
+        "cal_id": str(uuid.uuid4()),
+        "backend": backend,
+        "timestamp": data.get("lastUpdated") or datetime.now(timezone.utc).isoformat(),
+        "n_qubits": n_q,
+        "median_t1_us": med_t1,
+        "median_t2_us": med_t2,
+        "median_1q_error": med_1q,
+        "median_2q_error": med_2q,
+        "median_readout_error": med_ro,
+        "min_t1_us": round(min(t1s), 1) if t1s else 0.0,
+        "max_t1_us": round(max(t1s), 1) if t1s else 0.0,
+        "qv": 0,  # Rigetti doesn't use QV
+        "clops": 800,
+        "qubits": qubit_cals,
+        "health_score": round(health, 1),
+        "trend": "stable",
+        "firmware_version": "rigetti_api",
+        "data_source": "rigetti_api",
+    }
+
+
 def _gen_calibration(backend: str, seed_offset: int, history: list[dict]) -> dict:
     rng2 = random.Random(hash(backend) + seed_offset)
     n_q = BACKENDS[backend]["n_qubits"]
@@ -374,6 +501,14 @@ def get_calibration(
                 if cal:
                     _check_alerts(db, backend, cal)
                     return {**BackendCalibration(**{k: v for k, v in cal.items() if k != "data_source"}).model_dump(), "data_source": "ionq_api"}
+
+        elif backend.startswith("rigetti"):
+            token = get_active_key_for_user(db, "rigetti", identity.user_id)
+            if token:
+                cal = _fetch_rigetti_calibration(backend, token)
+                if cal:
+                    _check_alerts(db, backend, cal)
+                    return {**BackendCalibration(**{k: v for k, v in cal.items() if k != "data_source"}).model_dump(), "data_source": "rigetti_api"}
 
     # Fall back to simulated data
     _seed_calibrations(db)
