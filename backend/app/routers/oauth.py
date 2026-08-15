@@ -48,8 +48,15 @@ def exchange_oauth_code(code: str = Query(...), db: Session = Depends(get_db)):
     record = store_get(db, "oauth_handoff", code)
     if not record:
         raise HTTPException(status_code=400, detail="Invalid or expired handoff code")
-    created = datetime.fromisoformat(record["created_at"])
-    age = (datetime.now(timezone.utc) - created).total_seconds()
+    try:
+        created = datetime.fromisoformat(record["created_at"])
+        # Ensure timezone-aware for subtraction
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - created).total_seconds()
+    except (ValueError, KeyError):
+        store_delete(db, "oauth_handoff", code)
+        raise HTTPException(status_code=400, detail="Invalid handoff record")
     if age > _HANDOFF_TTL:
         store_delete(db, "oauth_handoff", code)
         raise HTTPException(status_code=400, detail="Handoff code has expired")
@@ -74,29 +81,36 @@ def google_login():
 
 
 @router.get("/google/callback")
-def google_callback(code: str, db: Session = Depends(get_db)):
-    # Exchange code for access token
-    token_res = httpx.post("https://oauth2.googleapis.com/token", data={
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": GOOGLE_REDIRECT,
-        "grant_type": "authorization_code",
-    }, timeout=10)
-    token_res.raise_for_status()
-    access_token = token_res.json()["access_token"]
+def google_callback(
+    db: Session = Depends(get_db),
+    code: str | None = None,
+    error: str | None = None,
+):
+    if error or not code:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+    try:
+        token_res = httpx.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT,
+            "grant_type": "authorization_code",
+        }, timeout=10)
+        token_res.raise_for_status()
+        access_token = token_res.json()["access_token"]
 
-    # Fetch user info
-    info_res = httpx.get("https://www.googleapis.com/oauth2/v2/userinfo",
-                         headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
-    info_res.raise_for_status()
-    info = info_res.json()
+        info_res = httpx.get("https://www.googleapis.com/oauth2/v2/userinfo",
+                             headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+        info_res.raise_for_status()
+        info = info_res.json()
 
-    user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
-    jwt = create_access_token(user.id, user.org_id, user.role)
-    dest = "/onboarding" if is_new else "/runs"
-    code = _store_handoff(db, jwt)
-    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={code}&next={dest}")
+        user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
+        jwt = create_access_token(user.id, user.org_id, user.role)
+        dest = "/onboarding" if is_new else "/runs"
+        handoff_code = _store_handoff(db, jwt)
+        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={handoff_code}&next={dest}")
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
 
 # ── GitHub ────────────────────────────────────────────────────────────────────
@@ -113,38 +127,46 @@ def github_login():
 
 
 @router.get("/github/callback")
-def github_callback(code: str, db: Session = Depends(get_db)):
-    # Exchange code for access token
-    token_res = httpx.post("https://github.com/login/oauth/access_token", json={
-        "client_id": GITHUB_CLIENT_ID,
-        "client_secret": GITHUB_CLIENT_SECRET,
-        "code": code,
-        "redirect_uri": GITHUB_REDIRECT,
-    }, headers={"Accept": "application/json"}, timeout=10)
-    token_res.raise_for_status()
-    gh_token = token_res.json().get("access_token")
+def github_callback(
+    db: Session = Depends(get_db),
+    code: str | None = None,
+    error: str | None = None,
+):
+    if error or not code:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+    try:
+        token_res = httpx.post("https://github.com/login/oauth/access_token", json={
+            "client_id": GITHUB_CLIENT_ID,
+            "client_secret": GITHUB_CLIENT_SECRET,
+            "code": code,
+            "redirect_uri": GITHUB_REDIRECT,
+        }, headers={"Accept": "application/json"}, timeout=10)
+        token_res.raise_for_status()
+        gh_token = token_res.json().get("access_token")
+        if not gh_token:
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
-    headers = {"Authorization": f"Bearer {gh_token}"}
+        gh_headers = {"Authorization": f"Bearer {gh_token}"}
 
-    # Fetch user profile
-    profile = httpx.get("https://api.github.com/user", headers=headers, timeout=10).json()
+        profile = httpx.get("https://api.github.com/user", headers=gh_headers, timeout=10).json()
 
-    # GitHub can hide the primary email — fetch it explicitly
-    email: str | None = profile.get("email")
-    if not email:
-        emails = httpx.get("https://api.github.com/user/emails", headers=headers, timeout=10).json()
-        primary = next((e for e in emails if e.get("primary") and e.get("verified")), None)
-        email = primary["email"] if primary else None
+        email: str | None = profile.get("email")
+        if not email:
+            emails = httpx.get("https://api.github.com/user/emails", headers=gh_headers, timeout=10).json()
+            primary = next((e for e in emails if e.get("primary") and e.get("verified")), None)
+            email = primary["email"] if primary else None
 
-    if not email:
-        return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
+        if not email:
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
 
-    name = profile.get("name") or profile.get("login") or email
-    user, is_new = _upsert_user(db, email=email, name=name)
-    jwt = create_access_token(user.id, user.org_id, user.role)
-    dest = "/onboarding" if is_new else "/runs"
-    code = _store_handoff(db, jwt)
-    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={code}&next={dest}")
+        name = profile.get("name") or profile.get("login") or email
+        user, is_new = _upsert_user(db, email=email, name=name)
+        jwt = create_access_token(user.id, user.org_id, user.role)
+        dest = "/onboarding" if is_new else "/runs"
+        handoff_code = _store_handoff(db, jwt)
+        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={handoff_code}&next={dest}")
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
