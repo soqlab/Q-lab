@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import os
-import secrets
-from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,7 +13,6 @@ from ..auth import create_access_token
 from ..database import get_db
 from ..email_service import send_welcome_email
 from ..models import User
-from ..store import store_delete, store_get, store_put
 
 router = APIRouter(prefix="/auth", tags=["oauth"])
 
@@ -28,41 +25,6 @@ BASE_URL             = os.getenv("API_BASE_URL", "https://www.soqlab.com/qlab-ap
 
 GOOGLE_REDIRECT = f"{BASE_URL}/auth/google/callback"
 GITHUB_REDIRECT = f"{BASE_URL}/auth/github/callback"
-
-_HANDOFF_TTL = 300  # 5 minutes
-
-
-def _store_handoff(db: Session, jwt: str) -> str:
-    """Store JWT under a random opaque code; return the code."""
-    code = secrets.token_urlsafe(48)
-    store_put(db, "oauth_handoff", code, {
-        "jwt": jwt,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return code
-
-
-@router.get("/oauth/exchange")
-def exchange_oauth_code(code: str = Query(...), db: Session = Depends(get_db)):
-    """Exchange a short-lived handoff code for a JWT. Called by the frontend callback page."""
-    record = store_get(db, "oauth_handoff", code)
-    if not record:
-        raise HTTPException(status_code=400, detail="Invalid or expired handoff code")
-    try:
-        created = datetime.fromisoformat(record["created_at"])
-        # Ensure timezone-aware for subtraction
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - created).total_seconds()
-    except (ValueError, KeyError):
-        store_delete(db, "oauth_handoff", code)
-        raise HTTPException(status_code=400, detail="Invalid handoff record")
-    if age > _HANDOFF_TTL:
-        store_delete(db, "oauth_handoff", code)
-        raise HTTPException(status_code=400, detail="Handoff code has expired")
-    jwt = record["jwt"]
-    store_delete(db, "oauth_handoff", code)
-    return {"access_token": jwt, "token_type": "bearer"}
 
 
 # ── Google ────────────────────────────────────────────────────────────────────
@@ -107,8 +69,7 @@ def google_callback(
         user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
         jwt = create_access_token(user.id, user.org_id, user.role)
         dest = "/onboarding" if is_new else "/runs"
-        handoff_code = _store_handoff(db, jwt)
-        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={handoff_code}&next={dest}")
+        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
     except Exception:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
@@ -163,8 +124,7 @@ def github_callback(
         user, is_new = _upsert_user(db, email=email, name=name)
         jwt = create_access_token(user.id, user.org_id, user.role)
         dest = "/onboarding" if is_new else "/runs"
-        handoff_code = _store_handoff(db, jwt)
-        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?code={handoff_code}&next={dest}")
+        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
     except Exception:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
