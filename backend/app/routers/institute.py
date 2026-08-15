@@ -85,6 +85,8 @@ class LogActivityRequest(BaseModel):
 
 def _build_dashboard(institute_id: str, db: Session) -> dict:
     inst = store_get(db, "institute", institute_id)
+    if inst is None:
+        raise HTTPException(404, "Institute not found")
     all_acts = store_list(db, "institute_activity")
     acts = [a for a in all_acts if a["institute_id"] == institute_id]
 
