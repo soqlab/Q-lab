@@ -10,11 +10,11 @@ bcrypt
 httpx
 anthropic>=0.30
 stripe>=8.0
-qiskit[visualization]
-qiskit-ibm-runtime
-matplotlib
-pylatexenc
-numpy
-scipy
-qiskit-aer
+numpy>=1.26,<3.0
+scipy>=1.12
+matplotlib>=3.8
+pylatexenc>=2.10
+qiskit>=1.2,<2.0
+qiskit-aer>=0.15,<1.0
+qiskit-ibm-runtime>=0.26
 # Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)
