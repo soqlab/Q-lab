@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, Coins, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 
-type NavItem = { href: string; icon: React.ElementType; label: string };
+type NavItem = { href: string; icon: React.ElementType; label: string; badge?: string };
 
 const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
   {
@@ -93,8 +93,8 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/hypotheses", icon: Lightbulb, label: "Hypotheses" },
       { href: "/bayes-opt", icon: TrendingDown, label: "Bayes Opt" },
       { href: "/bayes-uncertainty", icon: BarChart3, label: "Bayes Uncertainty" },
-      { href: "/causal", icon: Share2, label: "Causal Analysis" },
-      { href: "/causal-inference", icon: GitMerge, label: "Causal Inference" },
+      { href: "/causal", icon: Share2, label: "Causal Analysis", badge: "Preview" },
+      { href: "/causal-inference", icon: GitMerge, label: "Causal Inference", badge: "Preview" },
       { href: "/anomaly-physics", icon: AlertOctagon, label: "Physics Checker" },
       { href: "/stats-engine", icon: Calculator, label: "Stats Engine" },
       { href: "/multi-comparisons", icon: Calculator, label: "Multi-Comparisons" },
@@ -118,7 +118,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/xeb", icon: Target, label: "XEB Fidelity" },
       { href: "/zne-pec", icon: Filter, label: "ZNE / PEC" },
       { href: "/error-mitigate", icon: Filter, label: "Error Mitigation" },
-      { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation" },
+      { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation", badge: "Preview" },
       { href: "/error-budget", icon: BarChart3, label: "Error Budget" },
       { href: "/dd-optimizer", icon: Wand2, label: "DD Optimizer" },
       { href: "/syndrome-decoder", icon: ShieldCheck, label: "Syndrome Decoder" },
@@ -135,7 +135,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/qml-datasets", icon: Boxes, label: "QML Datasets" },
       { href: "/quantum-chem", icon: FlaskConical, label: "Quantum Chem" },
       { href: "/quantum-sensing", icon: Navigation, label: "Quantum Sensing" },
-      { href: "/quantum-finance", icon: DollarSign, label: "Quantum Finance" },
+      { href: "/quantum-finance", icon: DollarSign, label: "Quantum Finance", badge: "Preview" },
       { href: "/quantum-network", icon: Wifi, label: "Quantum Network" },
       { href: "/quantum-internet", icon: Globe2, label: "Quantum Internet" },
       { href: "/protocol-sim", icon: ShieldCheck, label: "QKD Simulator" },
@@ -208,7 +208,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/offline-export", icon: Download, label: "Offline Export" },
       { href: "/environment", icon: Layers, label: "Env Snapshots" },
       { href: "/plugins", icon: Package, label: "Plugins" },
-      { href: "/collab-notebook", icon: FileCode, label: "Collab Notebooks" },
+      { href: "/collab-notebook", icon: FileCode, label: "Collab Notebooks", badge: "Preview" },
       { href: "/notebook", icon: FileCode, label: "Notebooks" },
     ],
   },
@@ -303,14 +303,19 @@ function NavGroup({
       </button>
       {open && (
         <div style={{ paddingLeft: 4 }}>
-          {items.map(({ href, icon: Icon, label: lbl }) => (
+          {items.map(({ href, icon: Icon, label: lbl, badge }) => (
             <Link
               key={href}
               className={`nav-link${pathname === href ? " active" : ""}`}
               href={href}
             >
               <Icon size={18} aria-hidden="true" />
-              {lbl}
+              <span style={{ flex: 1 }}>{lbl}</span>
+              {badge && (
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", background: "rgba(245,158,11,0.15)", color: "#f59e0b", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>
+                  {badge}
+                </span>
+              )}
             </Link>
           ))}
         </div>

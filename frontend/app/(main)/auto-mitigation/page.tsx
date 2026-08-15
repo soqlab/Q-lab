@@ -77,9 +77,13 @@ export default function AutoMitigationPage() {
   return (
     <div className="page" style={{ padding: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Auto-Mitigation Selector</h1>
-      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
         ML-driven selection of optimal error-mitigation strategy combinations.
       </p>
+      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>⚗️</span>
+        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Strategy selection and fidelity estimates are analytical — not measured on real hardware.</span></span>
+      </div>
 
       <div style={{ display: "flex", gap: 24 }}>
         {/* ── Left: Form ── */}
