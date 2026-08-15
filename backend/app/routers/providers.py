@@ -80,6 +80,8 @@ class ProviderJobResult(BaseModel):
     transpiled_gates: int
     success: bool
     error_message: str | None
+    is_simulated: bool = True
+    simulation_note: str = "Job simulated locally — real hardware submission requires provider credentials"
 
 class MultiProviderResult(BaseModel):
     batch_id: str

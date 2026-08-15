@@ -2,9 +2,12 @@ from __future__ import annotations
 import uuid
 import random
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/hpc-bridge", tags=["hpc-bridge"])
 
@@ -44,7 +47,7 @@ CLUSTERS = [
     },
 ]
 
-jobs_store: dict[str, dict] = {}
+_SIM_NOTE = "HPC job simulated locally — not submitted to Frontier/Perlmutter/Summit"
 
 
 class JobRequest(BaseModel):
@@ -123,39 +126,48 @@ def _simulate_progress(job: dict) -> dict:
 
 
 @router.post("/job")
-def submit_job(req: JobRequest):
+def submit_job(req: JobRequest, db: Session = Depends(get_db)):
     if req.scheduler.lower() not in ("slurm", "pbs", "lsf"):
         raise HTTPException(400, f"Unsupported scheduler: {req.scheduler}")
     if req.n_nodes < 1 or req.n_nodes > 512:
         raise HTTPException(400, "n_nodes must be between 1 and 512")
     job = _make_job(req)
-    jobs_store[job["job_id"]] = job
-    return job
+    store_put(db, "hpc_job", job["job_id"], job)
+    return {**job, "is_simulated": True, "simulation_note": _SIM_NOTE}
 
 
 @router.get("/job/{job_id}")
-def get_job(job_id: str):
-    job = jobs_store.get(job_id)
+def get_job(job_id: str, db: Session = Depends(get_db)):
+    job = store_get(db, "hpc_job", job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return _simulate_progress(job)
+    job = _simulate_progress(job)
+    store_put(db, "hpc_job", job["job_id"], job)
+    return {**job, "is_simulated": True, "simulation_note": _SIM_NOTE}
 
 
 @router.post("/job/{job_id}/cancel")
-def cancel_job(job_id: str):
-    job = jobs_store.get(job_id)
+def cancel_job(job_id: str, db: Session = Depends(get_db)):
+    job = store_get(db, "hpc_job", job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     if job["status"] in ("completed", "failed", "cancelled"):
         raise HTTPException(400, f"Job already in terminal state: {job['status']}")
     job["status"] = "cancelled"
     job["exit_code"] = -1
+    store_put(db, "hpc_job", job_id, job)
     return {"job_id": job_id, "status": "cancelled", "message": f"SLURM job {job['slurm_job_id']} cancelled."}
 
 
 @router.get("/jobs")
-def list_jobs():
-    return [_simulate_progress(j) for j in jobs_store.values()]
+def list_jobs(db: Session = Depends(get_db)):
+    jobs = store_list(db, "hpc_job")
+    result = []
+    for j in jobs:
+        updated = _simulate_progress(j)
+        store_put(db, "hpc_job", updated["job_id"], updated)
+        result.append(updated)
+    return result
 
 
 @router.get("/clusters")
@@ -164,7 +176,7 @@ def list_clusters():
 
 
 @router.post("/hybrid-workflow")
-def hybrid_workflow(req: HybridWorkflowRequest):
+def hybrid_workflow(req: HybridWorkflowRequest, db: Session = Depends(get_db)):
     workflow_id = str(uuid.uuid4())
     quantum_run_id = str(uuid.uuid4())
     job_req = JobRequest(
@@ -179,7 +191,7 @@ def hybrid_workflow(req: HybridWorkflowRequest):
         partition="quantum_post",
     )
     job = _make_job(job_req)
-    jobs_store[job["job_id"]] = job
+    store_put(db, "hpc_job", job["job_id"], job)
     return {
         "workflow_id": workflow_id,
         "quantum_run_id": quantum_run_id,

@@ -3,15 +3,15 @@ import uuid
 import random
 import math
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/rb-gst", tags=["rb-gst"])
-
-_rb_results: dict[str, dict] = {}
-_spam_results: dict[str, dict] = {}
-_xeb_results: dict[str, dict] = {}
 
 
 class RBRequest(BaseModel):
@@ -74,7 +74,7 @@ def _fit_rb(sequence_lengths: list[int], qubit: int) -> dict:
 
 
 @router.post("/rb")
-def run_rb(req: RBRequest):
+def run_rb(req: RBRequest, db: Session = Depends(get_db)):
     rb_id = str(uuid.uuid4())
     max_len = req.max_sequence_length or 1024
     lengths = sorted(set(
@@ -90,7 +90,7 @@ def run_rb(req: RBRequest):
         **fit,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _rb_results[rb_id] = result
+    store_put(db, "rb_result", rb_id, result)
     return result
 
 
@@ -109,7 +109,7 @@ def _confusion_matrix(n: int, base_error: float) -> list[list[float]]:
 
 
 @router.post("/spam")
-def run_spam(req: SPAMRequest):
+def run_spam(req: SPAMRequest, db: Session = Depends(get_db)):
     spam_id = str(uuid.uuid4())
     n = min(req.n_qubits or 1, 3)
     state_prep_err = round(random.uniform(0.001, 0.008), 5)
@@ -132,7 +132,7 @@ def run_spam(req: SPAMRequest):
         "f_spam": f_spam, "recommendations": recs,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _spam_results[spam_id] = result
+    store_put(db, "spam_result", spam_id, result)
     return result
 
 
@@ -143,7 +143,7 @@ def _xeb_fidelity_per_cycle(n_qubits: int, depth: int) -> float:
 
 
 @router.post("/xeb")
-def run_xeb(req: XEBRequest):
+def run_xeb(req: XEBRequest, db: Session = Depends(get_db)):
     xeb_id = str(uuid.uuid4())
     max_d = req.max_depth or 20
     depths = list(range(1, max_d + 1, max(1, max_d // 10)))
@@ -164,15 +164,19 @@ def run_xeb(req: XEBRequest):
         "method": "linear_cross_entropy_benchmarking",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _xeb_results[xeb_id] = result
+    store_put(db, "xeb_result", xeb_id, result)
     return result
 
 
 @router.get("/report/{backend}")
-def device_report(backend: str):
-    rb_for_backend = [r for r in _rb_results.values() if r["backend"] == backend]
-    spam_for_backend = [r for r in _spam_results.values() if r["backend"] == backend]
-    xeb_for_backend = [r for r in _xeb_results.values() if r["backend"] == backend]
+def device_report(backend: str, db: Session = Depends(get_db)):
+    rb_all = store_list(db, "rb_result")
+    spam_all = store_list(db, "spam_result")
+    xeb_all = store_list(db, "xeb_result")
+
+    rb_for_backend = [r for r in rb_all if r["backend"] == backend]
+    spam_for_backend = [r for r in spam_all if r["backend"] == backend]
+    xeb_for_backend = [r for r in xeb_all if r["backend"] == backend]
 
     if not rb_for_backend and not spam_for_backend and not xeb_for_backend:
         alpha = round(0.994 + random.gauss(0, 0.001), 5)

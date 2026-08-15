@@ -49,6 +49,9 @@ _REPOSITORY_SPECS: dict[str, dict] = {
 # ---------------------------------------------------------------------------
 
 
+_PUB_NOTE = "This is a simulated publication record — no data was uploaded to Zenodo/figshare/OSF"
+
+
 class DatasetPublication(BaseModel):
     pub_id: str
     title: str
@@ -65,6 +68,8 @@ class DatasetPublication(BaseModel):
     record_count: int
     created_at: str
     published_at: Optional[str] = None
+    is_simulated: bool = True
+    note: str = _PUB_NOTE
 
 
 class DOIMintResult(BaseModel):
@@ -73,6 +78,8 @@ class DOIMintResult(BaseModel):
     url: str
     record_id: str
     minted_at: str
+    is_simulated: bool = True
+    note: str = _PUB_NOTE
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +123,8 @@ def _generate_record_id(repository: str) -> str:
 
 
 def _build_doi(repository: str, record_id: str) -> str:
-    spec = _REPOSITORY_SPECS.get(repository, _REPOSITORY_SPECS["zenodo"])
-    return f"{spec['doi_prefix']}{record_id}"
+    # Uses the 10.00000 prefix (unregistered) so the DOI is clearly non-resolvable.
+    return f"10.00000/test-{repository}-{record_id}"
 
 
 def _build_url(repository: str, record_id: str) -> str:

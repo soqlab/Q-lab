@@ -80,7 +80,9 @@ def _simulate(paper: Dict, backend: str, n_shots: int) -> Dict:
     if nl > 0.05: issues.append("High noise level — results may not match original hardware.")
     return {"original_value": orig, "replicated_value": rep, "deviation_sigma": round(sigma, 3),
             "verdict": verdict, "verdict_detail": detail, "statistical_test": "two-tailed z-test",
-            "p_value": p_val, "circuit_ran": True, "issues": issues, "sem": round(sem, 6)}
+            "p_value": p_val, "circuit_ran": False, "is_simulated": True,
+            "simulation_note": "Replication simulated with noise model — circuit not executed on real hardware",
+            "issues": issues, "sem": round(sem, 6)}
 
 def _seed_db(db: Session):
     random.seed(99)

@@ -15,6 +15,9 @@ router = APIRouter(prefix="/api/v1/conference", tags=["conference"])
 NS = "conference_assets"
 
 
+_CONF_NOTE = "Content generated with simulated experiment values — review before submitting to academic venues"
+
+
 class ConferenceAsset(BaseModel):
     asset_id: str
     type: str
@@ -28,6 +31,8 @@ class ConferenceAsset(BaseModel):
     file_size_kb: float
     download_url: str
     created_at: str
+    is_simulated: bool = True
+    note: str = _CONF_NOTE
 
 
 class AbstractSummary(BaseModel):
