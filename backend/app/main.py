@@ -185,13 +185,10 @@ from .routers import copilot as copilot_router
 from .routers import stats_engine as stats_engine_router
 from .routers import autopilot as autopilot_router
 from .routers import tomography as tomography_router
-from .routers import zne_pec as zne_pec_router
-from .routers import error_budget as error_budget_router
 from .routers import dd_optimizer as dd_optimizer_router
 from .routers import peer_review as peer_review_router
 from .routers import replication as replication_router
 from .routers import collab as collab_router
-from .routers import cal_forecast as cal_forecast_router
 from .routers import backend_emulator as backend_emulator_router
 from .routers import job_scheduler as job_scheduler_router
 from .routers import paper_draft as paper_draft_router
@@ -235,7 +232,6 @@ from .routers import spectral_noise as spectral_noise_router
 from .routers import lab_inventory as lab_inventory_router
 from .routers import qml_datasets as qml_datasets_router
 from .routers import quantum_internet as quantum_internet_router
-from .routers import collab_notebook as collab_notebook_router
 from .routers import federated as federated_router
 from .routers import plugins as plugins_router
 from .routers import doi as doi_router
@@ -450,13 +446,10 @@ app.include_router(copilot_router.router)
 app.include_router(stats_engine_router.router)
 app.include_router(autopilot_router.router)
 app.include_router(tomography_router.router)
-app.include_router(zne_pec_router.router)
-app.include_router(error_budget_router.router)
 app.include_router(dd_optimizer_router.router)
 app.include_router(peer_review_router.router)
 app.include_router(replication_router.router)
 app.include_router(collab_router.router)
-app.include_router(cal_forecast_router.router)
 app.include_router(backend_emulator_router.router)
 app.include_router(job_scheduler_router.router)
 app.include_router(paper_draft_router.router)
@@ -500,7 +493,6 @@ app.include_router(spectral_noise_router.router)
 app.include_router(lab_inventory_router.router)
 app.include_router(qml_datasets_router.router)
 app.include_router(quantum_internet_router.router)
-app.include_router(collab_notebook_router.router)
 app.include_router(federated_router.router)
 app.include_router(plugins_router.router)
 app.include_router(doi_router.router)

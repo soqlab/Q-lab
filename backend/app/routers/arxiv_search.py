@@ -1,10 +1,11 @@
-"""arXiv Search — in-memory database of 30+ seminal quantum computing papers.
+"""arXiv Search — real arXiv API with curated fallback.
 
-No real arXiv API calls are made. Papers are searched by keyword matching
-against titles, abstracts, authors, and categories.
+Queries the live arXiv API (export.arxiv.org) first; falls back to the
+curated list of 30 seminal papers when the API is unreachable or times out.
 """
 from __future__ import annotations
-import math, random, uuid, time
+import math, uuid, time, urllib.request, urllib.parse, urllib.error
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter
@@ -426,47 +427,149 @@ class SearchRequest(BaseModel):
     sort_by: str = Field(default="relevance", description="relevance | year | citations")
 
 
+_ARXIV_NS = "http://www.w3.org/2005/Atom"
+_ARXIV_NS2 = "http://arxiv.org/schemas/atom"
+
+
+def _fetch_arxiv(query: str, category: Optional[str], max_results: int, sort_by: str) -> Optional[List[Dict]]:
+    """Call the real arXiv API and return parsed results, or None on failure."""
+    sort_map = {"year": "submittedDate", "citations": "relevance", "relevance": "relevance"}
+    arxiv_sort = sort_map.get(sort_by, "relevance")
+
+    q = f"all:{query}"
+    if category:
+        q = f"cat:{category} AND all:{query}"
+
+    params = urllib.parse.urlencode({
+        "search_query": q,
+        "start": 0,
+        "max_results": min(max_results, 25),
+        "sortBy": arxiv_sort,
+        "sortOrder": "descending",
+    })
+    url = f"http://export.arxiv.org/api/query?{params}"
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Q-Lab/1.0 (research tool)"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            xml_data = resp.read().decode("utf-8")
+    except Exception:
+        return None
+
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError:
+        return None
+
+    papers = []
+    for entry in root.findall(f"{{{_ARXIV_NS}}}entry"):
+        title_el = entry.find(f"{{{_ARXIV_NS}}}title")
+        abstract_el = entry.find(f"{{{_ARXIV_NS}}}summary")
+        id_el = entry.find(f"{{{_ARXIV_NS}}}id")
+        published_el = entry.find(f"{{{_ARXIV_NS}}}published")
+
+        title = (title_el.text or "").strip().replace("\n", " ") if title_el is not None else ""
+        abstract = (abstract_el.text or "").strip().replace("\n", " ") if abstract_el is not None else ""
+        arxiv_url = (id_el.text or "").strip() if id_el is not None else ""
+        arxiv_id = arxiv_url.split("/abs/")[-1] if "/abs/" in arxiv_url else arxiv_url
+        year = int(published_el.text[:4]) if published_el is not None and published_el.text else 0
+
+        authors = [
+            (a.find(f"{{{_ARXIV_NS}}}name").text or "").strip()
+            for a in entry.findall(f"{{{_ARXIV_NS}}}author")
+            if a.find(f"{{{_ARXIV_NS}}}name") is not None
+        ]
+
+        cats = [
+            t.get("term", "")
+            for t in entry.findall(f"{{{_ARXIV_NS}}}category")
+        ]
+
+        doi_link = next(
+            (link.get("href", "") for link in entry.findall(f"{{{_ARXIV_NS}}}link")
+             if link.get("title") == "doi"),
+            f"https://arxiv.org/abs/{arxiv_id}"
+        )
+
+        fake_paper = {
+            "arxiv_id": arxiv_id,
+            "title": title,
+            "authors": authors,
+            "year": year,
+            "abstract": abstract,
+            "categories": cats,
+            "citation_count_estimate": 0,
+            "doi_url": doi_link,
+            "keywords": [],
+        }
+        papers.append(fake_paper)
+
+    return papers if papers else None
+
+
 @router.post("")
 def search_papers(req: SearchRequest):
     t0 = time.perf_counter()
     query_tokens = req.query.lower().split()
 
-    pool = PAPERS
-    if req.category:
-        pool = [p for p in pool if req.category in p["categories"]]
+    # Try real arXiv API first
+    live_papers = _fetch_arxiv(req.query, req.category, req.max_results, req.sort_by)
+    source = "arxiv_api"
 
-    scored = [(p, _relevance(p, query_tokens)) for p in pool]
-
-    if req.sort_by == "year":
-        scored.sort(key=lambda x: x[0]["year"], reverse=True)
-    elif req.sort_by == "citations":
-        scored.sort(key=lambda x: x[0]["citation_count_estimate"], reverse=True)
+    if live_papers:
+        top_papers = live_papers[:req.max_results]
+        results = []
+        for paper in top_papers:
+            results.append({
+                "arxiv_id": paper["arxiv_id"],
+                "title": paper["title"],
+                "authors": paper["authors"],
+                "year": paper["year"],
+                "abstract_snippet": _snippet(paper["abstract"]),
+                "categories": paper["categories"],
+                "relevance_score": _relevance(paper, query_tokens),
+                "citation_count_estimate": paper["citation_count_estimate"],
+                "bibtex": _bibtex(paper),
+                "doi_url": paper["doi_url"],
+            })
+        cat_counts: Dict[str, int] = {}
+        for paper in top_papers:
+            for c in paper["categories"]:
+                cat_counts[c] = cat_counts.get(c, 0) + 1
+        related_topics = sorted(cat_counts, key=cat_counts.get, reverse=True)[:5]  # type: ignore[arg-type]
     else:
-        scored.sort(key=lambda x: x[1], reverse=True)
-
-    top = scored[: req.max_results]
-
-    results = []
-    for paper, score in top:
-        results.append({
-            "arxiv_id": paper["arxiv_id"],
-            "title": paper["title"],
-            "authors": paper["authors"],
-            "year": paper["year"],
-            "abstract_snippet": _snippet(paper["abstract"]),
-            "categories": paper["categories"],
-            "relevance_score": score,
-            "citation_count_estimate": paper["citation_count_estimate"],
-            "bibtex": _bibtex(paper),
-            "doi_url": paper["doi_url"],
-        })
-
-    # Related topics: most common categories in top results
-    cat_counts: Dict[str, int] = {}
-    for paper, _ in top:
-        for c in paper["categories"]:
-            cat_counts[c] = cat_counts.get(c, 0) + 1
-    related_topics = sorted(cat_counts, key=cat_counts.get, reverse=True)[:5]  # type: ignore[arg-type]
+        # Fallback: curated local list
+        source = "local_cache"
+        pool = PAPERS
+        if req.category:
+            pool = [p for p in pool if req.category in p["categories"]]
+        scored = [(p, _relevance(p, query_tokens)) for p in pool]
+        if req.sort_by == "year":
+            scored.sort(key=lambda x: x[0]["year"], reverse=True)
+        elif req.sort_by == "citations":
+            scored.sort(key=lambda x: x[0]["citation_count_estimate"], reverse=True)
+        else:
+            scored.sort(key=lambda x: x[1], reverse=True)
+        top = scored[:req.max_results]
+        results = []
+        for paper, score in top:
+            results.append({
+                "arxiv_id": paper["arxiv_id"],
+                "title": paper["title"],
+                "authors": paper["authors"],
+                "year": paper["year"],
+                "abstract_snippet": _snippet(paper["abstract"]),
+                "categories": paper["categories"],
+                "relevance_score": score,
+                "citation_count_estimate": paper["citation_count_estimate"],
+                "bibtex": _bibtex(paper),
+                "doi_url": paper["doi_url"],
+            })
+        cat_counts = {}
+        for paper, _ in top:
+            for c in paper["categories"]:
+                cat_counts[c] = cat_counts.get(c, 0) + 1
+        related_topics = sorted(cat_counts, key=cat_counts.get, reverse=True)[:5]  # type: ignore[arg-type]
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
 
@@ -478,6 +581,7 @@ def search_papers(req: SearchRequest):
         "results": results,
         "related_topics": related_topics,
         "search_time_ms": round(elapsed_ms, 3),
+        "source": source,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
