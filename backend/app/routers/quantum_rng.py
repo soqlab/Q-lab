@@ -16,7 +16,7 @@ import random
 import struct
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -110,7 +110,7 @@ class QRNGRequest(BaseModel):
     seed: Optional[int] = None
 
 
-from typing import Optional
+
 
 
 @router.post("")
