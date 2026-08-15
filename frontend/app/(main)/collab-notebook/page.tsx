@@ -297,9 +297,9 @@ export default function CollabNotebookPage() {
 
   return (
     <>
-      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-        <span style={{ fontSize: 16, flexShrink: 0 }}>⚗️</span>
-        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Cell execution generates template outputs — not from a live kernel.</span></span>
+      <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>🔜</span>
+        <span><strong style={{ color: "#6366f1" }}>Coming Soon</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Live kernel execution is in development — it requires secure container sandboxing to safely run arbitrary code. Notebook structure, editing, and collaboration are fully functional today.</span></span>
       </div>
       <div style={{ display: "flex", gap: 0, minHeight: 500 }}>
       {/* Left Sidebar */}

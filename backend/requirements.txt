@@ -16,4 +16,5 @@ matplotlib
 pylatexenc
 numpy
 scipy
+qiskit-aer
 # Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)

@@ -25,10 +25,6 @@ export default function QuantumFinancePage() {
 
   return (
     <>
-      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-        <span style={{ fontSize: 16, flexShrink: 0 }}>⚗️</span>
-        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Quantum speedup is theoretical. All pricing calculations are classical.</span></span>
-      </div>
       <div style={{ display: "flex", gap: 24 }}>
       <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
