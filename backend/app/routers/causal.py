@@ -3,13 +3,14 @@ import uuid
 import random
 import math
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/causal", tags=["causal"])
-
-_analyses: dict[str, dict] = {}
 
 QUANTUM_TREATMENTS = ["backend", "gate_error_rate", "T2", "n_shots", "mitigation_method"]
 QUANTUM_OUTCOMES = ["fidelity", "energy", "error_rate", "circuit_depth"]
@@ -119,7 +120,7 @@ def _interpret(ate: float, p: float, treatment: str, outcome: str) -> str:
 
 
 @router.post("/analyze")
-def causal_analyze(req: CausalAnalyzeRequest):
+def causal_analyze(req: CausalAnalyzeRequest, db: Session = Depends(get_db)):
     causal_id = str(uuid.uuid4())
     ate, ate_std = _simulate_ate(req.data, req.treatment, req.outcome)
     p = _p_value(ate, ate_std)
@@ -144,7 +145,7 @@ def causal_analyze(req: CausalAnalyzeRequest):
         "interpretation": _interpret(ate, p, req.treatment, req.outcome),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _analyses[causal_id] = result
+    store_put(db, "causal_analysis", causal_id, result)
     return result
 
 
@@ -186,7 +187,7 @@ def identify_confounders(req: ConfounderRequest):
 
 
 @router.get("")
-def list_analyses():
+def list_analyses(db: Session = Depends(get_db)):
     return [
         {
             "causal_id": a["causal_id"],
@@ -196,6 +197,6 @@ def list_analyses():
             "p_value": a["p_value"],
             "created_at": a["created_at"],
         }
-        for a in _analyses.values()
+        for a in store_list(db, "causal_analysis")
     ]
 

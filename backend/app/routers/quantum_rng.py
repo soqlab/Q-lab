@@ -41,7 +41,11 @@ def _measure_bell_pair(theta_a: float, theta_b: float, rng: random.Random) -> tu
 
 def _correlation(theta_a: float, theta_b: float, n_shots: int, rng: random.Random) -> float:
     """E(a, b) = P(same outcome) - P(different outcome)."""
-    same = sum(1 for _ in range(n_shots) if _measure_bell_pair(theta_a, theta_b, rng)[0] == _measure_bell_pair(theta_a, theta_b, rng)[1])
+    same = 0
+    for _ in range(n_shots):
+        pair = _measure_bell_pair(theta_a, theta_b, rng)
+        if pair[0] == pair[1]:
+            same += 1
     return (2 * same - n_shots) / n_shots
 
 
@@ -119,7 +123,8 @@ def generate_random(req: QRNGRequest, db: Session = Depends(get_db)):
     # CHSH certification
     chsh_rng = random.Random(req.seed if req.seed is not None else rng.randint(0, 2 ** 31))
     chsh_value = _compute_chsh(req.n_chsh_shots, chsh_rng)
-    is_certified = chsh_value > 2.0
+    # Always False — this is a classical PRNG simulation, not a real quantum device.
+    is_certified = False
 
     # Convert bits to hex
     bit_str = "".join(str(b) for b in bits)
@@ -144,12 +149,8 @@ def generate_random(req: QRNGRequest, db: Session = Depends(get_db)):
         "first_32_bits": bit_str[:32] + ("..." if len(bit_str) > 32 else ""),
         "chsh_value": chsh_value,
         "classical_bound": 2.0, "quantum_bound": round(2 * math.sqrt(2), 4),
-        "is_quantum_certified": is_certified,
-        "certification_message": (
-            f"CHSH S={chsh_value:.4f} > 2.0 (classical bound) — quantum origin verified"
-            if is_certified else
-            f"CHSH S={chsh_value:.4f} ≤ 2.0 — cannot certify quantum origin"
-        ),
+        "is_quantum_certified": False,
+        "certification_message": "Quantum statistics simulated classically — not from real quantum hardware",
         "randomness_tests": tests,
         "created_at": record.created_at.isoformat(),
     }

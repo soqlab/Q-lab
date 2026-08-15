@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import uuid
 import math
@@ -6,13 +6,17 @@ import random
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/benchmark-leaderboard", tags=["benchmark-leaderboard"])
 
 # ---------------------------------------------------------------------------
-# Seed data
+# Seed data (read-only constants)
 # ---------------------------------------------------------------------------
 
 _BACKENDS = [
@@ -38,46 +42,54 @@ def _build_history(base: float, days: int = 30) -> List[Dict]:
         history.append({"timestamp": ts.isoformat(), "value": val})
     return history
 
-
-# in-memory stores
-_leaderboard: Dict[str, Dict] = {}
-_history: Dict[str, Dict[str, List[Dict]]] = {}   # backend -> bm_type -> list
-_submissions: List[Dict] = []
-
-random.seed(42)
-
-for _b in _BACKENDS:
-    name = _b["name"]
-    _history[name] = {}
-    scores = []
-    for bm_type, bm_key in zip(_BM_TYPES, _BM_KEYS):
-        base = _b[bm_key]
-        hist = _build_history(base)
-        _history[name][bm_type] = hist
-        scores.append(base)
-
-    overall = round(sum(scores) / len(scores), 4)
-    _leaderboard[name] = {
-        "backend":         name,
-        "qaoa_ratio":      _b["qaoa"],
-        "vqe_fidelity":    _b["vqe"],
-        "qft_fidelity":    _b["qft"],
-        "ghz_fidelity":    _b["ghz"],
-        "mirror_fidelity": _b["mirror"],
-        "overall_score":   overall,
-        "rank":            0,
-        "last_updated":    _NOW.isoformat(),
-        "trend":           "stable",
-    }
-
-def _rerank() -> None:
-    sorted_backends = sorted(_leaderboard.values(), key=lambda x: x["overall_score"], reverse=True)
-    for i, entry in enumerate(sorted_backends):
-        _leaderboard[entry["backend"]]["rank"] = i + 1
-
-_rerank()
-
 _LAST_RUN = _NOW.isoformat()
+
+
+def _ensure_seeded(db: Session) -> None:
+    """Populate bench_leaderboard and bench_history with seed data if empty."""
+    existing = store_list(db, "bench_leaderboard")
+    if any("rank" in e for e in existing):
+        return
+
+    random.seed(42)
+    for _b in _BACKENDS:
+        name = _b["name"]
+        scores = []
+        for bm_type, bm_key in zip(_BM_TYPES, _BM_KEYS):
+            base = _b[bm_key]
+            hist = _build_history(base)
+            store_put(db, "bench_history", f"{name}::{bm_type}", {
+                "backend": name,
+                "bm_type": bm_type,
+                "data": hist,
+            })
+            scores.append(base)
+
+        overall = round(sum(scores) / len(scores), 4)
+        store_put(db, "bench_leaderboard", name, {
+            "backend":         name,
+            "qaoa_ratio":      _b["qaoa"],
+            "vqe_fidelity":    _b["vqe"],
+            "qft_fidelity":    _b["qft"],
+            "ghz_fidelity":    _b["ghz"],
+            "mirror_fidelity": _b["mirror"],
+            "overall_score":   overall,
+            "rank":            0,
+            "last_updated":    _NOW.isoformat(),
+            "trend":           "stable",
+        })
+
+    _rerank(db)
+
+
+def _rerank(db: Session) -> None:
+    all_records = store_list(db, "bench_leaderboard")
+    lb_entries = [e for e in all_records if "rank" in e and "submission_id" not in e]
+    sorted_backends = sorted(lb_entries, key=lambda x: x["overall_score"], reverse=True)
+    for i, entry in enumerate(sorted_backends):
+        entry["rank"] = i + 1
+        store_put(db, "bench_leaderboard", entry["backend"], entry)
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -95,24 +107,32 @@ class SubmitPayload(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-def get_leaderboard():
-    entries = sorted(_leaderboard.values(), key=lambda x: x["rank"])
+def get_leaderboard(db: Session = Depends(get_db)):
+    _ensure_seeded(db)
+    all_records = store_list(db, "bench_leaderboard")
+    lb_entries = [e for e in all_records if "rank" in e and "submission_id" not in e]
+    entries = sorted(lb_entries, key=lambda x: x["rank"])
     return {
-        "benchmarks":    entries,
-        "last_run":      _LAST_RUN,
+        "benchmarks":     entries,
+        "last_run":       _LAST_RUN,
         "total_backends": len(entries),
     }
 
 
 @router.get("/records")
-def get_records():
+def get_records(db: Session = Depends(get_db)):
+    _ensure_seeded(db)
     records: Dict[str, Dict] = {}
+    all_history = store_list(db, "bench_history")
     for bm_type in _BM_TYPES:
         best_val = -1.0
         best_backend = None
         best_ts = None
-        for backend, hist_map in _history.items():
-            for entry in hist_map.get(bm_type, []):
+        for hist_record in all_history:
+            if hist_record.get("bm_type") != bm_type:
+                continue
+            backend = hist_record.get("backend")
+            for entry in hist_record.get("data", []):
                 if entry["value"] > best_val:
                     best_val = entry["value"]
                     best_backend = backend
@@ -127,68 +147,90 @@ def get_records():
 
 
 @router.get("/history/{benchmark_type}")
-def get_benchmark_history(benchmark_type: str):
+def get_benchmark_history(benchmark_type: str, db: Session = Depends(get_db)):
     if benchmark_type not in _BM_TYPES:
         raise HTTPException(status_code=404, detail=f"Unknown benchmark type '{benchmark_type}'. Valid: {_BM_TYPES}")
+    _ensure_seeded(db)
+    all_history = store_list(db, "bench_history")
     series = []
-    for backend, hist_map in _history.items():
-        series.append({
-            "backend": backend,
-            "data":    hist_map.get(benchmark_type, []),
-        })
+    for hist_record in all_history:
+        if hist_record.get("bm_type") == benchmark_type:
+            series.append({
+                "backend": hist_record["backend"],
+                "data":    hist_record.get("data", []),
+            })
     return {"benchmark_type": benchmark_type, "series": series, "n_backends": len(series)}
 
 
 @router.get("/backend/{backend}")
-def get_backend_detail(backend: str):
-    if backend not in _leaderboard:
+def get_backend_detail(backend: str, db: Session = Depends(get_db)):
+    _ensure_seeded(db)
+    entry = store_get(db, "bench_leaderboard", backend)
+    if entry is None:
         raise HTTPException(status_code=404, detail=f"Backend '{backend}' not found.")
-    entry = _leaderboard[backend].copy()
+    entry = entry.copy()
     entry["history"] = {}
     for bm_type in _BM_TYPES:
-        entry["history"][bm_type] = _history[backend].get(bm_type, [])
-    recent_subs = [s for s in _submissions if s["backend"] == backend]
+        hist_record = store_get(db, "bench_history", f"{backend}::{bm_type}")
+        entry["history"][bm_type] = hist_record.get("data", []) if hist_record else []
+    all_records = store_list(db, "bench_leaderboard")
+    recent_subs = [e for e in all_records if e.get("submission_id") and e.get("backend") == backend]
     entry["recent_submissions"] = recent_subs[-10:]
     return entry
 
 
 @router.post("/submit")
-def submit_result(payload: SubmitPayload):
+def submit_result(payload: SubmitPayload, db: Session = Depends(get_db)):
     if payload.benchmark_type not in _BM_TYPES:
         raise HTTPException(status_code=400, detail=f"Unknown benchmark_type. Valid: {_BM_TYPES}")
     if not (0.0 <= payload.value <= 1.0):
         raise HTTPException(status_code=400, detail="Value must be between 0.0 and 1.0")
 
+    _ensure_seeded(db)
     ts = datetime.now(timezone.utc).isoformat()
 
-    if payload.backend not in _leaderboard:
-        scores = [payload.value] + [0.5] * (len(_BM_TYPES) - 1)
-        _leaderboard[payload.backend] = {
-            "backend":         payload.backend,
+    lb_entry = store_get(db, "bench_leaderboard", payload.backend)
+    if lb_entry is None:
+        lb_entry = {
+            "backend":       payload.backend,
             **{bt: 0.5 for bt in _BM_TYPES},
-            "overall_score":   round(sum(scores) / len(scores), 4),
-            "rank":            0,
-            "last_updated":    ts,
-            "trend":           "new",
+            "overall_score": 0.5,
+            "rank":          0,
+            "last_updated":  ts,
+            "trend":         "new",
         }
-        _history[payload.backend] = {bt: [] for bt in _BM_TYPES}
+        for bm_type in _BM_TYPES:
+            store_put(db, "bench_history", f"{payload.backend}::{bm_type}", {
+                "backend": payload.backend,
+                "bm_type": bm_type,
+                "data": [],
+            })
 
-    key_map = dict(zip(_BM_TYPES, _BM_KEYS))
     bm_key = payload.benchmark_type
-    old_val = _leaderboard[payload.backend].get(bm_key, 0.5)
-    _leaderboard[payload.backend][bm_key] = payload.value
-    _leaderboard[payload.backend]["last_updated"] = ts
+    old_val = lb_entry.get(bm_key, 0.5)
+    lb_entry[bm_key] = payload.value
+    lb_entry["last_updated"] = ts
 
     trend = "up" if payload.value > old_val + 0.005 else ("down" if payload.value < old_val - 0.005 else "stable")
-    _leaderboard[payload.backend]["trend"] = trend
+    lb_entry["trend"] = trend
 
-    all_vals = [_leaderboard[payload.backend].get(bt, 0.5) for bt in _BM_TYPES]
-    _leaderboard[payload.backend]["overall_score"] = round(sum(all_vals) / len(all_vals), 4)
+    all_vals = [lb_entry.get(bt, 0.5) for bt in _BM_TYPES]
+    lb_entry["overall_score"] = round(sum(all_vals) / len(all_vals), 4)
 
-    _history[payload.backend][payload.benchmark_type].append({"timestamp": ts, "value": payload.value})
+    store_put(db, "bench_leaderboard", payload.backend, lb_entry)
 
+    hist_key = f"{payload.backend}::{payload.benchmark_type}"
+    hist_record = store_get(db, "bench_history", hist_key) or {
+        "backend": payload.backend,
+        "bm_type": payload.benchmark_type,
+        "data": [],
+    }
+    hist_record["data"].append({"timestamp": ts, "value": payload.value})
+    store_put(db, "bench_history", hist_key, hist_record)
+
+    sub_id = str(uuid.uuid4())
     sub = {
-        "submission_id":  str(uuid.uuid4()),
+        "submission_id":  sub_id,
         "backend":        payload.backend,
         "benchmark_type": payload.benchmark_type,
         "value":          payload.value,
@@ -196,14 +238,15 @@ def submit_result(payload: SubmitPayload):
         "circuit_depth":  payload.circuit_depth,
         "submitted_at":   ts,
     }
-    _submissions.append(sub)
+    store_put(db, "bench_leaderboard", sub_id, sub)
 
-    _rerank()
+    _rerank(db)
+
+    updated_entry = store_get(db, "bench_leaderboard", payload.backend)
 
     return {
-        "submission": sub,
-        "leaderboard_position": _leaderboard[payload.backend]["rank"],
-        "overall_score":        _leaderboard[payload.backend]["overall_score"],
+        "submission":           sub,
+        "leaderboard_position": updated_entry["rank"] if updated_entry else 0,
+        "overall_score":        lb_entry["overall_score"],
         "trend":                trend,
     }
-

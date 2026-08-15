@@ -3,15 +3,17 @@ from __future__ import annotations
 import math, uuid, re
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/circuit-embed", tags=["circuit_embed"])
 
 GATE_VOCAB = ["h", "x", "y", "z", "s", "sdg", "t", "tdg", "cx", "cz", "swap",
               "rx", "ry", "rz", "u1", "u2", "u3", "ccx", "id", "sx"]
-
-_index: List[dict] = []
 
 
 def _embed(qasm: str) -> List[float]:
@@ -67,7 +69,7 @@ def _describe(qasm: str, emb: List[float]) -> str:
     return f"{n_q}-qubit {kind} circuit (~{n_g} gates, dominant: {dominant})"
 
 
-def _seed_demos() -> None:
+def _seed_demos(db: Session) -> None:
     demos = [
         ("Bell State", 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[2];\ncreg c[2];\nh q[0];\ncx q[0],q[1];\nmeasure q -> c;'),
         ("GHZ State", 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[3];\ncreg c[3];\nh q[0];\ncx q[0],q[1];\ncx q[1],q[2];\nmeasure q -> c;'),
@@ -79,7 +81,7 @@ def _seed_demos() -> None:
     ]
     for name, qasm in demos:
         emb = _embed(qasm)
-        _index.append({
+        entry = {
             "embed_id": f"demo-{uuid.uuid4().hex[:8]}",
             "circuit_name": name,
             "tags": ["demo"],
@@ -87,7 +89,8 @@ def _seed_demos() -> None:
             "embedding": emb,
             "description": _describe(qasm, emb),
             "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        store_put(db, "circuit_embed_index", entry["embed_id"], entry)
 
 
 class IndexRequest(BaseModel):
@@ -104,7 +107,7 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/index")
-def index_circuit(req: IndexRequest):
+def index_circuit(req: IndexRequest, db: Session = Depends(get_db)):
     emb = _embed(req.qasm)
     entry = {
         "embed_id": f"emb-{uuid.uuid4().hex[:12]}",
@@ -115,14 +118,16 @@ def index_circuit(req: IndexRequest):
         "description": _describe(req.qasm, emb),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _index.append(entry)
+    store_put(db, "circuit_embed_index", entry["embed_id"], entry)
     return {"embed_id": entry["embed_id"], "description": entry["description"], "embedding_dim": len(emb)}
 
 
 @router.post("/search")
-def search_circuits(req: SearchRequest):
-    if not _index:
-        _seed_demos()
+def search_circuits(req: SearchRequest, db: Session = Depends(get_db)):
+    index = store_list(db, "circuit_embed_index")
+    if not index:
+        _seed_demos(db)
+        index = store_list(db, "circuit_embed_index")
     qe = _embed(req.query_qasm)
     qdesc = _describe(req.query_qasm, qe)
     results = [
@@ -135,22 +140,24 @@ def search_circuits(req: SearchRequest):
             "description": e["description"],
             "created_at": e["created_at"],
         }
-        for e in _index
+        for e in index
         if _cosine(qe, e["embedding"]) >= req.min_similarity
     ]
     results.sort(key=lambda x: -x["similarity"])
     return {
         "query_description": qdesc,
         "embedding_dim": len(qe),
-        "total_indexed": len(_index),
+        "total_indexed": len(index),
         "results": results[:req.top_k],
         "n_results": min(len(results), req.top_k),
     }
 
 
 @router.get("/index")
-def list_indexed():
-    if not _index:
-        _seed_demos()
+def list_indexed(db: Session = Depends(get_db)):
+    index = store_list(db, "circuit_embed_index")
+    if not index:
+        _seed_demos(db)
+        index = store_list(db, "circuit_embed_index")
     return [{"embed_id": e["embed_id"], "circuit_name": e["circuit_name"],
-             "description": e["description"], "created_at": e["created_at"]} for e in _index]
+             "description": e["description"], "created_at": e["created_at"]} for e in index]
