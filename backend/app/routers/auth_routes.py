@@ -71,8 +71,8 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    _OWNER_EMAIL = "stateofquantumlab@gmail.com"
-    role = "owner" if payload.email.lower() == _OWNER_EMAIL else "researcher"
+    _owner_email = os.getenv("QLAB_OWNER_EMAIL", "").strip().lower()
+    role = "owner" if (_owner_email and payload.email.lower() == _owner_email) else "researcher"
 
     org: Organization | None = None
     if payload.org_name:
