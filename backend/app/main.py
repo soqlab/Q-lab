@@ -264,10 +264,18 @@ API_URL = os.getenv("QLAB_API_URL", "https://www.soqlab.com")
 # that occurs when 200+ routers are included with a lifespan= parameter set.
 init_db()
 
+_ENV = os.getenv("ENVIRONMENT", "development").lower()
+_DOCS_URL = None if _ENV == "production" else "/docs"
+_REDOC_URL = None if _ENV == "production" else "/redoc"
+_OPENAPI_URL = None if _ENV == "production" else "/openapi.json"
+
 app = FastAPI(
     title="Q-Lab API",
     version="1.0.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
+    docs_url=_DOCS_URL,
+    redoc_url=_REDOC_URL,
+    openapi_url=_OPENAPI_URL,
 )
 
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "https://www.soqlab.com,https://soqlab.com").split(",") if o.strip()]
