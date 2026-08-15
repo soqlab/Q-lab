@@ -399,16 +399,39 @@ def update_subscription(
             "subscription": sub,
         }
 
-    # --- Real Stripe path (skeleton) ---
-    # When STRIPE_SECRET_KEY is available you would:
-    #   1. Create/retrieve Stripe customer
-    #   2. Create checkout session or subscription update
-    #   3. Return session URL for redirect
-    # For now raise a not-implemented error so callers know to add Stripe SDK.
-    raise HTTPException(
-        status_code=501,
-        detail="Stripe integration skeleton: add stripe-python and implement checkout session creation.",
+    # --- Real Stripe path: return checkout URL for the new plan ---
+    price_map = {
+        "pro":        os.getenv("STRIPE_PRO_PRICE_ID", ""),
+        "enterprise": os.getenv("STRIPE_ENTERPRISE_PRICE_ID", ""),
+    }
+    price_id = price_map.get(body.plan, "")
+    if not price_id:
+        raise HTTPException(status_code=422, detail=f"No Stripe price configured for plan '{body.plan}'.")
+
+    uid = identity.user_id or 0
+    sub = _get_or_create_subscription(db, uid)
+    customer_id = sub.get("stripe_customer_id")
+    if not customer_id:
+        from ..models import User
+        from sqlalchemy import select as _select
+        user = db.scalar(_select(User).where(User.id == uid))
+        email = user.email if user else ""
+        customer = stripe_lib.Customer.create(email=email, metadata={"qlab_user_id": str(uid)})
+        customer_id = customer.id
+        sub["stripe_customer_id"] = customer_id
+        store_put(db, _NS_SUBSCRIPTION, _sub_key(uid), sub)
+
+    app_url = APP_URL
+    session = stripe_lib.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        line_items=[{"price": price_id, "quantity": 1}],
+        mode="subscription",
+        success_url=f"{app_url}/billing?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{app_url}/billing?canceled=true",
+        metadata={"qlab_user_id": str(uid), "plan": body.plan},
     )
+    return {"checkout_url": session.url, "plan": body.plan}
 
 
 @router.get("/invoices")
@@ -559,6 +582,9 @@ async def stripe_webhook(
     """
     payload = await request.body()
     secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+
+    if not secret:
+        raise HTTPException(status_code=400, detail="Webhook endpoint not configured.")
 
     if secret and stripe_signature:
         # Stripe signature format: t=<ts>,v1=<sig>[,v1=<sig2>]
