@@ -57,6 +57,8 @@ class ExecutionResult(BaseModel):
     execution_time_ms: float
     success: bool
     executed_at: str
+    is_simulated: bool = True
+    simulation_note: str = "Execution is simulated locally — outputs are template-generated, not from a real kernel"
 
 
 class CreateNotebookRequest(BaseModel):
@@ -356,6 +358,8 @@ def execute_notebook(notebook_id: str, req: ExecuteRequest, db: Session = Depend
                 execution_time_ms=time_ms,
                 success=success,
                 executed_at=now_iso,
+                is_simulated=True,
+                simulation_note="Execution is simulated locally — outputs are template-generated, not from a real kernel",
             )
         )
 

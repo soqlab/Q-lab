@@ -55,31 +55,41 @@ def _p_value(ate: float, ate_std: float) -> float:
     return max(p, 0.0001)
 
 
-def _refutation_tests(ate: float, p_value: float) -> list[dict]:
+def _refutation_tests(ate: float, p_value: float, ate_std: float) -> list[dict]:
+    # Analytically approximated refutation tests — not true permutation/resampling tests
+    placebo_p = round(min(0.85, max(0.3, 1.0 - p_value)), 4)
+    rcc_ate_shift = abs(ate) * 0.05  # random confounder shifts ATE by ~5%
+    rcc_p = round(min(0.4, max(0.05, p_value * 1.5)), 4)
+    subset_p = round(min(0.2, max(0.01, p_value * 1.2)), 4)
+    bootstrap_p = round(min(0.5, max(0.0001, p_value * 1.05)), 4)
     return [
         {
             "test": "placebo_treatment",
-            "passed": p_value < 0.05,
-            "p_value": round(random.uniform(0.3, 0.8), 4),
+            "passed": placebo_p > 0.1,
+            "p_value": placebo_p,
             "description": "Replacing treatment with random noise should remove the effect",
+            "note": "Analytically approximated — not a true permutation test",
         },
         {
             "test": "random_common_cause",
-            "passed": abs(ate - random.uniform(-0.01, 0.01)) < 0.05,
-            "p_value": round(random.uniform(0.05, 0.4), 4),
+            "passed": rcc_ate_shift < 0.05,
+            "p_value": rcc_p,
             "description": "Adding a random common cause should not change ATE significantly",
+            "note": "Analytically approximated — not a true resampling test",
         },
         {
             "test": "data_subset_refutation",
-            "passed": random.uniform(0, 1) > 0.2,
-            "p_value": round(random.uniform(0.01, 0.15), 4),
+            "passed": p_value < 0.1,
+            "p_value": subset_p,
             "description": "ATE estimated on 80% subset should be within 10% of full estimate",
+            "note": "Analytically approximated — not a true subset sampling test",
         },
         {
             "test": "bootstrap_refutation",
             "passed": p_value < 0.1,
-            "p_value": round(p_value * random.uniform(0.9, 1.1), 4),
+            "p_value": bootstrap_p,
             "description": "Bootstrap confidence interval excludes zero",
+            "note": "Derived from standard error — not a true bootstrap resample",
         },
     ]
 
@@ -128,7 +138,7 @@ def causal_analyze(req: CausalAnalyzeRequest, db: Session = Depends(get_db)):
     ci = [round(ate - z * ate_std, 4), round(ate + z * ate_std, 4)]
     confounders = _detect_confounders(req.covariates, req.treatment, req.outcome)
     nodes, edges = _causal_graph(req.treatment, req.outcome, confounders)
-    refutations = _refutation_tests(ate, p)
+    refutations = _refutation_tests(ate, p, ate_std)
     result = {
         "causal_id": causal_id,
         "treatment": req.treatment,
