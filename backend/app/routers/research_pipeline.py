@@ -2,13 +2,14 @@
 import uuid
 import random
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/research-pipeline", tags=["research-pipeline"])
-
-_pipelines: dict[str, dict] = {}
 
 STAGE_ORDER = [
     "hypothesis",
@@ -151,7 +152,7 @@ class PipelineCreateRequest(BaseModel):
 
 
 @router.post("/create")
-def create_pipeline(req: PipelineCreateRequest):
+def create_pipeline(req: PipelineCreateRequest, db: Session = Depends(get_db)):
     pipeline_id = str(uuid.uuid4())
     stages = _build_stages(active_idx=0)
     pipeline = {
@@ -167,15 +168,15 @@ def create_pipeline(req: PipelineCreateRequest):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    _pipelines[pipeline_id] = pipeline
+    store_put(db, "research_pipeline", pipeline_id, pipeline)
     return pipeline
 
 
 @router.post("/{pipeline_id}/advance")
-def advance_pipeline(pipeline_id: str):
-    if pipeline_id not in _pipelines:
+def advance_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
+    p = store_get(db, "research_pipeline", pipeline_id)
+    if p is None:
         raise HTTPException(status_code=404, detail="Pipeline not found")
-    p = _pipelines[pipeline_id]
     current_idx = STAGE_ORDER.index(p["current_stage"])
     if current_idx >= len(STAGE_ORDER) - 1:
         raise HTTPException(status_code=400, detail="Pipeline already at final stage")
@@ -184,18 +185,20 @@ def advance_pipeline(pipeline_id: str):
     p["current_stage"] = STAGE_ORDER[next_idx]
     p["overall_completion_pct"] = _completion_pct(p["stages"])
     p["updated_at"] = datetime.now(timezone.utc).isoformat()
+    store_put(db, "research_pipeline", pipeline_id, p)
     return p
 
 
 @router.get("/{pipeline_id}")
-def get_pipeline(pipeline_id: str):
-    if pipeline_id not in _pipelines:
+def get_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
+    p = store_get(db, "research_pipeline", pipeline_id)
+    if p is None:
         raise HTTPException(status_code=404, detail="Pipeline not found")
-    return _pipelines[pipeline_id]
+    return p
 
 
 @router.get("")
-def list_pipelines():
+def list_pipelines(db: Session = Depends(get_db)):
     return [
         {
             "pipeline_id": p["pipeline_id"],
@@ -204,6 +207,6 @@ def list_pipelines():
             "overall_completion_pct": p["overall_completion_pct"],
             "created_at": p["created_at"],
         }
-        for p in _pipelines.values()
+        for p in store_list(db, "research_pipeline")
     ]
 

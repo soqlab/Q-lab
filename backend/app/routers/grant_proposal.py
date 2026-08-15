@@ -2,13 +2,14 @@
 import uuid
 import random
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/grant-proposal", tags=["grant-proposal"])
-
-_proposals: dict[str, dict] = {}
 
 AGENCY_PROGRAMS = {
     "NSF": ["Quantum Leap Challenge Institutes", "CAREER", "CIF: Small", "FET: Small"],
@@ -179,7 +180,7 @@ def _word_count(sections: dict) -> int:
 
 
 @router.post("/generate")
-def generate_proposal(req: GrantRequest):
+def generate_proposal(req: GrantRequest, db: Session = Depends(get_db)):
     proposal_id = str(uuid.uuid4())
     agency = req.agency.upper()
     programs = AGENCY_PROGRAMS.get(agency, ["General Research Program"])
@@ -202,19 +203,20 @@ def generate_proposal(req: GrantRequest):
         "checklist": _checklist(req),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _proposals[proposal_id] = proposal
+    store_put(db, "grant_proposal", proposal_id, proposal)
     return proposal
 
 
 @router.get("/{proposal_id}")
-def get_proposal(proposal_id: str):
-    if proposal_id not in _proposals:
+def get_proposal(proposal_id: str, db: Session = Depends(get_db)):
+    p = store_get(db, "grant_proposal", proposal_id)
+    if p is None:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    return _proposals[proposal_id]
+    return p
 
 
 @router.get("")
-def list_proposals():
+def list_proposals(db: Session = Depends(get_db)):
     return [
         {
             "proposal_id": p["proposal_id"],
@@ -225,6 +227,6 @@ def list_proposals():
             "total_word_count": p["total_word_count"],
             "created_at": p["created_at"],
         }
-        for p in _proposals.values()
+        for p in store_list(db, "grant_proposal")
     ]
 

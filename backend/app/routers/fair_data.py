@@ -16,16 +16,17 @@ import random
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 # ---------------------------------------------------------------------------
 # Original fair-data sub-router
 # ---------------------------------------------------------------------------
 
 _fair_data_router = APIRouter(prefix="/api/v1/fair-data", tags=["fair-data"])
-
-_records: dict[str, dict] = {}
 
 
 class FAIRGenerateRequest(BaseModel):
@@ -161,7 +162,7 @@ def _checklist(score: dict) -> list[dict]:
 
 
 @_fair_data_router.post("/generate")
-def generate_fair_record(req: FAIRGenerateRequest):
+def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)):
     record_id = str(uuid.uuid4())
     doi = _make_doi()
     score = _fair_score(req)
@@ -177,7 +178,7 @@ def generate_fair_record(req: FAIRGenerateRequest):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "_meta": req.model_dump(),
     }
-    _records[record_id] = record
+    store_put(db, "fair_data_record", record_id, record)
     return {k: v for k, v in record.items() if k != "_meta"}
 
 
@@ -211,15 +212,15 @@ def validate_fair(req: FAIRValidateRequest):
 
 
 @_fair_data_router.get("/{record_id}")
-def get_record(record_id: str):
-    if record_id not in _records:
+def get_record(record_id: str, db: Session = Depends(get_db)):
+    r = store_get(db, "fair_data_record", record_id)
+    if r is None:
         raise HTTPException(status_code=404, detail="FAIR record not found")
-    r = _records[record_id]
     return {k: v for k, v in r.items() if k != "_meta"}
 
 
 @_fair_data_router.get("/")
-def list_records():
+def list_records(db: Session = Depends(get_db)):
     return [
         {
             "record_id": r["record_id"],
@@ -228,7 +229,7 @@ def list_records():
             "fair_score": r["fair_score"]["total"],
             "created_at": r["created_at"],
         }
-        for r in _records.values()
+        for r in store_list(db, "fair_data_record")
     ]
 
 

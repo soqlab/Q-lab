@@ -48,6 +48,9 @@ _BACKEND_PROFILES: dict = {
 }
 
 
+_SIM_NOTE = "Live values are simulated — connect provider credentials in Settings for real data"
+
+
 class BackendStatus(BaseModel):
     backend: str
     operational: bool
@@ -59,6 +62,8 @@ class BackendStatus(BaseModel):
     cx_error: float
     last_calibrated: str
     alert_level: str
+    data_source: str = "simulated"
+    note: str = _SIM_NOTE
 
 
 class QueueSnapshot(BaseModel):
@@ -70,6 +75,8 @@ class QueueSnapshot(BaseModel):
     jobs_pending: int
     peak_today: int
     taken_at: str
+    data_source: str = "simulated"
+    note: str = _SIM_NOTE
 
 
 class CalibrationDrift(BaseModel):
@@ -81,6 +88,7 @@ class CalibrationDrift(BaseModel):
     drift_pct: float
     timestamp: str
     alert: bool
+    data_source: str = "simulated"
 
 
 class AlertSubscription(BaseModel):

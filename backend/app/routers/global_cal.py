@@ -3,13 +3,14 @@ import uuid
 import random
 import statistics
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/global-cal", tags=["global-cal"])
-
-_CALIBRATIONS: dict[str, list] = {}
 
 SEED_DATA = {
     "ibm_brisbane": [
@@ -39,12 +40,14 @@ SEED_DATA = {
     ],
 }
 
-def _seed():
+
+def _seed(db: Session):
+    if store_list(db, "global_cal"):
+        return
     ts = datetime.now(timezone.utc).isoformat()
     for backend, entries in SEED_DATA.items():
-        _CALIBRATIONS[backend] = []
         for e in entries:
-            _CALIBRATIONS[backend].append({
+            record = {
                 "record_id": str(uuid.uuid4()),
                 "backend": backend,
                 "qubit": e["qubit"],
@@ -54,9 +57,9 @@ def _seed():
                 "readout_error": e["readout_error"],
                 "timestamp": ts,
                 "institution": e.get("institution", "anonymous"),
-            })
+            }
+            store_put(db, "global_cal", record["record_id"], record)
 
-_seed()
 
 class ContributeRequest(BaseModel):
     backend: str
@@ -74,7 +77,8 @@ class CompareRequest(BaseModel):
     your_t2: float
 
 @router.post("/contribute")
-def contribute(req: ContributeRequest):
+def contribute(req: ContributeRequest, db: Session = Depends(get_db)):
+    _seed(db)
     record = {
         "record_id": str(uuid.uuid4()),
         "backend": req.backend,
@@ -86,12 +90,14 @@ def contribute(req: ContributeRequest):
         "timestamp": req.timestamp or datetime.now(timezone.utc).isoformat(),
         "institution": req.institution or "anonymous",
     }
-    _CALIBRATIONS.setdefault(req.backend, []).append(record)
+    store_put(db, "global_cal", record["record_id"], record)
     return record
 
 @router.get("/backend/{backend_name}")
-def get_backend(backend_name: str):
-    records = _CALIBRATIONS.get(backend_name, [])
+def get_backend(backend_name: str, db: Session = Depends(get_db)):
+    _seed(db)
+    all_records = store_list(db, "global_cal")
+    records = [r for r in all_records if r["backend"] == backend_name]
     if not records:
         raise HTTPException(status_code=404, detail=f"No calibration data for backend '{backend_name}'")
     t1s = [r["t1_us"] for r in records]
@@ -118,9 +124,14 @@ def get_backend(backend_name: str):
     }
 
 @router.get("/leaderboard")
-def leaderboard():
+def leaderboard(db: Session = Depends(get_db)):
+    _seed(db)
+    all_records = store_list(db, "global_cal")
+    grouped: dict[str, list] = {}
+    for r in all_records:
+        grouped.setdefault(r["backend"], []).append(r)
     ranked = []
-    for backend, records in _CALIBRATIONS.items():
+    for backend, records in grouped.items():
         if not records:
             continue
         t2s = [r["t2_us"] for r in records]
@@ -139,8 +150,10 @@ def leaderboard():
     return {"leaderboard": ranked, "ranked_by": "median_t2_us", "as_of": datetime.now(timezone.utc).isoformat()}
 
 @router.post("/compare")
-def compare(req: CompareRequest):
-    records = _CALIBRATIONS.get(req.backend, [])
+def compare(req: CompareRequest, db: Session = Depends(get_db)):
+    _seed(db)
+    all_records = store_list(db, "global_cal")
+    records = [r for r in all_records if r["backend"] == req.backend]
     if not records:
         raise HTTPException(status_code=404, detail=f"No data for backend '{req.backend}'")
     t1s = sorted(r["t1_us"] for r in records)

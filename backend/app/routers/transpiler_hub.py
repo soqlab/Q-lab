@@ -1,9 +1,13 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/transpiler-hub", tags=["transpiler-hub"])
 
@@ -58,8 +62,6 @@ TRANSLATIONS: dict[tuple[str, str], str] = {
     ),
 }
 
-translations_store: dict[str, dict] = {}
-
 
 class TranslateRequest(BaseModel):
     circuit: str
@@ -101,7 +103,7 @@ def _detect_sdk(circuit: str) -> tuple[str, float, list[str]]:
 
 
 @router.post("/translate")
-def translate_circuit(req: TranslateRequest):
+def translate_circuit(req: TranslateRequest, db: Session = Depends(get_db)):
     src = req.source_sdk.lower()
     tgt = req.target_sdk.lower()
     if src not in SUPPORTED_SDKS:
@@ -138,7 +140,7 @@ def translate_circuit(req: TranslateRequest):
         "notes": notes,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    translations_store[tid] = record
+    store_put(db, "transpiler_translation", tid, record)
     return record
 
 

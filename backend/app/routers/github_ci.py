@@ -46,6 +46,8 @@ class PipelineRun(BaseModel):
     log_url: str
     started_at: str
     completed_at: Optional[str] = None
+    is_simulated: bool = True
+    simulation_note: str = "CI results are probabilistic simulations — not from real circuit execution"
 
 
 class WebhookPayload(BaseModel):
