@@ -299,9 +299,13 @@ export default function CausalPage() {
       <h1 style={{ marginBottom: 4, fontSize: 30, fontWeight: 900, color: "var(--text)" }}>
         Causal Inference Engine
       </h1>
-      <p style={{ marginBottom: 32, color: "var(--muted)" }}>
+      <p style={{ marginBottom: 16, color: "var(--muted)" }}>
         Discover causation vs correlation in quantum experiments.
       </p>
+      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>⚗️</span>
+        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Refutation tests are analytically approximated — not true permutation or bootstrap tests.</span></span>
+      </div>
 
       {/* Tab bar */}
       <div style={{ marginBottom: 24, display: "flex", gap: 4, borderBottom: "1px solid var(--line)" }}>

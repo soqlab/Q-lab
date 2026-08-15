@@ -296,7 +296,12 @@ export default function CollabNotebookPage() {
   };
 
   return (
-    <div style={{ display: "flex", gap: 0, minHeight: 500 }}>
+    <>
+      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>⚗️</span>
+        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong><span style={{ color: "var(--muted)", marginLeft: 8 }}>Cell execution generates template outputs — not from a live kernel.</span></span>
+      </div>
+      <div style={{ display: "flex", gap: 0, minHeight: 500 }}>
       {/* Left Sidebar */}
       <div style={{ width: 280, flexShrink: 0, borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", background: "var(--surface)", maxHeight: "calc(100vh - 130px)", position: "sticky", top: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
@@ -608,5 +613,6 @@ export default function CollabNotebookPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
