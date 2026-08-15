@@ -40,7 +40,8 @@ def _pick_strategy(n_qubits: int, depth: int, backend: str, budget: float, targe
              "expected_improvement": 0.04, "overhead": 3.0},
         ]
         overhead = 3.3
-        predicted = round(min(target + random.uniform(-0.01, 0.03), 0.999), 4)
+        improvement = sum(t["expected_improvement"] for t in techniques)
+        predicted = round(min(target + improvement * (1 - depth / 200), 0.999), 4)
     elif is_large or is_deep:
         strategy = "full_stack_mitigation"
         techniques = [
@@ -54,7 +55,8 @@ def _pick_strategy(n_qubits: int, depth: int, backend: str, budget: float, targe
              "expected_improvement": 0.02, "overhead": 1.0},
         ]
         overhead = min(budget, 3.94)
-        predicted = round(min(target + random.uniform(-0.02, 0.02), 0.97), 4)
+        improvement = sum(t["expected_improvement"] for t in techniques)
+        predicted = round(min(target + improvement * max(0, 1 - depth / 500), 0.97), 4)
     else:
         strategy = "zne_readout"
         techniques = [
@@ -64,7 +66,8 @@ def _pick_strategy(n_qubits: int, depth: int, backend: str, budget: float, targe
              "expected_improvement": 0.05, "overhead": 3.0},
         ]
         overhead = 3.45
-        predicted = round(min(target + random.uniform(-0.01, 0.02), 0.96), 4)
+        improvement = sum(t["expected_improvement"] for t in techniques)
+        predicted = round(min(target + improvement * 0.75, 0.96), 4)
 
     alternatives = [
         {"strategy": "pec_only", "fidelity": round(predicted - 0.03, 4), "overhead": round(overhead * 1.6, 2)},
@@ -92,9 +95,11 @@ def select_mitigation(req: SelectRequest, db: Session = Depends(get_db)):
         "techniques": techniques,
         "combined_overhead": round(overhead, 3),
         "predicted_fidelity": predicted,
-        "confidence": round(random.uniform(0.82, 0.95), 3),
+        "confidence": round(min(0.95, 0.82 + len(techniques) * 0.025), 3),
         "reasoning": reasoning,
         "alternatives": alternatives,
+        "is_simulated": True,
+        "simulation_note": "Strategy selection and predicted fidelity are analytically estimated — not measured on real hardware",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "request": req.model_dump(),
     }
@@ -107,17 +112,21 @@ def apply_mitigation(req: ApplyRequest, db: Session = Depends(get_db)):
     if rec is None:
         raise HTTPException(status_code=404, detail="Recommendation not found")
     total_shots = sum(req.circuit_counts.values()) if req.circuit_counts else 1024
-    raw = round(random.uniform(0.70, 0.85), 4)
-    mitigated = round(min(raw + random.uniform(0.06, 0.14), 0.995), 4)
-    improvement = round((mitigated - raw) / raw * 100, 2)
-    contributions = {t["name"]: round(random.uniform(0.01, 0.07), 4) for t in rec["techniques"]}
+    predicted = rec["predicted_fidelity"]
+    total_improvement = sum(t["expected_improvement"] for t in rec["techniques"])
+    raw = round(max(0.50, min(predicted - total_improvement, 0.89)), 4)
+    mitigated = round(min(predicted, 0.995), 4)
+    improvement_pct = round((mitigated - raw) / max(raw, 0.01) * 100, 2)
+    contributions = {t["name"]: round(t["expected_improvement"], 4) for t in rec["techniques"]}
     return {
         "mitigated_value": mitigated,
         "raw_value": raw,
-        "improvement_pct": improvement,
+        "improvement_pct": improvement_pct,
         "technique_contributions": contributions,
         "total_overhead": rec["combined_overhead"],
         "shots_used": total_shots,
+        "is_simulated": True,
+        "simulation_note": "Values are analytically derived from technique parameters — not measured from real circuit execution",
         "applied_at": datetime.now(timezone.utc).isoformat(),
     }
 

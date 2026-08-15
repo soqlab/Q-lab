@@ -5,26 +5,34 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
 import { fetchMe } from "../../../lib/api";
 
+const API_PREFIX = "/qlab-api";
+
 function OAuthCallback() {
   const { setSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
+    const code = searchParams.get("code");
     const error = searchParams.get("error");
     const next = searchParams.get("next") || "/runs";
 
-    if (error || !token) {
+    if (error || !code) {
       router.push("/login?error=oauth_failed");
       return;
     }
 
-    fetchMe(token)
-      .then(user => {
-        setSession(token, user);
-        router.push(next);
+    fetch(`${API_PREFIX}/auth/oauth/exchange?code=${encodeURIComponent(code)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("exchange_failed");
+        return res.json();
       })
+      .then(({ access_token }: { access_token: string }) =>
+        fetchMe(access_token).then(user => {
+          setSession(access_token, user);
+          router.push(next);
+        })
+      )
       .catch(() => router.push("/login?error=oauth_failed"));
   }, []); // eslint-disable-line
 

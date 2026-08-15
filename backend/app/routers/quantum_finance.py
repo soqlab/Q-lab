@@ -107,7 +107,9 @@ def run_finance(req: FinanceRequest):
         "asset_returns": [round(x, 4) for x in expected_returns],
         "circuit_depth": circuit_depth,
         "n_cnot_gates": n_cnot,
-        "quantum_advantage_achieved": speedup > 2.0,
-        "interpretation": f"Quantum AE gives {speedup:.1f}× speedup over classical Monte Carlo. Black-Scholes reference: ${bs_price:.2f}.",
+        "quantum_advantage_achieved": False,
+        "is_simulated": True,
+        "simulation_note": "All calculations are classical. Quantum AE speedup is theoretical — not from real quantum hardware.",
+        "interpretation": f"Theoretical quantum AE speedup: {speedup:.1f}× over classical Monte Carlo (calculated analytically, not from real quantum hardware). Black-Scholes reference: ${bs_price:.2f}.",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
