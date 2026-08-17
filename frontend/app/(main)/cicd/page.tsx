@@ -116,9 +116,9 @@ export default function CICDPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
-        <span>⚗️</span>
-        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong> — CI pipeline checks run locally with probabilistic results. Real GitHub/GitLab webhook integration is in development.</span>
+      <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+        <span>⚡</span>
+        <span><strong style={{ color: "#10b981" }}>Real Execution</strong> — Circuit checks run your QASM through Qiskit AerSimulator and report actual measured fidelity against your threshold.</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>CI/CD Integration</h1>
