@@ -133,6 +133,10 @@ export default function HPCBridgePage() {
 
   return (
     <div style={{ minHeight: "100vh", padding: 24, display: "flex", flexDirection: "column", gap: 32 }}>
+      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+        <span>⚗️</span>
+        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong> — Jobs are queued and tracked locally. Real submission to Frontier, Perlmutter, and Summit is in development.</span>
+      </div>
       <div>
         <h1 style={{ fontSize: 30, fontWeight: 700, color: "var(--text)" }}>HPC Hybrid Bridge</h1>
         <p style={{ color: "var(--muted)", marginTop: 4 }}>
