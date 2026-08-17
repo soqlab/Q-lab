@@ -59,6 +59,10 @@ export default function EnsemblePage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem" }}>
+      <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#e2e8f0", lineHeight: 1.6 }}>
+        <span>⚗️</span>
+        <span><strong style={{ color: "#f59e0b" }}>Simulated Preview</strong> — All provider backends (IBM, IonQ, Braket, Rigetti) run as local simulators. Real hardware submission is in development.</span>
+      </div>
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 10 }}>
           <GitMerge size={28} color="#3b82f6" /> Multi-Backend Statistical Ensemble
