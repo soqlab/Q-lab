@@ -116,9 +116,7 @@ def _make_zenodo_metadata(req: FAIRGenerateRequest) -> dict:
         "access_right": "open",
         "license": "cc-by",
         "keywords": ["quantum computing", req.algorithm, req.backend, "FAIR", "Qiskit"],
-        "related_identifiers": [
-            {"relation": "isCitedBy", "identifier": "https://arxiv.org/abs/placeholder", "scheme": "url"}
-        ],
+        "related_identifiers": [],
         "custom": {
             "quantum:backend": req.backend,
             "quantum:algorithm": req.algorithm,
