@@ -88,7 +88,7 @@ export default function OnboardingPage() {
 
   const displayKey = newKey || apiKeys[0]?.prefix?.replace("…", "...") || "qlab_YOUR_API_KEY";
 
-  const installCode = `pip install qlab-sdk`;
+  const installCode = `pip install git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk`;
 
   const autoTrackCode = `import qlab
 
@@ -198,7 +198,7 @@ with qlab.RunContext("bell-circuit", project="my-project") as run:
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>Works in any Python 3.9+ environment.</p>
         <CodeBlock code={installCode} lang="bash" />
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>
-          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install qlab-sdk qiskit qiskit-aer</code>
+          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install "git+https://github.com/yasseennandally/Q-lab.git#subdirectory=sdk" qiskit qiskit-aer</code>
         </p>
       </Step>
 
@@ -236,7 +236,7 @@ with qlab.RunContext("bell-circuit", project="my-project") as run:
       <div style={{ marginTop: 24, padding: 16, background: "#1c1b2e", borderRadius: 8, border: "1px solid #312e81", display: "flex", alignItems: "center", gap: 12 }}>
         <Code2 size={18} style={{ color: "#818cf8", flexShrink: 0 }} />
         <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>
-          The SDK source is in <code style={{ color: "#a5b4fc" }}>sdk/</code> in the repo. Copy it into your project or install directly from the path.
+          Need help? Email <a href="mailto:stateofquantumlab@gmail.com" style={{ color: "#a5b4fc" }}>stateofquantumlab@gmail.com</a> or open an issue on <a href="https://github.com/yasseennandally/Q-lab" style={{ color: "#a5b4fc" }} target="_blank" rel="noreferrer">GitHub</a>.
         </p>
       </div>
     </main>
