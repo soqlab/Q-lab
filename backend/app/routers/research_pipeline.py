@@ -132,7 +132,7 @@ def _stage_note(name: str, status: str) -> str:
         "statistical_review": "Bootstrap CI computed over 1000 resamples; Bonferroni correction applied.",
         "peer_review": "Submitted to PRA; two reviewer rounds completed with minor revisions.",
         "paper_draft": "Manuscript drafted in LaTeX; 6 figures, 2 tables, 32 references.",
-        "arxiv_submission": "Uploaded to arXiv under quant-ph; assigned arXiv:2406.XXXXX.",
+        "arxiv_submission": "Uploaded to arXiv under quant-ph; awaiting identifier assignment.",
     }
     return notes.get(name, "") if status in ("active", "complete") else ""
 
