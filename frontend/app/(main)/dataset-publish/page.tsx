@@ -265,8 +265,8 @@ export default function DatasetPublishPage() {
   return (
     <main className="page">
       <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
-        <span>🔬</span>
-        <span><strong style={{ color: "#6366f1" }}>Zenodo Live</strong> — Zenodo submissions mint real DOIs when <code style={{ background: "rgba(99,102,241,0.15)", padding: "1px 5px", borderRadius: 4 }}>ZENODO_API_TOKEN</code> is configured. Figshare and OSF integration coming soon.</span>
+        <span>🔜</span>
+        <span><strong style={{ color: "#6366f1" }}>Coming Soon</strong> — Real DOI minting via Zenodo, Figshare, and OSF is in development. Publications are tracked locally for now.</span>
       </div>
       <div className="toolbar">
         <div>
