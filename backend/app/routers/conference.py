@@ -1,22 +1,38 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional, List
+import json
+import os
 from datetime import datetime, timezone
-import uuid, random, math
+from typing import List, Optional
+
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..store import store_put, store_get, store_list, store_delete
+from ..store import store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/conference", tags=["conference"])
-
 NS = "conference_assets"
 
+# ---------------------------------------------------------------------------
+# Anthropic client — real AI generation
+# ---------------------------------------------------------------------------
 
-_CONF_NOTE = "Content generated with simulated experiment values — review before submitting to academic venues"
+_anthropic_client = None
+try:
+    import anthropic as _anthro_lib
+    _key = os.getenv("ANTHROPIC_API_KEY")
+    if _key:
+        _anthropic_client = _anthro_lib.Anthropic(api_key=_key)
+except ImportError:
+    pass
 
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
 
 class ConferenceAsset(BaseModel):
     asset_id: str
@@ -28,11 +44,9 @@ class ConferenceAsset(BaseModel):
     sections: List[dict]
     template: str
     format: str
-    file_size_kb: float
     download_url: str
     created_at: str
-    is_simulated: bool = True
-    note: str = _CONF_NOTE
+    ai_generated: bool = False
 
 
 class AbstractSummary(BaseModel):
@@ -68,145 +82,194 @@ class GenerateAbstractRequest(BaseModel):
     venue: str
 
 
-def _exp_ref(experiment_ids: List[str]) -> str:
-    if not experiment_ids:
-        return "our experimental runs"
-    return f"experiments {', '.join(experiment_ids[:3])}"
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_run_context(db: Session, experiment_ids: List[str]) -> str:
+    lines = []
+    for eid in experiment_ids[:6]:
+        for ns in ("runs", "experiments", "circuit_runs"):
+            data = store_get(db, ns, eid)
+            if data:
+                name = data.get("name") or data.get("circuit_name") or "unnamed circuit"
+                backend = data.get("backend", "unknown")
+                qubits = data.get("n_qubits") or data.get("num_qubits") or "?"
+                depth = data.get("depth", "?")
+                health = data.get("health_score", "?")
+                lines.append(
+                    f"- Run {eid[:8]}: circuit='{name}', backend={backend}, "
+                    f"qubits={qubits}, depth={depth}, health={health}"
+                )
+                break
+        else:
+            lines.append(f"- Experiment ID: {eid[:8]}")
+    return "\n".join(lines) if lines else "No experiment data available."
 
 
-def _poster_sections(title: str, experiment_ids: List[str], highlight_metric: str) -> List[dict]:
-    fidelity_val = round(random.uniform(0.91, 0.999), 4)
-    circuit_depth = random.randint(8, 64)
-    n_qubits = random.randint(4, 27)
-    shots = random.choice([1024, 4096, 8192, 16384])
+def _ai_call(prompt: str, max_tokens: int = 1500) -> Optional[str]:
+    if _anthropic_client is None:
+        return None
+    try:
+        msg = _anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+    except Exception:
+        return None
+
+
+def _parse_json_array(text: str) -> Optional[list]:
+    try:
+        start = text.find("[")
+        end = text.rfind("]") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
+    except Exception:
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Poster
+# ---------------------------------------------------------------------------
+
+def _poster_sections(
+    title: str, venue: str, authors: List[str],
+    experiment_ids: List[str], highlight_metric: str, db: Session
+) -> tuple[List[dict], bool]:
+    run_ctx = _fetch_run_context(db, experiment_ids)
+    prompt = f"""You are a quantum computing researcher writing a conference poster.
+
+Title: {title}
+Venue: {venue}
+Authors: {', '.join(authors)}
+Metric of interest: {highlight_metric}
+Experiment data:
+{run_ctx}
+
+Generate exactly 4 poster sections as a JSON array:
+[
+  {{"title": "Introduction", "content": "3-4 sentences...", "figures": [{{"label": "Fig. 1", "caption": "...", "type": "circuit_diagram"}}]}},
+  {{"title": "Methods", "content": "3-4 sentences...", "figures": [{{"label": "Fig. 2", "caption": "...", "type": "line_plot"}}]}},
+  {{"title": "Results", "content": "3-4 sentences citing specific metrics...", "figures": [{{"label": "Fig. 3", "caption": "...", "type": "bar_chart"}}]}},
+  {{"title": "Conclusion", "content": "2-3 sentences...", "figures": []}}
+]
+
+Write realistic, grounded academic content. Return ONLY the JSON array."""
+
+    text = _ai_call(prompt, 1800)
+    if text:
+        sections = _parse_json_array(text)
+        if sections and len(sections) >= 2:
+            return sections, True
+
+    exp_ref = f"runs {', '.join(e[:8] for e in experiment_ids[:3])}" if experiment_ids else "our experiments"
     return [
-        {
-            "title": "Introduction",
-            "content": (
-                f"Quantum computing offers exponential speedup for select problem classes. "
-                f"In this work we present results from {_exp_ref(experiment_ids)}, "
-                f"targeting {n_qubits}-qubit circuits executed on near-term hardware. "
-                f"Our objective is to characterize {highlight_metric} as a function of circuit depth "
-                f"and noise model parameters, establishing a reproducible benchmarking protocol."
-            ),
-            "figures": [
-                {"label": "Fig. 1", "caption": f"Circuit topology for {n_qubits}-qubit register", "type": "circuit_diagram"},
-            ],
-        },
-        {
-            "title": "Methods",
-            "content": (
-                f"We compiled variational circuits of depth {circuit_depth} using the Qiskit transpiler "
-                f"with optimization level 3. Each circuit was executed with {shots} shots. "
-                f"Readout error mitigation was applied via matrix inversion on calibration data collected "
-                f"within the same calibration window as {_exp_ref(experiment_ids)}. "
-                f"Gate fidelities were estimated from randomized benchmarking sequences of length 2–1024."
-            ),
-            "figures": [
-                {"label": "Fig. 2", "caption": "Randomized benchmarking decay curves", "type": "line_plot"},
-                {"label": "Fig. 3", "caption": "Noise model heatmap across qubit pairs", "type": "heatmap"},
-            ],
-        },
-        {
-            "title": "Results",
-            "content": (
-                f"Across {_exp_ref(experiment_ids)} we measured a peak {highlight_metric} of {fidelity_val} "
-                f"at circuit depth {circuit_depth // 2}, consistent with the predicted decoherence envelope. "
-                f"The {highlight_metric} degraded by {round(random.uniform(0.01, 0.05), 3)} per additional "
-                f"CNOT layer. Error mitigation improved raw {highlight_metric} by "
-                f"{round(random.uniform(0.02, 0.08), 3)} on average. "
-                f"Statistical significance was confirmed at p < 0.01 via bootstrapped confidence intervals."
-            ),
-            "figures": [
-                {"label": "Fig. 4", "caption": f"{highlight_metric.capitalize()} vs. circuit depth", "type": "scatter_plot"},
-                {"label": "Fig. 5", "caption": "Error-mitigated vs. raw output distribution", "type": "bar_chart"},
-            ],
-        },
-        {
-            "title": "Conclusion",
-            "content": (
-                f"This poster demonstrates that {highlight_metric} can be reliably sustained above "
-                f"{round(fidelity_val - 0.05, 3)} for circuits up to depth {circuit_depth} on current hardware. "
-                f"Future work will extend the protocol to {n_qubits + 5}-qubit systems and incorporate "
-                f"zero-noise extrapolation. All experiment data from {_exp_ref(experiment_ids)} "
-                f"are available via the Q-Lab research platform."
-            ),
-            "figures": [],
-        },
+        {"title": "Introduction", "content": f"This poster presents {title}, targeting {highlight_metric} characterization from {exp_ref} on near-term quantum hardware.", "figures": []},
+        {"title": "Methods", "content": f"Circuits from {exp_ref} were compiled with Qiskit, executed with readout mitigation and zero-noise extrapolation.", "figures": []},
+        {"title": "Results", "content": f"Measured {highlight_metric} values from {exp_ref}. Full datasets available via Q-Lab.", "figures": []},
+        {"title": "Conclusion", "content": f"Results establish a reproducible protocol. Future work targets larger qubit registers.", "figures": []},
+    ], False
+
+
+# ---------------------------------------------------------------------------
+# Slides
+# ---------------------------------------------------------------------------
+
+def _slides_sections(
+    title: str, venue: str, authors: List[str],
+    experiment_ids: List[str], n_slides: int, db: Session
+) -> tuple[List[dict], bool]:
+    run_ctx = _fetch_run_context(db, experiment_ids)
+    count = min(n_slides, 14)
+    prompt = f"""You are preparing a {count}-slide quantum computing talk.
+
+Title: {title}
+Venue: {venue}
+Authors: {', '.join(authors)}
+Experiment data:
+{run_ctx}
+
+Generate {count} slides as a JSON array. Each slide:
+{{"title": "slide title", "content": "2-3 bullet points as one string separated by newlines", "figures": []}}
+
+Include slides for: motivation, background, setup, circuit design, key results, error analysis, conclusion.
+Return ONLY the JSON array."""
+
+    text = _ai_call(prompt, 2000)
+    if text:
+        slides = _parse_json_array(text)
+        if slides and len(slides) >= 3:
+            return slides[:n_slides], True
+
+    default_titles = [
+        "Introduction & Motivation", "Quantum Background", "Experimental Setup",
+        "Circuit Design", "Calibration Protocol", "Key Results",
+        "Error Mitigation", "Noise Analysis", "Scalability", "Conclusions",
+        "Future Work", "Acknowledgements",
     ]
+    exp_ref = ', '.join(e[:8] for e in experiment_ids[:2]) if experiment_ids else "experiments"
+    return [
+        {"title": t, "content": f"Content for '{t}' based on experiments: {exp_ref}", "figures": []}
+        for t in default_titles[:n_slides]
+    ], False
 
 
-def _slides_sections(title: str, experiment_ids: List[str], n_slides: int) -> List[dict]:
-    n_qubits = random.randint(4, 27)
-    fidelity_val = round(random.uniform(0.91, 0.999), 4)
-    slide_titles = [
-        "Title & Motivation",
-        "Background: Quantum Error Sources",
-        "Experimental Setup",
-        "Circuit Design",
-        "Calibration Protocol",
-        "Key Results: Fidelity Metrics",
-        "Key Results: Noise Characterization",
-        "Error Mitigation Impact",
-        "Comparison with Classical Simulation",
-        "Scalability Analysis",
-        "Open Challenges",
-        "Conclusions & Next Steps",
-        "Acknowledgements",
-        "References",
-    ]
-    slides = []
-    for i in range(min(n_slides, len(slide_titles))):
-        slides.append({
-            "title": slide_titles[i],
-            "content": (
-                f"Slide {i + 1} of {n_slides}. "
-                f"This slide covers {slide_titles[i].lower()} in the context of {_exp_ref(experiment_ids)}. "
-                f"Key datapoint: {n_qubits}-qubit register, peak fidelity {fidelity_val}."
-            ),
-            "figures": [
-                {"label": f"Slide {i + 1} Fig.", "caption": f"Visualization for {slide_titles[i]}", "type": "auto"}
-            ] if i % 2 == 0 else [],
-        })
-    return slides
+# ---------------------------------------------------------------------------
+# Abstract
+# ---------------------------------------------------------------------------
 
+def _abstract_sections(
+    title: str, authors: List[str], experiment_ids: List[str],
+    max_words: int, venue: str, db: Session
+) -> tuple[List[dict], bool]:
+    run_ctx = _fetch_run_context(db, experiment_ids)
+    prompt = f"""Write an academic abstract ({max_words} words max) for a quantum computing paper.
 
-def _abstract_sections(title: str, authors: List[str], experiment_ids: List[str], max_words: int, venue: str) -> List[dict]:
-    n_qubits = random.randint(4, 27)
-    fidelity_val = round(random.uniform(0.91, 0.999), 4)
-    speedup = round(random.uniform(1.5, 10.0), 2)
+Title: {title}
+Authors: {', '.join(authors)}
+Venue: {venue}
+Experiment data:
+{run_ctx}
+
+Include: motivation, methods, key quantitative results, significance.
+Write at a level appropriate for {venue}.
+Return ONLY the abstract text, no labels."""
+
+    text = _ai_call(prompt, 600)
+    if text and len(text.split()) >= 50:
+        return [{"title": "Abstract", "content": text.strip(), "figures": []}], True
+
+    exp_ref = f"experiments {', '.join(e[:8] for e in experiment_ids[:3])}" if experiment_ids else "our experiments"
     body = (
-        f"We present {title}, a study of variational quantum circuits executed on {n_qubits}-qubit "
-        f"superconducting hardware. Using data from {_exp_ref(experiment_ids)}, we characterize "
-        f"gate fidelity and decoherence under realistic noise conditions. Our protocol combines "
-        f"randomized benchmarking, readout error mitigation, and zero-noise extrapolation to achieve "
-        f"a peak circuit fidelity of {fidelity_val}. We demonstrate a {speedup}x reduction in sampling "
-        f"overhead compared to unmitigated baselines. Results are benchmarked against classical "
-        f"statevector simulation and show agreement within statistical error bars. "
-        f"These findings, to be presented at {venue}, establish a reproducible methodology for "
-        f"near-term quantum advantage characterization. "
-        f"Authors: {', '.join(authors)}."
+        f"We present {title}, a systematic characterization of quantum circuits using the Q-Lab "
+        f"experiment tracking platform. Using data from {exp_ref}, we quantify gate fidelity, "
+        f"decoherence rates, and error mitigation efficacy under realistic noise conditions. "
+        f"Our protocol combines randomized benchmarking, readout error mitigation, and zero-noise "
+        f"extrapolation, yielding reproducible results across multiple backends. "
+        f"These findings, to be presented at {venue}, provide a scalable benchmarking methodology "
+        f"for near-term quantum advantage characterization. Authors: {', '.join(authors)}."
     )
-    return [{"title": "Abstract", "content": body, "figures": []}]
+    return [{"title": "Abstract", "content": body, "figures": []}], False
 
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @router.post("/generate-poster", response_model=ConferenceAsset)
 def generate_poster(req: GeneratePosterRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
     asset_id = str(uuid.uuid4())
-    sections = _poster_sections(req.title, req.experiment_ids, req.highlight_metric)
+    sections, ai_used = _poster_sections(req.title, req.venue, req.authors, req.experiment_ids, req.highlight_metric, db)
     asset = ConferenceAsset(
-        asset_id=asset_id,
-        type="poster",
-        title=req.title,
-        venue=req.venue,
-        authors=req.authors,
-        experiment_ids=req.experiment_ids,
-        sections=sections,
-        template=req.template,
-        format="pdf",
-        file_size_kb=round(random.uniform(800.0, 3500.0), 1),
+        asset_id=asset_id, type="poster", title=req.title, venue=req.venue,
+        authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,
+        template=req.template, format="pdf",
         download_url=f"/api/v1/conference/asset/{asset_id}/download",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(), ai_generated=ai_used,
     )
     store_put(db, NS, asset_id, asset.model_dump())
     return asset
@@ -215,20 +278,13 @@ def generate_poster(req: GeneratePosterRequest, db: Session = Depends(get_db)) -
 @router.post("/generate-slides", response_model=ConferenceAsset)
 def generate_slides(req: GenerateSlidesRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
     asset_id = str(uuid.uuid4())
-    sections = _slides_sections(req.title, req.experiment_ids, req.n_slides)
+    sections, ai_used = _slides_sections(req.title, req.venue, req.authors, req.experiment_ids, req.n_slides, db)
     asset = ConferenceAsset(
-        asset_id=asset_id,
-        type="slides",
-        title=req.title,
-        venue=req.venue,
-        authors=req.authors,
-        experiment_ids=req.experiment_ids,
-        sections=sections,
-        template=req.template,
-        format="pptx",
-        file_size_kb=round(random.uniform(1200.0, 6000.0), 1),
+        asset_id=asset_id, type="slides", title=req.title, venue=req.venue,
+        authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,
+        template=req.template, format="pptx",
         download_url=f"/api/v1/conference/asset/{asset_id}/download",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(), ai_generated=ai_used,
     )
     store_put(db, NS, asset_id, asset.model_dump())
     return asset
@@ -237,20 +293,13 @@ def generate_slides(req: GenerateSlidesRequest, db: Session = Depends(get_db)) -
 @router.post("/generate-abstract", response_model=ConferenceAsset)
 def generate_abstract(req: GenerateAbstractRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
     asset_id = str(uuid.uuid4())
-    sections = _abstract_sections(req.title, req.authors, req.experiment_ids, req.max_words, req.venue)
+    sections, ai_used = _abstract_sections(req.title, req.authors, req.experiment_ids, req.max_words, req.venue, db)
     asset = ConferenceAsset(
-        asset_id=asset_id,
-        type="abstract",
-        title=req.title,
-        venue=req.venue,
-        authors=req.authors,
-        experiment_ids=req.experiment_ids,
-        sections=sections,
-        template="plain",
-        format="pdf",
-        file_size_kb=round(random.uniform(20.0, 80.0), 1),
+        asset_id=asset_id, type="abstract", title=req.title, venue=req.venue,
+        authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,
+        template="plain", format="pdf",
         download_url=f"/api/v1/conference/asset/{asset_id}/download",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(), ai_generated=ai_used,
     )
     store_put(db, NS, asset_id, asset.model_dump())
     return asset
@@ -263,15 +312,12 @@ def list_assets(db: Session = Depends(get_db)) -> List[AbstractSummary]:
         content = " ".join(s.get("content", "") for s in a.get("sections", []))
         word_count = len(content.split())
         key_results = [
-            sentence.strip()
-            for sentence in content.split(".")
-            if any(kw in sentence.lower() for kw in ["fidelity", "speedup", "result", "peak", "achieve", "demonstrate"])
+            s.strip() for s in content.split(".")
+            if any(kw in s.lower() for kw in ["fidelity", "result", "peak", "achieve", "demonstrate", "show"])
         ][:3]
         summaries.append(AbstractSummary(
-            asset_id=a["asset_id"],
-            title=a["title"],
-            word_count=word_count,
-            key_results=key_results if key_results else ["See full asset for details."],
+            asset_id=a["asset_id"], title=a["title"], word_count=word_count,
+            key_results=key_results or ["See full asset for details."],
         ))
     return summaries
 

@@ -17,4 +17,5 @@ pylatexenc>=2.10
 qiskit>=1.2,<2.0
 qiskit-aer>=0.15,<1.0
 qiskit-ibm-runtime>=0.26
+paramiko>=3.4
 # Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)
