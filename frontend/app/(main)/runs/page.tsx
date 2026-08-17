@@ -493,6 +493,68 @@ function RunsInner() {
         </section>
       )}
 
+      {/* Runs table */}
+      {!loading && runs.length > 0 && (
+        <section className="panel" style={{ marginTop: 0 }}>
+          <div className="panel-header">
+            <h2>Runs <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 14 }}>({runs.length})</span></h2>
+          </div>
+          <div className="table-wrap">
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Status</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Circuit</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Backend</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Project</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Qubits</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Depth</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Health</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((run, i) => (
+                  <tr
+                    key={run.run_id}
+                    style={{ borderBottom: i < runs.length - 1 ? "1px solid var(--line)" : "none", cursor: "pointer" }}
+                    onClick={() => window.location.href = `/runs/${run.run_id}`}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
+                  >
+                    <td style={{ padding: "10px 12px" }}>
+                      <span className={statusClass(run.status)}>{run.status}</span>
+                    </td>
+                    <td style={{ padding: "10px 12px", maxWidth: 220 }}>
+                      <span style={{ color: "var(--text)", fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {run.circuit_name || "—"}
+                      </span>
+                      <span style={{ color: "var(--muted)", fontSize: 11, fontFamily: "ui-monospace,monospace" }}>
+                        {run.run_id.slice(0, 8)}…
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{run.backend || "—"}</td>
+                    <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{run.project || "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                      {run.fingerprint?.num_qubits ?? "—"}
+                    </td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                      {run.fingerprint?.depth ?? "—"}
+                    </td>
+                    <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                      <HealthBadge score={run.health_score} />
+                    </td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                      {new Date(run.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
     </main>
   );
 }
