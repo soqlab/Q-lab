@@ -52,12 +52,12 @@ function LoginForm() {
     setResending(true);
     setResent(false);
     try {
-      await fetch("/qlab-api/auth/resend-verification-email", {
+      const res = await fetch("/qlab-api/auth/resend-verification-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setResent(true);
+      if (res.ok) setResent(true);
     } finally {
       setResending(false);
     }
