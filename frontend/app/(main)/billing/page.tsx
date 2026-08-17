@@ -594,10 +594,12 @@ function BillingPageInner() {
                         textAlign: "right",
                         fontVariantNumeric: "tabular-nums",
                         fontWeight: 600,
-                        color: "#9aa8b6",
+                        color: inv.amount_usd > 0 ? "var(--text)" : "#9aa8b6",
                       }}
                     >
-                      —
+                      {inv.amount_usd > 0
+                        ? `$${inv.amount_usd.toFixed(2)}`
+                        : "Free"}
                     </td>
                     <td>
                       <span

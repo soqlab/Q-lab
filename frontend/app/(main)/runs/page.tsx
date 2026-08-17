@@ -437,9 +437,27 @@ function RunsInner() {
         }} type="button">
           <RefreshCw size={16} aria-hidden="true" /> Reset
         </button>
-        <a className="button secondary" href={exportUrl} style={{ height: 38, fontSize: 14 }} title="Export all runs as CSV">
+        <button
+          className="button secondary"
+          style={{ height: 38, fontSize: 14 }}
+          title="Export all runs as CSV"
+          type="button"
+          onClick={async () => {
+            const res = await fetch(exportUrl, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "runs.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
           <Download size={16} aria-hidden="true" /> CSV
-        </a>
+        </button>
         {live && (
           <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ok)", marginLeft: 4 }}>
             <Wifi size={14} /> Live
