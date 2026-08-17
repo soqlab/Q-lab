@@ -60,6 +60,12 @@ export default function HPCBridgePage() {
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+  // SSH credentials for real submission
+  const [showSsh, setShowSsh] = useState(false);
+  const [sshHost, setSshHost] = useState("");
+  const [sshUser, setSshUser] = useState("");
+  const [sshKeyB64, setSshKeyB64] = useState("");
+
   const fetchJobs = useCallback(async () => {
     setJobsLoading(true);
     try {
@@ -100,6 +106,9 @@ export default function HPCBridgePage() {
         partition: partition || undefined,
         quantum_run_id: quantumRunId || undefined,
         script,
+        ssh_host: sshHost || undefined,
+        ssh_user: sshUser || undefined,
+        ssh_key_b64: sshKeyB64 || undefined,
       });
       setSubmitSuccess(true);
       setName("");
@@ -133,9 +142,15 @@ export default function HPCBridgePage() {
 
   return (
     <div style={{ minHeight: "100vh", padding: 24, display: "flex", flexDirection: "column", gap: 32 }}>
-      <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
-        <span>🖥️</span>
-        <span><strong style={{ color: "#6366f1" }}>SSH Submission Ready</strong> — Provide <code style={{ background: "rgba(99,102,241,0.15)", padding: "1px 5px", borderRadius: 4 }}>ssh_host</code>, <code style={{ background: "rgba(99,102,241,0.15)", padding: "1px 5px", borderRadius: 4 }}>ssh_user</code>, and <code style={{ background: "rgba(99,102,241,0.15)", padding: "1px 5px", borderRadius: 4 }}>ssh_key_b64</code> to submit real SLURM jobs to any cluster you have access to.</span>
+      <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)", borderRadius: 8, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <span>🖥️</span>
+          <span><strong style={{ color: "#6366f1" }}>Real SLURM Submission</strong> — Fill in your SSH credentials below to submit jobs to any cluster you have access to (Frontier, Perlmutter, your university HPC, etc). Without credentials, jobs are tracked locally as a preview.</span>
+        </div>
+        <div style={{ paddingLeft: 24, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--muted)" }}>
+          <span>Need HPC access? Apply via <a href="https://www.nersc.gov/users/accounts/user-accounts/get-a-nersc-account/" target="_blank" rel="noreferrer" style={{ color: "#6366f1" }}>NERSC</a>, <a href="https://my.olcf.ornl.gov/account-application-new" target="_blank" rel="noreferrer" style={{ color: "#6366f1" }}>OLCF (Frontier/Summit)</a>, or your institution&apos;s HPC centre.</span>
+          <span>To get your base64 SSH key: run <code style={{ background: "rgba(99,102,241,0.15)", padding: "1px 5px", borderRadius: 4 }}>base64 ~/.ssh/id_rsa | tr -d &apos;\n&apos;</code> in your terminal and paste the output.</span>
+        </div>
       </div>
       <div>
         <h1 style={{ fontSize: 30, fontWeight: 700, color: "var(--text)" }}>HPC Hybrid Bridge</h1>
@@ -306,6 +321,36 @@ export default function HPCBridgePage() {
               className="input"
               style={{ width: "100%", color: "var(--ok)", fontFamily: "ui-monospace,monospace", fontSize: 12, resize: "vertical" }}
             />
+          </div>
+
+          {/* SSH credentials */}
+          <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setShowSsh(v => !v)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)" }}
+            >
+              <span>🔐 SSH Credentials {sshHost ? <span style={{ color: "#10b981", fontWeight: 400 }}>({sshHost})</span> : <span style={{ color: "var(--muted)", fontWeight: 400 }}>— optional, for real submission</span>}</span>
+              <span style={{ color: "var(--muted)" }}>{showSsh ? "▲" : "▼"}</span>
+            </button>
+            {showSsh && (
+              <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--line)" }}>
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Cluster hostname</label>
+                  <input type="text" value={sshHost} onChange={e => setSshHost(e.target.value)} placeholder="login.frontier.olcf.ornl.gov" className="input" style={{ width: "100%" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Username</label>
+                  <input type="text" value={sshUser} onChange={e => setSshUser(e.target.value)} placeholder="your_hpc_username" className="input" style={{ width: "100%" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+                    Private key (base64) — run <code style={{ background: "var(--line)", padding: "1px 4px", borderRadius: 3, fontSize: 11 }}>base64 ~/.ssh/id_rsa | tr -d &apos;\n&apos;</code>
+                  </label>
+                  <textarea value={sshKeyB64} onChange={e => setSshKeyB64(e.target.value)} placeholder="LS0tLS1CRUdJTi..." rows={3} className="input" style={{ width: "100%", fontFamily: "ui-monospace,monospace", fontSize: 11, resize: "vertical" }} />
+                </div>
+              </div>
+            )}
           </div>
 
           {submitError && (
