@@ -766,27 +766,38 @@ function HeroFabric() {
       ctx.fillText(text.toUpperCase(), P(n).x+ox, P(n).y+oy);
     }
 
+    const PROVIDERS = [
+      { node: N.ibm,     label: "ibm",     color: "#33e0c6", cycle: 3.1 },
+      { node: N.ionq,    label: "ionq",    color: "#a78bfa", cycle: 2.9 },
+      { node: N.rigetti, label: "rigetti", color: "#f472b6", cycle: 3.3 },
+      { node: N.aer,     label: "aer_sim", color: "#60a5fa", cycle: 3.0 },
+    ];
+    const SWITCH_EVERY = 3.5; // seconds per provider
+
     function frame(ts:number) {
       if (!t0) t0=ts;
       const time=(ts-t0)/1000;
       ctx.clearRect(0,0,W,H);
 
+      const provIdx = Math.floor(time / SWITCH_EVERY) % PROVIDERS.length;
+      const prov = PROVIDERS[provIdx];
+      const target = prov.node;
+
       // passive edges
-      [N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer],[N.qlab,N.oracle],[N.qlab,N.assistant];
-      [[N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer],[N.qlab,N.oracle],[N.qlab,N.assistant]]
+      [[N.qlab,N.ionq],[N.qlab,N.rigetti],[N.qlab,N.aer],[N.qlab,N.oracle],[N.qlab,N.assistant],[N.qlab,N.ibm]]
         .forEach(([a,b])=>edge(a,b,"#1e2d45",1,1));
       // active edges
-      [[N.code,N.sdk],[N.sdk,N.qlab],[N.qlab,N.ibm]]
+      [[N.code,N.sdk],[N.sdk,N.qlab],[N.qlab,target]]
         .forEach(([a,b])=>edge(a,b,"#6366f1",1.7,0.55));
 
       if (!reduce) {
         // particles
-        ([[N.code,N.sdk,2.3],[N.sdk,N.qlab,2.7],[N.qlab,N.ibm,3.1]] as any[]).forEach(([a,b,cyc],ei)=>{
+        ([[N.code,N.sdk,2.3],[N.sdk,N.qlab,2.7],[N.qlab,target,prov.cycle]] as any[]).forEach(([a,b,cyc])=>{
           for(let k=0;k<3;k++){
             const ph=((time/cyc)+k/3)%1;
             const pt=ptBez(a,b,ph);
             ctx.globalAlpha=0.25+0.75*Math.sin(ph*Math.PI);
-            ctx.fillStyle="#33e0c6";
+            ctx.fillStyle=prov.color;
             ctx.beginPath(); ctx.arc(pt.x,pt.y,2.8,0,Math.PI*2); ctx.fill();
           }
         });
@@ -799,10 +810,16 @@ function HeroFabric() {
         ctx.globalAlpha=1;
       }
 
-      // nodes
-      [[N.oracle,"#1e2d45"],[N.assistant,"#1e2d45"],[N.ionq,"#a78bfa"],[N.rigetti,"#a78bfa"],[N.aer,"#1e2d45"]]
+      // nodes — active provider gets glow treatment
+      PROVIDERS.forEach(p => {
+        const isActive = p.node === target;
+        circle(P(p.node), p.node.r,
+          isActive ? `${p.color}1a` : "#070c1a",
+          isActive ? p.color : "#1e2d45",
+          isActive ? 1.8 : 1.5);
+      });
+      [[N.oracle,"#1e2d45"],[N.assistant,"#1e2d45"]]
         .forEach(([n,s]) => circle(P(n as any),(n as any).r,"#070c1a",s as string,1.5));
-      circle(P(N.ibm), N.ibm.r, "rgba(51,224,198,0.1)", "#33e0c6", 1.8);
       circle(P(N.sdk), N.sdk.r, "rgba(99,102,241,0.1)", "#6366f1", 1.7);
       circle(P(N.code),N.code.r,"rgba(99,102,241,0.1)","#6366f1",1.5);
       circle(P(N.qlab),N.qlab.r,"rgba(99,102,241,0.15)","#6366f1",2);
@@ -812,10 +829,10 @@ function HeroFabric() {
       label(N.qlab,"Q-LAB","above");
       label(N.oracle,"cost oracle","above");
       label(N.assistant,"assistant","below");
-      label(N.ibm,"ibm ★","right");
-      label(N.ionq,"ionq","right");
-      label(N.rigetti,"rigetti","right");
-      label(N.aer,"aer_sim","right");
+      PROVIDERS.forEach(p => {
+        const isActive = p.node === target;
+        label(p.node, isActive ? `${p.label} ★` : p.label, "right");
+      });
 
       raf=requestAnimationFrame(frame);
     }
