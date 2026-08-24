@@ -236,7 +236,7 @@ with qlab.RunContext("bell-circuit", project="my-project") as run:
       <div style={{ marginTop: 24, padding: 16, background: "#1c1b2e", borderRadius: 8, border: "1px solid #312e81", display: "flex", alignItems: "center", gap: 12 }}>
         <Code2 size={18} style={{ color: "#818cf8", flexShrink: 0 }} />
         <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>
-          Need help? Email <a href="mailto:stateofquantumlab@gmail.com" style={{ color: "#a5b4fc" }}>stateofquantumlab@gmail.com</a> or open an issue on <a href="https://github.com/yasseennandally/Q-lab" style={{ color: "#a5b4fc" }} target="_blank" rel="noreferrer">GitHub</a>.
+          Need help? Email <a href="mailto:contact@soqlab.com" style={{ color: "#a5b4fc" }}>contact@soqlab.com</a> or open an issue on <a href="https://github.com/yasseennandally/Q-lab" style={{ color: "#a5b4fc" }} target="_blank" rel="noreferrer">GitHub</a>.
         </p>
       </div>
     </main>
