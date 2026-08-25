@@ -972,10 +972,13 @@ export default function LandingPage() {
                 )}
               </div>
 
-              <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: "#3d506a", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "ui-monospace,monospace" }}>Featured on</span>
                 <a href="https://buildlist.io/?ref=cb60ee99-6bed-47ba-93c6-08916112a6e4" target="_blank" rel="noopener noreferrer">
                   <img src="https://buildlist.io/badge.svg" alt="Featured on Buildlist" style={{ height: 28, width: "auto", opacity: 0.85, verticalAlign: "middle" }} />
+                </a>
+                <a target="_blank" rel="noopener noreferrer" href="https://betalist.com/startups/q-lab?utm_campaign=badge-q-lab&utm_medium=badge&utm_source=badge-featured">
+                  <img alt="Featured on BetaList" width="117" height="40" style={{ width: 117, height: 40, opacity: 0.85, verticalAlign: "middle" }} src="https://betalist.com/badges/featured?id=180588&theme=dark" />
                 </a>
               </div>
             </div>
