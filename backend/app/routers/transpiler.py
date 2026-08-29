@@ -185,9 +185,10 @@ def _parse_params(raw: str | None) -> list[float]:
         return []
     parts = [p.strip() for p in raw.split(",")]
     result = []
+    _safe_env = {"__builtins__": {}, "pi": math.pi}
     for part in parts:
         try:
-            val = float(eval(part.replace("pi", str(math.pi))))
+            val = float(eval(part.replace("pi", str(math.pi)), _safe_env, {}))
             result.append(val)
         except Exception:
             result.append(0.0)

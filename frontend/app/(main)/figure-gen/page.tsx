@@ -276,9 +276,10 @@ export default function FigureGenPage() {
                       Download SVG
                     </button>
                   </div>
-                  <div
-                    dangerouslySetInnerHTML={{ __html: result.svg_content }}
-                    style={{ background: "white", padding: "1rem", borderRadius: 8, maxWidth: "100%", overflow: "auto" }}
+                  <img
+                    src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(result.svg_content)))}`}
+                    alt="Generated figure"
+                    style={{ background: "white", padding: "1rem", borderRadius: 8, maxWidth: "100%", display: "block" }}
                   />
                 </div>
 
