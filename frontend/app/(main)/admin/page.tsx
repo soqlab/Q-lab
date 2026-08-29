@@ -137,13 +137,7 @@ function Overview({ stats, logs, logTotal }: { stats: Record<string, unknown>; l
         </div>
         {!logs.length ? <div className="empty">No audit events yet.</div> : (
           <div className="table-wrap" style={{ maxHeight: 320, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--line) transparent" }}>
-            <style>{`
-              .audit-scroll::-webkit-scrollbar { width: 6px; }
-              .audit-scroll::-webkit-scrollbar-track { background: transparent; }
-              .audit-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
-              .audit-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
-            `}</style>
-            <div className="audit-scroll" style={{ maxHeight: 320, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
+              <div className="admin-scroll" style={{ maxHeight: 320, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
             <table>
               <thead><tr><th>Time</th><th>Action</th><th>Resource</th><th>User ID</th><th>IP</th></tr></thead>
               <tbody>
@@ -322,13 +316,7 @@ function UsersTab({ token }: { token: string }) {
                   </div>
                 ))}
               </div>
-              <style>{`
-                .activity-scroll::-webkit-scrollbar { width: 6px; }
-                .activity-scroll::-webkit-scrollbar-track { background: transparent; }
-                .activity-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
-                .activity-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
-              `}</style>
-              <div className="table-wrap activity-scroll" style={{ maxHeight: 260, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
+              <div className="table-wrap admin-scroll" style={{ maxHeight: 260, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
                 {activity.recent_actions.length === 0 ? (
                   <div className="empty">No recorded actions.</div>
                 ) : (
@@ -1549,7 +1537,7 @@ function SecurityTab({ token }: { token: string }) {
 
         <section className="panel">
           <div className="panel-header"><h2>Recent Registrations</h2></div>
-          <div className="activity-scroll" style={{ maxHeight: 300, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
+          <div className="admin-scroll" style={{ maxHeight: 300, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
             {data.recent_registrations.length === 0 ? (
               <div className="empty">No new registrations.</div>
             ) : (
@@ -1629,6 +1617,12 @@ export default function AdminPage() {
 
   return (
     <main className="page">
+      <style>{`
+        .admin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .admin-scroll::-webkit-scrollbar-track { background: rgba(99,102,241,0.06); border-radius: 999px; }
+        .admin-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.35); border-radius: 999px; }
+        .admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+      `}</style>
       <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid var(--line)", flexWrap: "wrap", position: "relative" }}>
         {PRIMARY_TABS.map(t => (
           <button
