@@ -66,6 +66,7 @@ export default function ForgotPasswordPage() {
               required
               autoFocus
               autoComplete="email"
+              maxLength={254}
               placeholder="you@university.edu"
             />
             {error && <div className="auth-error">{error}</div>}

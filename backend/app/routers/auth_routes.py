@@ -4,7 +4,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,13 @@ class LoginPayload(BaseModel):
 
 class ForgotPasswordPayload(BaseModel):
     email: str
+
+    @field_validator("email")
+    @classmethod
+    def email_max_length(cls, v: str) -> str:
+        if len(v) > 254:
+            raise ValueError("Email address must be 254 characters or fewer")
+        return v
 
 
 class ResetPasswordPayload(BaseModel):

@@ -136,7 +136,14 @@ function Overview({ stats, logs, logTotal }: { stats: Record<string, unknown>; l
           <span style={{ fontSize: 13, color: "var(--muted)" }}>Last 50 of {logTotal}</span>
         </div>
         {!logs.length ? <div className="empty">No audit events yet.</div> : (
-          <div className="table-wrap">
+          <div className="table-wrap" style={{ maxHeight: 320, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--line) transparent" }}>
+            <style>{`
+              .audit-scroll::-webkit-scrollbar { width: 6px; }
+              .audit-scroll::-webkit-scrollbar-track { background: transparent; }
+              .audit-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+              .audit-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+            `}</style>
+            <div className="audit-scroll" style={{ maxHeight: 320, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
             <table>
               <thead><tr><th>Time</th><th>Action</th><th>Resource</th><th>User ID</th><th>IP</th></tr></thead>
               <tbody>
@@ -151,6 +158,7 @@ function Overview({ stats, logs, logTotal }: { stats: Record<string, unknown>; l
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </section>
