@@ -573,3 +573,5 @@ tbody tr:hover { background: var(--panel-2); }
 .admin-scroll::-webkit-scrollbar-track { background: rgba(99,102,241,0.06); border-radius: 999px; }
 .admin-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.45); border-radius: 999px; }
 .admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
