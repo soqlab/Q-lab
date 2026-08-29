@@ -567,3 +567,9 @@ tbody tr:hover { background: var(--panel-2); }
   z-index: 1000;
   white-space: nowrap;
 }
+
+/* Admin scrollbar — applied globally so it works in all sub-components */
+.admin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.admin-scroll::-webkit-scrollbar-track { background: rgba(99,102,241,0.06); border-radius: 999px; }
+.admin-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.45); border-radius: 999px; }
+.admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }

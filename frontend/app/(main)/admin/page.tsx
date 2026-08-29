@@ -1617,12 +1617,6 @@ export default function AdminPage() {
 
   return (
     <main className="page">
-      <style>{`
-        .admin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .admin-scroll::-webkit-scrollbar-track { background: rgba(99,102,241,0.06); border-radius: 999px; }
-        .admin-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.35); border-radius: 999px; }
-        .admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
-      `}</style>
       <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid var(--line)", flexWrap: "wrap", position: "relative" }}>
         {PRIMARY_TABS.map(t => (
           <button
