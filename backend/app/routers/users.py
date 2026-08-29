@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from ..auth import generate_api_key, hash_password, verify_password
 from ..database import get_db
 from ..deps import Identity, require_auth, require_role
 from ..models import APIKey, User
+from ..rate_limit import write_limiter
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -79,7 +80,7 @@ def change_password(
     return {"changed": True}
 
 
-@router.post("/me/api-keys")
+@router.post("/me/api-keys", dependencies=[Depends(write_limiter)])
 def create_api_key(
     payload: CreateKeyPayload,
     identity: Identity = Depends(require_auth),

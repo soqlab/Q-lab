@@ -769,20 +769,8 @@ def _filtered_runs_query(backend=None, status=None, project=None):
 # ------------------------------------------------------------------
 
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    run_count = db.scalar(select(func.count()).select_from(Run)) or 0
-    project_count = db.scalar(select(func.count()).select_from(Project)) or 0
-    from .models import User, Webhook
-    user_count = db.scalar(select(func.count()).select_from(User)) or 0
-    webhook_count = db.scalar(select(func.count()).select_from(Webhook)) or 0
-    return {
-        "status": "ok",
-        "version": "1.0.0",
-        "runs": run_count,
-        "projects": project_count,
-        "users": user_count,
-        "webhooks": webhook_count,
-    }
+def health_check():
+    return {"status": "ok", "version": "1.0.0"}
 
 
 # ------------------------------------------------------------------
@@ -944,7 +932,7 @@ def search_runs(
 @app.post("/api/v1/projects")
 def create_project(
     payload: ProjectPayload,
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
     project = db.scalar(select(Project).where(Project.slug == payload.slug))
@@ -1120,6 +1108,8 @@ def update_run(
     db: Session = Depends(get_db),
 ):
     run = _find_run(db, run_id)
+    if run.org_id and identity.org_id and run.org_id != identity.org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if payload.status is not None:
         run.status = payload.status
@@ -1158,6 +1148,8 @@ def delete_run(
     db: Session = Depends(get_db),
 ):
     run = _find_run(db, run_id)
+    if run.org_id and identity.org_id and run.org_id != identity.org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     db.delete(run)
     db.commit()
     log_audit(db, "run.deleted", "run", run_id, identity=identity, request=request)
@@ -1212,7 +1204,7 @@ def rerun_helper(run_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/runs/{run_id}/bundle.zip")
-def reproducibility_bundle(run_id: str, db: Session = Depends(get_db)):
+def reproducibility_bundle(run_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     run = _run_to_dict(_find_run(db, run_id))
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -1238,7 +1230,7 @@ def reproducibility_bundle(run_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/runs/{run_id}/capsule.zip")
-def reproducibility_capsule(run_id: str, db: Session = Depends(get_db)):
+def reproducibility_capsule(run_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Reproducibility Time Capsule — hermetic zip with SHA256 manifest."""
     run = _run_to_dict(_find_run(db, run_id))
     files: dict[str, bytes] = {}

@@ -30,8 +30,23 @@ class RateLimiter:
                 )
             window.append(now)
 
+    def _cleanup(self) -> None:
+        now = time.monotonic()
+        cutoff = now - self.period
+        empty = [k for k, dq in self._windows.items() if not dq or dq[-1] < cutoff]
+        for k in empty:
+            del self._windows[k]
+
     def __call__(self, request: Request) -> None:
-        ip = request.client.host if request.client else "unknown"
+        # Respect X-Forwarded-For when behind a reverse proxy (Render, Cloudflare, nginx)
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            ip = forwarded.split(",")[0].strip()
+        else:
+            ip = request.client.host if request.client else "unknown"
+        with self._lock:
+            if len(self._windows) > 10000:
+                self._cleanup()
         self.check(ip)
 
 
