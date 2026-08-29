@@ -6,6 +6,7 @@ sqlalchemy
 alembic
 psycopg2-binary
 python-jose[cryptography]
+cryptography>=42.0
 bcrypt
 httpx
 anthropic>=0.30

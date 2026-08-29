@@ -9,13 +9,16 @@ Supports: circuit_diagram, energy_landscape, probability_histogram,
 
 from __future__ import annotations
 
+import html
 import math
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+
+from ..deps import require_auth
 
 router = APIRouter(prefix="/api/v1/figure-gen", tags=["figure_gen"])
 
@@ -107,7 +110,7 @@ def _text(x: float, y: float, content: str, anchor: str = "middle",
     fs = f'font-size="{size}px" ' if size else ""
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" text-anchor="{anchor}" '
-        f'fill="{color}" {fs}font-weight="{fw}">{content}</text>'
+        f'fill="{color}" {fs}font-weight="{fw}">{html.escape(content)}</text>'
     )
 
 
@@ -144,7 +147,7 @@ def _title_block(title: str, xlabel: str, ylabel: str,
         parts.append(
             f'<text x="12" y="{H / 2:.1f}" text-anchor="middle" '
             f'fill="{th["axis_color"]}" '
-            f'transform="rotate(-90,12,{H/2:.1f})">{ylabel}</text>'
+            f'transform="rotate(-90,12,{H/2:.1f})">{html.escape(ylabel)}</text>'
         )
     return "".join(parts)
 
@@ -580,7 +583,7 @@ def _latex_caption(figure_type: str, title: str, style: str) -> str:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_auth)])
 def generate_figure(req: FigureRequest) -> Dict[str, Any]:
     # Dimensions by figure type
     dims = {

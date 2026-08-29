@@ -1,7 +1,6 @@
 """API Credential Vault — store and manage provider API keys securely.
 
-Keys are XOR-obfuscated with a site secret before storage.  In production
-replace _encrypt / _decrypt with Fernet (cryptography package) or AWS KMS.
+Keys are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) using QLAB_SECRET_KEY.
 
 Supported providers: ibm | ionq | rigetti | braket | custom
 """
@@ -14,6 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -25,30 +25,26 @@ from ..models import ApiCredential
 
 router = APIRouter(prefix="/api/v1/credentials", tags=["credentials"])
 
-_SITE_SECRET = os.environ.get("QLAB_SECRET", "qlab-dev-secret-change-in-prod")
+# Derive a 32-byte URL-safe base64 Fernet key from QLAB_SECRET_KEY
+_raw_secret = os.environ.get("QLAB_SECRET_KEY", "")
+if not _raw_secret:
+    raise RuntimeError("QLAB_SECRET_KEY must be set to encrypt credentials")
+_fernet = Fernet(base64.urlsafe_b64encode(hashlib.sha256(_raw_secret.encode()).digest()))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Encryption helpers (XOR + base64; replace with Fernet for production)
+# Encryption helpers (Fernet: AES-128-CBC + HMAC-SHA256)
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _derive_key(secret: str, length: int) -> bytes:
-    h = hashlib.sha256(secret.encode()).digest()
-    return (h * (length // 32 + 1))[:length]
-
 
 def _encrypt(plaintext: str) -> str:
-    raw = plaintext.encode()
-    key = _derive_key(_SITE_SECRET, len(raw))
-    xored = bytes(a ^ b for a, b in zip(raw, key))
-    return base64.b64encode(xored).decode()
+    return _fernet.encrypt(plaintext.encode()).decode()
 
 
 def _decrypt(ciphertext: str) -> str:
-    xored = base64.b64decode(ciphertext.encode())
-    key = _derive_key(_SITE_SECRET, len(xored))
-    raw = bytes(a ^ b for a, b in zip(xored, key))
-    return raw.decode()
+    try:
+        return _fernet.decrypt(ciphertext.encode()).decode()
+    except InvalidToken:
+        raise HTTPException(status_code=500, detail="Credential decryption failed")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

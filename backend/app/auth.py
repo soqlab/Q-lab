@@ -6,7 +6,10 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("QLAB_SECRET_KEY") or secrets.token_hex(32)
+SECRET_KEY = os.getenv("QLAB_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("QLAB_SECRET_KEY environment variable must be set")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

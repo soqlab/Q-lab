@@ -35,6 +35,13 @@ class RegisterPayload(BaseModel):
     password: str
     org_name: Optional[str] = None
 
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
 
 class LoginPayload(BaseModel):
     email: str
@@ -50,6 +57,9 @@ class ForgotPasswordPayload(BaseModel):
         if len(v) > 254:
             raise ValueError("Email address must be 254 characters or fewer")
         return v
+
+
+
 
 
 class ResetPasswordPayload(BaseModel):
@@ -140,10 +150,8 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
 @router.post("/login", dependencies=[Depends(auth_limiter)])
 def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
-    # OAuth-only accounts have an empty password_hash — give a helpful hint
-    if user and not user.password_hash:
-        raise HTTPException(status_code=401, detail=OAUTH_HINT)
-    if not user or not verify_password(payload.password, user.password_hash):
+    # Unified error for all invalid-credential cases to prevent account enumeration
+    if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
