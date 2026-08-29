@@ -322,7 +322,13 @@ function UsersTab({ token }: { token: string }) {
                   </div>
                 ))}
               </div>
-              <div className="table-wrap" style={{ maxHeight: 260, overflowY: "auto" }}>
+              <style>{`
+                .activity-scroll::-webkit-scrollbar { width: 6px; }
+                .activity-scroll::-webkit-scrollbar-track { background: transparent; }
+                .activity-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+                .activity-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+              `}</style>
+              <div className="table-wrap activity-scroll" style={{ maxHeight: 260, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
                 {activity.recent_actions.length === 0 ? (
                   <div className="empty">No recorded actions.</div>
                 ) : (
@@ -1543,7 +1549,7 @@ function SecurityTab({ token }: { token: string }) {
 
         <section className="panel">
           <div className="panel-header"><h2>Recent Registrations</h2></div>
-          <div style={{ maxHeight: 300, overflowY: "auto" }}>
+          <div className="activity-scroll" style={{ maxHeight: 300, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
             {data.recent_registrations.length === 0 ? (
               <div className="empty">No new registrations.</div>
             ) : (
