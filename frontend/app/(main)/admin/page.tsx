@@ -845,15 +845,26 @@ function ActivityFeedTab({ token }: { token: string }) {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch("/qlab-api/api/v1/admin/activity-feed?limit=200", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(data => { setEvents(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    function fetchFeed() {
+      fetch("/qlab-api/api/v1/admin/activity-feed?limit=200", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return;
+          setEvents(Array.isArray(data) ? data : []);
+          setLastUpdated(new Date());
+          setLoading(false);
+        })
+        .catch(() => { if (!cancelled) setLoading(false); });
+    }
+    fetchFeed();
+    const interval = setInterval(fetchFeed, 10_000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [token]);
 
   const filtered = filter
@@ -873,7 +884,15 @@ function ActivityFeedTab({ token }: { token: string }) {
     <section className="panel">
       <div className="panel-header" style={{ gap: 12 }}>
         <h2>Live Activity Feed</h2>
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>{filtered.length} events</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#22c55e" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block", animationName: "pulse-dot", animationDuration: "2s", animationIterationCount: "infinite" }} />
+          live · {filtered.length} events
+        </span>
+        {lastUpdated && (
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            updated {lastUpdated.toLocaleTimeString(undefined, { timeStyle: "medium" })}
+          </span>
+        )}
         <input
           value={filter}
           onChange={e => setFilter(e.target.value)}
