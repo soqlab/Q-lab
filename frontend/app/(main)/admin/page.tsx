@@ -890,7 +890,7 @@ function ActivityFeedTab({ token }: { token: string }) {
       ) : filtered.length === 0 ? (
         <div className="empty">No events yet — activity appears here as users interact with Q-Lab.</div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="admin-scroll" style={{ maxHeight: 420, overflowY: "auto", overflowX: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left" }}>
