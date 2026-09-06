@@ -980,6 +980,9 @@ export default function LandingPage() {
                 <a target="_blank" rel="noopener noreferrer" href="https://betalist.com/startups/q-lab?utm_campaign=badge-q-lab&utm_medium=badge&utm_source=badge-featured">
                   <img alt="Featured on BetaList" width="117" height="40" style={{ width: 117, height: 40, opacity: 0.85, verticalAlign: "middle" }} src="https://betalist.com/badges/featured?id=180588&theme=dark" />
                 </a>
+                <a href="https://peerpush.com/p/q-lab" target="_blank" rel="noopener noreferrer">
+                  <img src="https://peerpush.com/p/q-lab/badge.png" alt="Q-Lab on PeerPush" style={{ height: 28, width: "auto", opacity: 0.85, verticalAlign: "middle" }} />
+                </a>
               </div>
             </div>
 
