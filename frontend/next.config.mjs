@@ -41,7 +41,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: https://buildlist.io https://betalist.com",
+              "img-src 'self' data: https://buildlist.io https://betalist.com https://peerpush.com",
               "connect-src 'self'",
               "frame-ancestors 'self'",
             ].join("; "),
