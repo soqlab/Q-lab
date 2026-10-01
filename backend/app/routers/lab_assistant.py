@@ -19,11 +19,11 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
+from ..ai_provider import resolve_ai_provider, NoAIProviderError, ai_complete
 from ..database import get_db
 from ..deps import get_identity, Identity
 from ..models import Run
 from ..store import store_put, store_get, store_list, store_delete
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["lab-assistant"])
 
@@ -269,15 +269,36 @@ def _execute_tool(name: str, inputs: dict, db: Session) -> str:
     return f"Unknown tool: {name}"
 
 
-def _call_claude(system: str, messages: list, db: Session | None = None, api_key: Optional[str] = None) -> str:
-    """Call Claude with tool use support. Executes tools and loops until a text answer."""
+def _call_claude(
+    system: str, messages: list, db: Session | None = None,
+    api_key: Optional[str] = None, provider_name: str = "anthropic",
+    base_url: Optional[str] = None,
+) -> str:
+    """Call AI with tool use support (Anthropic) or simple completion (other providers)."""
+    if not api_key and provider_name == "anthropic":
+        raise HTTPException(503, "Add an AI provider key in Settings → Credentials")
+
+    # Non-Anthropic providers: fall back to plain completion (no tool use)
+    if provider_name != "anthropic":
+        prompt = "\n".join(
+            m["content"] if isinstance(m["content"], str)
+            else str(m["content"])
+            for m in messages if m.get("role") == "user"
+        ) or (messages[-1]["content"] if messages else "")
+        try:
+            import openai as _openai
+            client = _openai.OpenAI(api_key=api_key or "nokey", base_url=base_url)
+            msgs = [{"role": "system", "content": system}] if system else []
+            msgs += messages
+            resp = client.chat.completions.create(model=_MODEL, max_tokens=1500, messages=msgs)
+            return (resp.choices[0].message.content or "").strip()
+        except Exception as exc:
+            raise HTTPException(502, f"AI request failed: {exc}")
+
     try:
         import anthropic
     except ImportError:
         raise HTTPException(503, "anthropic package not installed. Run: pip install anthropic")
-
-    if not api_key:
-        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
 
     client = anthropic.Anthropic(api_key=api_key)
     current_messages = list(messages)
@@ -326,9 +347,13 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), identity: Optional[Id
     """Main RAG chat endpoint. Retrieves relevant runs, calls Claude, persists conversation."""
     if not body.message.strip():
         raise HTTPException(400, "message cannot be empty")
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
-    if not api_key:
-        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
+    if not identity:
+        raise HTTPException(401, "Login required to use AI features")
+    try:
+        _provider_name, api_key, _base_url, _cfg = resolve_ai_provider(db, identity.user_id)
+    except NoAIProviderError:
+        raise HTTPException(503, "Add an AI provider key in Settings → Credentials")
+    provider_name, base_url = _provider_name, _base_url
 
     # Load or create conversation
     conversation_id, conversation = _get_or_create_conversation(db, body.conversation_id)
@@ -379,8 +404,8 @@ User question: {body.message}"""
     history = conversation.messages[-10:]
     messages = list(history) + [{"role": "user", "content": user_prompt}]
 
-    # Call Claude (with tool use)
-    answer = _call_claude(system, messages, db=db, api_key=api_key)
+    # Call AI (with tool use for Anthropic; plain completion for others)
+    answer = _call_claude(system, messages, db=db, api_key=api_key, provider_name=provider_name, base_url=base_url)
 
     # Extract cited run IDs
     cited_runs = _extract_cited_runs(answer)

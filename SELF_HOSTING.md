@@ -72,6 +72,22 @@ volumes:
   pgdata:
 ```
 
+## AI Provider
+
+Q-Lab supports any AI provider for AI features (insights, lab assistant, circuit designer, etc.).
+Users add their own API key in **Settings → Credentials** and choose their preferred provider:
+
+| Provider | Notes |
+|---|---|
+| Anthropic (Claude) | [console.anthropic.com](https://console.anthropic.com) |
+| OpenAI (GPT-4o) | [platform.openai.com](https://platform.openai.com) |
+| Groq | Free tier available — [console.groq.com](https://console.groq.com) |
+| Mistral AI | [console.mistral.ai](https://console.mistral.ai) |
+| Google Gemini | [aistudio.google.com](https://aistudio.google.com) |
+| Custom / local | Any OpenAI-compatible server — Ollama, LM Studio, vLLM, etc. |
+
+No `ANTHROPIC_API_KEY` environment variable is needed. Each user provides their own key.
+
 ## SDK Configuration
 
 Point the SDK at your self-hosted instance:
