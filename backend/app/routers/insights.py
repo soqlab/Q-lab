@@ -1,7 +1,7 @@
 """AI Insight Engine — generate natural language analysis of a run using Claude.
 
 Insights are cached in the `run_insights` table after first generation.
-Set ANTHROPIC_API_KEY in the environment to enable.
+Add your Anthropic API key in Settings → Credentials to enable.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from ..database import get_db
 from ..deps import Identity, log_audit, require_auth
 from ..health_score import compute_health_score, health_breakdown
 from ..models import Run, RunMetric
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/runs", tags=["insights"])
 
@@ -409,11 +410,7 @@ def _build_circuit_prompt(ctx: dict) -> str:
 # Claude API call
 # ---------------------------------------------------------------------------
 
-def _call_claude(prompt: str, max_tokens: int = 2000) -> dict:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not set")
-
+def _call_claude(prompt: str, max_tokens: int = 2000, api_key: str = "") -> dict:
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
@@ -433,12 +430,8 @@ def _call_claude(prompt: str, max_tokens: int = 2000) -> dict:
         raise ValueError("anthropic package not installed — run: pip install anthropic")
 
 
-def _stream_claude(prompt: str):
+def _stream_claude(prompt: str, api_key: str = ""):
     """Yield SSE-formatted chunks from a streaming Claude response."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        yield 'data: {"error": "ANTHROPIC_API_KEY not set"}\n\n'
-        return
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
@@ -469,8 +462,9 @@ def generate_insights(
 ):
     """Generate AI insights for a run. Cached after first generation."""
     check_ai_limit(identity)
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -487,7 +481,7 @@ def generate_insights(
     prompt = _build_prompt(ctx)
 
     try:
-        result = _call_claude(prompt)
+        result = _call_claude(prompt, api_key=api_key)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
@@ -497,12 +491,6 @@ def generate_insights(
 
     _save_cached(db, run_id, _MODEL, result)
 
-    try:
-        from .billing import track_ai_insight
-        track_ai_insight(db, identity.user_id)
-    except Exception:
-        pass
-
     log_audit(db, "insight.generated", "run", run_id, identity=identity, meta={"model": _MODEL})
     return {"cached": False, "model": _MODEL, "created_at": datetime.now(timezone.utc).isoformat(), **result}
 
@@ -510,9 +498,6 @@ def generate_insights(
 @router.get("/{run_id}/insights")
 def get_insights(run_id: str, db: Session = Depends(get_db)):
     """Return cached insights, or 404 if not yet generated."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
-
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -528,8 +513,9 @@ def get_insights(run_id: str, db: Session = Depends(get_db)):
 def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Stream insight generation as SSE for live display."""
     check_ai_limit(identity)
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -539,7 +525,7 @@ def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identi
     prompt = _build_prompt(ctx)
 
     return StreamingResponse(
-        _stream_claude(prompt),
+        _stream_claude(prompt, api_key=api_key),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -549,8 +535,9 @@ def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identi
 def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Deep gate-level circuit analysis — always re-runs, no cache. Returns structured JSON."""
     check_ai_limit(identity)
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=503, detail="AI insights unavailable — ANTHROPIC_API_KEY not configured")
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -560,19 +547,13 @@ def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Ident
     prompt = _build_circuit_prompt(ctx)
 
     try:
-        result = _call_claude(prompt, max_tokens=1000)
+        result = _call_claude(prompt, max_tokens=1000, api_key=api_key)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"AI returned invalid JSON: {e}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Circuit analysis failed: {e}")
-
-    try:
-        from .billing import track_ai_insight
-        track_ai_insight(db, identity.user_id)
-    except Exception:
-        pass
 
     return {
         "run_id": run_id,
@@ -585,9 +566,8 @@ def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Ident
 @router.get("/insights/status")
 def insights_status():
     """Check if AI insights are configured."""
-    has_key = bool(os.getenv("ANTHROPIC_API_KEY"))
     return {
-        "available": has_key,
-        "model": _MODEL if has_key else None,
-        "message": "Ready" if has_key else "Set ANTHROPIC_API_KEY to enable AI insights",
+        "available": False,
+        "model": None,
+        "message": "Add your Anthropic API key in Settings → Credentials",
     }

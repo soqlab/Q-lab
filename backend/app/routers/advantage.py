@@ -31,9 +31,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import get_identity, Identity
 from ..models import AdvantageResult, Run
 from ..health_score import compute_health_score
 from ..store import store_put, store_get
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/advantage", tags=["advantage"])
 
@@ -407,8 +409,8 @@ def _call_claude_analysis(
     health_score: float,
     success_prob: Optional[float],
     classical_cost: dict,
+    api_key: Optional[str] = None,
 ) -> Optional[dict]:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return None
 
@@ -452,7 +454,7 @@ Answer in JSON:
 
 
 @router.post("/analyze/{run_id}")
-def analyze_run_advantage(run_id: str, db: Session = Depends(get_db)):
+def analyze_run_advantage(run_id: str, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
     """Analyze quantum advantage for a stored run using heuristics + optional Claude AI."""
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -485,9 +487,10 @@ def analyze_run_advantage(run_id: str, db: Session = Depends(get_db)):
         n_qubits, circuit_depth, classical_cost, algorithm, run.qasm
     )
 
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
     claude_analysis = _call_claude_analysis(
         run, algorithm, n_qubits, circuit_depth, n_shots,
-        health_score, success_prob, classical_cost,
+        health_score, success_prob, classical_cost, api_key=api_key,
     )
 
     result: dict[str, Any] = {

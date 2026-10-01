@@ -22,6 +22,7 @@ from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..health_score import compute_health_score
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
@@ -335,18 +336,16 @@ def get_digest(
         "ai_summary": None,
     }
 
-    if with_ai and os.getenv("ANTHROPIC_API_KEY"):
-        digest["ai_summary"] = _ai_digest_summary(digest)
+    ai_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
+    if with_ai and ai_key:
+        digest["ai_summary"] = _ai_digest_summary(digest, ai_key)
 
     return digest
 
 
-def _ai_digest_summary(digest: dict) -> Optional[str]:
+def _ai_digest_summary(digest: dict, api_key: str) -> Optional[str]:
     try:
         import anthropic
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
         prompt = f"""Write a 3-sentence executive digest of a quantum researcher's experiment activity.
 
 Data:
