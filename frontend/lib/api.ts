@@ -4028,6 +4028,37 @@ export async function updateCredential(credId: string, req: { label?: string; ap
 }
 
 // ------------------------------------------------------------------
+// AI Provider Settings
+// ------------------------------------------------------------------
+
+export type AIProviderMeta = {
+  provider: string;
+  label: string;
+  models: { fast: string; smart: string };
+};
+
+export type AIProviderSettings = {
+  preferred_provider: string | null;
+  available_providers: AIProviderMeta[];
+};
+
+export async function getAIProviderSettings(): Promise<AIProviderSettings> {
+  const res = await fetch(apiUrl("/api/v1/settings/ai-provider"), { cache: "no-store", headers: authHeaders() });
+  if (!res.ok) throw new Error("Could not load AI settings");
+  return res.json();
+}
+
+export async function setAIProviderPreference(provider: string): Promise<{ preferred_provider: string }> {
+  const res = await fetch(apiUrl("/api/v1/settings/ai-provider"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ provider }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ------------------------------------------------------------------
 // Notification System
 // ------------------------------------------------------------------
 

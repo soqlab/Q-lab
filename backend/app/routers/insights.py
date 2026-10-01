@@ -18,12 +18,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from ..ai_provider import ai_complete_json, ai_stream, NoAIProviderError
 from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
 from ..deps import Identity, log_audit, require_auth
 from ..health_score import compute_health_score, health_breakdown
 from ..models import Run, RunMetric
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/runs", tags=["insights"])
 
@@ -406,48 +406,6 @@ def _build_circuit_prompt(ctx: dict) -> str:
     ])
 
 
-# ---------------------------------------------------------------------------
-# Claude API call
-# ---------------------------------------------------------------------------
-
-def _call_claude(prompt: str, max_tokens: int = 2000, api_key: str = "") -> dict:
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model=_MODEL,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        raw = msg.content[0].text.strip()
-        # Strip markdown fences if model wraps in them despite instruction
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1]
-            raw = raw.rsplit("```", 1)[0].strip()
-        return json.loads(raw)
-    except (ImportError, ModuleNotFoundError):
-        raise ValueError("anthropic package not installed — run: pip install anthropic")
-
-
-def _stream_claude(prompt: str, api_key: str = ""):
-    """Yield SSE-formatted chunks from a streaming Claude response."""
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        with client.messages.stream(
-            model=_MODEL,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        ) as stream:
-            for text in stream.text_stream:
-                chunk = json.dumps({"delta": text})
-                yield f"data: {chunk}\n\n"
-        yield 'data: {"done": true}\n\n'
-    except Exception as e:
-        yield f'data: {json.dumps({"error": str(e)})}\n\n'
-
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -462,9 +420,6 @@ def generate_insights(
 ):
     """Generate AI insights for a run. Cached after first generation."""
     check_ai_limit(identity)
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -481,9 +436,9 @@ def generate_insights(
     prompt = _build_prompt(ctx)
 
     try:
-        result = _call_claude(prompt, api_key=api_key)
-    except ValueError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        result = ai_complete_json(prompt, db=db, user_id=identity.user_id, max_tokens=2000)
+    except NoAIProviderError:
+        raise HTTPException(status_code=503, detail="Add an AI provider key in Settings → Credentials")
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"AI returned invalid JSON: {e}")
     except Exception as e:
@@ -513,9 +468,6 @@ def get_insights(run_id: str, db: Session = Depends(get_db)):
 def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Stream insight generation as SSE for live display."""
     check_ai_limit(identity)
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -525,7 +477,7 @@ def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identi
     prompt = _build_prompt(ctx)
 
     return StreamingResponse(
-        _stream_claude(prompt, api_key=api_key),
+        ai_stream(prompt, db=db, user_id=identity.user_id, max_tokens=2000),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -535,9 +487,6 @@ def stream_insights(run_id: str, db: Session = Depends(get_db), identity: Identi
 def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
     """Deep gate-level circuit analysis — always re-runs, no cache. Returns structured JSON."""
     check_ai_limit(identity)
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id)
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Add your Anthropic API key in Settings → Credentials")
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -547,9 +496,9 @@ def circuit_insights(run_id: str, db: Session = Depends(get_db), identity: Ident
     prompt = _build_circuit_prompt(ctx)
 
     try:
-        result = _call_claude(prompt, max_tokens=1000, api_key=api_key)
-    except ValueError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        result = ai_complete_json(prompt, db=db, user_id=identity.user_id, max_tokens=1000)
+    except NoAIProviderError:
+        raise HTTPException(status_code=503, detail="Add an AI provider key in Settings → Credentials")
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"AI returned invalid JSON: {e}")
     except Exception as e:

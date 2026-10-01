@@ -104,6 +104,7 @@ from .routers import cicd as cicd_router
 from .routers import circuit_versioning as circuit_versioning_router
 from .routers import zne_pec as zne_pec_router
 from .routers import credentials as credentials_router
+from .routers import ai_settings as ai_settings_router
 from .routers import notifications as notifications_router
 from .routers import qv_runner as qv_runner_router
 from .routers import gate_char as gate_char_router
@@ -372,6 +373,7 @@ app.include_router(cicd_router.router)
 app.include_router(circuit_versioning_router.router)
 app.include_router(zne_pec_router.router)
 app.include_router(credentials_router.router)
+app.include_router(ai_settings_router.router)
 app.include_router(notifications_router.router)
 app.include_router(qv_runner_router.router)
 app.include_router(gate_char_router.router)

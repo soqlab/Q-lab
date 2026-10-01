@@ -8,8 +8,6 @@ Router prefix: /api/v1/circuit-designer
 from __future__ import annotations
 
 import json
-import os
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Optional
@@ -18,14 +16,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..ai_provider import ai_complete_json, NoAIProviderError
 from ..database import get_db
 from ..deps import get_identity, Identity
 from ..store import store_put, store_get, store_list
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/circuit-designer", tags=["circuit-designer"])
 
-_MODEL = "claude-sonnet-4-6"
 _NAMESPACE = "circuit_designs"
 
 # ---------------------------------------------------------------------------
@@ -64,13 +61,9 @@ def _call_claude(
     complexity: str,
     include_measurements: bool,
     optimization_goal: Optional[str],
-    api_key: str = "",
+    db: Session = None,
+    user_id: int = 0,
 ) -> dict:
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(503, "anthropic package not installed. Run: pip install anthropic")
-
     system = (
         "You are an expert quantum circuit designer. You generate valid OpenQASM 2.0 circuits "
         "and Qiskit Python code. Always respond with valid JSON. Circuits must be syntactically "
@@ -100,24 +93,7 @@ Respond with JSON:
   "suggested_backends": ["ibm_sherbrooke", "ibm_cairo"]
 }}"""
 
-    client = anthropic.Anthropic(api_key=api_key)
-    msg = client.messages.create(
-        model=_MODEL,
-        max_tokens=2000,
-        temperature=0.2,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    raw = msg.content[0].text.strip()
-
-    # Extract JSON — Claude may wrap in code fences
-    json_match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not json_match:
-        raise HTTPException(500, "Claude returned a non-JSON response. Please try again.")
-    try:
-        return json.loads(json_match.group())
-    except json.JSONDecodeError as exc:
-        raise HTTPException(500, f"Failed to parse Claude JSON response: {exc}")
+    return ai_complete_json(user, db=db, user_id=user_id, system=system, max_tokens=2000)
 
 
 # ---------------------------------------------------------------------------
@@ -127,19 +103,22 @@ Respond with JSON:
 @router.post("/design", response_model=DesignResult)
 def design_circuit(req: DesignRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
     """Generate a quantum circuit from a natural-language description."""
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
-    if not api_key:
-        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
+    if not identity:
+        raise HTTPException(401, "Login required to use AI features")
 
-    claude_resp = _call_claude(
-        description=req.description,
-        n_qubits=req.n_qubits,
-        backend=req.backend,
-        complexity=req.complexity,
-        include_measurements=req.include_measurements,
-        optimization_goal=req.optimization_goal,
-        api_key=api_key,
-    )
+    try:
+        claude_resp = _call_claude(
+            description=req.description,
+            n_qubits=req.n_qubits,
+            backend=req.backend,
+            complexity=req.complexity,
+            include_measurements=req.include_measurements,
+            optimization_goal=req.optimization_goal,
+            db=db,
+            user_id=identity.user_id,
+        )
+    except NoAIProviderError:
+        raise HTTPException(503, "Add an AI provider key in Settings → Credentials")
 
     design_id = f"cd-{uuid.uuid4().hex[:16]}"
     now = datetime.now(timezone.utc).isoformat()

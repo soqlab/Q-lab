@@ -30,12 +30,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..ai_provider import ai_complete_json, NoAIProviderError
 from ..database import get_db
 from ..deps import get_identity, Identity
 from ..models import AdvantageResult, Run
 from ..health_score import compute_health_score
 from ..store import store_put, store_get
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/advantage", tags=["advantage"])
 
@@ -409,16 +409,9 @@ def _call_claude_analysis(
     health_score: float,
     success_prob: Optional[float],
     classical_cost: dict,
-    api_key: Optional[str] = None,
+    db: Session = None,
+    user_id: int = 0,
 ) -> Optional[dict]:
-    if not api_key:
-        return None
-
-    try:
-        import anthropic
-    except ImportError:
-        return None
-
     prompt = f"""Analyze whether this quantum experiment demonstrates quantum advantage.
 
 Circuit: {run.circuit_name}, Algorithm: {algorithm}
@@ -437,20 +430,9 @@ Answer in JSON:
 }}"""
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=600,
-            temperature=0.1,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = msg.content[0].text.strip()
-        json_match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
-    except Exception:
-        pass
-    return None
+        return ai_complete_json(prompt, db=db, user_id=user_id, max_tokens=600)
+    except (NoAIProviderError, Exception):
+        return None
 
 
 @router.post("/analyze/{run_id}")
@@ -487,10 +469,10 @@ def analyze_run_advantage(run_id: str, db: Session = Depends(get_db), identity: 
         n_qubits, circuit_depth, classical_cost, algorithm, run.qasm
     )
 
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
     claude_analysis = _call_claude_analysis(
         run, algorithm, n_qubits, circuit_depth, n_shots,
-        health_score, success_prob, classical_cost, api_key=api_key,
+        health_score, success_prob, classical_cost,
+        db=db, user_id=identity.user_id if identity else 0,
     )
 
     result: dict[str, Any] = {
