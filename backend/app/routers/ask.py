@@ -22,6 +22,7 @@ from ..database import get_db
 from ..deps import get_identity, log_audit, Identity
 from ..models import Run
 from ..health_score import compute_health_score
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/ask", tags=["ask"])
 
@@ -91,14 +92,11 @@ Respond in plain text (no markdown headers, no bullet points unless the question
 Maximum 400 words."""
 
 
-def _call_claude(prompt: str) -> str:
+def _call_claude(prompt: str, api_key: str) -> str:
     try:
         import anthropic
     except ImportError:
         raise HTTPException(503, "anthropic package not installed. Run: pip install anthropic>=0.30")
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(503, "ANTHROPIC_API_KEY not configured")
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model=_MODEL,
@@ -109,15 +107,11 @@ def _call_claude(prompt: str) -> str:
     return msg.content[0].text.strip()
 
 
-async def _stream_claude(prompt: str) -> AsyncGenerator[str, None]:
+async def _stream_claude(prompt: str, api_key: str) -> AsyncGenerator[str, None]:
     try:
         import anthropic
     except ImportError:
         yield "data: " + json.dumps({"error": "anthropic package not installed"}) + "\n\n"
-        return
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        yield "data: " + json.dumps({"error": "ANTHROPIC_API_KEY not configured"}) + "\n\n"
         return
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -156,6 +150,9 @@ def ask(
 ):
     if identity:
         check_ai_limit(identity)
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
+    if not api_key:
+        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
     runs = _fetch_runs(db, body, identity)
     if not runs:
         return {
@@ -166,7 +163,7 @@ def ask(
 
     summaries = [_run_summary(r) for r in runs]
     prompt = _build_prompt(body.question, summaries, {"project": body.project, "backend": body.backend, "days": body.days})
-    answer = _call_claude(prompt)
+    answer = _call_claude(prompt, api_key)
 
     cited = [r["run_id"] for r in summaries if r["run_id"] in answer]
     if identity and identity.user_id:
@@ -186,6 +183,9 @@ async def ask_stream(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
+    if not api_key:
+        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
     runs = _fetch_runs(db, body, identity)
     summaries = [_run_summary(r) for r in runs]
     prompt = _build_prompt(body.question, summaries, {"project": body.project, "backend": body.backend, "days": body.days})
@@ -194,7 +194,7 @@ async def ask_stream(
     async def event_stream():
         meta = json.dumps({"run_count": len(runs), "run_ids": [r["run_id"] for r in summaries[:20]]})
         yield f"data: {{\"meta\": {meta}}}\n\n"
-        async for chunk in _stream_claude(prompt):
+        async for chunk in _stream_claude(prompt, api_key):
             yield chunk
 
     return StreamingResponse(
@@ -206,5 +206,4 @@ async def ask_stream(
 
 @router.get("/status")
 def ask_status():
-    available = bool(os.getenv("ANTHROPIC_API_KEY"))
-    return {"available": available, "model": _MODEL if available else None}
+    return {"available": False, "model": None}
