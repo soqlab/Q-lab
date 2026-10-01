@@ -32,6 +32,13 @@ export default function CostOraclePage() {
     <div style={{ padding: 24, maxWidth: 896, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700 }}>Cost Oracle</h1>
       <p style={{ color: "var(--muted)" }}>Estimate and compare quantum cloud execution costs across providers before submitting jobs.</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, fontSize: 12, color: "var(--muted)" }}>
+        <span style={{ color: "#6366f1", fontWeight: 600 }}>ⓘ</span>
+        Prices last verified <strong style={{ color: "var(--text)" }}>August 2024</strong> against IBM Quantum, IonQ, Braket, and Quantinuum published rates. Verify current pricing before budgeting production workloads.{" "}
+        <a href="https://quantum.ibm.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>IBM</a>
+        <a href="https://ionq.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>IonQ</a>
+        <a href="https://aws.amazon.com/braket/pricing/" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>Braket</a>
+      </div>
 
       <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

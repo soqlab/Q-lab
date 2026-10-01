@@ -950,14 +950,12 @@ export default function LandingPage() {
               </div>
 
               <h1 className="lp-hero-headline">
-                The Research Platform{" "}
-                <span>Quantum Scientists</span>{" "}
-                Actually Use
+                Experiment Tracking for{" "}
+                <span>Quantum Researchers</span>
               </h1>
 
               <p className="lp-hero-sub">
-                Track experiments across IBM Quantum, IonQ, and Braket. Collaborate
-                in real-time. Never lose a result again.
+                Log, compare, and reproduce Qiskit experiments across IBM Quantum, IonQ, and Braket — one SDK call, zero configuration.
               </p>
 
               <div className="lp-hero-ctas">
@@ -995,10 +993,10 @@ export default function LandingPage() {
         <div className="lp-stats">
           <div className="lp-stats-inner">
             {[
-              { value: "80+", label: "Integrated Tools" },
+              { value: "1 line", label: "SDK Setup" },
               { value: "IBM · IonQ · Braket", label: "Supported Providers" },
-              { value: "Real-time", label: "Collaboration" },
-              { value: "Zero Config", label: "SDK Setup" },
+              { value: "Open Source", label: "Codebase" },
+              { value: "Free Tier", label: "No credit card" },
             ].map((s) => (
               <div key={s.label} className="lp-stat">
                 <div className="lp-stat-value">{s.value}</div>
