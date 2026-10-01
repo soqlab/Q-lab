@@ -2,7 +2,7 @@
 
 Keys are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) using QLAB_SECRET_KEY.
 
-Supported providers: ibm | ionq | rigetti | braket | custom
+Supported providers: ibm | ionq | rigetti | braket | anthropic | custom
 """
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def get_active_key_for_user(db: Session, provider: str, user_id: int) -> Optiona
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CredentialCreate(BaseModel):
-    provider: str = Field(..., description="ibm | ionq | rigetti | braket | custom")
+    provider: str = Field(..., description="ibm | ionq | rigetti | braket | anthropic | custom")
     label: str
     api_key: str
     expires_at: Optional[str] = None  # ISO datetime string
@@ -133,7 +133,7 @@ def create_credential(
     identity: Identity = Depends(require_auth),
 ):
     """Store a new API key for a provider."""
-    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "custom"}:
+    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "custom"}:
         raise HTTPException(422, f"Unknown provider '{req.provider}'")
     expires = None
     if req.expires_at:

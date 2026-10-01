@@ -11,23 +11,18 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import get_identity, Identity
 from ..store import store_get, store_list, store_put
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/conference", tags=["conference"])
 NS = "conference_assets"
 
 # ---------------------------------------------------------------------------
-# Anthropic client — real AI generation
+# Anthropic client — real AI generation (per-request, key from credentials DB)
 # ---------------------------------------------------------------------------
 
-_anthropic_client = None
-try:
-    import anthropic as _anthro_lib
-    _key = os.getenv("ANTHROPIC_API_KEY")
-    if _key:
-        _anthropic_client = _anthro_lib.Anthropic(api_key=_key)
-except ImportError:
-    pass
+_anthropic_client = None  # kept for backwards compat; not used for auth
 
 
 # ---------------------------------------------------------------------------
@@ -107,11 +102,13 @@ def _fetch_run_context(db: Session, experiment_ids: List[str]) -> str:
     return "\n".join(lines) if lines else "No experiment data available."
 
 
-def _ai_call(prompt: str, max_tokens: int = 1500) -> Optional[str]:
-    if _anthropic_client is None:
+def _ai_call(prompt: str, max_tokens: int = 1500, api_key: Optional[str] = None) -> Optional[str]:
+    if not api_key:
         return None
     try:
-        msg = _anthropic_client.messages.create(
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
@@ -138,7 +135,8 @@ def _parse_json_array(text: str) -> Optional[list]:
 
 def _poster_sections(
     title: str, venue: str, authors: List[str],
-    experiment_ids: List[str], highlight_metric: str, db: Session
+    experiment_ids: List[str], highlight_metric: str, db: Session,
+    api_key: Optional[str] = None,
 ) -> tuple[List[dict], bool]:
     run_ctx = _fetch_run_context(db, experiment_ids)
     prompt = f"""You are a quantum computing researcher writing a conference poster.
@@ -160,7 +158,7 @@ Generate exactly 4 poster sections as a JSON array:
 
 Write realistic, grounded academic content. Return ONLY the JSON array."""
 
-    text = _ai_call(prompt, 1800)
+    text = _ai_call(prompt, 1800, api_key=api_key)
     if text:
         sections = _parse_json_array(text)
         if sections and len(sections) >= 2:
@@ -181,7 +179,8 @@ Write realistic, grounded academic content. Return ONLY the JSON array."""
 
 def _slides_sections(
     title: str, venue: str, authors: List[str],
-    experiment_ids: List[str], n_slides: int, db: Session
+    experiment_ids: List[str], n_slides: int, db: Session,
+    api_key: Optional[str] = None,
 ) -> tuple[List[dict], bool]:
     run_ctx = _fetch_run_context(db, experiment_ids)
     count = min(n_slides, 14)
@@ -199,7 +198,7 @@ Generate {count} slides as a JSON array. Each slide:
 Include slides for: motivation, background, setup, circuit design, key results, error analysis, conclusion.
 Return ONLY the JSON array."""
 
-    text = _ai_call(prompt, 2000)
+    text = _ai_call(prompt, 2000, api_key=api_key)
     if text:
         slides = _parse_json_array(text)
         if slides and len(slides) >= 3:
@@ -224,7 +223,8 @@ Return ONLY the JSON array."""
 
 def _abstract_sections(
     title: str, authors: List[str], experiment_ids: List[str],
-    max_words: int, venue: str, db: Session
+    max_words: int, venue: str, db: Session,
+    api_key: Optional[str] = None,
 ) -> tuple[List[dict], bool]:
     run_ctx = _fetch_run_context(db, experiment_ids)
     prompt = f"""Write an academic abstract ({max_words} words max) for a quantum computing paper.
@@ -239,7 +239,7 @@ Include: motivation, methods, key quantitative results, significance.
 Write at a level appropriate for {venue}.
 Return ONLY the abstract text, no labels."""
 
-    text = _ai_call(prompt, 600)
+    text = _ai_call(prompt, 600, api_key=api_key)
     if text and len(text.split()) >= 50:
         return [{"title": "Abstract", "content": text.strip(), "figures": []}], True
 
@@ -261,9 +261,10 @@ Return ONLY the abstract text, no labels."""
 # ---------------------------------------------------------------------------
 
 @router.post("/generate-poster", response_model=ConferenceAsset)
-def generate_poster(req: GeneratePosterRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
+def generate_poster(req: GeneratePosterRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)) -> ConferenceAsset:
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
     asset_id = str(uuid.uuid4())
-    sections, ai_used = _poster_sections(req.title, req.venue, req.authors, req.experiment_ids, req.highlight_metric, db)
+    sections, ai_used = _poster_sections(req.title, req.venue, req.authors, req.experiment_ids, req.highlight_metric, db, api_key=api_key)
     asset = ConferenceAsset(
         asset_id=asset_id, type="poster", title=req.title, venue=req.venue,
         authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,
@@ -276,9 +277,10 @@ def generate_poster(req: GeneratePosterRequest, db: Session = Depends(get_db)) -
 
 
 @router.post("/generate-slides", response_model=ConferenceAsset)
-def generate_slides(req: GenerateSlidesRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
+def generate_slides(req: GenerateSlidesRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)) -> ConferenceAsset:
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
     asset_id = str(uuid.uuid4())
-    sections, ai_used = _slides_sections(req.title, req.venue, req.authors, req.experiment_ids, req.n_slides, db)
+    sections, ai_used = _slides_sections(req.title, req.venue, req.authors, req.experiment_ids, req.n_slides, db, api_key=api_key)
     asset = ConferenceAsset(
         asset_id=asset_id, type="slides", title=req.title, venue=req.venue,
         authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,
@@ -291,9 +293,10 @@ def generate_slides(req: GenerateSlidesRequest, db: Session = Depends(get_db)) -
 
 
 @router.post("/generate-abstract", response_model=ConferenceAsset)
-def generate_abstract(req: GenerateAbstractRequest, db: Session = Depends(get_db)) -> ConferenceAsset:
+def generate_abstract(req: GenerateAbstractRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)) -> ConferenceAsset:
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
     asset_id = str(uuid.uuid4())
-    sections, ai_used = _abstract_sections(req.title, req.authors, req.experiment_ids, req.max_words, req.venue, db)
+    sections, ai_used = _abstract_sections(req.title, req.authors, req.experiment_ids, req.max_words, req.venue, db, api_key=api_key)
     asset = ConferenceAsset(
         asset_id=asset_id, type="abstract", title=req.title, venue=req.venue,
         authors=req.authors, experiment_ids=req.experiment_ids, sections=sections,

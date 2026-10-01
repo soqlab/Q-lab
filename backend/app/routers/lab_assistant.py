@@ -20,8 +20,10 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import get_identity, Identity
 from ..models import Run
 from ..store import store_put, store_get, store_list, store_delete
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["lab-assistant"])
 
@@ -267,16 +269,15 @@ def _execute_tool(name: str, inputs: dict, db: Session) -> str:
     return f"Unknown tool: {name}"
 
 
-def _call_claude(system: str, messages: list, db: Session | None = None) -> str:
+def _call_claude(system: str, messages: list, db: Session | None = None, api_key: Optional[str] = None) -> str:
     """Call Claude with tool use support. Executes tools and loops until a text answer."""
     try:
         import anthropic
     except ImportError:
         raise HTTPException(503, "anthropic package not installed. Run: pip install anthropic")
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        raise HTTPException(503, "ANTHROPIC_API_KEY not configured. Set the environment variable to enable the Lab Assistant.")
+        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
 
     client = anthropic.Anthropic(api_key=api_key)
     current_messages = list(messages)
@@ -321,10 +322,13 @@ def _call_claude(system: str, messages: list, db: Session | None = None) -> str:
 # ------------------------------------------------------------------
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(body: ChatRequest, db: Session = Depends(get_db)):
+def chat(body: ChatRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
     """Main RAG chat endpoint. Retrieves relevant runs, calls Claude, persists conversation."""
     if not body.message.strip():
         raise HTTPException(400, "message cannot be empty")
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
+    if not api_key:
+        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
 
     # Load or create conversation
     conversation_id, conversation = _get_or_create_conversation(db, body.conversation_id)
@@ -376,7 +380,7 @@ User question: {body.message}"""
     messages = list(history) + [{"role": "user", "content": user_prompt}]
 
     # Call Claude (with tool use)
-    answer = _call_claude(system, messages, db=db)
+    answer = _call_claude(system, messages, db=db, api_key=api_key)
 
     # Extract cited run IDs
     cited_runs = _extract_cited_runs(answer)

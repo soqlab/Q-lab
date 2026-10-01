@@ -253,7 +253,6 @@ from .routers import researcher_profiles as researcher_profiles_router
 from .routers import gdpr as gdpr_router
 from .routers import departments as departments_router
 from .routers import institute_admin as institute_admin_router
-from .routers import billing as billing_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
@@ -522,7 +521,6 @@ app.include_router(researcher_profiles_router.router)
 app.include_router(gdpr_router.router)
 app.include_router(departments_router.router)
 app.include_router(institute_admin_router.router)
-app.include_router(billing_router.router)
 app.include_router(sdk_compat_router.router)
 
 LEGACY_RUNS_FILE = DATA_DIR / "runs.json"
@@ -1048,14 +1046,6 @@ def create_run(
 
     # Audit
     log_audit(db, "run.created", "run", run.run_id, identity=identity, request=request)
-
-    # Billing — count only new run_ids, never upsert retries
-    if is_new_run and identity and identity.user_id:
-        try:
-            from .routers.billing import track_run as _billing_track_run
-            _billing_track_run(db, identity.user_id)
-        except Exception:
-            pass
 
     return {"status": "received", "run_id": run.run_id, "dashboard_url": run_dict["dashboard_url"]}
 

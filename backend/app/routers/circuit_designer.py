@@ -19,7 +19,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import get_identity, Identity
 from ..store import store_put, store_get, store_list
+from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/circuit-designer", tags=["circuit-designer"])
 
@@ -62,11 +64,8 @@ def _call_claude(
     complexity: str,
     include_measurements: bool,
     optimization_goal: Optional[str],
+    api_key: str = "",
 ) -> dict:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(503, "Circuit Designer requires ANTHROPIC_API_KEY")
-
     try:
         import anthropic
     except ImportError:
@@ -126,10 +125,11 @@ Respond with JSON:
 # ---------------------------------------------------------------------------
 
 @router.post("/design", response_model=DesignResult)
-def design_circuit(req: DesignRequest, db: Session = Depends(get_db)):
+def design_circuit(req: DesignRequest, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
     """Generate a quantum circuit from a natural-language description."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(503, "Circuit Designer requires ANTHROPIC_API_KEY")
+    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
+    if not api_key:
+        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
 
     claude_resp = _call_claude(
         description=req.description,
@@ -138,6 +138,7 @@ def design_circuit(req: DesignRequest, db: Session = Depends(get_db)):
         complexity=req.complexity,
         include_measurements=req.include_measurements,
         optimization_goal=req.optimization_goal,
+        api_key=api_key,
     )
 
     design_id = f"cd-{uuid.uuid4().hex[:16]}"

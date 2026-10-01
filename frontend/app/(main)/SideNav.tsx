@@ -245,7 +245,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/settings/notifications", icon: BellRing, label: "Notifications" },
       { href: "/credentials", icon: Key, label: "Credentials" },
       { href: "/gdpr", icon: Lock, label: "GDPR Tools" },
-      { href: "/billing", icon: Coins, label: "Usage & Billing" },
     ],
   },
 ];
