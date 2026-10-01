@@ -7,9 +7,8 @@ Claude scans relevant runs and answers with specific numbers and run citations.
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -17,16 +16,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..ai_provider import ai_complete, ai_stream, NoAIProviderError
 from ..ai_rate_limit import check_ai_limit
 from ..database import get_db
 from ..deps import get_identity, log_audit, Identity
 from ..models import Run
 from ..health_score import compute_health_score
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/ask", tags=["ask"])
 
-_MODEL = os.getenv("QLAB_INSIGHT_MODEL", "claude-haiku-4-5")
 _MAX_CONTEXT_RUNS = 60
 
 
@@ -92,42 +90,6 @@ Respond in plain text (no markdown headers, no bullet points unless the question
 Maximum 400 words."""
 
 
-def _call_claude(prompt: str, api_key: str) -> str:
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(503, "anthropic package not installed. Run: pip install anthropic>=0.30")
-    client = anthropic.Anthropic(api_key=api_key)
-    msg = client.messages.create(
-        model=_MODEL,
-        max_tokens=800,
-        temperature=0.1,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return msg.content[0].text.strip()
-
-
-async def _stream_claude(prompt: str, api_key: str) -> AsyncGenerator[str, None]:
-    try:
-        import anthropic
-    except ImportError:
-        yield "data: " + json.dumps({"error": "anthropic package not installed"}) + "\n\n"
-        return
-
-    client = anthropic.Anthropic(api_key=api_key)
-    try:
-        with client.messages.stream(
-            model=_MODEL,
-            max_tokens=800,
-            temperature=0.1,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            for text in stream.text_stream:
-                yield "data: " + json.dumps({"token": text}) + "\n\n"
-    except Exception as exc:
-        yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
-    yield "data: [DONE]\n\n"
-
 
 def _fetch_runs(db: Session, body: AskRequest, identity: Optional[Identity]) -> list[Run]:
     since = datetime.now(timezone.utc) - timedelta(days=body.days)
@@ -150,9 +112,8 @@ def ask(
 ):
     if identity:
         check_ai_limit(identity)
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
-    if not api_key:
-        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
+    if not identity:
+        raise HTTPException(401, "Login required to use AI features")
     runs = _fetch_runs(db, body, identity)
     if not runs:
         return {
@@ -163,7 +124,12 @@ def ask(
 
     summaries = [_run_summary(r) for r in runs]
     prompt = _build_prompt(body.question, summaries, {"project": body.project, "backend": body.backend, "days": body.days})
-    answer = _call_claude(prompt, api_key)
+    try:
+        answer = ai_complete(prompt, db=db, user_id=identity.user_id, system="", max_tokens=800)
+    except NoAIProviderError:
+        raise HTTPException(503, "Add an AI provider key in Settings → Credentials")
+    except Exception as exc:
+        raise HTTPException(502, f"AI request failed: {exc}")
 
     cited = [r["run_id"] for r in summaries if r["run_id"] in answer]
     if identity and identity.user_id:
@@ -173,7 +139,6 @@ def ask(
         "answer": answer,
         "cited_run_ids": cited,
         "run_count": len(runs),
-        "model": _MODEL,
     }
 
 
@@ -183,9 +148,8 @@ async def ask_stream(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
-    api_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
-    if not api_key:
-        raise HTTPException(503, "Add your Anthropic API key in Settings → Credentials")
+    if not identity:
+        raise HTTPException(401, "Login required to use AI features")
     runs = _fetch_runs(db, body, identity)
     summaries = [_run_summary(r) for r in runs]
     prompt = _build_prompt(body.question, summaries, {"project": body.project, "backend": body.backend, "days": body.days})
@@ -194,8 +158,12 @@ async def ask_stream(
     async def event_stream():
         meta = json.dumps({"run_count": len(runs), "run_ids": [r["run_id"] for r in summaries[:20]]})
         yield f"data: {{\"meta\": {meta}}}\n\n"
-        async for chunk in _stream_claude(prompt, api_key):
-            yield chunk
+        try:
+            for chunk in ai_stream(prompt, db=db, user_id=identity.user_id, max_tokens=800):
+                yield chunk
+        except NoAIProviderError:
+            yield 'data: {"error": "Add an AI provider key in Settings → Credentials"}\n\n'
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_stream(),

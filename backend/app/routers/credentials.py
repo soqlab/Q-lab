@@ -2,7 +2,9 @@
 
 Keys are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) using QLAB_SECRET_KEY.
 
-Supported providers: ibm | ionq | rigetti | braket | anthropic | custom
+Quantum providers: ibm | ionq | rigetti | braket
+AI providers:      anthropic | openai | groq | mistral | gemini | custom
+Other:             custom
 """
 from __future__ import annotations
 
@@ -133,7 +135,7 @@ def create_credential(
     identity: Identity = Depends(require_auth),
 ):
     """Store a new API key for a provider."""
-    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "custom"}:
+    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "openai", "groq", "mistral", "gemini", "custom"}:
         raise HTTPException(422, f"Unknown provider '{req.provider}'")
     expires = None
     if req.expires_at:

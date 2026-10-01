@@ -18,11 +18,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..ai_provider import ai_complete, NoAIProviderError
 from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..health_score import compute_health_score
-from .credentials import get_active_key_for_user
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
@@ -336,16 +336,14 @@ def get_digest(
         "ai_summary": None,
     }
 
-    ai_key = get_active_key_for_user(db, "anthropic", identity.user_id) if identity else None
-    if with_ai and ai_key:
-        digest["ai_summary"] = _ai_digest_summary(digest, ai_key)
+    if with_ai and identity:
+        digest["ai_summary"] = _ai_digest_summary(digest, db, identity.user_id)
 
     return digest
 
 
-def _ai_digest_summary(digest: dict, api_key: str) -> Optional[str]:
+def _ai_digest_summary(digest: dict, db: Session, user_id: int) -> Optional[str]:
     try:
-        import anthropic
         prompt = f"""Write a 3-sentence executive digest of a quantum researcher's experiment activity.
 
 Data:
@@ -358,8 +356,6 @@ Data:
 - Top projects: {', '.join(list(digest['by_project'].keys())[:3]) or 'none'}
 
 Be specific and scientific. No generic phrases. Reference actual numbers."""
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(model=_MODEL, max_tokens=200, temperature=0.1, messages=[{"role": "user", "content": prompt}])
-        return msg.content[0].text.strip()
+        return ai_complete(prompt, db=db, user_id=user_id, max_tokens=200)
     except Exception:
         return None
