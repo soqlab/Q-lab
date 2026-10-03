@@ -549,7 +549,7 @@ from qlab import QLabTracker
 
 tracker = QLabTracker(
     api_key="qlab_YOUR_KEY",
-    url="https://soqlab.com",
+    url="https://your-qlab-domain.com",
 )
 # Use tracker.run() or tracker.log_run() to track experiments.`}</pre>
       </section>

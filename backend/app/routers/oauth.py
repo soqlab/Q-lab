@@ -20,8 +20,8 @@ GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GITHUB_CLIENT_ID     = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
-FRONTEND_URL         = os.getenv("FRONTEND_URL", "https://www.soqlab.com")
-BASE_URL             = os.getenv("API_BASE_URL", "https://www.soqlab.com/qlab-api")
+FRONTEND_URL         = os.getenv("FRONTEND_URL", os.getenv("QLAB_APP_URL", ""))
+BASE_URL             = os.getenv("API_BASE_URL", os.getenv("QLAB_APP_URL", "") + "/qlab-api")
 
 GOOGLE_REDIRECT = f"{BASE_URL}/auth/google/callback"
 GITHUB_REDIRECT = f"{BASE_URL}/auth/github/callback"

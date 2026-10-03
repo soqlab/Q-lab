@@ -136,7 +136,7 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
         user.verify_token = verify_token
         user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
         db.commit()
-        app_url = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+        app_url = os.getenv("QLAB_APP_URL", "")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception:
@@ -192,7 +192,7 @@ def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db
         user.reset_token = token
         user.reset_token_expires = time.time() + _RESET_TTL_SECONDS
         db.commit()
-        app_url = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+        app_url = os.getenv("QLAB_APP_URL", "")
         reset_url = f"{app_url}/reset-password?token={token}"
         try:
             send_password_reset_email(to_email=user.email, reset_url=reset_url)
@@ -251,7 +251,7 @@ def resend_verification_by_email(payload: ResendByEmailPayload, db: Session = De
         user.verify_token = verify_token
         user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
         db.commit()
-        app_url = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+        app_url = os.getenv("QLAB_APP_URL", "")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception as e:
@@ -273,7 +273,7 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
         user.verify_token = verify_token
         user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
         db.commit()
-        app_url = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+        app_url = os.getenv("QLAB_APP_URL", "")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
     except Exception as e:

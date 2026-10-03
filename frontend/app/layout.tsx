@@ -14,17 +14,12 @@ export const metadata: Metadata = {
     siteName: "Q-Lab",
     title: "Q-Lab — Quantum Experiment Observatory",
     description: "Automatically capture, compare, and reproduce every Qiskit circuit run. The missing observability layer for quantum computing research.",
-    url: "https://www.soqlab.com",
-    images: [{ url: "https://www.soqlab.com/og-image.png", width: 1200, height: 630, alt: "Q-Lab quantum experiment tracker" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Q-Lab — Quantum Experiment Observatory",
     description: "Automatically capture, compare, and reproduce every Qiskit circuit run.",
-    images: ["https://www.soqlab.com/og-image.png"],
   },
-  metadataBase: new URL("https://www.soqlab.com"),
-  alternates: { canonical: "https://www.soqlab.com" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
               "name": "Q-Lab",
-              "url": "https://www.soqlab.com",
               "description": "Quantum experiment tracking and observability platform for Qiskit research teams.",
               "applicationCategory": "DeveloperApplication",
               "operatingSystem": "Web",

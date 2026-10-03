@@ -1206,7 +1206,7 @@ def auto_track(api_key: Optional[str] = None, project: Optional[str] = None) -> 
     """
     init(
         api_key=api_key or os.getenv("QLAB_API_KEY"),
-        api_url=os.getenv("QLAB_API_URL", "https://www.soqlab.com/qlab-api"),
+        api_url=os.getenv("QLAB_API_URL", ""),
         project=project,
     )
 

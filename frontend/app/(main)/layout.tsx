@@ -177,9 +177,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </header>
         <div style={{ flex: 1 }}>{children}</div>
         <footer style={{ padding: "16px 24px", borderTop: "1px solid var(--line)", fontSize: 12, color: "var(--muted)", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <span>© {new Date().getFullYear()} Q-Lab (soqlab.com)</span>
-          <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "#475569" }}>Terms</a>
-          <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: "#475569" }}>Privacy</a>
+          <span>© {new Date().getFullYear()} Q-Lab — <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noreferrer" style={{ color: "#475569" }}>MIT License</a></span>
         </footer>
       </div>
       <NPSWidget />

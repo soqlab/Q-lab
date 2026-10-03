@@ -105,7 +105,7 @@ def send_email(
     to: str,
     subject: str,
     html: str,
-    from_addr: str = "Q-Lab <noreply@soqlab.com>",
+    from_addr: str = os.getenv("SMTP_FROM", "Q-Lab <noreply@example.com>"),
 ) -> bool:
     """
     Send an HTML email using whichever transport is configured.
@@ -396,6 +396,7 @@ def send_welcome_email(
 ) -> bool:
     """Send a welcome email to a newly registered user."""
     subject = "Welcome to Q-Lab"
+    app_url = os.getenv("QLAB_APP_URL", "")
 
     body = f"""
       <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
@@ -453,7 +454,7 @@ def send_welcome_email(
           <td align="center"
               style="background:linear-gradient(135deg,#4f46e5,#7c3aed);
                      border-radius:8px;padding:14px 32px;">
-            <a href="https://www.soqlab.com"
+            <a href="{app_url}"
                style="font-size:15px;font-weight:600;color:#ffffff;
                       text-decoration:none;letter-spacing:0.3px;">
               Open Q-Lab &rarr;
@@ -960,4 +961,4 @@ def send_contact_email(name: str, from_email: str, message: str) -> bool:
       <p style="margin:0;font-size:12px;color:#6b7280;">Sent via Q-Lab contact form</p>
     </div>
     """
-    return send_email(to=owner, subject=subject, html=html, from_addr="Q-Lab Contact <noreply@soqlab.com>")
+    return send_email(to=owner, subject=subject, html=html)
