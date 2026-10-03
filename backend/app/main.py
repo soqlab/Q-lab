@@ -534,11 +534,14 @@ app.include_router(sdk_compat_router.router)
 async def sdk_telemetry_ping(request: Request) -> dict:
     try:
         body = await request.json()
-        with SessionLocal() as _db:
+        _db = SessionLocal()
+        try:
             log_audit(_db, "sdk.ping", "sdk", "ping", meta={
                 "sdk_version": str(body.get("sdk_version", ""))[:20],
                 "python": str(body.get("python", ""))[:20],
             })
+        finally:
+            _db.close()
     except Exception:
         pass
     return {"ok": True}
