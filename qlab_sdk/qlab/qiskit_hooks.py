@@ -14,7 +14,7 @@ from .context import capture_context
 
 _CLIENT: Optional[QLabClient] = None
 _INITIALIZED = False
-_TELEMETRY_URL = "https://telemetry.soqlab.com/ping"
+_TELEMETRY_URL = "https://soqlab.com/qlab-api/ping"
 
 
 def _fire_telemetry_ping() -> None:
