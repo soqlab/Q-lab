@@ -2,9 +2,8 @@
 
 Keys are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) using QLAB_SECRET_KEY.
 
-Quantum providers: ibm | ionq | rigetti | braket
-AI providers:      anthropic | openai | groq | mistral | gemini | custom
-Other:             custom
+Quantum providers: defined in app/backends.py (add new hardware there)
+AI providers:      defined in app/ai_provider.py (add new AI providers there)
 """
 from __future__ import annotations
 
@@ -21,9 +20,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..backends import QUANTUM_BACKEND_IDS
+from ..ai_provider import AI_PROVIDER_NAMES
 from ..database import get_db
 from ..deps import Identity, require_auth
 from ..models import ApiCredential
+
+_ALLOWED_PROVIDERS = QUANTUM_BACKEND_IDS | AI_PROVIDER_NAMES | {"other"}
 
 router = APIRouter(prefix="/api/v1/credentials", tags=["credentials"])
 
@@ -135,7 +138,7 @@ def create_credential(
     identity: Identity = Depends(require_auth),
 ):
     """Store a new API key for a provider."""
-    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "openai", "groq", "mistral", "gemini", "custom", "agent"}:
+    if req.provider not in _ALLOWED_PROVIDERS:
         raise HTTPException(422, f"Unknown provider '{req.provider}'")
     expires = None
     if req.expires_at:

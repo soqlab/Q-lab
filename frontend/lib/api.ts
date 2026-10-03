@@ -4059,6 +4059,28 @@ export async function setAIProviderPreference(provider: string): Promise<{ prefe
 }
 
 // ------------------------------------------------------------------
+// Quantum Backend Registry
+// ------------------------------------------------------------------
+
+export type BackendMeta = {
+  id: string;
+  label: string;
+  color: string;
+  docs_url: string;
+  credential_hint: string;
+};
+
+export async function getBackends(): Promise<BackendMeta[]> {
+  try {
+    const res = await fetch(apiUrl("/api/v1/backends"), { cache: "no-store" });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ------------------------------------------------------------------
 // Notification System
 // ------------------------------------------------------------------
 
