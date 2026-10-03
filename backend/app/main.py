@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .analytics import get_timeseries, get_backend_stats, get_kpis
+from .backends import QUANTUM_BACKENDS
 from .database import DATA_DIR, SessionLocal, get_db, init_db
 from .deps import Identity, get_identity, log_audit, require_auth
 from .events import event_stream, publish_sync, set_event_loop
@@ -529,6 +530,12 @@ app.include_router(sdk_compat_router.router)
 # ---------------------------------------------------------------------------
 # Anonymous SDK telemetry — counts active installs, no PII stored
 # ---------------------------------------------------------------------------
+
+@app.get("/api/v1/backends", tags=["backends"])
+def list_quantum_backends():
+    """Return all registered quantum hardware backends."""
+    return [{"id": k, **v} for k, v in QUANTUM_BACKENDS.items()]
+
 
 @app.post("/ping", include_in_schema=False)
 async def sdk_telemetry_ping(request: Request) -> dict:
