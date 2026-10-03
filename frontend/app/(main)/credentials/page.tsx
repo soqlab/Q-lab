@@ -1,28 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  ApiCredential, CredentialTestResult, AIProviderMeta,
+  ApiCredential, CredentialTestResult, AIProviderMeta, BackendMeta,
   listCredentials, createCredential, deleteCredential, testCredential, updateCredential,
-  getAIProviderSettings, setAIProviderPreference,
+  getAIProviderSettings, setAIProviderPreference, getBackends,
 } from "../../../lib/api";
 import { Key, Plus, Trash2, CheckCircle, XCircle, RefreshCw, Eye, EyeOff, Shield, Bot, Zap } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Provider metadata
+// AI provider metadata (static — defined in ai_provider.py)
+// Quantum backend metadata is dynamic — fetched from /api/v1/backends
 // ---------------------------------------------------------------------------
 
-const QUANTUM_PROVIDERS = ["ibm", "ionq", "braket", "rigetti"];
 const AI_PROVIDERS = ["anthropic", "openai", "groq", "mistral", "gemini", "custom", "agent"];
-const ALL_PROVIDERS = [...QUANTUM_PROVIDERS, ...AI_PROVIDERS, "other"];
 
-const PROVIDER_COLORS: Record<string, string> = {
-  ibm: "#6929c4", ionq: "#0f62fe", braket: "#ff9900", rigetti: "#2b5ce6",
+const AI_COLORS: Record<string, string> = {
   anthropic: "#d97706", openai: "#10a37f", groq: "#f55036", mistral: "#ff6b35",
   gemini: "#4285f4", custom: "#8b5cf6", agent: "#06b6d4", other: "#6b7280",
 };
 
-const PROVIDER_LABELS: Record<string, string> = {
-  ibm: "IBM Quantum", ionq: "IonQ", braket: "Amazon Braket", rigetti: "Rigetti",
+const AI_LABELS: Record<string, string> = {
   anthropic: "Claude (Anthropic)", openai: "GPT (OpenAI)", groq: "Groq",
   mistral: "Mistral AI", gemini: "Gemini (Google)", custom: "Custom (OpenAI-compatible)",
   agent: "Custom Agent (webhook)", other: "Other",
@@ -74,18 +71,32 @@ export default function CredentialsPage() {
   const [aiProviders, setAiProviders] = useState<AIProviderMeta[]>([]);
   const [aiPrefSaving, setAiPrefSaving] = useState(false);
 
+  // Quantum backend registry (from /api/v1/backends)
+  const [backends, setBackends] = useState<BackendMeta[]>([]);
+
+  // Merged label/color lookups — backends come from API, AI from static constants
+  const providerColor = (id: string) =>
+    backends.find(b => b.id === id)?.color ?? AI_COLORS[id] ?? "#6b7280";
+  const providerLabel = (id: string) =>
+    backends.find(b => b.id === id)?.label ?? AI_LABELS[id] ?? id.toUpperCase();
+
+  const quantumProviderIds = backends.map(b => b.id);
+  const allProviderIds = [...quantumProviderIds, ...AI_PROVIDERS, "other"];
+
   const load = async () => {
     setLoading(true);
     try {
-      const [data, aiSettings] = await Promise.all([
+      const [data, aiSettings, bkds] = await Promise.all([
         listCredentials(filterProvider !== "all" ? filterProvider : undefined),
         getAIProviderSettings().catch(() => null),
+        getBackends(),
       ]);
       setCreds(data);
       if (aiSettings) {
         setPreferredAI(aiSettings.preferred_provider);
         setAiProviders(aiSettings.available_providers);
       }
+      if (bkds.length) setBackends(bkds);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
@@ -176,18 +187,18 @@ export default function CredentialsPage() {
             const isPreferred = preferredAI === p;
             return (
               <button key={p} onClick={() => handleSetAIPref(p)} disabled={aiPrefSaving}
-                title={hasCred ? `Use ${PROVIDER_LABELS[p]}` : `Add a ${PROVIDER_LABELS[p]} key first`}
+                title={hasCred ? `Use ${providerLabel(p)}` : `Add a ${providerLabel(p)} key first`}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
                   padding: "0.45rem 0.9rem", borderRadius: 8, fontSize: "0.82rem", fontWeight: isPreferred ? 700 : 400,
                   cursor: "pointer", transition: "all 0.15s",
-                  background: isPreferred ? PROVIDER_COLORS[p] + "22" : "transparent",
-                  border: `1px solid ${isPreferred ? PROVIDER_COLORS[p] : "#334155"}`,
-                  color: isPreferred ? PROVIDER_COLORS[p] : hasCred ? "#94a3b8" : "#475569",
+                  background: isPreferred ? providerColor(p) + "22" : "transparent",
+                  border: `1px solid ${isPreferred ? providerColor(p) : "#334155"}`,
+                  color: isPreferred ? providerColor(p) : hasCred ? "#94a3b8" : "#475569",
                   opacity: aiPrefSaving ? 0.6 : 1,
                 }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: hasCred ? PROVIDER_COLORS[p] : "#334155" }} />
-                {PROVIDER_LABELS[p]}
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: hasCred ? providerColor(p) : "#334155" }} />
+                {providerLabel(p)}
                 {isPreferred && <Zap size={11} />}
                 {!hasCred && <span style={{ fontSize: "0.65rem", color: "#475569" }}>(no key)</span>}
               </button>
@@ -196,7 +207,7 @@ export default function CredentialsPage() {
         </div>
         {preferredAI && (
           <p style={{ marginTop: 10, fontSize: "0.8rem", color: "#64748b" }}>
-            Active: <strong style={{ color: PROVIDER_COLORS[preferredAI] ?? "#94a3b8" }}>{PROVIDER_LABELS[preferredAI] ?? preferredAI}</strong>
+            Active: <strong style={{ color: providerColor(preferredAI!) ?? "#94a3b8" }}>{providerLabel(preferredAI!) ?? preferredAI}</strong>
             {!hasAIKey(preferredAI) && <span style={{ color: "#f59e0b" }}> — add a key below to activate</span>}
           </p>
         )}
@@ -216,10 +227,10 @@ export default function CredentialsPage() {
               Provider
               <select value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} style={inputStyle}>
                 <optgroup label="Quantum Backends">
-                  {QUANTUM_PROVIDERS.map(p => <option key={p} value={p}>{PROVIDER_LABELS[p] ?? p.toUpperCase()}</option>)}
+                  {quantumProviderIds.map(p => <option key={p} value={p}>{providerLabel(p) ?? p.toUpperCase()}</option>)}
                 </optgroup>
                 <optgroup label="AI Providers">
-                  {AI_PROVIDERS.map(p => <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>)}
+                  {AI_PROVIDERS.map(p => <option key={p} value={p}>{providerLabel(p)}</option>)}
                 </optgroup>
                 <optgroup label="Other">
                   <option value="other">Other</option>
@@ -274,13 +285,13 @@ export default function CredentialsPage() {
 
       {/* Filter pills */}
       <div style={{ display: "flex", gap: 6, marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        {["all", ...ALL_PROVIDERS].map(p => (
+        {["all", ...allProviderIds].map(p => (
           <button key={p} onClick={() => setFilterProvider(p)}
             style={{ padding: "0.35rem 0.85rem", borderRadius: 20, border: "1px solid", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
-              background: filterProvider === p ? (PROVIDER_COLORS[p] ?? "#3b82f6") : "transparent",
-              borderColor: filterProvider === p ? (PROVIDER_COLORS[p] ?? "#3b82f6") : "#334155",
+              background: filterProvider === p ? (providerColor(p) ?? "#3b82f6") : "transparent",
+              borderColor: filterProvider === p ? (providerColor(p) ?? "#3b82f6") : "#334155",
               color: filterProvider === p ? "#fff" : "#64748b" }}>
-            {p === "all" ? "All" : (PROVIDER_LABELS[p] ?? p.toUpperCase())}
+            {p === "all" ? "All" : (providerLabel(p) ?? p.toUpperCase())}
           </button>
         ))}
       </div>
@@ -301,19 +312,19 @@ export default function CredentialsPage() {
             return (
               <div key={cred.cred_id}
                 style={{ background: "#1e293b", borderRadius: 12,
-                  border: `1px solid ${cred.provider === preferredAI && isAI ? PROVIDER_COLORS[cred.provider] + "55" : cred.is_active ? "#334155" : "#1e293b"}`,
+                  border: `1px solid ${cred.provider === preferredAI && isAI ? providerColor(cred.provider) + "55" : cred.is_active ? "#334155" : "#1e293b"}`,
                   padding: "1rem 1.25rem", opacity: cred.is_active ? 1 : 0.6 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: PROVIDER_COLORS[cred.provider] ?? "#6b7280" }} />
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: providerColor(cred.provider) ?? "#6b7280" }} />
                     <div>
                       <div style={{ color: "#e2e8f0", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                         {cred.label}
                         <span style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 400, background: "#0f172a", padding: "0 6px", borderRadius: 4 }}>
-                          {PROVIDER_LABELS[cred.provider] ?? cred.provider.toUpperCase()}
+                          {providerLabel(cred.provider) ?? cred.provider.toUpperCase()}
                         </span>
                         {isAI && cred.provider === preferredAI && (
-                          <span style={{ fontSize: "0.7rem", color: PROVIDER_COLORS[cred.provider], background: PROVIDER_COLORS[cred.provider] + "22", padding: "0 6px", borderRadius: 4, display: "flex", alignItems: "center", gap: 3 }}>
+                          <span style={{ fontSize: "0.7rem", color: providerColor(cred.provider), background: providerColor(cred.provider) + "22", padding: "0 6px", borderRadius: 4, display: "flex", alignItems: "center", gap: 3 }}>
                             <Zap size={9} /> Preferred AI
                           </span>
                         )}
@@ -329,7 +340,7 @@ export default function CredentialsPage() {
                     {testResult && <StatusBadge status={testResult.status} />}
                     {isAI && cred.provider !== preferredAI && cred.is_active && (
                       <button onClick={() => handleSetAIPref(cred.provider)} disabled={aiPrefSaving}
-                        style={{ background: "#0f172a", border: `1px solid ${PROVIDER_COLORS[cred.provider]}55`, color: PROVIDER_COLORS[cred.provider], borderRadius: 6, padding: "0.35rem 0.7rem", cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 4 }}>
+                        style={{ background: "#0f172a", border: `1px solid ${providerColor(cred.provider)}55`, color: providerColor(cred.provider), borderRadius: 6, padding: "0.35rem 0.7rem", cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 4 }}>
                         <Zap size={11} /> Set Preferred
                       </button>
                     )}
