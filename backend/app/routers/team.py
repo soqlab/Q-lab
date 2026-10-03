@@ -13,7 +13,7 @@ from ..deps import Identity, require_auth, require_role
 from ..email_service import send_invite_email
 from ..models import OrgInvite, Organization, User
 
-APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+APP_URL = os.getenv("QLAB_APP_URL", "")
 
 router = APIRouter(prefix="/api/v1/team", tags=["team"])
 

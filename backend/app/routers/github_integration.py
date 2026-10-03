@@ -23,7 +23,7 @@ from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..store import store_delete, store_get, store_list, store_put
 
-APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
+APP_URL = os.getenv("QLAB_APP_URL", "")
 
 router = APIRouter(prefix="/api/v1/github", tags=["github"])
 

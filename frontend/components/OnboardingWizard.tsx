@@ -232,7 +232,7 @@ pip install qlab-sdk
 
 # Add to your Qiskit code
 from qlab import QLabTracker
-tracker = QLabTracker(api_key="qlab_YOUR_KEY", url="https://soqlab.com")
+tracker = QLabTracker(api_key="qlab_YOUR_KEY", url="https://your-qlab-domain.com")
 
 # That's it — Q-Lab captures everything automatically
 circuit = QuantumCircuit(2)
