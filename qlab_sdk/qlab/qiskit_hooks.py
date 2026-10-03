@@ -14,6 +14,39 @@ from .context import capture_context
 
 _CLIENT: Optional[QLabClient] = None
 _INITIALIZED = False
+_TELEMETRY_URL = "https://telemetry.soqlab.com/ping"
+
+
+def _fire_telemetry_ping() -> None:
+    """Fire a single anonymous ping so we can count active SDK installs.
+
+    Opt out with: QLAB_TELEMETRY=off  (any of: off, 0, false, no)
+    Collects only: SDK version, Python version. Nothing identifying.
+    """
+    if os.getenv("QLAB_TELEMETRY", "").lower() in ("off", "0", "false", "no"):
+        return
+
+    import sys
+    import threading
+
+    def _ping() -> None:
+        try:
+            import urllib.request, json as _json
+            payload = _json.dumps({
+                "sdk_version": "0.2.0",
+                "python": sys.version.split()[0],
+            }).encode()
+            req = urllib.request.Request(
+                _TELEMETRY_URL,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=3)
+        except Exception:
+            pass
+
+    threading.Thread(target=_ping, daemon=True).start()
 _transpiler_context = __import__("threading").local()
 _CONFIG = {
     "api_url": "http://localhost:8000",
@@ -1190,6 +1223,8 @@ def init(
     _patch_transpile()
 
     _INITIALIZED = True
+
+    _fire_telemetry_ping()
 
 
 def auto_track(api_key: Optional[str] = None, project: Optional[str] = None) -> None:

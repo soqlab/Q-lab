@@ -102,6 +102,16 @@ qlab.init(
 )
 ```
 
+## Telemetry
+
+The Q-Lab SDK sends one anonymous ping when `qlab.init()` is called. It contains only the SDK version and Python version — nothing identifying, no experiment data, no hostnames.
+
+To opt out, set the environment variable before running your code:
+
+```bash
+export QLAB_TELEMETRY=off
+```
+
 ## Data & Privacy
 
 All experiment data is stored in your PostgreSQL database. Nothing is sent to external services unless you explicitly configure integrations (Zenodo, SMTP, etc.).

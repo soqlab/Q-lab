@@ -525,6 +525,25 @@ app.include_router(departments_router.router)
 app.include_router(institute_admin_router.router)
 app.include_router(sdk_compat_router.router)
 
+
+# ---------------------------------------------------------------------------
+# Anonymous SDK telemetry — counts active installs, no PII stored
+# ---------------------------------------------------------------------------
+
+@app.post("/ping", include_in_schema=False)
+async def sdk_telemetry_ping(request: Request) -> dict:
+    try:
+        body = await request.json()
+        with SessionLocal() as _db:
+            log_audit(_db, "sdk.ping", "sdk", "ping", meta={
+                "sdk_version": str(body.get("sdk_version", ""))[:20],
+                "python": str(body.get("python", ""))[:20],
+            })
+    except Exception:
+        pass
+    return {"ok": True}
+
+
 LEGACY_RUNS_FILE = DATA_DIR / "runs.json"
 BACKEND_STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 FRONTEND_STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "static"
