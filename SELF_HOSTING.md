@@ -85,6 +85,7 @@ Users add their own API key in **Settings → Credentials** and choose their pre
 | Mistral AI | [console.mistral.ai](https://console.mistral.ai) |
 | Google Gemini | [aistudio.google.com](https://aistudio.google.com) |
 | Custom / local | Any OpenAI-compatible server — Ollama, LM Studio, vLLM, etc. |
+| Custom Agent | Your own HTTP endpoint — LangChain, CrewAI, n8n, FastAPI, etc. Q-Lab POSTs `{"prompt","system","max_tokens"}` and reads `{"content":"..."}` from the response. |
 
 No `ANTHROPIC_API_KEY` environment variable is needed. Each user provides their own key.
 
