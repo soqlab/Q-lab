@@ -10,8 +10,6 @@ services:
         value: sqlite:///./data/qlab.db
       - key: SECRET_KEY
         generateValue: true
-      - key: ANTHROPIC_API_KEY
-        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -21,17 +19,7 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: QLAB_APP_URL
-        value: https://soqlab.com
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: STRIPE_PRO_PRICE_ID
-        sync: false
-      - key: STRIPE_ENTERPRISE_PRICE_ID
-        sync: false
-      - key: QLAB_BILLING_ENABLED
-        value: "false"
+        value: https://your-qlab-domain.com
     healthCheckPath: /health
     disk:
       name: qlab-data

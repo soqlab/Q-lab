@@ -20,7 +20,7 @@ from ..models import Run
 
 router = APIRouter(tags=["public"])
 
-SITE_URL = os.getenv("QLAB_SITE_URL", "https://www.soqlab.com")
+SITE_URL = os.getenv("QLAB_SITE_URL", os.getenv("QLAB_APP_URL", ""))
 
 
 # ── Badge ─────────────────────────────────────────────────────────────────────

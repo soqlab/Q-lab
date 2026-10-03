@@ -257,8 +257,8 @@ from .routers import institute_admin as institute_admin_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
-APP_URL = os.getenv("QLAB_APP_URL", "https://www.soqlab.com")
-API_URL = os.getenv("QLAB_API_URL", "https://www.soqlab.com")
+APP_URL = os.getenv("QLAB_APP_URL", "")
+API_URL = os.getenv("QLAB_API_URL", "")
 
 # Run DB init at import time — avoids the lifespan merging stack-depth issue
 # that occurs when 200+ routers are included with a lifespan= parameter set.
@@ -278,7 +278,7 @@ app = FastAPI(
     openapi_url=_OPENAPI_URL,
 )
 
-_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "https://www.soqlab.com,https://soqlab.com").split(",") if o.strip()]
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
