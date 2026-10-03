@@ -12,19 +12,20 @@ import { Key, Plus, Trash2, CheckCircle, XCircle, RefreshCw, Eye, EyeOff, Shield
 // ---------------------------------------------------------------------------
 
 const QUANTUM_PROVIDERS = ["ibm", "ionq", "braket", "rigetti"];
-const AI_PROVIDERS = ["anthropic", "openai", "groq", "mistral", "gemini", "custom"];
+const AI_PROVIDERS = ["anthropic", "openai", "groq", "mistral", "gemini", "custom", "agent"];
 const ALL_PROVIDERS = [...QUANTUM_PROVIDERS, ...AI_PROVIDERS, "other"];
 
 const PROVIDER_COLORS: Record<string, string> = {
   ibm: "#6929c4", ionq: "#0f62fe", braket: "#ff9900", rigetti: "#2b5ce6",
   anthropic: "#d97706", openai: "#10a37f", groq: "#f55036", mistral: "#ff6b35",
-  gemini: "#4285f4", custom: "#8b5cf6", other: "#6b7280",
+  gemini: "#4285f4", custom: "#8b5cf6", agent: "#06b6d4", other: "#6b7280",
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
   ibm: "IBM Quantum", ionq: "IonQ", braket: "Amazon Braket", rigetti: "Rigetti",
   anthropic: "Claude (Anthropic)", openai: "GPT (OpenAI)", groq: "Groq",
-  mistral: "Mistral AI", gemini: "Gemini (Google)", custom: "Custom (OpenAI-compatible)", other: "Other",
+  mistral: "Mistral AI", gemini: "Gemini (Google)", custom: "Custom (OpenAI-compatible)",
+  agent: "Custom Agent (webhook)", other: "Other",
 };
 
 const AI_PROVIDER_NOTES: Record<string, string> = {
@@ -34,6 +35,7 @@ const AI_PROVIDER_NOTES: Record<string, string> = {
   mistral: "Get your key at console.mistral.ai",
   gemini: "Get your key at aistudio.google.com",
   custom: "Enter your base URL and API key (leave key blank for local models like Ollama)",
+  agent: "Point to any HTTP endpoint you control — LangChain, CrewAI, n8n, custom FastAPI, etc. Q-Lab will POST {prompt, system, max_tokens} and read {content} from the response.",
 };
 
 // ---------------------------------------------------------------------------
@@ -91,11 +93,13 @@ export default function CredentialsPage() {
   useEffect(() => { load(); }, [filterProvider]);
 
   const handleCreate = async () => {
-    const apiKey = form.provider === "custom"
+    const needsUrl = form.provider === "custom" || form.provider === "agent";
+    const apiKey = needsUrl
       ? `${form.base_url.trim()}|||${form.api_key.trim()}`
       : form.api_key;
     if (!form.label) { setError("Label is required"); return; }
     if (form.provider === "custom" && !form.base_url.trim()) { setError("Base URL is required for custom provider"); return; }
+    if (form.provider === "agent" && !form.base_url.trim()) { setError("Webhook URL is required"); return; }
     setSaving(true); setError(null);
     try {
       await createCredential({ provider: form.provider, label: form.label, api_key: apiKey, expires_at: form.expires_at || undefined });
@@ -225,22 +229,25 @@ export default function CredentialsPage() {
             <label style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
               Label
               <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-                placeholder={form.provider === "custom" ? "e.g. Local Ollama" : "e.g. Production Token"}
+                placeholder={form.provider === "agent" ? "e.g. My LangChain Agent" : form.provider === "custom" ? "e.g. Local Ollama" : "e.g. Production Token"}
                 style={inputStyle} />
             </label>
-            {form.provider === "custom" && (
+            {(form.provider === "custom" || form.provider === "agent") && (
               <label style={{ color: "#94a3b8", fontSize: "0.85rem", gridColumn: "1 / -1" }}>
-                Base URL
+                {form.provider === "agent" ? "Webhook URL" : "Base URL"}
                 <input value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))}
-                  placeholder="http://localhost:11434/v1"
+                  placeholder={form.provider === "agent" ? "https://your-agent.example.com/invoke" : "http://localhost:11434/v1"}
                   style={inputStyle} />
               </label>
             )}
             <label style={{ color: "#94a3b8", fontSize: "0.85rem", gridColumn: "1 / -1" }}>
-              API Key{form.provider === "custom" && <span style={{ color: "#475569" }}> (optional for local models)</span>}
+              {form.provider === "agent"
+                ? <span>Auth Token <span style={{ color: "#475569" }}>(optional — sent as Bearer token)</span></span>
+                : <span>API Key{form.provider === "custom" && <span style={{ color: "#475569" }}> (optional for local models)</span>}</span>
+              }
               <div style={{ position: "relative", marginTop: 4 }}>
                 <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))}
-                  placeholder={form.provider === "custom" ? "Leave blank for Ollama / no-auth servers" : "Paste your API key here…"}
+                  placeholder={form.provider === "agent" ? "Leave blank for unauthenticated endpoints" : form.provider === "custom" ? "Leave blank for Ollama / no-auth servers" : "Paste your API key here…"}
                   style={{ ...inputStyle, padding: "0.5rem 2.5rem 0.5rem 0.75rem" }} />
                 <button onClick={() => setShowKey(s => !s)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#64748b", cursor: "pointer" }}>
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
