@@ -135,7 +135,7 @@ def create_credential(
     identity: Identity = Depends(require_auth),
 ):
     """Store a new API key for a provider."""
-    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "openai", "groq", "mistral", "gemini", "custom"}:
+    if req.provider not in {"ibm", "ionq", "rigetti", "braket", "anthropic", "openai", "groq", "mistral", "gemini", "custom", "agent"}:
         raise HTTPException(422, f"Unknown provider '{req.provider}'")
     expires = None
     if req.expires_at:
