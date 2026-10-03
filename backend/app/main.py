@@ -254,7 +254,6 @@ from .routers import carbon as carbon_router
 from .routers import researcher_profiles as researcher_profiles_router
 from .routers import gdpr as gdpr_router
 from .routers import departments as departments_router
-from .routers import institute_admin as institute_admin_router
 from .routers import sdk_compat as sdk_compat_router
 from .tasks import deliver_webhooks
 
@@ -523,7 +522,6 @@ app.include_router(carbon_router.router)
 app.include_router(researcher_profiles_router.router)
 app.include_router(gdpr_router.router)
 app.include_router(departments_router.router)
-app.include_router(institute_admin_router.router)
 app.include_router(sdk_compat_router.router)
 
 
