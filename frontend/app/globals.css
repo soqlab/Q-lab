@@ -156,7 +156,11 @@ button, input, select, textarea { font: inherit; }
   place-items: center;
   border: 1px solid var(--accent);
   color: var(--accent);
-  border-radius: 6px;
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .brand-mark {
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.25), inset 0 0 8px rgba(0, 212, 255, 0.06);
 }
 
 .nav { display: grid; gap: 6px; }
@@ -182,13 +186,19 @@ button, input, select, textarea { font: inherit; }
 }
 
 .topbar {
-  height: 70px;
+  height: 64px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 28px;
+  padding: 0 24px;
+}
+
+[data-theme="dark"] .topbar {
+  border-bottom-color: #1a2e40;
+  background: #080f18;
+  box-shadow: 0 1px 0 rgba(0, 212, 255, 0.08);
 }
 
 /* ------------------------------------------------------------------ */
@@ -584,6 +594,34 @@ tbody tr:hover { background: var(--panel-2); }
 .admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
 
 @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ------------------------------------------------------------------ */
+/* Dark-mode panel / card overrides (OSINT feel)                        */
+/* ------------------------------------------------------------------ */
+[data-theme="dark"] .panel,
+[data-theme="dark"] .card {
+  border-color: #162030;
+}
+
+[data-theme="dark"] .sidebar {
+  border-right-color: #0e1e2e;
+  background: linear-gradient(180deg, #020609 0%, #030810 100%);
+}
+
+[data-theme="dark"] body {
+  background: #060c14;
+}
+
+/* Subtle scanline on main content in dark mode */
+[data-theme="dark"] .content {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 212, 255, 0.012) 3px,
+    rgba(0, 212, 255, 0.012) 4px
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* OSINT / Terminal utilities                                            */
