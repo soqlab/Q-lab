@@ -398,6 +398,7 @@ function GetStartedBanner() {
 export default function SideNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "owner";
 
   return (
     <nav className="nav" aria-label="Primary">
@@ -411,6 +412,14 @@ export default function SideNav() {
           pathname={pathname}
         />
       ))}
+      {isAdmin && (
+        <NavGroup
+          label="Admin"
+          defaultOpen={false}
+          items={[{ href: "/admin", icon: ShieldCheck, label: "Admin Panel" }]}
+          pathname={pathname}
+        />
+      )}
       <AIQuotaBar />
     </nav>
   );
