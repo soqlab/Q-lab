@@ -2,27 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { getRbacRoles, listRbacUsers, changeUserRole, RbacRole, RbacUser } from "../../../../lib/api";
+import { useAuth } from "../../../../lib/auth";
 
 const ROLE_COLOR: Record<string, string> = {
   owner: "#f59e0b", admin: "#3b82f6", researcher: "#10b981", viewer: "#6b7280",
 };
 
 export default function RBACPage() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [users, setUsers] = useState<RbacUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [changing, setChanging] = useState<number | null>(null);
 
+  const isAdmin = user?.role === "admin" || user?.role === "owner";
+
   const load = () => {
+    if (!isAdmin) { setLoading(false); return; }
     setLoading(true);
     Promise.all([getRbacRoles(), listRbacUsers()])
       .then(([r, u]) => { setRoles(r.roles ?? []); setUsers(u ?? []); setErr(""); })
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setErr(msg === "PERMISSION_DENIED" ? "You need admin or owner role to manage users." : msg);
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isAdmin]);
 
   const handleRoleChange = async (userId: number, role: string) => {
     setChanging(userId);
@@ -35,6 +43,15 @@ export default function RBACPage() {
       setChanging(null);
     }
   };
+
+  if (!isAdmin) return (
+    <div style={{ padding: 32, maxWidth: 500 }}>
+      <h1 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 700 }}>Role Management</h1>
+      <div style={{ padding: "14px 16px", background: "var(--info-bg)", color: "var(--info-text)", borderRadius: 6, fontSize: 13 }}>
+        You need <strong>admin</strong> or <strong>owner</strong> role to manage user permissions. Contact your workspace owner to request access.
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ padding: 24, maxWidth: 1000 }}>

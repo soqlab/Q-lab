@@ -3774,7 +3774,8 @@ export async function getRbacRoles(): Promise<{ roles: RbacRole[]; total_permiss
 
 export async function listRbacUsers(): Promise<RbacUser[]> {
   const res = await fetch(apiUrl("/api/v1/rbac/users"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("RBAC users failed");
+  if (res.status === 403) throw new Error("PERMISSION_DENIED");
+  if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
   return res.json();
 }
 
