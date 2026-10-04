@@ -43,31 +43,40 @@
 /* Design tokens — dark                                                 */
 /* ------------------------------------------------------------------ */
 [data-theme="dark"] {
-  --bg: #0e1117;
-  --panel: #161c2a;
-  --panel-2: #1a2233;
-  --text: #e2e8f0;
-  --muted: #8896a7;
-  --line: #252d3d;
-  --strong: #38a5d0;
-  --strong-2: #5bbae3;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --danger: #f87171;
+  --bg: #060c14;
+  --panel: #0a1220;
+  --panel-2: #0d1628;
+  --text: #b8cad8;
+  --muted: #4a6070;
+  --line: #162030;
+  --strong: #00d4ff;
+  --strong-2: #00a8cc;
+  --ok: #00e887;
+  --warn: #ffaa00;
+  --danger: #ff3838;
 
-  --input-bg: #1e2636;
-  --input-border: #2a3548;
-  --table-border: #252d3d;
-  --ok-bg: rgba(52, 211, 153, 0.1);
-  --ok-text: #34d399;
-  --danger-bg: rgba(248, 113, 113, 0.1);
-  --danger-text: #f87171;
-  --info-bg: rgba(56, 165, 208, 0.12);
-  --info-text: #5bbae3;
-  --code-bg: #090d14;
-  --code-text: #c9d8e8;
-  --shimmer-a: #1e2636;
-  --shimmer-b: #252f42;
+  --input-bg: #0d1628;
+  --input-border: #1e3048;
+  --table-border: #162030;
+  --ok-bg: rgba(0, 232, 135, 0.08);
+  --ok-text: #00e887;
+  --danger-bg: rgba(255, 56, 56, 0.10);
+  --danger-text: #ff3838;
+  --info-bg: rgba(0, 212, 255, 0.08);
+  --info-text: #00d4ff;
+  --code-bg: #040810;
+  --code-text: #00d4ff;
+  --shimmer-a: #0d1628;
+  --shimmer-b: #162030;
+
+  /* Sidebar */
+  --sidebar-bg: #020609;
+  --sidebar-border: #0e1e2e;
+  --sidebar-text: #7a9aaa;
+  --nav-text: #7a9aaa;
+  --nav-hover-bg: #0e1e2e;
+  --nav-active-text: #00d4ff;
+  --accent: #00d4ff;
 }
 
 /* ------------------------------------------------------------------ */
@@ -575,3 +584,91 @@ tbody tr:hover { background: var(--panel-2); }
 .admin-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
 
 @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ------------------------------------------------------------------ */
+/* OSINT / Terminal utilities                                            */
+/* ------------------------------------------------------------------ */
+
+/* Neon glow text */
+.text-neon {
+  color: var(--strong);
+  text-shadow: 0 0 8px var(--strong), 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+/* Terminal badge — monospace pill for status labels */
+.term-badge {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+/* Live indicator dot */
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+/* OSINT card — terminal border style */
+.intel-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--strong);
+  border-radius: 3px;
+  padding: 14px 16px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+}
+
+[data-theme="dark"] .intel-card {
+  background: #0a1220;
+  border-color: #162030;
+  border-left-color: #00d4ff;
+}
+
+/* Scanline overlay (optional — add class to a page container) */
+.scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+[data-theme="dark"] .scanlines::after {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 212, 255, 0.015) 2px,
+    rgba(0, 212, 255, 0.015) 4px
+  );
+}
+
+/* Nav badge for LIVE items */
+.nav-badge-live {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(0, 232, 135, 0.15);
+  color: #00e887;
+  border: 1px solid rgba(0, 232, 135, 0.3);
+}
