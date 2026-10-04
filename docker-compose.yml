@@ -1,44 +1,47 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: qlab_app
-    environment:
-      DATABASE_URL: postgresql+psycopg://qlab:qlab@postgres:5432/qlab
-      QLAB_API_KEYS: ${QLAB_API_KEYS:-dev-key}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      QLAB_INSIGHT_MODEL: ${QLAB_INSIGHT_MODEL:-claude-haiku-4-5-20251001}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-
-  postgres:
-    image: timescale/timescaledb:latest-pg16
-    container_name: qlab_timescaledb
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: qlab
-      POSTGRES_PASSWORD: qlab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: qlab
-    ports:
-      - "5432:5432"
     volumes:
-      - qlab_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qlab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  minio:
-    image: minio/minio
-    container_name: qlab_minio
-    command: server /data --console-address ":9001"
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: qlab
-      MINIO_ROOT_PASSWORD: qlab12345
+      DATABASE_URL: postgresql+psycopg://qlab:${POSTGRES_PASSWORD:-changeme}@db/qlab
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      ENVIRONMENT: production
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - qlab_minio:/data
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      QLAB_API_URL: http://backend:8000
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
 
 volumes:
-  qlab_pgdata:
-  qlab_minio:
+  pgdata:
