@@ -54,6 +54,7 @@ from .routers import health_trend as health_trend_router
 from .routers import insights as insights_router
 from .routers import hardware_rec as hardware_rec_router
 from .routers import hardware_intel as hardware_intel_router
+from .routers import institute_admin as institute_admin_router
 from .routers import stats_compare as stats_compare_router
 from .routers import pub_report as pub_report_router
 from .routers import paper_package as paper_package_router
@@ -323,6 +324,7 @@ app.include_router(health_trend_router.router)
 app.include_router(insights_router.router)
 app.include_router(hardware_rec_router.router)
 app.include_router(hardware_intel_router.router)
+app.include_router(institute_admin_router.router)
 app.include_router(stats_compare_router.router)
 app.include_router(pub_report_router.router)
 app.include_router(paper_package_router.router)

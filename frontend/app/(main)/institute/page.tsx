@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -100,7 +100,7 @@ function KpiStrip({ overview }: { overview: Overview }) {
     { label: "Total Runs",       value: overview.total_runs.toLocaleString(),     color: "#1d6f8f" },
     { label: "Runs This Month",  value: overview.runs_this_month.toLocaleString(), color: "#3b82f6" },
     { label: "Departments",      value: overview.total_departments,               color: "#8b5cf6" },
-    { label: "Avg Health Score", value: overview.avg_health_score ?? "—",        color: healthColor(overview.avg_health_score) },
+    { label: "Avg Health Score", value: overview.avg_health_score ?? "â€”",        color: healthColor(overview.avg_health_score) },
     { label: "Success Rate",     value: `${(overview.success_rate * 100).toFixed(1)}%`, color: "#10b981" },
     { label: "Total QPU Time",   value: overview.total_qpu_time_formatted,        color: "#f59e0b" },
   ];
@@ -134,7 +134,7 @@ function SortBtn({ id, label, sortBy, onSort }: { id: string; label: string; sor
         borderRadius: 4, padding: "2px 8px",
       }}
     >
-      {active ? "▼ " : ""}{label}
+      {active ? "â–¼ " : ""}{label}
     </button>
   );
 }
@@ -185,11 +185,11 @@ function LeaderboardTable({
                       fontWeight: 700,
                       color: entry.rank === 1 ? "#f59e0b" : entry.rank === 2 ? "#9ca3af" : entry.rank === 3 ? "#b45309" : "inherit",
                     }}>
-                      {entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`}
+                      {entry.rank <= 3 ? ["ðŸ¥‡", "ðŸ¥ˆ", "ðŸ¥‰"][entry.rank - 1] : `#${entry.rank}`}
                     </span>
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{entry.name || "—"}</div>
+                    <div style={{ fontWeight: 600 }}>{entry.name || "â€”"}</div>
                     <div style={{ fontSize: 11, color: "var(--muted, #6b7280)" }}>{entry.email}</div>
                   </td>
                   <td style={{ fontSize: 13 }}>
@@ -200,7 +200,7 @@ function LeaderboardTable({
                   <td>{entry.completed_runs.toLocaleString()}</td>
                   <td>
                     <span style={{ color: healthColor(entry.avg_health_score), fontWeight: 600 }}>
-                      {entry.avg_health_score ?? "—"}
+                      {entry.avg_health_score ?? "â€”"}
                     </span>
                   </td>
                   <td>{(entry.success_rate * 100).toFixed(1)}%</td>
@@ -235,7 +235,7 @@ function BudgetChart({ data }: { data: BudgetData }) {
       <div className="panel-header">
         <h2>QPU Budget by Department</h2>
         <span style={{ fontSize: 12, color: "var(--muted, #6b7280)" }}>
-          Total: {data.total_cost_formatted} — {data.cost_model}
+          Total: {data.total_cost_formatted} â€” {data.cost_model}
         </span>
       </div>
       {!items.length ? (
@@ -261,7 +261,7 @@ function BudgetChart({ data }: { data: BudgetData }) {
                     fill="var(--fg, #111)"
                     fontWeight={500}
                   >
-                    {d.department.length > 26 ? d.department.slice(0, 24) + "…" : d.department}
+                    {d.department.length > 26 ? d.department.slice(0, 24) + "â€¦" : d.department}
                   </text>
                   {/* Bar background */}
                   <rect x={PL} y={y} width={chartW} height={BAR_H} rx={4} fill="#f1f5f9" />
@@ -358,7 +358,7 @@ export default function InstitutePage() {
 
   const loadLeaderboard = useCallback(async (sort: string) => {
     try {
-      const res = await fetch(`/qlab-api/institute-admin/leaderboard?sort_by=${sort}&limit=20`, {
+      const res = await fetch(`/qlab-api/api/v1/institute-admin/leaderboard?sort_by=${sort}&limit=20`, {
         headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
@@ -373,8 +373,8 @@ export default function InstitutePage() {
     setError(null);
     try {
       const [overviewRes, budgetRes] = await Promise.all([
-        fetch("/qlab-api/institute-admin/overview", { headers: authHeaders() }),
-        fetch("/qlab-api/institute-admin/budget", { headers: authHeaders() }),
+        fetch("/qlab-api/api/v1/institute-admin/overview", { headers: authHeaders() }),
+        fetch("/qlab-api/api/v1/institute-admin/budget", { headers: authHeaders() }),
       ]);
       if (!overviewRes.ok) throw new Error(`Overview fetch failed: ${overviewRes.status}`);
       if (!budgetRes.ok) throw new Error(`Budget fetch failed: ${budgetRes.status}`);
@@ -410,7 +410,7 @@ export default function InstitutePage() {
   async function handleDownloadReport() {
     setDownloadingReport(true);
     try {
-      const res = await fetch("/qlab-api/institute-admin/report?format=html", {
+      const res = await fetch("/qlab-api/api/v1/institute-admin/report?format=html", {
         headers: authHeaders(),
       });
       if (!res.ok) throw new Error("Report generation failed");
@@ -431,7 +431,7 @@ export default function InstitutePage() {
     }
   }
 
-  if (loading) return <main className="page"><div className="empty">Loading institution dashboard…</div></main>;
+  if (loading) return <main className="page"><div className="empty">Loading institution dashboardâ€¦</div></main>;
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger, #dc2626)" }}>{error}</div></main>;
   if (!overview) return null;
 
@@ -441,7 +441,7 @@ export default function InstitutePage() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 2 }}>
-            🏛 Institution Dashboard
+            ðŸ› Institution Dashboard
           </h1>
           <div style={{ fontSize: 13, color: "var(--muted, #6b7280)" }}>
             Last updated: {new Date(overview.generated_at).toLocaleString()}
@@ -453,7 +453,7 @@ export default function InstitutePage() {
           disabled={downloadingReport}
           type="button"
         >
-          {downloadingReport ? "Generating…" : "📄 Download Monthly Report"}
+          {downloadingReport ? "Generatingâ€¦" : "ðŸ“„ Download Monthly Report"}
         </button>
       </div>
 
@@ -477,3 +477,4 @@ export default function InstitutePage() {
     </main>
   );
 }
+
