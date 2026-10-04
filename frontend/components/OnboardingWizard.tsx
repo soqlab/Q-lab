@@ -38,7 +38,7 @@ export default function OnboardingWizard({ forceShow = false, onDismiss }: Onboa
     if (localStorage.getItem(ONBOARDING_KEY) === "1") return;
     // Check run count
     const token = localStorage.getItem(TOKEN_KEY);
-    fetch("/qlab-api/runs?limit=1", {
+    fetch("/qlab-api/api/v1/runs?limit=1", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => r.json())
@@ -68,7 +68,7 @@ export default function OnboardingWizard({ forceShow = false, onDismiss }: Onboa
     setDemoStatus("loading");
     const token = localStorage.getItem(TOKEN_KEY);
     try {
-      const res = await fetch("/qlab-api/runs", {
+      const res = await fetch("/qlab-api/api/v1/runs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

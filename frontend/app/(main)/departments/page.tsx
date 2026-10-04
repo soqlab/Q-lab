@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -62,7 +62,7 @@ const PRESET_COLORS = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6",
 ];
 
-const PRESET_ICONS = ["🔬", "⚛️", "🧠", "🖥️", "📡", "🔭", "💡", "🧪"];
+const PRESET_ICONS = ["ðŸ”¬", "âš›ï¸", "ðŸ§ ", "ðŸ–¥ï¸", "ðŸ“¡", "ðŸ”­", "ðŸ’¡", "ðŸ§ª"];
 
 const DEFAULT_FORM: CreateForm = {
   name: "",
@@ -71,7 +71,7 @@ const DEFAULT_FORM: CreateForm = {
   parent_dept_id: "",
   head_researcher: "",
   color: "#6366f1",
-  icon: "🔬",
+  icon: "ðŸ”¬",
 };
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ function DeptCard({
               <>
                 <span>
                   <HealthDot score={an.avg_health_score} />
-                  Health: <strong>{an.avg_health_score ?? "—"}</strong>
+                  Health: <strong>{an.avg_health_score ?? "â€”"}</strong>
                 </span>
                 <span>Runs: <strong>{an.total_runs}</strong></span>
               </>
@@ -200,7 +200,7 @@ function DeptCard({
               {[
                 ["Total Runs", an.total_runs],
                 ["Completed", an.completed_runs],
-                ["Avg Health", an.avg_health_score ?? "—"],
+                ["Avg Health", an.avg_health_score ?? "â€”"],
                 ["QPU Est.", `${an.estimated_qpu_seconds.toFixed(1)}s`],
               ].map(([label, value]) => (
                 <div key={String(label)} style={{ textAlign: "center", padding: "8px 0" }}>
@@ -211,9 +211,9 @@ function DeptCard({
             </div>
             <div style={{ fontSize: 12, color: "var(--muted, #6b7280)", display: "flex", gap: 8 }}>
               <span>{an.member_count} members</span>
-              <span>·</span>
+              <span>Â·</span>
               <span>Success rate: {(an.success_rate * 100).toFixed(1)}%</span>
-              <span>·</span>
+              <span>Â·</span>
               <span>{an.total_shots.toLocaleString()} shots</span>
             </div>
           </div>
@@ -274,7 +274,7 @@ function CreateModal({
         color: form.color,
         icon: form.icon,
       };
-      const res = await fetch("/qlab-api/departments", {
+      const res = await fetch("/qlab-api/api/v1/departments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -335,7 +335,7 @@ function CreateModal({
               style={{ marginTop: 4, display: "block", width: "100%", minHeight: 72, resize: "vertical" }}
               value={form.description}
               onChange={e => set("description", e.target.value)}
-              placeholder="Brief description of this department…"
+              placeholder="Brief description of this departmentâ€¦"
             />
           </label>
 
@@ -348,7 +348,7 @@ function CreateModal({
               value={form.parent_dept_id}
               onChange={e => set("parent_dept_id", e.target.value)}
             >
-              <option value="">— None (top level) —</option>
+              <option value="">â€” None (top level) â€”</option>
               {allDepts.map(d => (
                 <option key={d.id} value={d.id}>{d.icon} {d.name}</option>
               ))}
@@ -423,7 +423,7 @@ function CreateModal({
           )}
 
           <button className="button" type="submit" disabled={saving} style={{ alignSelf: "flex-end" }}>
-            {saving ? "Creating…" : "Create Department"}
+            {saving ? "Creatingâ€¦" : "Create Department"}
           </button>
         </form>
       </div>
@@ -465,18 +465,18 @@ function AnalyticsTable({ depts, analytics }: { depts: Department[]; analytics: 
                     <span style={{ color: d.color, fontWeight: 600 }}>{d.name}</span>
                   </td>
                   <td>{d.member_ids.length}</td>
-                  <td>{an ? an.total_runs : "—"}</td>
-                  <td>{an ? an.completed_runs : "—"}</td>
+                  <td>{an ? an.total_runs : "â€”"}</td>
+                  <td>{an ? an.completed_runs : "â€”"}</td>
                   <td>
                     {an ? (
                       <>
                         <HealthDot score={an.avg_health_score} />
-                        {an.avg_health_score ?? "—"}
+                        {an.avg_health_score ?? "â€”"}
                       </>
-                    ) : "—"}
+                    ) : "â€”"}
                   </td>
-                  <td>{an ? `${(an.success_rate * 100).toFixed(1)}%` : "—"}</td>
-                  <td>{an ? `${an.estimated_qpu_seconds.toFixed(1)}s` : "—"}</td>
+                  <td>{an ? `${(an.success_rate * 100).toFixed(1)}%` : "â€”"}</td>
+                  <td>{an ? `${an.estimated_qpu_seconds.toFixed(1)}s` : "â€”"}</td>
                 </tr>
               );
             })}
@@ -515,8 +515,8 @@ export default function DepartmentsPage() {
     setError(null);
     try {
       const [treeRes, listRes] = await Promise.all([
-        fetch("/qlab-api/departments/tree", { headers: authHeaders() }),
-        fetch("/qlab-api/departments", { headers: authHeaders() }),
+        fetch("/qlab-api/api/v1/departments/tree", { headers: authHeaders() }),
+        fetch("/qlab-api/api/v1/departments", { headers: authHeaders() }),
       ]);
       if (!treeRes.ok) throw new Error(`Tree fetch failed: ${treeRes.status}`);
       if (!listRes.ok) throw new Error(`List fetch failed: ${listRes.status}`);
@@ -528,7 +528,7 @@ export default function DepartmentsPage() {
       // Load analytics for each department in parallel
       const analyticsResults = await Promise.allSettled(
         deptList.map(d =>
-          fetch(`/qlab-api/departments/${d.id}/analytics`, { headers: authHeaders() })
+          fetch(`/qlab-api/api/v1/departments/${d.id}/analytics`, { headers: authHeaders() })
             .then(r => r.ok ? r.json() as Promise<DeptAnalytics> : null)
         )
       );
@@ -556,7 +556,7 @@ export default function DepartmentsPage() {
     void loadData();
   }, [token, router, loadData]);
 
-  if (loading) return <main className="page"><div className="empty">Loading departments…</div></main>;
+  if (loading) return <main className="page"><div className="empty">Loading departmentsâ€¦</div></main>;
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger, #dc2626)" }}>{error}</div></main>;
 
   const rootDepts = tree?.departments ?? [];
@@ -567,7 +567,7 @@ export default function DepartmentsPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 2 }}>
-            🏛 Department Hierarchy
+            ðŸ› Department Hierarchy
           </h1>
           <div style={{ fontSize: 13, color: "var(--muted, #6b7280)" }}>
             {allDepts.length} department{allDepts.length !== 1 ? "s" : ""} in your institution
@@ -634,3 +634,4 @@ export default function DepartmentsPage() {
     </main>
   );
 }
+
