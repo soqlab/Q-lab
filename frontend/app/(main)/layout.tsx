@@ -147,39 +147,110 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function LiveClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    function tick() {
+      const now = new Date();
+      setTime(now.toISOString().replace("T", " ").slice(0, 19) + " UTC");
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span style={{ fontFamily: "'Cascadia Code', Consolas, monospace", fontSize: 11, color: "var(--accent)", letterSpacing: 0.5 }}>{time}</span>;
+}
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
     <div className="app-shell">
       <SWUpdater />
       <WarmupBanner />
+
+      {/* ── Sidebar ── */}
       <aside className="sidebar">
-        <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+        {/* Brand */}
+        <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="brand-mark">
-              <Atom size={19} aria-hidden="true" />
+            <div className="brand-mark" style={{ position: "relative" }}>
+              <Atom size={18} aria-hidden="true" />
             </div>
-            <span>Q-Lab</span>
+            <span style={{ fontFamily: "'Cascadia Code', Consolas, monospace", letterSpacing: 1 }}>Q-LAB</span>
           </div>
-          <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>
-            State of Quantum
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 2 }}>
+            <span style={{
+              display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+              background: "var(--ok)", boxShadow: "0 0 6px var(--ok)",
+              animation: "pulse-dot 2s ease-in-out infinite",
+            }} />
+            <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Cascadia Code', Consolas, monospace" }}>
+              QUANTUM INTEL PLATFORM
+            </span>
+          </div>
         </div>
+
         <SideNav />
       </aside>
+
+      {/* ── Main content ── */}
       <div className="content">
-        <header className="topbar">
-          <div className="page-title">
-            <h1>Quantum Experiment Observatory</h1>
-            <p>Capture, compare, and reproduce circuit runs.</p>
+        {/* Topbar */}
+        <header className="topbar" style={{ gap: 16 }}>
+          {/* Left: mode label */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{
+              fontFamily: "'Cascadia Code', Consolas, monospace",
+              fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
+              color: "var(--accent)", fontWeight: 700,
+            }}>
+              QUANTUM EXPERIMENT TRACKER
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Capture · Analyze · Reproduce
+            </div>
           </div>
+
+          {/* Center: live stats strip */}
+          <div style={{
+            flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 20,
+          }}>
+            <LiveClock />
+            <span style={{
+              fontFamily: "'Cascadia Code', Consolas, monospace", fontSize: 10,
+              color: "var(--ok)", letterSpacing: 1,
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", background: "var(--ok)",
+                boxShadow: "0 0 5px var(--ok)", display: "inline-block",
+                animation: "pulse-dot 2s ease-in-out infinite",
+              }} />
+              SYS ONLINE
+            </span>
+          </div>
+
           <UserMenu />
         </header>
+
         <div style={{ flex: 1 }}>{children}</div>
-        <footer style={{ padding: "16px 24px", borderTop: "1px solid var(--line)", fontSize: 12, color: "var(--muted)", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <span>© {new Date().getFullYear()} Q-Lab — <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noreferrer" style={{ color: "#475569" }}>MIT License</a></span>
+
+        {/* Footer */}
+        <footer style={{
+          padding: "10px 24px", borderTop: "1px solid var(--line)",
+          fontSize: 11, color: "var(--muted)",
+          display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap",
+          fontFamily: "'Cascadia Code', Consolas, monospace", letterSpacing: 0.3,
+        }}>
+          <span style={{ color: "var(--accent)", opacity: 0.6 }}>Q-LAB</span>
+          <span>©{new Date().getFullYear()} MIT LICENSE</span>
+          <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noreferrer"
+            style={{ color: "var(--accent)", opacity: 0.7 }}>
+            ↗ SOURCE
+          </a>
         </footer>
       </div>
+
       <NPSWidget />
     </div>
     </AuthGuard>
