@@ -72,6 +72,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/compare/backends", icon: GitCompare, label: "Backend Compare" },
       { href: "/backend-emulator", icon: Cpu, label: "Backend Emulator" },
       { href: "/settings/decoherence", icon: AlertTriangle, label: "Decoherence" },
+      { href: "/intel", icon: Scan, label: "Hardware Intel", badge: "LIVE" },
       { href: "/hardware-jobs", icon: Server, label: "Hardware Jobs" },
       { href: "/global-cal", icon: Globe, label: "Global Cal DB" },
       { href: "/providers", icon: Server, label: "Multi-Provider" },
@@ -311,7 +312,7 @@ function NavGroup({
               <Icon size={18} aria-hidden="true" />
               <span style={{ flex: 1 }}>{lbl}</span>
               {badge && (
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", background: "rgba(245,158,11,0.15)", color: "#f59e0b", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>
+                <span className={badge === "LIVE" ? "nav-badge-live" : undefined} style={badge !== "LIVE" ? { fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", background: "rgba(245,158,11,0.15)", color: "#f59e0b", borderRadius: 4, padding: "1px 5px", flexShrink: 0 } : undefined}>
                   {badge}
                 </span>
               )}
