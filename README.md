@@ -1,10 +1,10 @@
-# Q-Lab — Quantum Experiment Intelligence Platform
+﻿# Q-Lab — Quantum Experiment Intelligence Platform
 
 > Capture, analyze, and reproduce every quantum circuit execution — with one SDK call and zero configuration.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Self-Hostable](https://img.shields.io/badge/self--hostable-yes-green.svg)](SELF_HOSTING.md)
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/yasseennandally/Q-lab)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/soqlab/Q-lab)
 
 ---
 
@@ -46,7 +46,7 @@ job = sampler.run(circuits, observables)  # Q-Lab captures this silently
 ### 1. Clone and set up
 
 ```bash
-git clone https://github.com/yasseennandally/Q-lab.git
+git clone https://github.com/soqlab/Q-lab.git
 cd Q-lab
 ```
 

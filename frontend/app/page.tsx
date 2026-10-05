@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -915,7 +915,7 @@ export default function LandingPage() {
           <ul className="lp-nav-links">
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How it works</a></li>
-            <li><a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            <li><a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a></li>
             <li><button onClick={openContact} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>Contact</button></li>
           </ul>
 
@@ -968,7 +968,7 @@ export default function LandingPage() {
                     <Link href="/register" className="lp-btn lp-btn-primary lp-btn-large">
                       Get Started Free →
                     </Link>
-                    <a href="https://github.com/yasseennandally/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-outline-large">
+                    <a href="https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-outline-large">
                       🖥 Self-Host
                     </a>
                   </>
@@ -976,11 +976,11 @@ export default function LandingPage() {
               </div>
 
               <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#94a3b8", border: "1px solid #1e293b", borderRadius: 6, padding: "4px 10px", textDecoration: "none", fontFamily: "ui-monospace,monospace" }}>
+                <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#94a3b8", border: "1px solid #1e293b", borderRadius: 6, padding: "4px 10px", textDecoration: "none", fontFamily: "ui-monospace,monospace" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
                   MIT · Open Source
                 </a>
-                <a href="https://github.com/yasseennandally/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#94a3b8", border: "1px solid #1e293b", borderRadius: 6, padding: "4px 10px", textDecoration: "none", fontFamily: "ui-monospace,monospace" }}>
+                <a href="https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#94a3b8", border: "1px solid #1e293b", borderRadius: 6, padding: "4px 10px", textDecoration: "none", fontFamily: "ui-monospace,monospace" }}>
                   🖥 Self-hostable
                 </a>
               </div>
@@ -1138,13 +1138,13 @@ export default function LandingPage() {
                   icon: "🖥",
                   title: "Self-host",
                   desc: "Run Q-Lab on your own servers. Docker Compose, one command.",
-                  cta: { label: "Read the guide →", href: "https://github.com/yasseennandally/Q-lab/blob/main/SELF_HOSTING.md", internal: false },
+                  cta: { label: "Read the guide →", href: "https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md", internal: false },
                 },
                 {
                   icon: "🔧",
                   title: "Contribute",
                   desc: "Fix bugs, add providers, improve the SDK. All PRs welcome.",
-                  cta: { label: "CONTRIBUTING.md →", href: "https://github.com/yasseennandally/Q-lab/blob/main/CONTRIBUTING.md", internal: false },
+                  cta: { label: "CONTRIBUTING.md →", href: "https://github.com/soqlab/Q-lab/blob/main/CONTRIBUTING.md", internal: false },
                 },
               ].map(card => (
                 <div key={card.title} style={{ background: "rgba(15,15,25,0.8)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "22px 20px" }}>
@@ -1159,7 +1159,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-            <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer"
+            <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer"
               style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8", border: "1px solid #1e293b", borderRadius: 8, padding: "8px 16px", textDecoration: "none", fontFamily: "ui-monospace,monospace" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
               ⭐ Star on GitHub
@@ -1173,9 +1173,9 @@ export default function LandingPage() {
             © {new Date().getFullYear()} Q-Lab — MIT License. Built in the open.
           </span>
           <div className="lp-footer-links">
-            <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="https://github.com/yasseennandally/Q-lab/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a>
-            <a href="https://github.com/yasseennandally/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer">Self-Host</a>
+            <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://github.com/soqlab/Q-lab/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a>
+            <a href="https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md" target="_blank" rel="noopener noreferrer">Self-Host</a>
             <button onClick={openContact} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>Contact</button>
             {!isAuthed && (
               <>

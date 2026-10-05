@@ -1,4 +1,4 @@
-# Self-Hosting Q-Lab
+﻿# Self-Hosting Q-Lab
 
 Q-Lab is MIT-licensed and fully self-hostable. Run it on your own servers — your experiment data never leaves your infrastructure.
 
@@ -10,7 +10,7 @@ Q-Lab is MIT-licensed and fully self-hostable. Run it on your own servers — yo
 ## Quick Start
 
 ```bash
-git clone https://github.com/yasseennandally/Q-lab.git
+git clone https://github.com/soqlab/Q-lab.git
 cd Q-lab
 cp .env.example .env
 # Edit .env — set QLAB_SECRET_KEY, DATABASE_URL, and SMTP credentials
@@ -118,5 +118,5 @@ All experiment data is stored in your PostgreSQL database. Nothing is sent to ex
 
 ## Support
 
-- GitHub Issues: https://github.com/yasseennandally/Q-lab/issues
+- GitHub Issues: https://github.com/soqlab/Q-lab/issues
 - Email: contact@soqlab.com
