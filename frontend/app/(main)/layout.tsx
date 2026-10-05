@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
@@ -244,7 +244,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         }}>
           <span style={{ color: "var(--accent)", opacity: 0.6 }}>Q-LAB</span>
           <span>©{new Date().getFullYear()} MIT LICENSE</span>
-          <a href="https://github.com/yasseennandally/Q-lab" target="_blank" rel="noreferrer"
+          <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noreferrer"
             style={{ color: "var(--accent)", opacity: 0.7 }}>
             ↗ SOURCE
           </a>
