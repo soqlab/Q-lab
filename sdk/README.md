@@ -1,6 +1,6 @@
 # qlab-sdk
 
-Python SDK for [Q-Lab](https://soqlab.com) — the quantum experiment tracker.
+Python SDK for [Q-Lab](https://qlab.soqlab.com) — the quantum experiment tracker.
 
 ## Install
 
@@ -15,7 +15,7 @@ from qlab import QLabTracker
 
 tracker = QLabTracker(
     api_key="qlab_YOUR_KEY",
-    url="https://soqlab.com",
+    url="https://qlab.soqlab.com",
 )
 
 # One-shot log
@@ -34,7 +34,7 @@ from qlab import QLabTracker
 from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
-tracker = QLabTracker(api_key="qlab_YOUR_KEY", url="https://soqlab.com")
+tracker = QLabTracker(api_key="qlab_YOUR_KEY", url="https://qlab.soqlab.com")
 sim = AerSimulator()
 
 with tracker.run("bell-circuit", project="my-project") as run:
