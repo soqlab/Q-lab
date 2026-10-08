@@ -915,6 +915,7 @@ export default function LandingPage() {
           <ul className="lp-nav-links">
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How it works</a></li>
+            <li><a href="#video">Video</a></li>
             <li><a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a></li>
             <li><button onClick={openContact} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>Contact</button></li>
           </ul>
@@ -1017,6 +1018,27 @@ export default function LandingPage() {
                 <div className="lp-stat-label">{s.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* ── Video ──────────────────────────────────────────────────────── */}
+        <div className="lp-section" id="video" style={{ paddingBottom: 60, textAlign: "center" }}>
+          <div className="lp-section-label">Watch</div>
+          <h2 className="lp-section-title">Q-Lab in under three minutes</h2>
+          <p className="lp-section-sub" style={{ margin: "0 auto 40px" }}>
+            What Q-Lab captures, how it works with your existing Qiskit code, and how to run it yourself.
+          </p>
+          <div style={{ maxWidth: 1000, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(99,102,241,0.25)", boxShadow: "0 24px 64px rgba(0,0,0,0.5)", background: "#000" }}>
+            <video
+              controls
+              playsInline
+              preload="metadata"
+              poster="/videos/qlab-commercial-poster.jpg"
+              style={{ display: "block", width: "100%", height: "auto", aspectRatio: "16 / 9" }}
+            >
+              <source src="/videos/qlab-commercial.mp4" type="video/mp4" />
+              Your browser can&apos;t play this video. <a href="/videos/qlab-commercial.mp4">Download it</a> instead.
+            </video>
           </div>
         </div>
 
