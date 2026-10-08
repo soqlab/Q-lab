@@ -19,7 +19,7 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://soqlab.com"
+Homepage = "https://soqlab.com/products/q-lab/"
 Repository = "https://github.com/yasseennandally/Q-lab"
 
 [project.optional-dependencies]
