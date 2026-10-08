@@ -19,7 +19,7 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: QLAB_APP_URL
-        value: https://your-qlab-domain.com
+        value: https://qlab.soqlab.com
     healthCheckPath: /health
     disk:
       name: qlab-data

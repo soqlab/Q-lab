@@ -1170,7 +1170,7 @@ export default function LandingPage() {
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <footer className="lp-footer">
           <span className="lp-footer-copy">
-            © {new Date().getFullYear()} Q-Lab — MIT License. Built in the open.
+            © {new Date().getFullYear()} Q-Lab — MIT License. A <a href="https://soqlab.com" style={{ color: "inherit", textDecoration: "underline" }}>SOQLAB</a> product.
           </span>
           <div className="lp-footer-links">
             <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noopener noreferrer">GitHub</a>
