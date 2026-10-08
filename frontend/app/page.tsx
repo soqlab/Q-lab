@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth";
+import VideoShowcase from "../components/VideoShowcase";
 
 // ─── Inline CSS injected once ────────────────────────────────────────────────
 const STYLES = `
@@ -438,8 +439,8 @@ const STYLES = `
     content: "";
     position: absolute;
     top: 24px;
-    left: calc(16.66% + 24px);
-    right: calc(16.66% + 24px);
+    left: 24px;
+    right: calc((100% - 80px) / 3 - 24px);
     height: 1px;
     background: linear-gradient(90deg, #6366f1, #8b5cf6, #6366f1);
     opacity: 0.3;
@@ -489,6 +490,7 @@ const STYLES = `
     font-size: 13px;
     color: #a78bfa;
     width: 100%;
+    margin-top: auto;
   }
 
   /* ── CTA section ── */
@@ -1022,24 +1024,13 @@ export default function LandingPage() {
         </div>
 
         {/* ── Video ──────────────────────────────────────────────────────── */}
-        <div className="lp-section" id="video" style={{ paddingBottom: 60, textAlign: "center" }}>
+        <div className="lp-section" id="video" style={{ paddingBottom: 130, textAlign: "center" }}>
           <div className="lp-section-label">Watch</div>
           <h2 className="lp-section-title">Q-Lab in under three minutes</h2>
           <p className="lp-section-sub" style={{ margin: "0 auto 40px" }}>
             What Q-Lab captures, how it works with your existing Qiskit code, and how to run it yourself.
           </p>
-          <div style={{ maxWidth: 1000, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(99,102,241,0.25)", boxShadow: "0 24px 64px rgba(0,0,0,0.5)", background: "#000" }}>
-            <video
-              controls
-              playsInline
-              preload="metadata"
-              poster="/videos/qlab-commercial-poster.jpg"
-              style={{ display: "block", width: "100%", height: "auto", aspectRatio: "16 / 9" }}
-            >
-              <source src="/videos/qlab-commercial.mp4" type="video/mp4" />
-              Your browser can&apos;t play this video. <a href="/videos/qlab-commercial.mp4">Download it</a> instead.
-            </video>
-          </div>
+          <VideoShowcase />
         </div>
 
         <hr className="lp-divider" />
