@@ -1,0 +1,11 @@
+# Q-Lab frontend on Netlify (qlab.soqlab.com). The backend stays on Render; Next.js rewrites
+# /qlab-api/* to QLAB_API_URL server-side, so the browser only ever talks to qlab.soqlab.com.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
+  QLAB_API_URL = "https://qlab-backend.onrender.com"
