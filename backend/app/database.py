@@ -29,6 +29,13 @@ class Base(DeclarativeBase):
 def init_db() -> None:
     from . import models  # noqa: F401
 
+    migrate_from = os.getenv("MIGRATE_FROM_DATABASE_URL", "").strip()
+    if migrate_from and DATABASE_URL.startswith("sqlite"):
+        from sqlalchemy.engine import make_url
+        from .pg_to_sqlite import migrate_once
+
+        migrate_once(migrate_from, Path(make_url(DATABASE_URL).database))
+
     Base.metadata.create_all(bind=engine)
     _ensure_compat_columns()
     _ensure_fts()
