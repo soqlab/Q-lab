@@ -1,6 +1,7 @@
 """Google and GitHub OAuth2 login."""
 from __future__ import annotations
 
+import logging
 import os
 
 import httpx
@@ -15,6 +16,7 @@ from ..email_service import send_welcome_email
 from ..models import User
 
 router = APIRouter(prefix="/auth", tags=["oauth"])
+log = logging.getLogger("qlab.oauth")
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -70,7 +72,8 @@ def google_callback(
         jwt = create_access_token(user.id, user.org_id, user.role)
         dest = "/onboarding" if is_new else "/runs"
         return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
-    except Exception:
+    except Exception as exc:
+        _log_failure("google", exc)
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
 
 
@@ -125,8 +128,17 @@ def github_callback(
         jwt = create_access_token(user.id, user.org_id, user.role)
         dest = "/onboarding" if is_new else "/runs"
         return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
-    except Exception:
+    except Exception as exc:
+        _log_failure("github", exc)
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+
+
+def _log_failure(provider: str, exc: Exception) -> None:
+    # Provider error bodies are short JSON like {"error": "invalid_grant"}; no codes or tokens.
+    detail = ""
+    if isinstance(exc, httpx.HTTPStatusError):
+        detail = f" status={exc.response.status_code} body={exc.response.text[:200]!r}"
+    log.warning("[oauth] %s sign-in failed: %s%s", provider, type(exc).__name__, detail)
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
