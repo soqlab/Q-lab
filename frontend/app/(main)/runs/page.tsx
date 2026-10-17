@@ -384,7 +384,7 @@ function RunsInner() {
   const total = runs.length;
   const completed = runs.filter(r => r.status === "completed").length;
   const failed = runs.filter(r => r.status === "failed").length;
-  const maxQubits = Math.max(0, ...runs.map(r => r.fingerprint.num_qubits ?? 0));
+  const maxQubits = Math.max(0, ...runs.map(r => r.fingerprint?.num_qubits ?? 0));
   const withCal = runs.filter(r => r.calibration && Object.keys(r.calibration).length > 0).length;
   const avgHealth = (() => {
     const scored = runs.filter(r => r.health_score !== null && r.health_score !== undefined);

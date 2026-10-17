@@ -863,7 +863,7 @@ function SecurityTab({ token }: { token: string }) {
         <section className="panel">
           <div className="panel-header">
             <h2>Users with Many IPs</h2>
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>> 2 IPs used to login</span>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>{">"} 2 IPs used to login</span>
           </div>
           {data.users_multiple_ips.length === 0 ? (
             <div className="empty" style={{ color: "#10b981" }}>All users login from consistent IPs.</div>

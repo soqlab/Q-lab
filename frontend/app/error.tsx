@@ -83,6 +83,15 @@ export default function Error({
         <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.65, margin: "0 0 24px" }}>
           This page hit an unexpected error. If it keeps happening, let us know via the feedback page.
         </p>
+        {(error.message || error.digest) && (
+          <pre style={{
+            fontSize: 11, color: "var(--muted)", background: "var(--surface)", border: "1px solid var(--line)",
+            borderRadius: 6, padding: "8px 10px", margin: "0 0 20px", textAlign: "left",
+            whiteSpace: "pre-wrap", wordBreak: "break-word",
+          }}>
+            {error.message}{error.digest ? `\ndigest: ${error.digest}` : ""}
+          </pre>
+        )}
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button
             onClick={reset}
