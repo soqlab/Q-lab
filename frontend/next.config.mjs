@@ -1,4 +1,6 @@
 const apiUrl = process.env.QLAB_API_URL || "http://127.0.0.1:8000";
+// Set where the browser calls the backend directly (see app/layout.tsx); it must be allowed here.
+const directApi = (process.env.NEXT_PUBLIC_QLAB_API_BASE || "").replace(/\/+$/, "");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -42,7 +44,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https://buildlist.io https://betalist.com https://peerpush.com",
-              "connect-src 'self'",
+              directApi ? `connect-src 'self' ${directApi}` : "connect-src 'self'",
               "frame-ancestors 'self'",
             ].join("; "),
           },
