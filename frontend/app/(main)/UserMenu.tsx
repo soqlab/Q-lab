@@ -13,7 +13,9 @@ export default function UserMenu() {
 
   function logout() {
     clearSession();
-    router.push("/login");
+    // The hosted app returns to the company site; self-hosted installs stay on their own login page.
+    if (window.location.hostname.endsWith("soqlab.com")) window.location.replace("https://soqlab.com");
+    else router.push("/login");
   }
 
   return (
