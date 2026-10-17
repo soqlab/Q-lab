@@ -227,7 +227,7 @@ export type AuditLogEntry = {
 
 const API_PREFIX = "/qlab-api";
 
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   return `${API_PREFIX}${path}`;
 }
 
