@@ -14,3 +14,6 @@
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
   QLAB_API_URL = "https://qlab-backend.onrender.com"
+  # Browser calls go straight to the backend: Netlify cuts proxied requests after ~25 s, and AI
+  # features and the live run feed need longer. The backend's CORS_ORIGINS must list this site.
+  NEXT_PUBLIC_QLAB_API_BASE = "https://qlab-backend.onrender.com"

@@ -22,10 +22,42 @@ export const metadata: Metadata = {
   },
 };
 
+// When the site is served by a host that limits proxied requests (Netlify cuts them at ~25 s),
+// the browser calls the backend directly instead of through /qlab-api. Unset on Render: no change.
+const API_BASE = (process.env.NEXT_PUBLIC_QLAB_API_BASE || "").replace(/\/+$/, "");
+const API_SHIM = `(function(){
+  var base = ${JSON.stringify(API_BASE)};
+  if (!base) return;
+  var P = "/qlab-api/";
+  function fix(u) {
+    try {
+      var p = new URL(String(u), location.href);
+      if (p.origin === location.origin && p.pathname.indexOf(P) === 0) return base + p.pathname.slice(P.length - 1) + p.search;
+    } catch (e) {}
+    return u;
+  }
+  var f = window.fetch;
+  window.fetch = function(input, init) {
+    if (input && typeof input === "object" && "url" in input) {
+      var nu = fix(input.url);
+      return f.call(this, nu === input.url ? input : new Request(nu, input), init);
+    }
+    return f.call(this, fix(input), init);
+  };
+  var ES = window.EventSource;
+  if (ES) {
+    var Shim = function(u, c) { return new ES(fix(u), c); };
+    Shim.prototype = ES.prototype;
+    Shim.CONNECTING = 0; Shim.OPEN = 1; Shim.CLOSED = 2;
+    window.EventSource = Shim;
+  }
+})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {API_BASE && <script dangerouslySetInnerHTML={{ __html: API_SHIM }} />}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#6366f1" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
