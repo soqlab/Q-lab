@@ -11,7 +11,7 @@ services:
     plan: starter
     envVars:
       - key: DATABASE_URL
-        value: sqlite:///./data/qlab.db
+        value: sqlite:///./data/qlab-sqlite.db
       - key: SECRET_KEY
         generateValue: true
       - key: SMTP_HOST
