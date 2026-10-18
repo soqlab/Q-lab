@@ -1,0 +1,42 @@
+# Two-service layout: separate backend and frontend on Render (about 6.5 EUR/month more than render.yaml).
+# To switch back, see deploy/README.md.
+services:
+  - type: web
+    name: qlab-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./data/qlab.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: QLAB_APP_URL
+        value: https://qlab.soqlab.com
+    healthCheckPath: /health
+    disk:
+      name: qlab-data
+      mountPath: /app/data
+      sizeGB: 10
+
+  - type: web
+    name: qlab-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: starter
+    dockerBuildArgs:
+      - key: QLAB_API_URL
+        value: https://qlab-backend.onrender.com
+    envVars:
+      - key: QLAB_API_URL
+        value: https://qlab-backend.onrender.com
