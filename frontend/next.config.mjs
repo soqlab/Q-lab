@@ -1,6 +1,9 @@
 const apiUrl = process.env.QLAB_API_URL || "http://127.0.0.1:8000";
 // Set where the browser calls the backend directly (see app/layout.tsx); it must be allowed here.
 const directApi = (process.env.NEXT_PUBLIC_QLAB_API_BASE || "").replace(/\/+$/, "");
+// Single-container deploy (deploy/render-single): requests arriving on these host names are the
+// backend's (the SDK posts runs to them), so they are passed through to the API untouched.
+const backendHosts = (process.env.QLAB_BACKEND_HOSTS || "").split(",").map((h) => h.trim()).filter(Boolean);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -13,22 +16,38 @@ const nextConfig = {
   // Pre-bundle large icon/component libraries so they're not compiled per-request
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts"],
+    // AI answers and exports can run past the 30 s default when proxied to the backend.
+    proxyTimeout: 300_000,
   },
 
   async rewrites() {
-    return [
+    const api = [
       {
         source: "/qlab-api/:path*",
         destination: `${apiUrl}/:path*`,
       },
     ];
+    if (!backendHosts.length) return api;
+    return {
+      beforeFiles: [
+        ...backendHosts.map((value) => ({
+          source: "/:path*",
+          has: [{ type: "host", value }],
+          destination: `${apiUrl}/:path*`,
+        })),
+        // The platform health check reaches the container without a public host name.
+        { source: "/health", destination: `${apiUrl}/health` },
+      ],
+      afterFiles: api,
+    };
   },
 
   async headers() {
     return [
       {
-        // All routes: security + no caching by default
+        // All routes: security + no caching by default (not on backend host names: the API sets its own)
         source: "/:path*",
+        ...(backendHosts.length ? { missing: backendHosts.map((value) => ({ type: "host", value })) } : {}),
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Pragma", value: "no-cache" },

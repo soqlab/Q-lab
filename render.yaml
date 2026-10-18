@@ -1,9 +1,13 @@
+# One Render service runs all of Q-Lab. For separate backend and frontend services,
+# use deploy/render-split.yaml instead (see deploy/README.md).
 services:
   - type: web
     name: qlab-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    # Site and API in one container (deploy/render-single). The service keeps its name, so the
+    # qlab-backend.onrender.com address the SDK posts to and the data disk stay the same.
+    dockerfilePath: ./deploy/render-single/Dockerfile
+    dockerContext: .
     plan: starter
     envVars:
       - key: DATABASE_URL
@@ -25,16 +29,3 @@ services:
       name: qlab-data
       mountPath: /app/data
       sizeGB: 10
-
-  - type: web
-    name: qlab-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    plan: starter
-    dockerBuildArgs:
-      - key: QLAB_API_URL
-        value: https://qlab-backend.onrender.com
-    envVars:
-      - key: QLAB_API_URL
-        value: https://qlab-backend.onrender.com
