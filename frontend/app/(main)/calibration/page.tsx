@@ -229,7 +229,7 @@ function ForecastChart({ m, cfg }: { m: MetricForecast; cfg: typeof METRIC_LABEL
 }
 
 function ForecastPanel({ loading, forecast }: { loading: boolean; forecast: CalibrationForecastResult | null }) {
-  const DIRECTION_ICON: Record<string, JSX.Element> = {
+  const DIRECTION_ICON: Record<string, React.JSX.Element> = {
     improving: <TrendingUp size={12} style={{ color: "#22c55e" }} />,
     degrading: <TrendingDown size={12} style={{ color: "#ef4444" }} />,
     stable: <Minus size={12} style={{ color: "#9ca3af" }} />,

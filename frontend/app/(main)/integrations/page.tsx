@@ -5,12 +5,12 @@ import {
   CheckCircle,
   XCircle,
   Copy,
-  Github,
   Send,
   MessageSquare,
   RefreshCw,
   Link as LinkIcon,
 } from "lucide-react";
+import GithubIcon from "../../../components/GithubIcon";
 
 const API = "/qlab-api";
 
@@ -206,7 +206,7 @@ function GitHubSection() {
     <section className="panel" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
       <div className="panel-header" style={{ background: "#0f172a", borderBottom: "1px solid #1e293b" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Github size={18} color="#94a3b8" />
+          <GithubIcon size={18} color="#94a3b8" />
           <h2 style={{ color: "#e2e8f0", margin: 0 }}>GitHub Integration</h2>
         </div>
         {!loadingConfig && (

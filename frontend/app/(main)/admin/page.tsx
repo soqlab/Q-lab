@@ -912,6 +912,235 @@ function SecurityTab({ token }: { token: string }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 type Tab = "overview" | "users" | "activity" | "analytics" | "runs" | "ai" | "security" | "feedback";
 
+// Helpers for the analytics, AI, security and activity tabs (restored: an earlier cleanup removed
+// them but kept the tabs that use them).
+interface ActivityEvent {
+  id: number; action: string; resource_type: string | null; resource_id: string | null;
+  user_id: number | null; user_email: string | null; ip_address: string | null;
+  user_agent: string | null; meta: Record<string, unknown>; created_at: string;
+}
+
+const ACTION_COLOR: Record<string, string> = {
+  "auth.login": "#10b981", "auth.register": "#6366f1",
+  "run.created": "#6366f1", "run.deleted": "#ef4444",
+  "insight.generated": "#f59e0b",
+  "page.view": "#64748b",
+};
+
+interface AnalyticsData {
+  period_days: number; total_events: number;
+  action_breakdown: { action: string; count: number }[];
+  daily_timeline: { day: string; active_users: number; events: number }[];
+  top_users: { user_id: number; email: string; events: number }[];
+  top_pages: { page: string; views: number }[];
+  signup_trend: { day: string; count: number }[];
+}
+
+interface RunsStatsData {
+  period_days: number; total_runs: number; completion_rate: number; failure_rate: number;
+  avg_circuit_depth: number | null;
+  backends: { backend: string; count: number }[];
+  statuses: { status: string; count: number }[];
+  daily_runs: { day: string; count: number }[];
+  qubit_distribution: { bucket: string; count: number }[];
+  top_projects: { project: string; runs: number }[];
+}
+
+interface SecurityData {
+  period_days: number; total_logins: number; new_registrations: number; unique_ips: number;
+  suspicious_ips: { ip: string; users: number; actions: number }[];
+  users_multiple_ips: { user_id: number; email: string; ip_count: number }[];
+  top_login_ips: { ip: string; count: number }[];
+  recent_registrations: { created_at: string; ip_address: string | null; user_agent: string | null }[];
+}
+
+const BACKEND_COLOR: Record<string, string> = {
+  ibm: "#6366f1", ionq: "#f59e0b", rigetti: "#ef4444", aer: "#10b981",
+  "ibm_nairobi": "#6366f1", "ibm_jakarta": "#6366f1",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  completed: "#10b981", failed: "#ef4444", running: "#f59e0b", submitted: "#64748b",
+};
+
+const ACTION_ICON: Record<string, string> = {
+  "auth.login": "🔑",
+  "auth.register": "✨",
+  "auth.logout": "🚪",
+  "run.created": "⚛️",
+  "run.updated": "✏️",
+  "run.deleted": "🗑️",
+  "run.viewed": "👁️",
+  "insight.generated": "🤖",
+  "insight.requested": "💡",
+  "cost_oracle.queried": "💰",
+  "assistant.queried": "🤖",
+  "billing.viewed": "💳",
+  "page.view": "📄",
+};
+
+function MiniBar({ value, max, color = "#6366f1" }: { value: number; max: number; color?: string }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.4s" }} />
+      </div>
+      <span style={{ fontSize: 12, color: "var(--muted)", minWidth: 32, textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
+  return (
+    <div className="metric" style={{ padding: "14px 18px" }}>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value" style={{ fontSize: 22, color: color ?? "var(--text)" }}>{String(value)}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Bar({ value, max, color = "#6366f1", label }: { value: number; max: number; color?: string; label: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div style={{ marginBottom: 9 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+        <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 500 }}>{label}</span>
+        <span style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{value.toLocaleString()}</span>
+      </div>
+      <div style={{ height: 5, background: "var(--line)", borderRadius: 3 }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.4s" }} />
+      </div>
+    </div>
+  );
+}
+
+function DaySelector({ days, setDays }: { days: number; setDays: (d: number) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+      {[7, 14, 30, 90].map(d => (
+        <button key={d} onClick={() => setDays(d)} style={{
+          padding: "5px 12px", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          background: days === d ? "var(--strong)" : "var(--surface)",
+          color: days === d ? "#fff" : "var(--muted)",
+          border: `1px solid ${days === d ? "var(--strong)" : "var(--line)"}`,
+        }}>Last {d}d</button>
+      ))}
+    </div>
+  );
+}
+
+function ActivityFeedTab({ token }: { token: string }) {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    function fetchFeed() {
+      fetch("/qlab-api/api/v1/admin/activity-feed?limit=200", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return;
+          setEvents(Array.isArray(data) ? data : []);
+          setLastUpdated(new Date());
+          setLoading(false);
+        })
+        .catch(() => { if (!cancelled) setLoading(false); });
+    }
+    fetchFeed();
+    const interval = setInterval(fetchFeed, 10_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [token]);
+
+  const filtered = filter
+    ? events.filter(e =>
+        e.action.includes(filter) ||
+        (e.user_email ?? "").includes(filter) ||
+        (e.resource_id ?? "").includes(filter)
+      )
+    : events;
+
+  function fmt(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" });
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header" style={{ gap: 12 }}>
+        <h2>Live Activity Feed</h2>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#22c55e" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block", animationName: "pulse-dot", animationDuration: "2s", animationIterationCount: "infinite" }} />
+          live · {filtered.length} events
+        </span>
+        {lastUpdated && (
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            updated {lastUpdated.toLocaleTimeString(undefined, { timeStyle: "medium" })}
+          </span>
+        )}
+        <input
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder="Filter by action, email, or resource…"
+          style={{
+            marginLeft: "auto", height: 32, padding: "0 12px", borderRadius: 6,
+            border: "1px solid var(--line)", background: "var(--surface)",
+            color: "var(--text)", fontSize: 13, width: 280,
+          }}
+        />
+      </div>
+      {loading ? (
+        <div className="empty">Loading activity…</div>
+      ) : filtered.length === 0 ? (
+        <div className="empty">No events yet — activity appears here as users interact with Q-Lab.</div>
+      ) : (
+        <div className="admin-scroll" style={{ maxHeight: 420, overflowY: "auto", overflowX: "auto", scrollbarWidth: "thin", scrollbarColor: "#6366f1 transparent" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left" }}>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Time</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>User</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Action</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>Resource</th>
+                <th style={{ padding: "8px 12px", color: "var(--muted)", fontWeight: 600 }}>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(e => (
+                <tr key={e.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", whiteSpace: "nowrap" }}>{fmt(e.created_at)}</td>
+                  <td style={{ padding: "7px 12px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.user_email ?? <span style={{ color: "var(--muted)" }}>anonymous</span>}
+                  </td>
+                  <td style={{ padding: "7px 12px" }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      background: `${ACTION_COLOR[e.action] ?? "#64748b"}18`,
+                      color: ACTION_COLOR[e.action] ?? "var(--muted)",
+                      borderRadius: 999, padding: "2px 9px", fontWeight: 600, fontSize: 12,
+                    }}>
+                      {ACTION_ICON[e.action] ?? "•"} {e.action}
+                    </span>
+                  </td>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.resource_id ?? "—"}
+                  </td>
+                  <td style={{ padding: "7px 12px", color: "var(--muted)", fontSize: 12 }}>{e.ip_address ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function AdminPage() {
   const { token, user, loading } = useAuth();
   const router = useRouter();

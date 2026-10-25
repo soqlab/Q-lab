@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle, Clock, RefreshCw, XCircle, PauseCircle } from "lucide-react";
 import { getCampaign, type CampaignDetail, type SweepRow } from "../../../../lib/api";
 
@@ -132,7 +132,8 @@ function HealthHeatmap({ rows, xAxis, yAxis }: { rows: SweepRow[]; xAxis: string
   );
 }
 
-export default function CampaignDetailPage({ params }: { params: { campaignId: string } }) {
+export default function CampaignDetailPage({ params: paramsPromise }: { params: Promise<{ campaignId: string }> }) {
+  const params = use(paramsPromise);
   const [data, setData] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

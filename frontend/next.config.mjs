@@ -10,10 +10,8 @@ const nextConfig = {
   // Standalone output is for the Docker image; Netlify (NETLIFY=true at build) brings its own runtime.
   output: process.env.NODE_ENV === "production" && !process.env.NETLIFY ? "standalone" : undefined,
 
-  eslint: { ignoreDuringBuilds: true },
-
-  // The app does not use next/image. Turning the optimiser off closes /_next/image, the
-  // endpoint behind several critical Next.js advisories (remote code execution via SVG/AVIF).
+  // The app does not use next/image, so the image optimiser (/_next/image, historically the
+  // source of several critical Next.js advisories) stays off: less attack surface, nothing lost.
   images: { unoptimized: true },
   typescript: { ignoreBuildErrors: true },
 
@@ -49,8 +47,9 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // All routes: security + no caching by default (not on backend host names: the API sets its own)
-        source: "/:path*",
+        // All routes: security + no caching by default (not on backend host names: the API sets its own).
+        // _next/static is left to Next.js, which serves those hashed files as immutable.
+        source: "/((?!_next/static/).*)",
         ...(backendHosts.length ? { missing: backendHosts.map((value) => ({ type: "host", value })) } : {}),
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
@@ -71,14 +70,6 @@ const nextConfig = {
               "frame-ancestors 'self'",
             ].join("; "),
           },
-        ],
-      },
-      {
-        // Hashed static assets override the above — cache forever
-        // (safe because _next/static filenames change on every build)
-        source: "/_next/static/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
       {

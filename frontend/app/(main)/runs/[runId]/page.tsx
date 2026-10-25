@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
@@ -54,7 +54,23 @@ import TomographyPanel from "./TomographyPanel";
 
 function CircuitDiagram({ runId }: { runId: string }) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  const src = qlabApiPath(`/api/v1/runs/${runId}/circuit.svg`);
+  // Fetched rather than linked: runs are private, and an <img src> cannot send the sign-in token.
+  const [src, setSrc] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let objectUrl: string | undefined;
+    let cancelled = false;
+    setState("loading");
+    fetch(qlabApiPath(`/api/v1/runs/${runId}/circuit.svg`))
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+        setState("ok");
+      })
+      .catch(() => { if (!cancelled) setState("error"); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [runId]);
 
   return (
     <section className="panel">
@@ -78,7 +94,7 @@ function CircuitDiagram({ runId }: { runId: string }) {
             Circuit diagram unavailable — QASM may use unsupported gates.
           </div>
         )}
-        {/* Always mount TransformWrapper so the img loads; hide until ready */}
+        {/* Hidden until the SVG has been fetched */}
         <div style={{ display: state === "ok" ? "block" : "none" }}>
           <TransformWrapper
             initialScale={1}
@@ -120,15 +136,6 @@ function CircuitDiagram({ runId }: { runId: string }) {
           </TransformWrapper>
         </div>
 
-        {/* Hidden loader img — triggers onLoad/onError outside the transform */}
-        <img
-          src={src}
-          alt=""
-          aria-hidden="true"
-          style={{ display: "none" }}
-          onLoad={() => setState("ok")}
-          onError={() => setState("error")}
-        />
       </div>
     </section>
   );
@@ -731,7 +738,8 @@ function OverleafButton({ runId }: { runId: string }) {
   );
 }
 
-export default function RunDetailPage({ params }: { params: { runId: string } }) {
+export default function RunDetailPage({ params: paramsPromise }: { params: Promise<{ runId: string }> }) {
+  const params = use(paramsPromise);
   const [run, setRun] = useState<QLabRun | null>(null);
   const [health, setHealth] = useState<Record<string, number | null>>({});
   const [tags, setTags] = useState<string[]>([]);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { fetchCircuitDiff, CircuitDiffResult } from "../../../../../../lib/api";
 
@@ -94,7 +94,8 @@ function GateDeltaTable({ delta }: { delta: CircuitDiffResult["gate_histogram_de
 // ------------------------------------------------------------------
 // Page
 // ------------------------------------------------------------------
-export default function CircuitDiffPage({ params }: { params: { runId: string; otherId: string } }) {
+export default function CircuitDiffPage({ params: paramsPromise }: { params: Promise<{ runId: string; otherId: string }> }) {
+  const params = use(paramsPromise);
   const { runId, otherId } = params;
   const [data, setData] = useState<CircuitDiffResult | null>(null);
   const [error, setError] = useState<string | null>(null);
