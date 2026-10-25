@@ -12,6 +12,7 @@ class QLabClient:
         timeout: float = 3.0,
         api_key: str | None = None,
         queue_path: str | None = None,
+        retry_on_start: bool = True,
     ):
         self.api_url = api_url.rstrip("/")
         self.timeout = timeout
@@ -23,7 +24,8 @@ class QLabClient:
         )
         self._queue_lock = threading.Lock()
         self._threads: list[threading.Thread] = []
-        self.retry_pending_async()
+        if retry_on_start:
+            self.retry_pending_async()
 
     def log_metrics_async(self, run_id: str, metrics: list[dict]) -> None:
         thread = threading.Thread(

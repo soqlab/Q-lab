@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Backend: pinned in backend/requirements.txt, so updates arrive as reviewable pull requests.
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /qlab_sdk
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
