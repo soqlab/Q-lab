@@ -5,7 +5,7 @@ store under the namespace "plugin_registry".
 """
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -370,7 +370,7 @@ def _seed(db: Session) -> None:
 def list_plugins(
     category: Optional[str] = Query(default=None),
     tag: Optional[str] = Query(default=None),
-    sort: str = Query(default="downloads", enum=["downloads", "rating", "newest"]),
+    sort: Literal["downloads", "rating", "newest"] = Query(default="downloads"),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     _seed(db)
