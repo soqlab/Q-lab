@@ -2,19 +2,34 @@ name: SDK Tests
 
 on:
   push:
-    paths: ['qlab_sdk/**']
+    paths: ['qlab_sdk/**', '.github/workflows/sdk-tests.yml']
   pull_request:
-    paths: ['qlab_sdk/**']
+    paths: ['qlab_sdk/**', '.github/workflows/sdk-tests.yml']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.12"]
+        # Auto-tracking Qiskit is the product, so both major versions are tested end to end.
+        qiskit-major: ["1", "2"]
+        include:
+          - qiskit-major: "1"
+            qiskit: "qiskit>=1.4,<2"
+            aer: "qiskit-aer>=0.15,<0.18"
+            runtime: "qiskit-ibm-runtime>=0.36,<0.45"
+          - qiskit-major: "2"
+            qiskit: "qiskit>=2,<3"
+            aer: "qiskit-aer>=0.17"
+            runtime: "qiskit-ibm-runtime>=0.40"
+    name: Python ${{ matrix.python-version }} · Qiskit ${{ matrix.qiskit-major }}.x
     defaults:
       run:
         working-directory: qlab_sdk
+    env:
+      QLAB_TELEMETRY: "off"
 
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +37,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" "${{ matrix.qiskit }}" "${{ matrix.aer }}" "${{ matrix.runtime }}"
+      - name: Installed Qiskit
+        run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
       - name: Run tests
         run: pytest tests/ -v --tb=short

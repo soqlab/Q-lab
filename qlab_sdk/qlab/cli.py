@@ -144,6 +144,7 @@ def cmd_queue_retry(args, cfg):
         api_url=cfg["api_url"],
         api_key=cfg.get("api_key") or None,
         queue_path=args.queue_path,
+        retry_on_start=False,  # this command retries itself; a second, background retry could upload twice
     )
     queue_path = client.queue_path
     before = 0
