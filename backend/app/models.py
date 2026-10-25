@@ -195,6 +195,23 @@ class Run(Base):
 
     project: Mapped["Project | None"] = relationship(back_populates="runs")
 
+    # Not columns: the SDK sends shots inside `execution` (older clients put them in
+    # `parameters`), and the health score is derived from results, calibration and fingerprint.
+    @property
+    def shots(self) -> int | None:
+        for source in (self.execution, self.parameters):
+            value = (source or {}).get("shots")
+            if isinstance(value, (int, float)):
+                return int(value)
+        return None
+
+    @property
+    def health_score(self) -> float | None:
+        from .health_score import compute_health_score
+        return compute_health_score({
+            "results": self.results, "calibration": self.calibration, "fingerprint": self.fingerprint,
+        })
+
 
 # ---------------------------------------------------------------------------
 # Experiment Campaigns

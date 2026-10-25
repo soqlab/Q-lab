@@ -117,7 +117,12 @@ def export_single_run(run_id: str, db: Session = Depends(get_db)):
         "results": run.results,
         "calibration": run.calibration,
         "fingerprint": run.fingerprint,
-        "metadata": run.metadata,
+        "qasm": run.qasm,
+        "context": run.context,
+        "parameters": run.parameters,
+        "execution": run.execution,
+        "transpiler": run.transpiler,
+        "timing": run.timing,
     }
     filename = f"qlab_run_{run_id}.json"
     return Response(

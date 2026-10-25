@@ -13,6 +13,7 @@ from typing import Optional
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(tags=["estimator"])
 
@@ -61,8 +62,8 @@ def estimate_run(run_id: str, db: Session = Depends(get_db)):
     # ---------------------------------------------------------------
     # Fidelity estimate
     # ---------------------------------------------------------------
-    gate_errors: dict = cal.get("gate_errors") or {}
-    readout_errors: dict = cal.get("readout_errors") or {}
+    gate_errors: dict = per_qubit(cal.get("gate_errors"))
+    readout_errors: dict = per_qubit(cal.get("readout_errors"))
 
     gate_fidelity: Optional[float] = None
     readout_fidelity: Optional[float] = None
@@ -203,25 +204,25 @@ def backend_calibration_drift(backend_name: str, db: Session = Depends(get_db)):
         ts = run.created_at.isoformat()
         rid = run.run_id
 
-        t1 = cal.get("t1_us") or {}
+        t1 = per_qubit(cal.get("t1_us"))
         if t1:
             vals = [v for v in t1.values() if isinstance(v, (int, float))]
             if vals:
                 series["avg_t1_us"].append({"t": ts, "v": round(sum(vals) / len(vals), 2), "run_id": rid})
 
-        t2 = cal.get("t2_us") or {}
+        t2 = per_qubit(cal.get("t2_us"))
         if t2:
             vals = [v for v in t2.values() if isinstance(v, (int, float))]
             if vals:
                 series["avg_t2_us"].append({"t": ts, "v": round(sum(vals) / len(vals), 2), "run_id": rid})
 
-        ge = cal.get("gate_errors") or {}
+        ge = per_qubit(cal.get("gate_errors"))
         if ge:
             vals = [v for v in ge.values() if isinstance(v, (int, float))]
             if vals:
                 series["avg_gate_error"].append({"t": ts, "v": round(sum(vals) / len(vals), 6), "run_id": rid})
 
-        re = cal.get("readout_errors") or {}
+        re = per_qubit(cal.get("readout_errors"))
         if re:
             vals = [v for v in re.values() if isinstance(v, (int, float))]
             if vals:
