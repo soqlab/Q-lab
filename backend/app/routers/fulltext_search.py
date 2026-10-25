@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..database import DATABASE_URL, get_db
+from ..run_scope import sql_visibility
 
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
@@ -20,44 +21,49 @@ def fulltext_search(
     if not q.strip():
         return {"results": [], "total": 0, "query": q}
 
+    # Hand-written SQL bypasses the ORM run filter, so the caller's visibility is applied here.
+    visible, scope_params = sql_visibility("r")
+
     if DATABASE_URL.startswith("sqlite"):
         # FTS5 query — append * for prefix search
         fts_query = q.strip() + "*" if not q.strip().endswith("*") else q.strip()
         try:
             rows = db.execute(
-                text("""
+                text(f"""
                     SELECT r.run_id, r.circuit_name, r.backend, r.project_slug,
                            r.status, r.created_at, r.tags,
                            bm25(runs_fts) AS score
                     FROM runs_fts
                     JOIN runs r ON runs_fts.rowid = r.id
-                    WHERE runs_fts MATCH :q
+                    WHERE runs_fts MATCH :q AND {visible}
                     ORDER BY bm25(runs_fts)
                     LIMIT :limit
                 """),
-                {"q": fts_query, "limit": limit},
+                {"q": fts_query, "limit": limit, **scope_params},
             ).fetchall()
         except Exception:
             # FTS table not yet populated — fall back to LIKE
             rows = db.execute(
-                text("""
-                    SELECT run_id, circuit_name, backend, project_slug, status, created_at, tags, 0 as score
-                    FROM runs
-                    WHERE circuit_name LIKE :q OR backend LIKE :q OR project_slug LIKE :q OR run_id LIKE :q
-                    ORDER BY created_at DESC LIMIT :limit
+                text(f"""
+                    SELECT r.run_id, r.circuit_name, r.backend, r.project_slug, r.status, r.created_at, r.tags, 0 as score
+                    FROM runs r
+                    WHERE (r.circuit_name LIKE :q OR r.backend LIKE :q OR r.project_slug LIKE :q OR r.run_id LIKE :q)
+                      AND {visible}
+                    ORDER BY r.created_at DESC LIMIT :limit
                 """),
-                {"q": f"%{q}%", "limit": limit},
+                {"q": f"%{q}%", "limit": limit, **scope_params},
             ).fetchall()
     else:
         # Postgres: use ILIKE (can upgrade to pg_trgm/GIN later)
         rows = db.execute(
-            text("""
-                SELECT run_id, circuit_name, backend, project_slug, status, created_at, tags, 0 as score
-                FROM runs
-                WHERE circuit_name ILIKE :q OR backend ILIKE :q OR project_slug ILIKE :q OR run_id ILIKE :q
-                ORDER BY created_at DESC LIMIT :limit
+            text(f"""
+                SELECT r.run_id, r.circuit_name, r.backend, r.project_slug, r.status, r.created_at, r.tags, 0 as score
+                FROM runs r
+                WHERE (r.circuit_name ILIKE :q OR r.backend ILIKE :q OR r.project_slug ILIKE :q OR r.run_id ILIKE :q)
+                  AND {visible}
+                ORDER BY r.created_at DESC LIMIT :limit
             """),
-            {"q": f"%{q}%", "limit": limit},
+            {"q": f"%{q}%", "limit": limit, **scope_params},
         ).fetchall()
 
     results = [

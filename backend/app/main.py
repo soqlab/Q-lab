@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .analytics import get_timeseries, get_backend_stats, get_kpis
+from .analytics import get_timeseries
 from .backends import QUANTUM_BACKENDS
 from .database import DATA_DIR, SessionLocal, get_db, init_db
 from .deps import Identity, get_identity, log_audit, require_auth
@@ -1200,18 +1200,30 @@ def download_qasm(run_id: str, db: Session = Depends(get_db)):
     return run.qasm
 
 
-@app.get("/api/v1/runs/{run_id}/circuit.svg")
-def circuit_svg(run_id: str, db: Session = Depends(get_db)):
-    run = _find_run(db, run_id)
+def _circuit_svg_response(run: Run, cache: str) -> Response:
     if not run.qasm:
         raise HTTPException(status_code=404, detail="No QASM stored for this run")
     try:
         from .circuit_renderer import render_qasm_svg
-        svg_bytes = render_qasm_svg(run_id, run.qasm)
-        return Response(content=svg_bytes, media_type="image/svg+xml",
-                        headers={"Cache-Control": "public, max-age=3600"})
+        svg_bytes = render_qasm_svg(run.run_id, run.qasm)
+        return Response(content=svg_bytes, media_type="image/svg+xml", headers={"Cache-Control": cache})
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not render circuit: {exc}")
+
+
+@app.get("/api/v1/runs/{run_id}/circuit.svg")
+def circuit_svg(run_id: str, db: Session = Depends(get_db)):
+    # Private to the run's owner, so browsers may cache it but shared caches may not.
+    return _circuit_svg_response(_find_run(db, run_id), "private, max-age=3600")
+
+
+@app.get("/api/v1/runs/public/{share_token}/circuit.svg")
+def public_circuit_svg(share_token: str, db: Session = Depends(get_db)):
+    """The circuit of a shared run, for its public share page (no sign-in)."""
+    run = db.scalar(select(Run).where(Run.share_token == share_token))
+    if run is None:
+        raise HTTPException(status_code=404, detail="Shared run not found or sharing has been disabled")
+    return _circuit_svg_response(run, "public, max-age=3600")
 
 
 @app.get("/api/v1/runs/{run_id}/circuit.txt", response_class=PlainTextResponse)

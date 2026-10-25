@@ -83,6 +83,23 @@ def current_scope() -> Any:
     return _scope.get()
 
 
+def sql_visibility(alias: str = "runs") -> tuple[str, dict[str, Any]]:
+    """The same rule as a SQL condition, for hand-written queries that bypass the ORM filter.
+
+    Returns (condition, params): use it as `WHERE <condition>` and pass the params along.
+    """
+    scope = _scope.get()
+    if scope is _UNSCOPED:
+        return "1=1", {}
+    if scope is _ANONYMOUS:
+        return f"({alias}.created_by_user_id IS NULL AND {alias}.org_id IS NULL)", {}
+    user_id, org_id = scope
+    if org_id is None:
+        return f"({alias}.created_by_user_id = :scope_user_id)", {"scope_user_id": user_id}
+    return (f"({alias}.created_by_user_id = :scope_user_id OR {alias}.org_id = :scope_org_id)",
+            {"scope_user_id": user_id, "scope_org_id": org_id})
+
+
 @event.listens_for(Session, "do_orm_execute")
 def _limit_runs_to_caller(state) -> None:
     scope = _scope.get()
@@ -97,4 +114,4 @@ def _limit_runs_to_caller(state) -> None:
     state.statement = state.statement.options(with_loader_criteria(Run, criteria, include_aliases=True))
 
 
-__all__ = ["scope_runs_to_caller", "visible", "current_scope", "scope_of", "UNSCOPED_PREFIXES"]
+__all__ = ["scope_runs_to_caller", "visible", "current_scope", "scope_of", "sql_visibility", "UNSCOPED_PREFIXES"]
