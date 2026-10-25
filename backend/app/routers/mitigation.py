@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["mitigation"])
 
@@ -62,10 +63,10 @@ def mitigation_advice(run_id: str, db: Session = Depends(get_db)):
     _TWO_Q = {"cx", "cz", "cy", "ecr", "rzx", "swap", "iswap"}
     n2q = sum(int(v) for k, v in gate_counts.items() if k.lower() in _TWO_Q)
 
-    t1_vals = [float(v) for v in (cal.get("t1_us") or {}).values() if v]
-    t2_vals = [float(v) for v in (cal.get("t2_us") or {}).values() if v]
-    ge_vals = [float(v) for v in (cal.get("gate_errors") or {}).values() if v]
-    ro_vals = [float(v) for v in (cal.get("readout_errors") or {}).values() if v]
+    t1_vals = [float(v) for v in per_qubit(cal.get("t1_us")).values() if v]
+    t2_vals = [float(v) for v in per_qubit(cal.get("t2_us")).values() if v]
+    ge_vals = [float(v) for v in per_qubit(cal.get("gate_errors")).values() if v]
+    ro_vals = [float(v) for v in per_qubit(cal.get("readout_errors")).values() if v]
 
     avg_t1 = sum(t1_vals) / len(t1_vals) if t1_vals else None
     avg_t2 = sum(t2_vals) / len(t2_vals) if t2_vals else None
@@ -137,8 +138,8 @@ def mitigation_advice(run_id: str, db: Session = Depends(get_db)):
     # ----------------------------------------------------------------
     # Rule 3: Pauli Twirling — coherent 2Q gate errors present
     # ----------------------------------------------------------------
-    cx_keys = [k for k in (cal.get("gate_errors") or {}) if any(c in k for c in ["cx", "ecr", "cz"])]
-    cx_errors = [(cal.get("gate_errors") or {})[k] for k in cx_keys]
+    cx_keys = [k for k in per_qubit(cal.get("gate_errors")) if any(c in k for c in ["cx", "ecr", "cz"])]
+    cx_errors = [per_qubit(cal.get("gate_errors"))[k] for k in cx_keys]
     avg_cx = sum(float(v) for v in cx_errors) / len(cx_errors) if cx_errors else None
     if n2q >= 2 and (avg_cx or avg_ge) and (avg_cx or avg_ge or 0) > 0.003:
         recommendations.append(_make_rec(

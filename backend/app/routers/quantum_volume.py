@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["quantum_volume"])
 
@@ -75,10 +76,10 @@ def quantum_volume(run_id: str, db: Session = Depends(get_db)):
     fp = run.fingerprint or {}
     num_qubits = int(fp.get("num_qubits") or 0)
 
-    t1_vals = [float(v) for v in (cal.get("t1_us") or {}).values() if v]
-    t2_vals = [float(v) for v in (cal.get("t2_us") or {}).values() if v]
-    ge_vals = [float(v) for v in (cal.get("gate_errors") or {}).values() if v]
-    ro_vals = [float(v) for v in (cal.get("readout_errors") or {}).values() if v]
+    t1_vals = [float(v) for v in per_qubit(cal.get("t1_us")).values() if v]
+    t2_vals = [float(v) for v in per_qubit(cal.get("t2_us")).values() if v]
+    ge_vals = [float(v) for v in per_qubit(cal.get("gate_errors")).values() if v]
+    ro_vals = [float(v) for v in per_qubit(cal.get("readout_errors")).values() if v]
 
     has_cal = bool(t1_vals or ge_vals)
 
@@ -88,8 +89,8 @@ def quantum_volume(run_id: str, db: Session = Depends(get_db)):
     avg_ro = sum(ro_vals) / len(ro_vals) if ro_vals else 0.01
 
     # Separate 2Q gate errors from 1Q
-    cx_keys = [k for k in (cal.get("gate_errors") or {}) if any(c in k for c in ["cx", "ecr", "cz", "rzx"])]
-    cx_vals = [float((cal.get("gate_errors") or {})[k]) for k in cx_keys if (cal.get("gate_errors") or {}).get(k)]
+    cx_keys = [k for k in per_qubit(cal.get("gate_errors")) if any(c in k for c in ["cx", "ecr", "cz", "rzx"])]
+    cx_vals = [float(per_qubit(cal.get("gate_errors"))[k]) for k in cx_keys if per_qubit(cal.get("gate_errors")).get(k)]
     ge_2q = sum(cx_vals) / len(cx_vals) if cx_vals else avg_ge * 10
     ge_1q = avg_ge
 
