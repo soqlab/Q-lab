@@ -11,7 +11,7 @@ import zipfile
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -879,8 +879,8 @@ def search_runs(
     tags: Optional[str] = Query(default=None, description="Comma-separated tags"),
     created_after: Optional[datetime] = None,
     created_before: Optional[datetime] = None,
-    sort_by: str = Query(default="created_at", enum=["created_at", "depth", "num_qubits"]),
-    sort_order: str = Query(default="desc", enum=["asc", "desc"]),
+    sort_by: Literal["created_at", "depth", "num_qubits"] = Query(default="created_at"),
+    sort_order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=500),
     identity: Optional[Identity] = Depends(get_identity),
