@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, Coins, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
+import { isCorePath, useLabs } from "../../lib/labs";
 
 type NavItem = { href: string; icon: React.ElementType; label: string; badge?: string };
 
@@ -395,15 +396,44 @@ function GetStartedBanner() {
   );
 }
 
+const LABS_COUNT = GROUPS.reduce((n, g) => n + g.items.filter((i) => !isCorePath(i.href)).length, 0);
+
+/** The switch at the bottom of the menu that shows or hides the experimental tools. */
+function LabsToggle({ on, set }: { on: boolean; set: (v: boolean) => void }) {
+  return (
+    <div style={{ margin: "10px 8px 0", padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 8 }}>
+      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+          <Beaker size={16} aria-hidden="true" /> Labs
+        </span>
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => set(e.target.checked)}
+          aria-label="Show experimental tools" style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
+      </label>
+      <p style={{ margin: "6px 0 0", fontSize: 11, lineHeight: 1.45, color: "var(--muted)" }}>
+        {on ? `Showing ${LABS_COUNT} experimental tools, marked LAB.` : `${LABS_COUNT} experimental tools are hidden. Turn on to try them.`}
+      </p>
+    </div>
+  );
+}
+
 export default function SideNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "owner";
+  const [labs, setLabs] = useLabs();
+  const groups = GROUPS
+    .map((g) => ({
+      ...g,
+      items: labs
+        ? g.items.map((i) => (isCorePath(i.href) || i.badge ? i : { ...i, badge: "LAB" }))
+        : g.items.filter((i) => isCorePath(i.href)),
+    }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <nav className="nav" aria-label="Primary">
       <GetStartedBanner />
-      {GROUPS.map((group) => (
+      {groups.map((group) => (
         <NavGroup
           key={group.label}
           label={group.label}
@@ -420,6 +450,7 @@ export default function SideNav() {
           pathname={pathname}
         />
       )}
+      <LabsToggle on={labs} set={setLabs} />
       <AIQuotaBar />
     </nav>
   );
