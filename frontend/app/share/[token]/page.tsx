@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { fetchPublicRun, healthColor, qlabApiPath, type QLabRun } from "../../../lib/api";
 
@@ -13,7 +13,8 @@ function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export default function PublicSharePage({ params }: { params: { token: string } }) {
+export default function PublicSharePage({ params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = use(paramsPromise);
   const [run, setRun] = useState<QLabRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,7 +143,7 @@ export default function PublicSharePage({ params }: { params: { token: string } 
                 <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Circuit Diagram</h2>
                 <div style={{ overflow: "auto", maxHeight: 360, background: "#f7f8fa", borderRadius: 8 }}>
                   <img
-                    src={qlabApiPath(`/api/v1/runs/${run.run_id}/circuit.svg`)}
+                    src={qlabApiPath(`/api/v1/runs/public/${encodeURIComponent(params.token)}/circuit.svg`)}
                     alt="Circuit diagram"
                     style={{ display: "block", maxWidth: "none" }}
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}

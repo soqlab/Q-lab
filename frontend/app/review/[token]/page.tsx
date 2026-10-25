@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import {
   CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp,
   ExternalLink, AlertTriangle, Microscope,
@@ -300,7 +300,8 @@ function ApprovedBanner({ signature, reviewerName, signedAt }: {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function ReviewPage({ params }: { params: { token: string } }) {
+export default function ReviewPage({ params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = use(paramsPromise);
   const { token } = params;
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);

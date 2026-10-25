@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle, XCircle, Clock, TrendingUp, BarChart2, Layers } from "lucide-react";
 import { fetchProjectStats, ProjectStats, ProjectTimelinePoint, healthColor, qlabApiPath } from "../../../../lib/api";
 
@@ -146,7 +146,8 @@ function RecentRunsTable({ runs }: { runs: ProjectTimelinePoint[] }) {
 // ------------------------------------------------------------------
 // Page
 // ------------------------------------------------------------------
-export default function ProjectPage({ params }: { params: { slug: string } }) {
+export default function ProjectPage({ params: paramsPromise }: { params: Promise<{ slug: string }> }) {
+  const params = use(paramsPromise);
   const [data, setData] = useState<ProjectStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
