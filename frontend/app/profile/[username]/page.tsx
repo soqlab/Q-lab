@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ExternalLink, MapPin, BookOpen, Github, Globe, Award } from "lucide-react";
+import { use, useEffect, useState } from "react";
+import { ExternalLink, MapPin, BookOpen, Globe, Award } from "lucide-react";
+import GithubIcon from "../../../components/GithubIcon";
 
 const API_PREFIX = "/qlab-api";
 
@@ -129,7 +130,8 @@ function InterestChip({ label }: { label: string }) {
   );
 }
 
-export default function PublicProfilePage({ params }: { params: { username: string } }) {
+export default function PublicProfilePage({ params: paramsPromise }: { params: Promise<{ username: string }> }) {
+  const params = use(paramsPromise);
   const { username } = params;
   const [profile, setProfile] = useState<ResearcherProfile | null>(null);
   const [runs, setRuns] = useState<PublicRun[]>([]);
@@ -244,7 +246,7 @@ export default function PublicProfilePage({ params }: { params: { username: stri
                 rel="noopener noreferrer"
                 style={styles.link}
               >
-                <Github size={14} /> {profile.github_username}
+                <GithubIcon size={14} /> {profile.github_username}
               </a>
             )}
             {profile.google_scholar_url && (

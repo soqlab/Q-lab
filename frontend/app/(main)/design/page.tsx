@@ -49,10 +49,10 @@ function SuggestionCard({ s, rank }: { s: ExperimentSuggestion; rank: number }) 
             <div>
               <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>GP Estimates</p>
               {[
-                ["Predicted Health", <span style={{ color: "#34d399", fontWeight: 600 }}>{s.predicted_health.toFixed(2)}</span>],
-                ["Uncertainty (1σ)", <span style={{ color: "#fbbf24", fontWeight: 600 }}>±{s.uncertainty.toFixed(2)}</span>],
-                ["Exp. Improvement", <span style={{ color: "#818cf8", fontWeight: 600 }}>{s.expected_improvement.toFixed(4)}</span>],
-                ["Novelty", <span style={{ color: "#c084fc", fontWeight: 600 }}>{s.novelty.toFixed(3)}</span>],
+                ["Predicted Health", <span key="v" style={{ color: "#34d399", fontWeight: 600 }}>{s.predicted_health.toFixed(2)}</span>],
+                ["Uncertainty (1σ)", <span key="v" style={{ color: "#fbbf24", fontWeight: 600 }}>±{s.uncertainty.toFixed(2)}</span>],
+                ["Exp. Improvement", <span key="v" style={{ color: "#818cf8", fontWeight: 600 }}>{s.expected_improvement.toFixed(4)}</span>],
+                ["Novelty", <span key="v" style={{ color: "#c084fc", fontWeight: 600 }}>{s.novelty.toFixed(3)}</span>],
               ].map(([label, value]) => (
                 <div key={String(label)} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid #0f172a" }}>
                   <span style={{ color: "#64748b" }}>{label}</span>

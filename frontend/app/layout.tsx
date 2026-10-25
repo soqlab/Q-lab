@@ -53,11 +53,38 @@ const API_SHIM = `(function(){
   }
 })();`;
 
+// Runs are private to their owner, so every API call must say who is asking. Many pages call
+// fetch("/qlab-api/...") without headers; this adds the signed-in user's token to those calls.
+// Only same-origin /qlab-api requests get it, and an explicit Authorization header is kept.
+const AUTH_SHIM = `(function(){
+  var f = window.fetch;
+  function isApi(u) {
+    try { var p = new URL(String(u), location.href); return p.origin === location.origin && p.pathname.indexOf("/qlab-api/") === 0; }
+    catch (e) { return false; }
+  }
+  window.fetch = function(input, init) {
+    try {
+      var isReq = input && typeof input === "object" && "url" in input;
+      var tok = localStorage.getItem("qlab_token");
+      if (tok && isApi(isReq ? input.url : input)) {
+        var h = new Headers((init && init.headers) || (isReq ? input.headers : undefined));
+        if (!h.has("Authorization")) {
+          h.set("Authorization", "Bearer " + tok);
+          init = Object.assign({}, init, { headers: h });
+        }
+      }
+    } catch (e) {}
+    return f.call(this, input, init);
+  };
+})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
         {API_BASE && <script dangerouslySetInnerHTML={{ __html: API_SHIM }} />}
+        {/* After API_SHIM, so it wraps it and sees the original /qlab-api URL. */}
+        <script dangerouslySetInnerHTML={{ __html: AUTH_SHIM }} />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#6366f1" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

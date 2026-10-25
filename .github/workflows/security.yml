@@ -1,0 +1,38 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/requirements.txt', 'qlab_sdk/pyproject.toml', 'frontend/package-lock.json', '.github/workflows/security.yml']
+  pull_request:
+    paths: ['backend/requirements.txt', 'qlab_sdk/pyproject.toml', 'frontend/package-lock.json', '.github/workflows/security.yml']
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, so new advisories against unchanged pins still show up
+  workflow_dispatch:
+
+jobs:
+  python-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: Audit backend dependencies
+        run: pip-audit -r backend/requirements.txt --progress-spinner off
+      - name: Audit SDK dependencies
+        run: pip-audit qlab_sdk --progress-spinner off
+
+  npm-dependencies:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

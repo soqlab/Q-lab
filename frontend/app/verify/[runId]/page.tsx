@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { getRunProvenance, getRunBadgeUrl, qlabApiPath } from "../../../lib/api";
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,8 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
-export default function VerifyPage({ params }: { params: { runId: string } }) {
+export default function VerifyPage({ params: paramsPromise }: { params: Promise<{ runId: string }> }) {
+  const params = use(paramsPromise);
   const runId = params.runId;
   const [prov, setProv] = useState<ProvenanceData | null>(null);
   const [error, setError] = useState<string | null>(null);
