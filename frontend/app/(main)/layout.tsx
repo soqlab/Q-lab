@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { Atom } from "lucide-react";
 import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
@@ -7,7 +8,8 @@ import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../lib/auth";
 import { usePageTracker } from "../../lib/usePageTracker";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { isCorePath, useLabs } from "../../lib/labs";
 
 function SWUpdater() {
   useEffect(() => {
@@ -147,6 +149,30 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Experimental pages are only shown once the user has turned Labs on. */
+function LabsGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [labs, setLabs, ready] = useLabs();
+  if (isCorePath(pathname) || labs) return <>{children}</>;
+  if (!ready) return null;
+  return (
+    <main className="page">
+      <div style={{ maxWidth: 520, margin: "10vh auto", textAlign: "center", display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#f59e0b" }}>Labs</span>
+        <h1 style={{ margin: 0, fontSize: 24 }}>This is an experimental tool</h1>
+        <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
+          It is part of Q-Lab Labs: early tools that are less tested than the core tracker. Turn on Labs to
+          use it. You can switch Labs off again at the bottom of the menu.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+          <button className="button" onClick={() => setLabs(true)}>Turn on Labs</button>
+          <Link href="/runs" className="button secondary" style={{ textDecoration: "none" }}>Back to runs</Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function LiveClock() {
   const [time, setTime] = useState("");
   useEffect(() => {
@@ -233,7 +259,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <UserMenu />
         </header>
 
-        <div style={{ flex: 1 }}>{children}</div>
+        <div style={{ flex: 1 }}><LabsGate>{children}</LabsGate></div>
 
         {/* Footer */}
         <footer style={{
