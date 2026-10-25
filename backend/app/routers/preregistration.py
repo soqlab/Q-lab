@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Run
 from ..store import store_get, store_list, store_put
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/prereg", tags=["preregistration"])
 
@@ -179,14 +180,14 @@ def _extract_metric(run: Run, metric: str) -> float | None:
         return h
 
     if metric == "gate_fidelity":
-        gate_errors = calibration.get("gate_errors") or {}
+        gate_errors = per_qubit(calibration.get("gate_errors"))
         if gate_errors:
             avg_err = sum(gate_errors.values()) / len(gate_errors)
             return max(0.0, 1.0 - avg_err)
         return None
 
     if metric == "readout_fidelity":
-        ro_errors = calibration.get("readout_errors") or {}
+        ro_errors = per_qubit(calibration.get("readout_errors"))
         if ro_errors:
             avg = sum(ro_errors.values()) / len(ro_errors)
             return max(0.0, 1.0 - avg)

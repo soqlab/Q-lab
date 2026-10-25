@@ -27,6 +27,7 @@ from .database import DATA_DIR, SessionLocal, get_db, init_db
 from .deps import Identity, get_identity, log_audit, require_auth
 from .events import event_stream, publish_sync, set_event_loop
 from .health_score import compute_health_score, health_breakdown
+from .run_scope import scope_of, scope_runs_to_caller
 from .models import Project, Run, RunAssertion, RunMetric
 from .rate_limit import auth_limiter, read_limiter, write_limiter
 from .routers import auth_routes, users, benchmarks, webhooks, admin, team, activity as activity_router
@@ -278,6 +279,8 @@ app = FastAPI(
     docs_url=_DOCS_URL,
     redoc_url=_REDOC_URL,
     openapi_url=_OPENAPI_URL,
+    # Every query on Run made while serving a request is limited to what the caller may see.
+    dependencies=[Depends(scope_runs_to_caller)],
 )
 
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
@@ -842,6 +845,7 @@ async def stream_runs(
 ):
     # Resolve identity from query-param token (EventSource can't send headers)
     org_id: Optional[int] = None
+    user_id: Optional[int] = None
     if token:
         try:
             from .auth import decode_token
@@ -850,10 +854,12 @@ async def stream_runs(
             user = db.scalar(select(User).where(User.id == int(payload["sub"]), User.is_active.is_(True)))
             if user:
                 org_id = user.org_id
+                user_id = user.id
         except Exception:
             pass
+    scope = scope_of(user_id, org_id)
     return StreamingResponse(
-        event_stream(filter_project=project, filter_org_id=org_id),
+        event_stream(filter_project=project, filter_org_id=org_id, scope=scope),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

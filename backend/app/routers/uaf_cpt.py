@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["uaf_cpt"])
 
@@ -115,10 +116,10 @@ def _detect_family(backend: str) -> str:
 
 
 def _cal_summary(cal: dict[str, Any]) -> dict[str, float | None]:
-    gate_errors = [_safe_float(v) for v in (cal.get("gate_errors") or {}).values()]
-    readout_errors = [_safe_float(v) for v in (cal.get("readout_errors") or {}).values()]
-    t1_vals = [_safe_float(v) for v in (cal.get("t1_us") or {}).values()]
-    t2_vals = [_safe_float(v) for v in (cal.get("t2_us") or {}).values()]
+    gate_errors = [_safe_float(v) for v in per_qubit(cal.get("gate_errors")).values()]
+    readout_errors = [_safe_float(v) for v in per_qubit(cal.get("readout_errors")).values()]
+    t1_vals = [_safe_float(v) for v in per_qubit(cal.get("t1_us")).values()]
+    t2_vals = [_safe_float(v) for v in per_qubit(cal.get("t2_us")).values()]
     gate_errors = [v for v in gate_errors if v is not None]
     readout_errors = [v for v in readout_errors if v is not None]
     t1_vals = [v for v in t1_vals if v is not None]

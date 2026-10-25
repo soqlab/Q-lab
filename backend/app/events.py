@@ -4,7 +4,9 @@ the async SSE endpoint yields from event_stream().
 """
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
+
+from .run_scope import visible
 
 _event_loop: asyncio.AbstractEventLoop | None = None
 _subscribers: list[asyncio.Queue] = []
@@ -41,6 +43,7 @@ def _dispatch(event: dict) -> None:
 async def event_stream(
     filter_project: str | None = None,
     filter_org_id: int | None = None,
+    scope: Any = None,
 ) -> AsyncGenerator[str, None]:
     q: asyncio.Queue = asyncio.Queue(maxsize=50)
     _subscribers.append(q)
@@ -54,6 +57,9 @@ async def event_stream(
                     run_project = data.get("project")
                     if run_project and run_project != filter_project:
                         continue
+                if scope is not None and event.get("type") != "run.deleted" and not visible(
+                        data.get("created_by_user_id"), data.get("org_id"), scope):
+                    continue
                 if filter_org_id is not None:
                     run_org = data.get("org_id")
                     if run_org is not None and run_org != filter_org_id:

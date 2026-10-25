@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["aemd"])
 
@@ -88,10 +89,10 @@ def aemd(run_id: str, db: Session = Depends(get_db)):
     measures = int(gate_counts.get("measure", 0))
     single_q = max(0, size - two_q - measures)
 
-    t1 = _avg([_safe(v) for v in (cal.get("t1_us") or {}).values()])
-    t2 = _avg([_safe(v) for v in (cal.get("t2_us") or {}).values()])
-    ge = _avg([_safe(v) for v in (cal.get("gate_errors") or {}).values()])
-    ro = _avg([_safe(v) for v in (cal.get("readout_errors") or {}).values()])
+    t1 = _avg([_safe(v) for v in per_qubit(cal.get("t1_us")).values()])
+    t2 = _avg([_safe(v) for v in per_qubit(cal.get("t2_us")).values()])
+    ge = _avg([_safe(v) for v in per_qubit(cal.get("gate_errors")).values()])
+    ro = _avg([_safe(v) for v in per_qubit(cal.get("readout_errors")).values()])
 
     ge_1q = ge or 0.001
     ge_2q = max((ge or 0.001) * 8, 0.006)

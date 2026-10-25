@@ -8,6 +8,7 @@ Weights:
   - Circuit efficiency (1 – non-Clifford ratio):          10 %
 """
 from typing import Any
+from .calibration_utils import per_qubit
 
 
 def compute_health_score(run: dict[str, Any]) -> float | None:
@@ -31,14 +32,14 @@ def compute_health_score(run: dict[str, Any]) -> float | None:
             weights.append(0.40)
 
     # --- gate fidelity (30 %) ---
-    gate_errors: dict = calibration.get("gate_errors") or {}
+    gate_errors: dict = per_qubit(calibration.get("gate_errors"))
     if gate_errors:
         avg_err = sum(gate_errors.values()) / len(gate_errors)
         components.append(max(0.0, (1 - avg_err) * 100))
         weights.append(0.30)
 
     # --- readout fidelity (20 %) ---
-    readout_errors: dict = calibration.get("readout_errors") or {}
+    readout_errors: dict = per_qubit(calibration.get("readout_errors"))
     if readout_errors:
         avg_ro = sum(readout_errors.values()) / len(readout_errors)
         components.append(max(0.0, (1 - avg_ro) * 100))
@@ -72,13 +73,13 @@ def health_breakdown(run: dict[str, Any]) -> dict[str, Any]:
         if total > 0:
             breakdown["success_probability"] = round(max(counts.values()) / total * 100, 1)
 
-    gate_errors = calibration.get("gate_errors") or {}
+    gate_errors = per_qubit(calibration.get("gate_errors"))
     if gate_errors:
         avg = sum(gate_errors.values()) / len(gate_errors)
         breakdown["gate_fidelity"] = round((1 - avg) * 100, 1)
         breakdown["avg_gate_error"] = round(avg, 6)
 
-    readout_errors = calibration.get("readout_errors") or {}
+    readout_errors = per_qubit(calibration.get("readout_errors"))
     if readout_errors:
         avg = sum(readout_errors.values()) / len(readout_errors)
         breakdown["readout_fidelity"] = round((1 - avg) * 100, 1)

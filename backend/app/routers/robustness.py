@@ -8,6 +8,7 @@ from typing import Any
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["robustness"])
 
@@ -77,10 +78,10 @@ def noise_robustness(run_id: str, db: Session = Depends(get_db)):
         single_q * _GATE_NS["single"] + two_q * _GATE_NS["two"] + measures * _GATE_NS["measure"]
     ) / 1000.0
 
-    t1_vals = [float(v) for v in (cal.get("t1_us") or {}).values() if v]
-    t2_vals = [float(v) for v in (cal.get("t2_us") or {}).values() if v]
-    ge_vals = [float(v) for v in (cal.get("gate_errors") or {}).values() if v]
-    ro_vals = [float(v) for v in (cal.get("readout_errors") or {}).values() if v]
+    t1_vals = [float(v) for v in per_qubit(cal.get("t1_us")).values() if v]
+    t2_vals = [float(v) for v in per_qubit(cal.get("t2_us")).values() if v]
+    ge_vals = [float(v) for v in per_qubit(cal.get("gate_errors")).values() if v]
+    ro_vals = [float(v) for v in per_qubit(cal.get("readout_errors")).values() if v]
 
     avg_t1 = sum(t1_vals) / len(t1_vals) if t1_vals else None
     avg_t2 = sum(t2_vals) / len(t2_vals) if t2_vals else None

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..calibration_utils import per_qubit
 
 router = APIRouter(prefix="/api/v1/runs", tags=["rca"])
 
@@ -46,10 +47,10 @@ def _analyse(run: Run) -> dict[str, Any]:
     ) / 1000.0
 
     # Calibration averages
-    t1_map: dict = cal.get("t1_us") or {}
-    t2_map: dict = cal.get("t2_us") or {}
-    ge_map: dict = cal.get("gate_errors") or {}
-    ro_map: dict = cal.get("readout_errors") or {}
+    t1_map: dict = per_qubit(cal.get("t1_us"))
+    t2_map: dict = per_qubit(cal.get("t2_us"))
+    ge_map: dict = per_qubit(cal.get("gate_errors"))
+    ro_map: dict = per_qubit(cal.get("readout_errors"))
 
     t1_vals = [float(v) for v in t1_map.values() if v]
     t2_vals = [float(v) for v in t2_map.values() if v]
