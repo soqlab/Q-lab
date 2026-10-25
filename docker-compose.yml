@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://qlab:${POSTGRES_PASSWORD:-changeme}@db/qlab
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      QLAB_SECRET_KEY: ${QLAB_SECRET_KEY:?QLAB_SECRET_KEY is required}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
       ENVIRONMENT: production

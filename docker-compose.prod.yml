@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://qlab:${POSTGRES_PASSWORD}@db:5432/qlab
-      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      QLAB_SECRET_KEY: ${QLAB_SECRET_KEY:?set QLAB_SECRET_KEY}
       ENVIRONMENT: production
       ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

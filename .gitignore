@@ -54,3 +54,7 @@ htmlcov/
 
 # Docker volumes
 docker-volumes/
+
+# Installers and build caches
+*.exe
+*.tsbuildinfo

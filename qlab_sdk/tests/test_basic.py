@@ -20,9 +20,10 @@ def test_cli_import():
     assert callable(main)
 
 
-def test_config_import():
-    from qlab.config import get_config
-    assert callable(get_config)
+def test_config_loads_defaults(tmp_path):
+    from qlab.config import load_config
+    cfg = load_config(str(tmp_path / "missing.toml"))
+    assert isinstance(cfg, dict)
 
 
 def test_fingerprint_import():

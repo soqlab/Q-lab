@@ -12,7 +12,7 @@ services:
     envVars:
       - key: DATABASE_URL
         value: sqlite:///./data/qlab-sqlite.db
-      - key: SECRET_KEY
+      - key: QLAB_SECRET_KEY
         generateValue: true
       - key: SMTP_HOST
         sync: false
