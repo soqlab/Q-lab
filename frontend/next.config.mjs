@@ -11,6 +11,10 @@ const nextConfig = {
   output: process.env.NODE_ENV === "production" && !process.env.NETLIFY ? "standalone" : undefined,
 
   eslint: { ignoreDuringBuilds: true },
+
+  // The app does not use next/image. Turning the optimiser off closes /_next/image, the
+  // endpoint behind several critical Next.js advisories (remote code execution via SVG/AVIF).
+  images: { unoptimized: true },
   typescript: { ignoreBuildErrors: true },
 
   // Pre-bundle large icon/component libraries so they're not compiled per-request
