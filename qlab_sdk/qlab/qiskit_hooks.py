@@ -1,6 +1,8 @@
 import atexit
 import hashlib
 import os
+import sys
+import threading
 import time
 import types
 import uuid
@@ -673,6 +675,7 @@ def _shadow_simulate(circuit: Any, real_counts: dict, shots: int, run_id: str) -
     import threading
 
     def _run() -> None:
+        _LOCAL.internal = True  # this thread's Aer run is Q-Lab's own, not the user's
         try:
             from qiskit_aer import AerSimulator  # type: ignore
             from qiskit_aer.noise import NoiseModel, depolarizing_error, ReadoutError  # type: ignore
@@ -714,7 +717,8 @@ def _shadow_simulate(circuit: Any, real_counts: dict, shots: int, run_id: str) -
             req = urllib.request.Request(
                 f"{_CONFIG['api_url'].rstrip('/')}/api/v1/runs/{run_id}/shadow",
                 data=payload,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json",
+                         **({"X-QLab-API-Key": _CLIENT.api_key} if _CLIENT is not None and _CLIENT.api_key else {})},
                 method="POST",
             )
             urllib.request.urlopen(req, timeout=20)
@@ -726,7 +730,55 @@ def _shadow_simulate(circuit: Any, real_counts: dict, shots: int, run_id: str) -
     threading.Thread(target=_run, daemon=True).start()
 
 
-def _patch_job_result(job: Any, run_ids: list[str], circuits: list[Any] | None = None) -> None:
+def _primitive_pub_results(result: Any) -> list[dict[str, Any]] | None:
+    """Per-circuit results of a V2 primitive (a PrimitiveResult of PubResults), or None."""
+    if not hasattr(result, "__iter__") or hasattr(result, "get_counts"):
+        return None
+    try:
+        pubs = list(result)
+    except Exception:
+        return None
+    out: list[dict[str, Any]] = []
+    for pub in pubs:
+        data = getattr(pub, "data", None)
+        if data is None:
+            return None
+        entry: dict[str, Any] = {}
+        try:
+            names = list(data.keys()) if hasattr(data, "keys") else list(vars(data))
+        except Exception:
+            names = []
+        for name in names:
+            try:
+                value = data[name] if hasattr(data, "__getitem__") else getattr(data, name)
+            except Exception:
+                continue
+            if hasattr(value, "get_counts"):
+                entry.setdefault("counts", _sanitize(value.get_counts()))
+                entry.setdefault("register", name)
+            elif name in ("evs", "stds"):
+                entry[name] = _sanitize(value.tolist() if hasattr(value, "tolist") else value)
+        metadata = getattr(pub, "metadata", None)
+        if metadata:
+            entry["metadata"] = _sanitize(metadata)
+        out.append(entry)
+    return out
+
+
+def _results_per_run(result: Any, n_runs: int) -> list[dict[str, Any]]:
+    """Split one job result into the results of each circuit it ran."""
+    pubs = _primitive_pub_results(result)
+    if pubs is not None and len(pubs) == n_runs:
+        return [{"result_class": result.__class__.__name__, **pub} for pub in pubs]
+    shared = _extract_result_metadata(result)
+    counts = shared.get("counts")
+    if isinstance(counts, list) and len(counts) == n_runs:  # backend.run with several circuits
+        return [{**shared, "counts": c} for c in counts]
+    return [shared] * n_runs
+
+
+def _patch_job_result(job: Any, run_ids: list[str], circuits: list[Any] | None = None,
+                      backend_name: Optional[str] = None) -> None:
     if not run_ids or not hasattr(job, "result"):
         return
 
@@ -751,19 +803,13 @@ def _patch_job_result(job: Any, run_ids: list[str], circuits: list[Any] | None =
                     )
             raise
 
-        results = _extract_result_metadata(result)
-
-        # Real QPU counts for shadow simulation
-        real_counts: dict = {}
         try:
-            rc = results.get("counts")
-            if isinstance(rc, dict):
-                real_counts = {str(k): int(v) for k, v in rc.items()}
+            per_run = _results_per_run(result, len(run_ids))
         except Exception:
-            pass
-        shots = sum(real_counts.values()) if real_counts else 1024
+            per_run = [{}] * len(run_ids)
 
         for i, run_id in enumerate(run_ids):
+            results = per_run[i]
             if _CLIENT is not None:
                 _CLIENT.update_run_async(
                     run_id,
@@ -773,9 +819,12 @@ def _patch_job_result(job: Any, run_ids: list[str], circuits: list[Any] | None =
                         "timing": {"result_time": result_time},
                     },
                 )
-            # Fire shadow simulation if Aer is available and we have real counts
-            if real_counts and circuits and i < len(circuits):
-                _shadow_simulate(circuits[i], real_counts, shots, run_id)
+            # Compare real-hardware counts with a noisy simulation. Simulator runs are skipped.
+            counts = results.get("counts") if isinstance(results, dict) else None
+            if (isinstance(counts, dict) and counts and circuits and i < len(circuits)
+                    and not _is_simulator(backend_name)):
+                real_counts = {str(k): int(v) for k, v in counts.items()}
+                _shadow_simulate(circuits[i], real_counts, sum(real_counts.values()), run_id)
 
         return result
 
@@ -785,25 +834,78 @@ def _patch_job_result(job: Any, run_ids: list[str], circuits: list[Any] | None =
     except Exception:
         pass
 
-def _patch_runtime_primitive(cls) -> None:
-    original_run = cls.run
 
-    if getattr(cls.run, "_qlab_patched", False):
+def _is_simulator(backend_name: Optional[str]) -> bool:
+    name = (backend_name or "").lower()
+    return not name or any(k in name for k in ("sim", "aer", "statevector", "fake", "estimator", "sampler"))
+
+
+# --- Patching ----------------------------------------------------------------------------
+# Qiskit classes override run() (AerSimulator.run, StatevectorSampler.run, ...), so patching
+# the base classes is not enough: every subclass that defines its own run() is wrapped, both
+# the ones already imported and the ones defined later (through __init_subclass__).
+#
+# One execution must give one run. Primitives call backend.run internally, sometimes from a
+# worker thread, and Q-Lab's own shadow simulation runs Aer: those inner calls are not tracked.
+
+_LOCAL = threading.local()
+_NESTED_CALLERS = ("qiskit.primitives", "qiskit_ibm_runtime")
+
+
+def _is_nested_call() -> bool:
+    if getattr(_LOCAL, "depth", 0) or getattr(_LOCAL, "internal", False):
+        return True
+    frame = sys._getframe(2)
+    while frame is not None:
+        if frame.f_globals.get("__name__", "").startswith(_NESTED_CALLERS):
+            return True
+        frame = frame.f_back
+    return False
+
+
+def _name_of(backend: Any) -> Optional[str]:
+    if backend is None:
+        return None
+    name = getattr(backend, "name", None)
+    if callable(name):
+        try:
+            name = name()
+        except Exception:
+            name = None
+    return name if isinstance(name, str) else None
+
+
+def _primitive_backend(primitive: Any) -> Any:
+    for attr in ("backend", "_backend", "mode", "_mode"):
+        try:
+            value = getattr(primitive, attr, None)
+            if callable(value) and not hasattr(value, "run"):
+                value = value()
+        except Exception:
+            continue
+        if value is not None:
+            return value
+    return None
+
+
+def _wrap_run(cls, kind: str) -> None:
+    """Wrap the run() that cls itself defines, so each top-level call records one run per circuit."""
+    original_run = cls.__dict__.get("run")
+    if original_run is None or getattr(original_run, "_qlab_patched", False):
         return
 
     def patched_run(self, *args, **kwargs):
-        backend_name = None
-        backend_obj = None
-        circuits = []
-        parameters = {}
+        if _is_nested_call():
+            return original_run(self, *args, **kwargs)
+
+        backend_obj = self if kind == "backend" else _primitive_backend(self)
+        backend_name = _name_of(backend_obj) or (None if kind == "backend" else type(self).__name__)
+        circuits: list[Any] = []
+        parameters: dict = {}
         calibration: dict = {}
         transpiler_ctx: dict = {}
         submit_time = datetime.now(timezone.utc).isoformat()
         try:
-            if hasattr(self, "backend"):
-                backend_obj = getattr(self, "backend")
-                backend_name = getattr(backend_obj, "name", None)
-
             circuits = _extract_circuits_from_args(args, kwargs)
             parameters = _extract_parameters(args, kwargs)
             calibration = _capture_calibration(backend_obj)
@@ -811,6 +913,7 @@ def _patch_runtime_primitive(cls) -> None:
         except Exception:
             pass
 
+        _LOCAL.depth = getattr(_LOCAL, "depth", 0) + 1
         try:
             job = original_run(self, *args, **kwargs)
         except Exception as error:
@@ -826,91 +929,75 @@ def _patch_runtime_primitive(cls) -> None:
                     timing={"submit_time": submit_time},
                 )
             raise
+        finally:
+            _LOCAL.depth -= 1
 
         execution = _extract_job_metadata(job)
-        run_ids = []
-        for circuit in circuits:
-            run_ids.append(
-                _capture_circuit(
-                    circuit,
-                    backend_name=backend_name,
-                    parameters=parameters,
-                    execution=execution,
-                    status="submitted",
-                    calibration=calibration,
-                    transpiler=transpiler_ctx,
-                    timing={"submit_time": submit_time},
-                )
+        run_ids = [
+            _capture_circuit(
+                circuit,
+                backend_name=backend_name,
+                parameters=parameters,
+                execution=execution,
+                status="submitted",
+                calibration=calibration,
+                transpiler=transpiler_ctx,
+                timing={"submit_time": submit_time},
             )
-
-        _patch_job_result(job, run_ids, circuits)
+            for circuit in circuits
+        ]
+        _patch_job_result(job, run_ids, circuits, backend_name)
         return job
 
     patched_run._qlab_patched = True
     cls.run = patched_run
 
-def _patch_backend_run(cls) -> None:
-    if not hasattr(cls, "run") or getattr(cls.run, "_qlab_patched", False):
-        return
 
-    original_run = cls.run
-
-    def patched_run(self, *args, **kwargs):
-        backend_name = None
-        circuits = []
-        parameters = {}
-        calibration: dict = {}
-        transpiler_ctx: dict = {}
-        submit_time = datetime.now(timezone.utc).isoformat()
+def _patch_family(base, kind: str) -> None:
+    """Wrap run() on base, on every subclass already defined, and on subclasses defined later."""
+    pending, seen = [base], set()
+    while pending:
+        cls = pending.pop()
+        if cls in seen:
+            continue
+        seen.add(cls)
+        _wrap_run(cls, kind)
         try:
-            backend_name = getattr(self, "name", None)
-            if callable(backend_name):
-                backend_name = backend_name()
+            pending.extend(cls.__subclasses__())
+        except TypeError:
+            pass
 
-            circuits = _extract_circuits_from_args(args, kwargs)
-            parameters = _extract_parameters(args, kwargs)
-            calibration = _capture_calibration(self)
-            transpiler_ctx = _pop_transpiler_context()
+    if base.__dict__.get("_qlab_subclass_hook"):
+        return
+    previous = base.__dict__.get("__init_subclass__")
+
+    def hook(subclass, **kw):
+        if previous is not None:
+            previous.__func__(subclass, **kw)
+        else:
+            super(base, subclass).__init_subclass__(**kw)
+        _wrap_run(subclass, kind)
+
+    base.__init_subclass__ = classmethod(hook)
+    base._qlab_subclass_hook = True
+
+
+def _patch_qiskit() -> None:
+    families = [
+        ("qiskit.providers", "BackendV2", "backend"),
+        ("qiskit.providers", "BackendV1", "backend"),          # Qiskit 1.x only
+        ("qiskit.primitives", "BaseSamplerV2", "primitive"),
+        ("qiskit.primitives", "BaseEstimatorV2", "primitive"),
+        ("qiskit.primitives", "BaseSamplerV1", "primitive"),   # Qiskit 1.x only
+        ("qiskit.primitives", "BaseEstimatorV1", "primitive"),
+    ]
+    for module_name, class_name, kind in families:
+        try:
+            module = __import__(module_name, fromlist=[class_name])
+            _patch_family(getattr(module, class_name), kind)
         except Exception:
             pass
 
-        try:
-            job = original_run(self, *args, **kwargs)
-        except Exception as error:
-            for circuit in circuits:
-                _capture_circuit(
-                    circuit,
-                    backend_name=backend_name,
-                    parameters=parameters,
-                    execution=_error_metadata(error),
-                    status="failed",
-                    calibration=calibration,
-                    transpiler=transpiler_ctx,
-                    timing={"submit_time": submit_time},
-                )
-            raise
-
-        execution = _extract_job_metadata(job)
-        run_ids = []
-        for circuit in circuits:
-            run_ids.append(
-                _capture_circuit(
-                    circuit,
-                    backend_name=backend_name,
-                    parameters=parameters,
-                    execution=execution,
-                    status="submitted",
-                    calibration=calibration,
-                    transpiler=transpiler_ctx,
-                    timing={"submit_time": submit_time},
-                )
-            )
-
-        _patch_job_result(job, run_ids, circuits)
-        return job
-
-    patched_run._qlab_patched = True
-    cls.run = patched_run
 
 def benchmark(
     circuit,
@@ -1190,36 +1277,7 @@ def init(
     )
     atexit.register(flush)
 
-    try:
-        from qiskit_ibm_runtime import SamplerV2, EstimatorV2
-
-        _patch_runtime_primitive(SamplerV2)
-        _patch_runtime_primitive(EstimatorV2)
-    except Exception:
-        pass
-
-    try:
-        from qiskit_ibm_runtime import Sampler, Estimator
-
-        _patch_runtime_primitive(Sampler)
-        _patch_runtime_primitive(Estimator)
-    except Exception:
-        pass
-
-    try:
-        from qiskit.providers import BackendV1
-
-        _patch_backend_run(BackendV1)
-    except Exception:
-        pass
-
-    try:
-        from qiskit.providers import BackendV2
-
-        _patch_backend_run(BackendV2)
-    except Exception:
-        pass
-
+    _patch_qiskit()
     _patch_transpile()
 
     _INITIALIZED = True
