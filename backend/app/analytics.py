@@ -37,78 +37,52 @@ def get_timeseries(
     return _sqlite_timeseries(org_id, project_slug, backend, days, granularity, db)
 
 
-def get_backend_stats(db) -> list[dict[str, Any]]:
-    """Return per-backend run counts and avg health scores."""
-    if _USE_CLICKHOUSE:
-        return _clickhouse_backend_stats()
-    return _sqlite_backend_stats(db)
-
-
-def get_kpis(org_id: int | None, db) -> dict[str, Any]:
-    """Return top-level KPIs: total runs, success rate, avg health, active projects."""
-    if _USE_CLICKHOUSE:
-        return _clickhouse_kpis(org_id)
-    return _sqlite_kpis(org_id, db)
-
-
 # --- SQLite implementations ---------------------------------------------------
 
 def _sqlite_timeseries(org_id, project_slug, backend, days, granularity, db):
-    from sqlalchemy import text
-    if granularity == "hour":
-        fmt = "strftime('%Y-%m-%dT%H:00:00', created_at)"
-    elif granularity == "week":
-        fmt = "strftime('%Y-W%W', created_at)"
-    else:
-        fmt = "strftime('%Y-%m-%d', created_at)"
+    """Runs per time bucket. ORM query, so the caller's run visibility applies (app/run_scope.py)."""
+    from datetime import timedelta
 
-    conditions = [f"created_at >= datetime('now', '-{days} days')"]
-    params: dict = {}
+    from sqlalchemy import select
+
+    from .models import Run
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    if db.bind.dialect.name == "sqlite":
+        since = since.replace(tzinfo=None)  # SQLite stores naive UTC timestamps
+    query = select(Run).where(Run.created_at >= since)
     if org_id:
-        conditions.append("org_id = :org_id")
-        params["org_id"] = org_id
+        query = query.where(Run.org_id == org_id)
     if project_slug:
-        conditions.append("project_slug = :project_slug")
-        params["project_slug"] = project_slug
+        query = query.where(Run.project_slug == project_slug)
     if backend:
-        conditions.append("backend = :backend")
-        params["backend"] = backend
+        query = query.where(Run.backend == backend)
 
-    where = " AND ".join(conditions)
-    rows = db.execute(text(f"""
-        SELECT {fmt} as bucket,
-               COUNT(*) as run_count,
-               AVG(CAST(json_extract(results, '$.health_score') AS REAL)) as avg_health
-        FROM runs WHERE {where}
-        GROUP BY bucket ORDER BY bucket
-    """), params).fetchall()
+    def bucket_of(ts: datetime) -> str:
+        if granularity == "hour":
+            return ts.strftime("%Y-%m-%dT%H:00:00")
+        if granularity == "week":
+            return ts.strftime("%Y-W%W")
+        return ts.strftime("%Y-%m-%d")
 
-    return [{"bucket": r[0], "run_count": r[1], "avg_health": round(r[2] or 0, 2)} for r in rows]
+    buckets: dict[str, dict[str, Any]] = {}
+    for run in db.scalars(query.order_by(Run.created_at)):
+        b = buckets.setdefault(bucket_of(run.created_at), {
+            "total": 0, "completed": 0, "failed": 0, "submitted": 0, "_health": []})
+        b["total"] += 1
+        if run.status in ("completed", "failed", "submitted"):
+            b[run.status] += 1
+        score = run.health_score
+        if score is not None:
+            b["_health"].append(score)
 
-
-def _sqlite_backend_stats(db):
-    from sqlalchemy import text
-    rows = db.execute(text("""
-        SELECT backend, COUNT(*) as runs,
-               AVG(CAST(json_extract(results, '$.health_score') AS REAL)) as avg_health,
-               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as successes
-        FROM runs WHERE backend IS NOT NULL
-        GROUP BY backend ORDER BY runs DESC LIMIT 20
-    """)).fetchall()
-    return [{"backend": r[0], "runs": r[1], "avg_health": round(r[2] or 0, 2), "success_rate": round((r[3] or 0) / max(r[1], 1), 3)} for r in rows]
-
-
-def _sqlite_kpis(org_id, db):
-    from sqlalchemy import text
-    q = db.execute(text(f"""
-        SELECT COUNT(*) as total,
-               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as success,
-               AVG(CAST(json_extract(results, '$.health_score') AS REAL)) as avg_health
-        FROM runs {"WHERE org_id = :oid" if org_id else ""}
-    """), {"oid": org_id} if org_id else {}).fetchone()
-    total, success, avg_health = q[0] or 0, q[1] or 0, q[2] or 0
-    projects = db.execute(text("SELECT COUNT(DISTINCT slug) FROM projects")).scalar() or 0
-    return {"total_runs": total, "success_rate": round(success / max(total, 1), 3), "avg_health": round(avg_health, 2), "active_projects": projects}
+    out = []
+    for key, b in buckets.items():
+        health = b.pop("_health")
+        avg = round(sum(health) / len(health), 2) if health else None
+        # "bucket"/"run_count" are the original field names; "date"/"total" are what the dashboard reads.
+        out.append({"date": key, "bucket": key, "run_count": b["total"], "avg_health": avg, **b})
+    return out
 
 
 # --- ClickHouse implementations -----------------------------------------------
@@ -135,34 +109,3 @@ def _clickhouse_timeseries(org_id, project_slug, backend, days, granularity):
     """, parameters=params)
     return [{"bucket": str(r[0]), "run_count": r[1], "avg_health": round(r[2] or 0, 2)} for r in result.result_rows]
 
-
-def _clickhouse_backend_stats():
-    client = _clickhouse_client()
-    result = client.query("""
-        SELECT backend, count() AS runs, avg(health_score) AS avg_health,
-               countIf(status='completed') / count() AS success_rate
-        FROM qlab_runs WHERE backend != ''
-        GROUP BY backend ORDER BY runs DESC LIMIT 20
-    """)
-    return [{"backend": r[0], "runs": r[1], "avg_health": round(r[2] or 0, 2), "success_rate": round(r[3] or 0, 3)} for r in result.result_rows]
-
-
-def _clickhouse_kpis(org_id):
-    client = _clickhouse_client()
-    if org_id:
-        result = client.query(
-            "SELECT count(), countIf(status='completed'), avg(health_score) FROM qlab_runs WHERE org_id = {org_id:Int64}",
-            parameters={"org_id": int(org_id)},
-        )
-        r = result.result_rows[0]
-        total, success, avg_h = r[0], r[1], r[2]
-        projects = client.query(
-            "SELECT uniq(project_slug) FROM qlab_runs WHERE org_id = {org_id:Int64}",
-            parameters={"org_id": int(org_id)},
-        ).result_rows[0][0]
-    else:
-        result = client.query("SELECT count(), countIf(status='completed'), avg(health_score) FROM qlab_runs")
-        r = result.result_rows[0]
-        total, success, avg_h = r[0], r[1], r[2]
-        projects = client.query("SELECT uniq(project_slug) FROM qlab_runs").result_rows[0][0]
-    return {"total_runs": total, "success_rate": round(success / max(total, 1), 3), "avg_health": round(avg_h or 0, 2), "active_projects": projects}
