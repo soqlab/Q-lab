@@ -1,10 +1,10 @@
 # Pinned to the versions the hosted Q-Lab runs (tested). Upgrade one at a time and run the tests.
-fastapi==0.143.5
+fastapi==0.161.1
 uvicorn[standard]==0.54.0
 pydantic==2.14.1
 python-dotenv==1.2.4
-sqlalchemy==2.1.5
-alembic==1.20.0
+sqlalchemy==2.1.6
+alembic==1.20.1
 psycopg2-binary==2.9.13
 psycopg[binary]==3.3.6
 PyJWT==2.15.1
@@ -12,13 +12,13 @@ cryptography==50.0.2
 bcrypt==5.0.0
 httpx==0.28.1
 anthropic==1.15.0
-openai==3.35.1
+openai==3.37.0
 numpy==2.5.4
 scipy==1.18.1
 matplotlib==3.11.2
 pylatexenc==2.11
 qiskit==1.4.6
-qiskit-aer==0.17.2
-qiskit-ibm-runtime==0.44.1
+qiskit-aer==0.18.0
+qiskit-ibm-runtime==0.51.0
 paramiko==5.1.0
 # Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)
