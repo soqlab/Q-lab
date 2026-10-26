@@ -274,7 +274,7 @@ _OPENAPI_URL = None if _ENV == "production" else "/openapi.json"
 
 app = FastAPI(
     title="Q-Lab API",
-    version="1.0.0",
+    version="0.3.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
     docs_url=_DOCS_URL,
     redoc_url=_REDOC_URL,
@@ -804,7 +804,7 @@ def _filtered_runs_query(backend=None, status=None, project=None):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": app.version}
 
 
 # ------------------------------------------------------------------

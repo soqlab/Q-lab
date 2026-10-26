@@ -1,0 +1,154 @@
+name: Release
+
+# Push a tag like v0.3.0 to release. The tag must match the versions in the repo and have a
+# CHANGELOG.md entry. Publishes:
+#   - the qlab-sdk package to PyPI (trusted publishing: no stored token; PyPI attaches
+#     signed attestations),
+#   - backend and dashboard images to ghcr.io/soqlab, with signed build provenance,
+#   - a GitHub release with the changelog notes, the SDK files and CycloneDX SBOMs.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: Tag matches every version in the repo
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          fail=0
+          check() { if [ "$2" != "$VERSION" ]; then echo "::error::$1 is '$2', tag is '$VERSION'"; fail=1; fi; }
+          check qlab_sdk/pyproject.toml "$(grep -m1 '^version = ' qlab_sdk/pyproject.toml | cut -d'"' -f2)"
+          check qlab_sdk/qlab/__init__.py "$(grep -m1 '__version__' qlab_sdk/qlab/__init__.py | cut -d'"' -f2)"
+          check frontend/package.json "$(node -p "require('./frontend/package.json').version")"
+          check backend/app/main.py "$(grep -m1 -E '^    version="' backend/app/main.py | cut -d'"' -f2)"
+          grep -q "^## \[$VERSION\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no '## [$VERSION]' section"; fail=1; }
+          exit $fail
+
+  sdk:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build qlab_sdk --outdir dist
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdk-dist
+          path: dist/
+
+  sbom:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        part: [backend, frontend, qlab_sdk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: ${{ matrix.part }}
+          format: cyclonedx-json
+          output-file: qlab-${{ needs.verify.outputs.version }}-${{ matrix.part }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.part }}
+          path: qlab-*.cdx.json
+
+  images:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        include:
+          - name: qlab-backend
+            context: backend
+            build-args: ""
+          - name: qlab-frontend
+            context: frontend
+            # Matches the backend service name in docker-compose.yml.
+            build-args: QLAB_API_URL=http://backend:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          build-args: ${{ matrix.build-args }}
+          tags: |
+            ghcr.io/soqlab/${{ matrix.name }}:${{ needs.verify.outputs.version }}
+            ghcr.io/soqlab/${{ matrix.name }}:latest
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/soqlab/${{ matrix.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+  github-release:
+    needs: [verify, sdk, sbom, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="${{ needs.verify.outputs.version }}" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && (index($0, "## [") == 1 || /^\[[^]]+\]: /) { exit }
+            on { print }' CHANGELOG.md > notes.md
+          cat >> notes.md <<EOF
+
+          **Docker images:** \`ghcr.io/soqlab/qlab-backend:${{ needs.verify.outputs.version }}\`,
+          \`ghcr.io/soqlab/qlab-frontend:${{ needs.verify.outputs.version }}\` (with signed build provenance).
+          **SDK:** \`pip install qlab-sdk==${{ needs.verify.outputs.version }}\`.
+          **SBOMs:** CycloneDX files for the backend, dashboard and SDK are attached.
+          EOF
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Q-Lab $GITHUB_REF_NAME" --notes-file notes.md assets/*
+
+  pypi:
+    needs: [verify, github-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/qlab-sdk/${{ needs.verify.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
