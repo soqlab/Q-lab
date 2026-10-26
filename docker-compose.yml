@@ -22,8 +22,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://qlab:${POSTGRES_PASSWORD:-changeme}@db/qlab
       QLAB_SECRET_KEY: ${QLAB_SECRET_KEY:?QLAB_SECRET_KEY is required}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      QLAB_APP_URL: ${QLAB_APP_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       ENVIRONMENT: production
     depends_on:
       db:
@@ -35,6 +35,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Next.js fixes its /qlab-api proxy target at build time, so it is set here, not only at runtime.
+        QLAB_API_URL: http://backend:8000
     restart: unless-stopped
     environment:
       QLAB_API_URL: http://backend:8000

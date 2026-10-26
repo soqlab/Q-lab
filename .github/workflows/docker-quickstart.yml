@@ -1,0 +1,59 @@
+name: Docker quick start
+
+# The documented self-hosting path (docker compose up) on a clean machine. It broke once
+# (QLAB_SECRET_KEY vs SECRET_KEY) without anyone noticing, so it is exercised here.
+on:
+  push:
+    branches: [main]
+    paths: ['docker-compose.yml', '.env.example', 'backend/Dockerfile', 'backend/requirements.txt',
+            'frontend/Dockerfile', 'frontend/package-lock.json', 'frontend/next.config.mjs',
+            '.github/workflows/docker-quickstart.yml']
+  pull_request:
+    paths: ['docker-compose.yml', '.env.example', 'backend/Dockerfile', 'backend/requirements.txt',
+            'frontend/Dockerfile', 'frontend/package-lock.json', 'frontend/next.config.mjs',
+            '.github/workflows/docker-quickstart.yml']
+  schedule:
+    - cron: '41 5 * * 1'   # weekly: base images and unpinned system packages change underneath
+  workflow_dispatch:
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure like a new user would (.env from the example)
+        run: |
+          cp .env.example .env
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
+          sed -i "s/^QLAB_SECRET_KEY=.*/QLAB_SECRET_KEY=$(openssl rand -hex 32)/" .env
+          sed -i "s|^QLAB_APP_URL=.*|QLAB_APP_URL=http://localhost:3000|" .env
+          sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS=http://localhost:3000|" .env
+
+      - name: docker compose up
+        run: docker compose up -d --build
+
+      - name: Backend answers
+        run: |
+          for i in $(seq 1 60); do curl -fsS http://localhost:8000/health && exit 0; sleep 5; done
+          exit 1
+
+      - name: Dashboard answers and reaches the backend through /qlab-api
+        run: |
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/login && break; sleep 5; done
+          curl -fsS http://localhost:3000/login -o /dev/null
+          curl -fsS http://localhost:3000/qlab-api/health
+
+      - name: A run can be stored and read back (Postgres)
+        run: |
+          RUN_ID="ci-$(date +%s)"
+          curl -fsS -X POST http://localhost:3000/qlab-api/api/v1/runs \
+            -H 'Content-Type: application/json' \
+            -d "{\"run_id\":\"$RUN_ID\",\"circuit_name\":\"bell\",\"backend\":\"aer_simulator\",\"fingerprint\":{\"num_qubits\":2,\"depth\":2},\"execution\":{\"shots\":100},\"results\":{\"counts\":{\"00\":50,\"11\":50}},\"status\":\"completed\",\"created_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+          curl -fsS "http://localhost:3000/qlab-api/api/v1/runs/$RUN_ID" | grep -q "\"run_id\":\"$RUN_ID\""
+          curl -fsS "http://localhost:3000/qlab-api/api/v1/analytics/timeseries?days=1" | grep -q '"total"'
+
+      - name: Logs
+        if: failure()
+        run: docker compose logs --no-color --tail=200
