@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 SECRET_KEY = os.getenv("QLAB_SECRET_KEY")
 if not SECRET_KEY:
