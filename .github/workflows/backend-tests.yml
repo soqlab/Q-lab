@@ -25,6 +25,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Install
-        run: pip install -r requirements.txt pytest
+        run: pip install -r requirements.txt pytest pytest-cov
       - name: Run tests
-        run: pytest tests -q
+        run: pytest tests -q --cov=app --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
