@@ -91,6 +91,20 @@ See [SELF_HOSTING.md](SELF_HOSTING.md) for Docker Compose setup, environment var
 
 ---
 
+## Your data
+
+- **Self-hosted:** your runs, circuits and results stay on your server. Nothing is sent to
+  SOQLAB: the backend never contacts us, and the SDK sends nothing to us when it points at
+  your own server.
+- **Hosted (qlab.soqlab.com):** your runs are stored on our server, visible only to you and
+  your organisation. You can export them, or request their deletion, from the dashboard.
+- **Install ping (hosted service only):** when the SDK talks to the hosted service it sends
+  one anonymous ping per process with the SDK and Python versions, so we can count active
+  installs. Turn it off with `QLAB_TELEMETRY=off`. See `_fire_telemetry_ping` in
+  [`qlab_sdk/qlab/qiskit_hooks.py`](qlab_sdk/qlab/qiskit_hooks.py).
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
