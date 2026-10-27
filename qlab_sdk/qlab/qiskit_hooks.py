@@ -19,13 +19,30 @@ _INITIALIZED = False
 _TELEMETRY_URL = "https://qlab.soqlab.com/qlab-api/ping"
 
 
-def _fire_telemetry_ping() -> None:
-    """Fire a single anonymous ping so we can count active SDK installs.
+def _sdk_version() -> str:
+    from . import __version__
+    return __version__
 
-    Opt out with: QLAB_TELEMETRY=off  (any of: off, 0, false, no)
-    Collects only: SDK version, Python version. Nothing identifying.
+
+# Hosts of the hosted service. Only users of qlab.soqlab.com send the install ping; a
+# self-hosted setup never contacts SOQLAB.
+_HOSTED_API_HOSTS = ("qlab.soqlab.com", "qlab-backend.onrender.com")
+
+
+def _uses_hosted_service(api_url: str) -> bool:
+    from urllib.parse import urlparse
+    return (urlparse(api_url or "").hostname or "") in _HOSTED_API_HOSTS
+
+
+def _fire_telemetry_ping() -> None:
+    """Send one anonymous ping per process so we can count active installs of the hosted service.
+
+    Sent only when the SDK talks to the hosted service; self-hosted setups send nothing.
+    Contains only the SDK and Python versions. Opt out with QLAB_TELEMETRY=off (or 0/false/no).
     """
     if os.getenv("QLAB_TELEMETRY", "").lower() in ("off", "0", "false", "no"):
+        return
+    if not _uses_hosted_service(_CONFIG.get("api_url", "")):
         return
 
     import sys
@@ -35,7 +52,7 @@ def _fire_telemetry_ping() -> None:
         try:
             import urllib.request, json as _json
             payload = _json.dumps({
-                "sdk_version": "0.2.0",
+                "sdk_version": _sdk_version(),
                 "python": sys.version.split()[0],
             }).encode()
             req = urllib.request.Request(
