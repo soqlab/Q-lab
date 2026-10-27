@@ -6,6 +6,10 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Changed
+- The SDK's anonymous install ping is sent only when it talks to the hosted service;
+  self-hosted setups never contact SOQLAB. It reports the real SDK version.
+
 ## [0.3.0] - 2026-10-26
 
 ### Security
