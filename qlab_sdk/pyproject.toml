@@ -26,9 +26,9 @@ classifiers = [
 dependencies = ["httpx>=0.24"]
 
 [project.optional-dependencies]
-qiskit = ["qiskit>=1.0"]
+qiskit = ["qiskit>=2.6.1"]
 jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
-all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
+all = ["qiskit>=2.6.1", "ipython>=7.0", "ipywidgets>=7.0"]
 dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]
 
 [project.urls]
