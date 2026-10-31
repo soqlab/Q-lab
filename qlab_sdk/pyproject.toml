@@ -27,8 +27,8 @@ dependencies = ["httpx>=0.24"]
 
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
-jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
-all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
+jupyter = ["ipython>=7.0", "ipywidgets>=8.1.9"]
+all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=8.1.9"]
 dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]
 
 [project.urls]
