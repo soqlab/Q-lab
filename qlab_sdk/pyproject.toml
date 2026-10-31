@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-authors = [{ name = "Q-Lab", email = "yasseennandally@gmail.com" }]
+authors = [{ name = "SOQLAB", email = "contact@soqlab.com" }]
 keywords = ["qiskit", "quantum", "experiment-tracking", "quantum-computing"]
 classifiers = [
     "Development Status :: 4 - Beta",
