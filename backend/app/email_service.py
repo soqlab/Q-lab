@@ -941,7 +941,7 @@ def send_account_deleted_email(to_email: str, user_name: str) -> bool:
       </p>
       <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
         If you did not request this, please contact us immediately at
-        <a href="mailto:stateofquantumlab@gmail.com">stateofquantumlab@gmail.com</a>.
+        <a href="mailto:contact@soqlab.com">contact@soqlab.com</a>.
       </p>
     """
     return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))
@@ -949,7 +949,7 @@ def send_account_deleted_email(to_email: str, user_name: str) -> bool:
 
 def send_contact_email(name: str, from_email: str, message: str) -> bool:
     """Forward a contact-form submission to the platform owner."""
-    owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "stateofquantumlab@gmail.com")
+    owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "contact@soqlab.com")
     subject = f"Q-Lab contact from {name}"
     html = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
