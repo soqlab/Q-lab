@@ -80,7 +80,7 @@ class APIKey(Base):
 
 
 # ---------------------------------------------------------------------------
-# Audit Log (append-only, tamper-evident)
+# Audit Log (append-only; not hash-chained)
 # ---------------------------------------------------------------------------
 
 class AuditLog(Base):
