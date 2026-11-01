@@ -14,6 +14,7 @@ from ..deps import Identity, log_audit, require_auth
 from ..email_service import (
     send_password_reset_email,
     send_welcome_email,
+    is_email_configured,
     send_verification_email,
     send_account_deleted_email,
 )
@@ -106,6 +107,9 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
         password_hash=hash_password(payload.password),
         role=role,
         org_id=org.id if org else None,
+        # A self-hosted install with no mail server (e.g. inside a network with no internet) can
+        # never deliver the confirmation email, so there is nothing to wait for.
+        email_verified=not is_email_configured(),
     )
     db.add(user)
     db.commit()
@@ -131,16 +135,17 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     log_audit(db, "auth.register", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
 
     # Send verification email — token stored in DB so it survives redeploys
-    try:
-        verify_token = secrets.token_urlsafe(32)
-        user.verify_token = verify_token
-        user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
-        db.commit()
-        app_url = os.getenv("QLAB_APP_URL", "")
-        verify_url = f"{app_url}/verify-email?token={verify_token}"
-        send_verification_email(to_email=user.email, verify_url=verify_url)
-    except Exception:
-        pass
+    if not user.email_verified:
+        try:
+            verify_token = secrets.token_urlsafe(32)
+            user.verify_token = verify_token
+            user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
+            db.commit()
+            app_url = os.getenv("QLAB_APP_URL", "")
+            verify_url = f"{app_url}/verify-email?token={verify_token}"
+            send_verification_email(to_email=user.email, verify_url=verify_url)
+        except Exception:
+            pass
 
     resp = _user_response(user, token)
     resp["api_key"] = full_key  # returned once — shown on the onboarding screen
@@ -155,7 +160,7 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
-    if not getattr(user, "email_verified", True):
+    if not getattr(user, "email_verified", True) and is_email_configured():
         raise HTTPException(status_code=403, detail="email_not_verified")
 
     from datetime import datetime, timezone

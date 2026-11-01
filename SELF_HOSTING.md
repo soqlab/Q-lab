@@ -2,6 +2,14 @@
 
 Q-Lab is MIT-licensed and fully self-hostable. Run it on your own servers — your experiment data never leaves your infrastructure.
 
+## Inside a company network, with no internet
+
+[deploy/internal/README.md](deploy/internal/README.md) installs Q-Lab on a server with no internet
+access. You get one bundle file with the images and the SDK, a setup script that generates the
+secrets, and HTTPS with the company's own certificate. Nothing calls out: the SDK sends no
+telemetry to a self-hosted server, and accounts need no email confirmation when no mail server is
+configured.
+
 ## Requirements
 
 - Docker & Docker Compose

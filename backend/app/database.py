@@ -36,6 +36,20 @@ def init_db() -> None:
 
         migrate_once(migrate_from, Path(make_url(DATABASE_URL).database))
 
+    if DATABASE_URL.startswith("sqlite"):
+        _create_schema()
+        return
+    # Each uvicorn worker runs this at import. On a fresh Postgres database two of them creating
+    # the same tables at once collide (duplicate pg_type) and one worker dies, so they take turns.
+    with engine.connect() as lock:
+        lock.execute(text("SELECT pg_advisory_lock(7351001)"))
+        try:
+            _create_schema()
+        finally:
+            lock.execute(text("SELECT pg_advisory_unlock(7351001)"))
+
+
+def _create_schema() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_compat_columns()
     _ensure_fts()

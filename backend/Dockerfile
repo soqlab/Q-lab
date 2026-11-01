@@ -15,4 +15,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "75"]
+# A worker loading its routers on a slow or busy host can miss uvicorn's 5 s healthcheck and be
+# killed mid-request; 120 s still replaces a genuinely stuck one.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "75", "--timeout-worker-healthcheck", "120"]
