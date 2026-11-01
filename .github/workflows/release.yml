@@ -104,7 +104,7 @@ jobs:
           tags: |
             ghcr.io/soqlab/${{ matrix.name }}:${{ needs.verify.outputs.version }}
             ghcr.io/soqlab/${{ matrix.name }}:latest
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/soqlab/${{ matrix.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
