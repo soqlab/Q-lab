@@ -16,12 +16,12 @@ from __future__ import annotations
 import json
 import os
 import smtplib
-import urllib.request
 import uuid
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from typing import Any, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -31,6 +31,7 @@ from ..database import get_db, SessionLocal
 from ..models import NotificationChannel, NotificationLog
 from ..store import store_get, store_put, store_list
 from ..email_service import is_email_configured, send_email, run_complete_email
+from ..outbound import require_safe_url
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
@@ -48,8 +49,9 @@ SMTP_FROM = os.environ.get("SMTP_FROM", "qlab@example.com")
 def _send_slack(webhook_url: str, event: str, payload: dict) -> None:
     text = f"*Q-Lab event: `{event}`*\n```{json.dumps(payload, indent=2)[:1200]}```"
     body = json.dumps({"text": text}).encode()
-    req = urllib.request.Request(webhook_url, data=body, headers={"Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=10)
+    require_safe_url(webhook_url)
+    # httpx, not urllib: urllib follows redirects, which could lead a public URL to an internal one.
+    httpx.post(webhook_url, content=body, headers={"Content-Type": "application/json"}, timeout=10).raise_for_status()
 
 
 def _send_webhook(url: str, event: str, payload: dict, secret: str = "") -> None:
@@ -59,8 +61,8 @@ def _send_webhook(url: str, event: str, payload: dict, secret: str = "") -> None
         import hmac, hashlib
         sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
         headers["X-Qlab-Signature"] = f"sha256={sig}"
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    urllib.request.urlopen(req, timeout=10)
+    require_safe_url(url)
+    httpx.post(url, content=body, headers=headers, timeout=10).raise_for_status()
 
 
 def _send_email(to: str, event: str, payload: dict) -> None:

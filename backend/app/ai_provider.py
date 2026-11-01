@@ -17,6 +17,8 @@ import json
 from typing import Generator, Iterator, Optional
 from sqlalchemy.orm import Session
 
+from .outbound import UnsafeURL, require_safe_url
+
 
 # ---------------------------------------------------------------------------
 # Provider catalogue
@@ -131,6 +133,11 @@ def resolve_ai_provider(db: Session, user_id: int) -> tuple[str, str, Optional[s
         api_key, base_url = _parse_credential(provider, raw)
         cfg = KNOWN_PROVIDERS[provider]
         resolved_base_url = base_url if base_url else cfg.get("base_url")
+        if base_url:  # an address the user typed in ("custom", "agent"), not one of ours
+            try:
+                require_safe_url(base_url)
+            except UnsafeURL as exc:
+                raise NoAIProviderError(f"{cfg['label']}: {exc}") from None
         return provider, api_key, resolved_base_url, cfg
 
     raise NoAIProviderError(

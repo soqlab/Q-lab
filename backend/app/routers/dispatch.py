@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..outbound import is_safe_url
 
 router = APIRouter(prefix="/api/v1/dispatch", tags=["dispatch"])
 
@@ -134,6 +135,8 @@ def _thresholds_met(thresholds: dict[str, Any], cal: dict) -> tuple[bool, list[s
 # ---------------------------------------------------------------------------
 
 def _fire_webhook(url: str, payload: dict) -> None:
+    if not is_safe_url(url):
+        return
     try:
         httpx.post(url, json=payload, timeout=5.0)
     except Exception:

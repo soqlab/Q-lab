@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Run
+from ..outbound import is_safe_url
 
 router = APIRouter(prefix="/api/v1/network", tags=["cal_network"])
 
@@ -170,6 +171,8 @@ def _combine_snapshots(snapshots: list[dict]) -> dict:
 def _fetch_peer_snapshot(peer_url: str, backend: str) -> dict | None:
     url = peer_url.rstrip("/") + f"/api/v1/network/calibration/{backend}"
     try:
+        if not is_safe_url(url):
+            return None
         r = httpx.get(url, timeout=6.0)
         if r.status_code == 200:
             return r.json()
@@ -181,6 +184,8 @@ def _fetch_peer_snapshot(peer_url: str, backend: str) -> dict | None:
 def _fetch_peer_status(peer_url: str) -> dict | None:
     url = peer_url.rstrip("/") + "/api/v1/network/status"
     try:
+        if not is_safe_url(url):
+            return None
         r = httpx.get(url, timeout=4.0)
         if r.status_code == 200:
             return r.json()

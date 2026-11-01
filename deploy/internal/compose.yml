@@ -31,6 +31,9 @@ services:
       CORS_ORIGINS: https://${SITE_ADDRESS}
       ENVIRONMENT: production
       QLAB_OWNER_EMAIL: ${QLAB_OWNER_EMAIL:-}
+      # Inside a company network the AI model, mail and chat servers are internal: let Q-Lab call
+      # them. (A shared hosted instance keeps this off; see backend/app/outbound.py.)
+      QLAB_ALLOW_PRIVATE_URLS: "1"
       # Optional internal mail server (email confirmation, password resets).
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

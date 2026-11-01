@@ -23,6 +23,7 @@ from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..health_score import compute_health_score
+from ..outbound import is_safe_url
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
@@ -128,7 +129,7 @@ def _generic_payload(rule: dict, run: dict, metric_value: float) -> dict:
 
 def _fire_webhook(rule: dict, run: dict, metric_value: float) -> bool:
     url = rule.get("webhook_url")
-    if not url:
+    if not url or not is_safe_url(url):
         return False
     payload = _slack_payload(rule, run, metric_value) if rule.get("is_slack") else _generic_payload(rule, run, metric_value)
     try:
