@@ -220,41 +220,26 @@ _TOOLS = [
 def _execute_tool(name: str, inputs: dict, db: Session) -> str:
     """Execute a tool call and return a string result for the model."""
     if name == "estimate_cost":
-        from .cost_oracle import PRICING, _ibm_seconds_estimate, _hqc_estimate
-        n_qubits      = int(inputs.get("n_qubits", 5))
-        circuit_depth = int(inputs.get("circuit_depth", 20))
-        n_shots       = int(inputs.get("n_shots", 1024))
-        n_circuits    = int(inputs.get("n_circuits", 1))
+        from .cost_oracle import CostEstimateRequest, estimate_rows
+        n_qubits      = max(1, int(inputs.get("n_qubits", 5)))
+        circuit_depth = max(1, int(inputs.get("circuit_depth", 20)))
+        n_shots       = max(1, int(inputs.get("n_shots", 1024)))
+        n_circuits    = max(1, int(inputs.get("n_circuits", 1)))
         lines = [f"Cost estimate for {n_qubits} qubits, depth {circuit_depth}, {n_shots} shots, {n_circuits} circuit(s):\n"]
-        results = []
-        for pid, p in PRICING.items():
-            try:
-                if pid == "ibm_quantum_free":
-                    cost = 0.0 if n_shots <= 10_000_000 else None
-                elif pid == "ibm_quantum_premium":
-                    cost = _ibm_seconds_estimate(n_qubits, circuit_depth, n_shots) * n_circuits
-                elif pid in ("aws_braket_sv1",):
-                    cost = p.get("cost_per_task", 0.075) * n_circuits
-                elif pid == "aws_braket_ionq":
-                    cost = (p["cost_per_task"] + n_shots * p["cost_per_shot"]) * n_circuits
-                elif pid == "aws_braket_rigetti":
-                    cost = (p["cost_per_task"] + n_shots * p["cost_per_shot"]) * n_circuits
-                elif pid == "azure_ionq":
-                    cost = n_shots * p["cost_per_shot"] * n_circuits
-                elif pid == "azure_quantinuum":
-                    cost = _hqc_estimate(n_qubits, circuit_depth, n_shots) * n_circuits
-                elif pid == "iqm_resonance":
-                    cost = (p.get("cost_per_circuit", 0.05) + n_shots * p.get("cost_per_shot", 0.0005)) * n_circuits
-                else:
-                    continue
-                results.append((cost if cost is not None else 999999, p["name"], cost))
-            except Exception:
-                continue
-        results.sort()
-        for _, name_p, cost in results:
-            cost_str = "FREE" if cost == 0 else (f"${cost:.4f}" if cost is not None else "N/A")
-            lines.append(f"  • {name_p}: {cost_str}")
-        cheapest = next((n for _, n, c in results if c is not None), "unknown")
+        rows = estimate_rows(CostEstimateRequest(
+            n_qubits=n_qubits, circuit_depth=circuit_depth, n_shots=n_shots, n_circuits=n_circuits,
+        ))
+        rows.sort(key=lambda r: (r.cost_total_usd is None, r.cost_total_usd or 0.0))
+        for r in rows:
+            if r.cost_total_usd is None:
+                cost_str = "not public"
+            elif r.cost_total_usd == 0:
+                cost_str = "FREE"
+            else:
+                cost_str = f"{r.cost_total_usd:.4f} {r.currency}"
+            stale = " [price may be out of date]" if r.pricing_stale else ""
+            lines.append(f"  • {r.provider_name}: {cost_str} (source {r.pricing_source}, checked {r.pricing_verified}){stale}")
+        cheapest = next((r.provider_name for r in rows if r.cost_total_usd and r.currency == "USD"), "unknown")
         lines.append(f"\nCheapest paid option: {cheapest}")
         return "\n".join(lines)
 

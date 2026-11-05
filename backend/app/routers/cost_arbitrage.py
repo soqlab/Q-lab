@@ -9,6 +9,7 @@ import uuid, random, math
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import pricing
 from ..store import store_delete, store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/cost-arbitrage", tags=["cost-arbitrage"])
@@ -20,10 +21,12 @@ router = APIRouter(prefix="/api/v1/cost-arbitrage", tags=["cost-arbitrage"])
 NS_RECOMMENDATIONS = "cost_recommendations"
 NS_SAVINGS = "cost_savings_history"
 
+# Prices: shared table (app/provider_prices.json) via price_key. Backends whose
+# provider publishes no price get no quote.
 _BACKEND_PRICING: dict = {
     "ibm_brisbane": {
         "provider": "IBM Quantum",
-        "cost_per_shot_usd": 0.000_096,
+        "price_key": "ibm_payg",
         "min_shots": 1000,
         "cx_error_base": 0.008,
         "t1_us_base": 185.0,
@@ -32,7 +35,7 @@ _BACKEND_PRICING: dict = {
     },
     "ibm_kyoto": {
         "provider": "IBM Quantum",
-        "cost_per_shot_usd": 0.000_096,
+        "price_key": "ibm_payg",
         "min_shots": 1000,
         "cx_error_base": 0.006,
         "t1_us_base": 210.0,
@@ -41,7 +44,7 @@ _BACKEND_PRICING: dict = {
     },
     "ionq_aria_1": {
         "provider": "IonQ",
-        "cost_per_shot_usd": 0.000_220,
+        "price_key": "azure_ionq_aria",
         "min_shots": 100,
         "cx_error_base": 0.003,
         "t1_us_base": 10_000.0,
@@ -50,7 +53,7 @@ _BACKEND_PRICING: dict = {
     },
     "rigetti_ankaa_2": {
         "provider": "Rigetti",
-        "cost_per_shot_usd": 0.000_047,
+        "price_key": "braket_rigetti_cepheus",
         "min_shots": 500,
         "cx_error_base": 0.018,
         "t1_us_base": 22.0,
@@ -59,21 +62,12 @@ _BACKEND_PRICING: dict = {
     },
     "quantinuum_h2": {
         "provider": "Quantinuum",
-        "cost_per_shot_usd": 0.000_650,
+        "price_key": "azure_quantinuum_h2",
         "min_shots": 50,
         "cx_error_base": 0.001,
         "t1_us_base": 3_600.0,
         "queue_base_min": 180.0,
         "fidelity_base": 0.997,
-    },
-    "oqc_lucy": {
-        "provider": "OQC",
-        "cost_per_shot_usd": 0.000_032,
-        "min_shots": 1000,
-        "cx_error_base": 0.022,
-        "t1_us_base": 28.0,
-        "queue_base_min": 5.0,
-        "fidelity_base": 0.931,
     },
 }
 
@@ -89,6 +83,9 @@ class BackendQuote(BaseModel):
     t1_us: float
     fidelity_score: float
     available: bool
+    pricing_source: str = ""
+    pricing_verified: str = ""
+    stale_warning: Optional[str] = None
 
 
 class ArbitrageRecommendation(BaseModel):
@@ -133,11 +130,15 @@ class QuoteRequest(BaseModel):
     n_qubits: int
 
 
-def _build_quote(backend: str, n_shots: int) -> BackendQuote:
+def _priced_backends() -> list[str]:
+    return [b for b, c in _BACKEND_PRICING.items() if pricing.PRICES[c["price_key"]]["model"] != "not_public"]
+
+
+def _build_quote(backend: str, n_shots: int, depth: int = 1, n_qubits: int = 1) -> BackendQuote:
     cfg = _BACKEND_PRICING[backend]
     shots = max(n_shots, cfg["min_shots"])
-    cost_per_shot = cfg["cost_per_shot_usd"] * random.uniform(0.95, 1.05)
-    total = round(shots * cost_per_shot, 4)
+    total = round(pricing.estimate_amount(cfg["price_key"], shots, depth=depth, qubits=n_qubits), 4)
+    cost_per_shot = total / shots if shots else 0.0
     cx_error = round(cfg["cx_error_base"] * random.uniform(0.88, 1.12), 6)
     t1_us = round(cfg["t1_us_base"] * random.uniform(0.9, 1.1), 2)
     fidelity = round(min(0.999, cfg["fidelity_base"] * random.uniform(0.98, 1.005)), 4)
@@ -155,6 +156,9 @@ def _build_quote(backend: str, n_shots: int) -> BackendQuote:
         t1_us=t1_us,
         fidelity_score=fidelity,
         available=available,
+        pricing_source=pricing.PRICES[cfg["price_key"]]["source"],
+        pricing_verified=pricing.PRICES[cfg["price_key"]]["verified_on"],
+        stale_warning=pricing.provenance(cfg["price_key"])["stale_warning"],
     )
 
 
@@ -171,7 +175,7 @@ def _score_quote(q: BackendQuote, budget_usd: float, target_fidelity: float, pre
 
 @router.post("/recommend", response_model=ArbitrageRecommendation)
 def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> ArbitrageRecommendation:
-    all_quotes = [_build_quote(b, req.n_shots) for b in _BACKEND_PRICING]
+    all_quotes = [_build_quote(b, req.n_shots) for b in _priced_backends()]
     scores = [_score_quote(q, req.budget_usd, req.target_fidelity, req.prefer_speed) for q in all_quotes]
 
     best_idx = max(range(len(scores)), key=lambda i: scores[i])
@@ -221,19 +225,12 @@ def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> Arbitrage
 
 @router.post("/quote", response_model=List[BackendQuote])
 def quote(req: QuoteRequest) -> List[BackendQuote]:
-    depth_factor = 1.0 + (req.circuit_depth / 100) * 0.1
-    qubit_factor = 1.0 + (req.n_qubits / 10) * 0.05
-    quotes = []
-    for backend in _BACKEND_PRICING:
-        q = _build_quote(backend, req.n_shots)
-        adjusted_total = round(q.estimated_total_usd * depth_factor * qubit_factor, 4)
-        quotes.append(q.model_copy(update={"estimated_total_usd": adjusted_total}))
-    return quotes
+    return [_build_quote(b, req.n_shots, req.circuit_depth, req.n_qubits) for b in _priced_backends()]
 
 
 @router.get("/market", response_model=MarketSnapshot)
 def get_market() -> MarketSnapshot:
-    quotes = [_build_quote(b, 1000) for b in _BACKEND_PRICING]
+    quotes = [_build_quote(b, 1000) for b in _priced_backends()]
     return MarketSnapshot(
         snapshot_id=str(uuid.uuid4()),
         taken_at=datetime.now(timezone.utc).isoformat(),

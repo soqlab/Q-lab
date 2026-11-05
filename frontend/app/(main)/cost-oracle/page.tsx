@@ -2,6 +2,11 @@
 import { useState } from "react";
 import { estimateProviderCost, getCostHistory, CostEstimateResult } from "@/lib/api";
 
+function money(v: number | null, currency: string, digits: number): string {
+  if (v === null || v === undefined) return "not public";
+  return currency === "USD" ? `$${v.toFixed(digits)}` : `${v.toFixed(digits)} ${currency}`;
+}
+
 export default function CostOraclePage() {
   const [nQubits, setNQubits] = useState(5);
   const [depth, setDepth] = useState(20);
@@ -34,10 +39,7 @@ export default function CostOraclePage() {
       <p style={{ color: "var(--muted)" }}>Estimate and compare quantum cloud execution costs across providers before submitting jobs.</p>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, fontSize: 12, color: "var(--muted)" }}>
         <span style={{ color: "#6366f1", fontWeight: 600 }}>ⓘ</span>
-        Prices last verified <strong style={{ color: "var(--text)" }}>August 2024</strong> against IBM Quantum, IonQ, Braket, and Quantinuum published rates. Verify current pricing before budgeting production workloads.{" "}
-        <a href="https://quantum.ibm.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>IBM</a>
-        <a href="https://ionq.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>IonQ</a>
-        <a href="https://aws.amazon.com/braket/pricing/" target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1", marginLeft: 4 }}>Braket</a>
+        <span>Each price below links to the provider page it was copied from and shows the day it was checked. Prices older than 30 days are flagged. Where a provider publishes no price we say &quot;not public&quot;.</span>
       </div>
 
       <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -88,7 +90,7 @@ export default function CostOraclePage() {
             <table style={{ width: "100%", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", fontSize: 12, textTransform: "uppercase" }}>
-                  {["Provider", "Cost/Circuit", "Total", "Queue (min)", "Free Tier"].map(h => (
+                  {["Provider", "Cost/Circuit", "Total", "Free Tier", "Price source"].map(h => (
                     <th key={h} style={{ textAlign: "left", padding: "12px 16px" }}>{h}</th>
                   ))}
                 </tr>
@@ -97,15 +99,29 @@ export default function CostOraclePage() {
                 {(result.providers ?? []).map((p, i) => (
                   <tr key={p.provider_id} style={{ borderBottom: "1px solid var(--line)", background: i === 0 ? "rgba(16,185,129,0.1)" : undefined }}>
                     <td style={{ padding: "8px 16px", fontWeight: 500 }}>{p.provider_name}</td>
-                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace" }}>${p.cost_per_circuit_usd.toFixed(5)}</td>
-                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", fontWeight: 600 }}>${p.cost_total_usd.toFixed(4)}</td>
-                    <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{p.estimated_queue_min ?? "–"}</td>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace" }}>{money(p.cost_per_circuit_usd, p.currency, 5)}</td>
+                    <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", fontWeight: 600 }}>{money(p.cost_total_usd, p.currency, 4)}</td>
                     <td style={{ padding: "8px 16px" }}>{p.free_tier ? <span style={{ color: "var(--ok)" }}>Yes</span> : <span style={{ color: "var(--muted)" }}>No</span>}</td>
+                    <td style={{ padding: "8px 16px", fontSize: 12 }}>
+                      <a href={p.pricing_source} target="_blank" rel="noopener noreferrer" style={{ color: "#6366f1" }}>source</a>
+                      <span style={{ color: p.pricing_stale ? "#f59e0b" : "var(--muted)", marginLeft: 6 }} title={p.stale_warning ?? undefined}>
+                        checked {p.pricing_verified}{p.pricing_stale ? " (stale)" : ""}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {(result.stale_warnings ?? []).length > 0 && (
+            <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ color: "#f59e0b", fontWeight: 600, fontSize: 13 }}>Some prices may be out of date</div>
+              {(result.stale_warnings ?? []).map((w, i) => (
+                <div key={i} style={{ color: "#f59e0b", fontSize: 12 }}>{w}</div>
+              ))}
+            </div>
+          )}
 
           {(result.recommendations ?? []).length > 0 && (
             <div style={{ background: "rgba(245,158,11,0.1)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>

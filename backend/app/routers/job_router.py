@@ -4,50 +4,53 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from .. import pricing
+
 router = APIRouter(prefix="/api/v1/jobs", tags=["job-router"])
 
-# Backend catalogue — static calibration baselines + cost model
+# Backend catalogue — static calibration baselines. Prices come from the shared
+# table (app/provider_prices.json) through each entry's price_key.
 BACKENDS: dict[str, dict] = {
     "ibm_brisbane": {
         "provider": "ibm", "n_qubits": 127,
         "t1_us": 280, "t2_us": 150, "gate_error": 0.001, "readout_error": 0.015,
-        "cost_per_shot": 1.6e-6, "queue_speed": "fast",
+        "price_key": "ibm_payg", "queue_speed": "fast",
         "native_gates": ["cx", "id", "rz", "sx", "x"],
     },
     "ibm_kyoto": {
         "provider": "ibm", "n_qubits": 127,
         "t1_us": 260, "t2_us": 140, "gate_error": 0.0012, "readout_error": 0.018,
-        "cost_per_shot": 1.6e-6, "queue_speed": "fast",
+        "price_key": "ibm_payg", "queue_speed": "fast",
         "native_gates": ["cx", "id", "rz", "sx", "x"],
     },
     "ibm_sherbrooke": {
         "provider": "ibm", "n_qubits": 127,
         "t1_us": 300, "t2_us": 160, "gate_error": 0.0009, "readout_error": 0.012,
-        "cost_per_shot": 1.6e-6, "queue_speed": "medium",
+        "price_key": "ibm_payg", "queue_speed": "medium",
         "native_gates": ["cx", "id", "rz", "sx", "x"],
     },
     "ionq_aria_1": {
         "provider": "ionq", "n_qubits": 25,
         "t1_us": 10000, "t2_us": 5000, "gate_error": 0.0003, "readout_error": 0.005,
-        "cost_per_shot": 0.00097, "queue_speed": "slow",
+        "price_key": "azure_ionq_aria", "queue_speed": "slow",
         "native_gates": ["rx", "ry", "rz", "cnot"],
     },
     "ionq_forte_1": {
         "provider": "ionq", "n_qubits": 36,
         "t1_us": 12000, "t2_us": 6000, "gate_error": 0.0002, "readout_error": 0.004,
-        "cost_per_shot": 0.0015, "queue_speed": "slow",
+        "price_key": "braket_ionq_forte", "queue_speed": "slow",
         "native_gates": ["rx", "ry", "rz", "cnot"],
     },
     "rigetti_ankaa_2": {
         "provider": "rigetti", "n_qubits": 84,
         "t1_us": 180, "t2_us": 90, "gate_error": 0.002, "readout_error": 0.02,
-        "cost_per_shot": 0.00075, "queue_speed": "medium",
+        "price_key": "braket_rigetti_cepheus", "queue_speed": "medium",
         "native_gates": ["cz", "cnot", "h", "rx", "ry", "rz"],
     },
     "simulator": {
         "provider": "simulator", "n_qubits": 32,
         "t1_us": 99999, "t2_us": 99999, "gate_error": 0.0, "readout_error": 0.0,
-        "cost_per_shot": 0.0, "queue_speed": "fast",
+        "price_key": "local_simulator", "queue_speed": "fast",
         "native_gates": ["h", "x", "y", "z", "cx", "rz", "rx", "ry", "measure"],
     },
 }
@@ -69,6 +72,9 @@ class BackendRecommendation(BaseModel):
     estimated_fidelity: float
     estimated_cost_usd: float
     queue_speed: str
+    pricing_source: str = ""
+    pricing_verified: str = ""
+    stale_warning: Optional[str] = None
     n_qubits: int
     reasoning: list[str]
 
@@ -110,6 +116,8 @@ def _score_backend(
     depth: int,
     shots: int,
     preference: str,
+    two_q_gates: int = 0,
+    one_q_gates: int = 0,
 ) -> tuple[float, float, float, list[str]]:
     """Return (score, fidelity, cost_usd, reasoning_list)."""
     reasoning: list[str] = []
@@ -123,12 +131,18 @@ def _score_backend(
     readout_fidelity = (1 - cfg["readout_error"]) ** n_qubits
     fidelity = round(gate_fidelity * readout_fidelity, 4)
 
-    cost_usd = round(cfg["cost_per_shot"] * shots * depth, 6)
+    cost = pricing.estimate_amount(
+        cfg["price_key"], shots, depth=depth, qubits=n_qubits,
+        one_q_gates=one_q_gates, two_q_gates=two_q_gates,
+    )
+    if cost is None:
+        return -1.0, 0.0, 0.0, ["No public price"]
+    cost_usd = round(cost, 6)
     queue = QUEUE_SCORE[cfg["queue_speed"]]
 
     # Normalised component scores (0–1)
     fidelity_score = fidelity
-    cost_score = 1.0 - min(cost_usd / 0.01, 1.0)  # cap at $0.01
+    cost_score = 1.0 - min(cost_usd / 100.0, 1.0)  # $100 or more scores 0
     speed_score = queue
 
     if fidelity > 0.95:
@@ -140,8 +154,6 @@ def _score_backend(
 
     if cost_usd == 0:
         reasoning.append("Free (simulator)")
-    elif cost_usd < 0.001:
-        reasoning.append(f"Very low cost (${cost_usd:.6f})")
     else:
         reasoning.append(f"Estimated cost ${cost_usd:.4f}")
 
@@ -166,11 +178,16 @@ def _score_backend(
 def route_job(req: RouteRequest) -> RouteResult:
     """Analyse a circuit and return a ranked list of backends."""
     n_qubits, depth, gate_count = _parse_circuit(req.qasm)
+    two_q = sum(
+        1 for ln in req.qasm.splitlines()
+        if ln.strip().split("(")[0].split(" ")[0].lower() in pricing.TWO_Q_GATES
+    )
+    one_q = max(0, gate_count - two_q)
 
     scored: list[tuple[str, float, float, float, list[str]]] = []
     for name, cfg in BACKENDS.items():
         score, fidelity, cost, reasoning = _score_backend(
-            name, cfg, n_qubits, depth, req.shots, req.preference
+            name, cfg, n_qubits, depth, req.shots, req.preference, two_q, one_q,
         )
         if score >= 0:
             scored.append((name, score, fidelity, cost, reasoning))
@@ -188,6 +205,9 @@ def route_job(req: RouteRequest) -> RouteResult:
             queue_speed=BACKENDS[name]["queue_speed"],
             n_qubits=BACKENDS[name]["n_qubits"],
             reasoning=reasoning,
+            pricing_source=pricing.PRICES[BACKENDS[name]["price_key"]]["source"],
+            pricing_verified=pricing.PRICES[BACKENDS[name]["price_key"]]["verified_on"],
+            stale_warning=pricing.provenance(BACKENDS[name]["price_key"])["stale_warning"],
         )
         for i, (name, score, fidelity, cost, reasoning) in enumerate(scored)
     ]

@@ -1,10 +1,7 @@
 """QPU Cost Tracker — per-run cost estimation, project summaries, and budget checking.
 
-Cost models (approximate, 2025):
-  IBM Quantum:  $1.60 / second QPU time
-  IonQ:         $0.01 / circuit credit  (credits = n_qubits * depth * shots / 1000)
-  Rigetti:      $0.0035 / task
-  Simulator:    free
+Prices come from the shared table (app/provider_prices.json, see app/pricing.py);
+each estimate names its source URL and the day the price was checked.
 
 Router prefix: /api/v1/costs
 """
@@ -21,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import pricing
 from ..models import Run
 from ..store import store_put, store_get, store_list
 
@@ -31,27 +29,9 @@ router = APIRouter(prefix="/api/v1/cost-tracker", tags=["cost_tracker"])
 # Pricing defaults
 # ─────────────────────────────────────────────────────────────────────────────
 
-DEFAULT_PRICING: dict[str, dict] = {
-    "ibm": {
-        "unit": "seconds",
-        "rate_usd_per_unit": 1.60,
-        "free_tier_units": 10,
-    },
-    "ionq": {
-        "unit": "circuit_credits",
-        "rate_usd_per_unit": 0.01,
-        "credit_formula": "n_qubits * circuit_depth * n_shots / 1000",
-    },
-    "rigetti": {
-        "unit": "task",
-        "rate_usd_per_unit": 0.0035,
-        "min_shots": 100,
-    },
-    "simulator": {
-        "unit": "shot",
-        "rate_usd_per_unit": 0.0,
-    },
-}
+def _default_pricing() -> dict[str, dict]:
+    """The shared price table, keyed by entry id, with provenance."""
+    return {e["id"]: e for e in pricing.table()}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -76,46 +56,43 @@ def _estimate_cost(run_data: dict) -> dict:
     n_qubits = run_data.get("n_qubits") or run_data.get("num_qubits") or 5
 
     timing = run_data.get("timing") or {}
-    qpu_time_s = timing.get("execution_time_s") or timing.get("qpu_time") or 0.1
 
     # Fingerprint may carry depth
     fp = run_data.get("fingerprint") or {}
     circuit_depth = fp.get("depth") or 10
 
-    if "ibm" in backend and "fake" not in backend:
-        cost_usd = qpu_time_s * 1.60
-        unit = "seconds"
-        quantity = qpu_time_s
-        provider = "ibm"
-    elif "ionq" in backend:
-        n_2q = max(n_qubits - 1, 1)
-        credits = n_2q * circuit_depth * n_shots / 1000
-        cost_usd = credits * 0.01
-        unit = "credits"
-        quantity = credits
-        provider = "ionq"
-    elif "rigetti" in backend or "ankaa" in backend:
-        tasks = max(n_shots / 100, 1)
-        cost_usd = 0.0035 * tasks
-        unit = "tasks"
-        quantity = tasks
-        provider = "rigetti"
-    elif "simulator" in backend or "aer" in backend or "fake" in backend or "statevector" in backend:
-        cost_usd = 0.0
-        unit = "free"
-        quantity = 0.0
-        provider = "simulator"
+    key = pricing.resolve(backend)
+    if key is None:
+        return {
+            "cost_usd": 0.0, "unit": "unpriced", "quantity": 0.0,
+            "provider": backend.split("_")[0] if "_" in backend else (backend or "unknown"),
+            "priced": False, "price_display": "no price on file",
+            "pricing_key": None, "pricing_source": None, "pricing_verified": None,
+            "pricing_stale": False, "stale_warning": None,
+        }
+    entry = pricing.PRICES[key]
+    model = entry["model"]
+    measured_time = timing.get("execution_time_s") or timing.get("qpu_time")
+    amount = pricing.estimate_amount(
+        key, int(n_shots), depth=int(circuit_depth), qubits=int(n_qubits),
+        qpu_seconds=float(measured_time) if measured_time and model in ("time_based", "per_minute") else None,
+    )
+    prov = pricing.provenance(key)
+    unit = {"time_based": "seconds", "per_minute": "seconds", "task_shot": "shots",
+            "gate_shot": "gate_shots", "free": "free", "not_public": "not_public"}[model]
+    if unit == "seconds":
+        quantity = float(measured_time) if measured_time else pricing.estimate_qpu_seconds(int(n_shots), int(circuit_depth), int(n_qubits))
     else:
-        cost_usd = 0.001 * n_shots  # fallback estimate
-        unit = "estimated"
-        quantity = float(n_shots)
-        provider = backend.split("_")[0] if "_" in backend else backend
-
+        quantity = float(n_shots) if unit != "free" else 0.0
     return {
-        "cost_usd": round(cost_usd, 6),
+        "cost_usd": round(amount or 0.0, 6),
         "unit": unit,
         "quantity": round(quantity, 4),
-        "provider": provider,
+        "provider": entry["provider"],
+        "priced": amount is not None,
+        "price_display": pricing.NOT_PUBLIC if amount is None else None,
+        "currency": entry.get("currency", "USD"),
+        **prov,
     }
 
 
@@ -208,6 +185,7 @@ def cost_summary(db: Session = Depends(get_db)):
     monthly_trend: dict[str, float] = defaultdict(float)
     run_details = []
     free_count = 0
+    prices_used: set[str] = set()
 
     for run in runs:
         data = _run_to_dict(run)
@@ -218,8 +196,10 @@ def cost_summary(db: Session = Depends(get_db)):
         if run.created_at:
             month_key = run.created_at.strftime("%Y-%m")
             monthly_trend[month_key] += run_cost
-        if run_cost == 0.0:
+        if cost["unit"] == "free":
             free_count += 1
+        if cost.get("pricing_key"):
+            prices_used.add(cost["pricing_key"])
         run_details.append({
             "run_id": run.run_id,
             "circuit_name": run.circuit_name,
@@ -240,6 +220,7 @@ def cost_summary(db: Session = Depends(get_db)):
         "monthly_trend": {k: round(v, 6) for k, v in sorted(monthly_trend.items())},
         "top_10_most_expensive": run_details[:10],
         "free_vs_paid_pct": {"free": round(free_pct, 1), "paid": round(100 - free_pct, 1)},
+        "prices_used": [{"id": k, **pricing.provenance(k)} for k in sorted(prices_used)],
     }
 
 
@@ -299,7 +280,7 @@ def update_pricing(payload: PricingUpdate, db: Session = Depends(get_db)):
 def list_pricing(db: Session = Depends(get_db)):
     """Return all custom pricing overrides + default pricing."""
     custom = {r["provider"]: r for r in store_list(db, "cost_pricing")}
-    merged = {**DEFAULT_PRICING}
+    merged = _default_pricing()
     for provider, override in custom.items():
         merged[provider] = override
     return {"pricing": merged, "custom_overrides": list(custom.keys())}

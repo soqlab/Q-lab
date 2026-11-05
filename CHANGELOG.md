@@ -13,6 +13,14 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   circuit is stored as QPY before and after transpilation.
 - `qlab ci check`: compares a run with a baseline by TVD against a shot-noise bound and writes
   JUnit XML for CI.
+### Removed
+- The old `sdk/` folder: a stale duplicate of the `qlab-sdk` package (0.1.0) that pointed at a
+  retired server. The SDK is `qlab_sdk/`.
+
+### Added
+- CI runs ruff on `backend/` and `qlab_sdk/` (`ruff.toml`: syntax errors and undefined names).
+- Tests for the core tracking API: runs, projects, compare, search, API keys, and checks that
+  one user cannot read, change or delete another's runs.
 
 ### Security
 - The job API (`/api/v1/jobs`) had no sign-in check: anyone could list, read and cancel every user's
@@ -20,6 +28,14 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   organisation's. Older jobs, which recorded no owner, are no longer listed.
 
 ### Fixed
+- Quantum hardware prices were out of date, some wrong by orders of magnitude, and had no source.
+  IonQ on Amazon Braket, for example, was priced at $0.00097 a shot. AWS charges $0.08 a shot plus
+  $0.30 a task. Rigetti was priced at $0.00035 a shot; AWS charges $0.000425. All prices now come
+  from one table, `backend/app/provider_prices.json`, and every router reads it: the cost
+  estimate, Cost Oracle, cost tracker, cost arbitrage, job router, scheduler, providers, institute
+  budget and lab assistant. Each entry names its source page and the day it was checked. Each
+  estimate returns both, plus a warning once the price is more than 30 days old. If a provider
+  (Quantinuum, IonQ direct) publishes no price, estimates say "not public" instead of a number.
 - Q-Lab no longer invents DOIs. `doi`, `dataset-publish` and `fair-data` could return made-up DOIs
   that looked citable. A DOI now only appears after a repository issues one.
 - Calibration forecasts come from the calibration recorded with your own runs. They used to be

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import pricing
 from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/providers", tags=["providers"])
@@ -49,27 +50,29 @@ except ImportError:
 # Provider specs (for metadata and custom noise models)
 # ---------------------------------------------------------------------------
 
+# price_key points into the shared price table (app/provider_prices.json);
+# None means the provider sells no public access.
 PROVIDERS: dict = {
     "ibm_quantum": {
         "name": "IBM Quantum", "max_qubits": 156,
         "backends": ["ibm_brisbane", "ibm_kyoto", "ibm_osaka", "ibm_sherbrooke"],
-        "cost_per_shot": 0.0, "free_tier": True, "avg_queue_min": 5,
+        "price_key": "ibm_open", "free_tier": True, "avg_queue_min": 5,
         "native_gates": ["ecr", "id", "rz", "sx", "x"], "connectivity": "heavy_hex",
         "two_q_fidelity": 0.9985, "t1_us": 300.0, "t2_us": 200.0,
         "gate_1q_err": 0.0003, "gate_2q_err": 0.0015, "readout_err": 0.01,
     },
     "aws_braket_ionq": {
-        "name": "AWS Braket (IonQ Aria)", "max_qubits": 25,
+        "name": "IonQ Aria", "max_qubits": 25,
         "backends": ["ionq_aria_1", "ionq_aria_2"],
-        "cost_per_shot": 0.00097, "free_tier": False, "avg_queue_min": 2,
+        "price_key": "azure_ionq_aria", "free_tier": False, "avg_queue_min": 2,
         "native_gates": ["ms", "gpi", "gpi2"], "connectivity": "all_to_all",
         "two_q_fidelity": 0.9972, "t1_us": 10000.0, "t2_us": 1000.0,
         "gate_1q_err": 0.0002, "gate_2q_err": 0.003, "readout_err": 0.005,
     },
     "aws_braket_rigetti": {
-        "name": "AWS Braket (Rigetti Ankaa-2)", "max_qubits": 84,
+        "name": "Rigetti Ankaa-2 (priced as Braket Cepheus)", "max_qubits": 84,
         "backends": ["rigetti_ankaa_2"],
-        "cost_per_shot": 0.00035, "free_tier": False, "avg_queue_min": 3,
+        "price_key": "braket_rigetti_cepheus", "free_tier": False, "avg_queue_min": 3,
         "native_gates": ["rx", "ry", "rz", "cz", "cphase"], "connectivity": "lattice_84",
         "two_q_fidelity": 0.9960, "t1_us": 28.0, "t2_us": 22.0,
         "gate_1q_err": 0.002, "gate_2q_err": 0.010, "readout_err": 0.03,
@@ -77,7 +80,7 @@ PROVIDERS: dict = {
     "quantinuum": {
         "name": "Quantinuum H2-1", "max_qubits": 32,
         "backends": ["h2_1", "h2_1e"],
-        "cost_per_shot": 0.0, "free_tier": False, "avg_queue_min": 60,
+        "price_key": "azure_quantinuum_h2", "free_tier": False, "avg_queue_min": 60,
         "native_gates": ["rzz", "rz", "ry", "rx", "h"], "connectivity": "all_to_all",
         "two_q_fidelity": 0.9998, "t1_us": 3600.0, "t2_us": 1200.0,
         "gate_1q_err": 0.00003, "gate_2q_err": 0.0002, "readout_err": 0.001,
@@ -85,7 +88,7 @@ PROVIDERS: dict = {
     "google_quantum_ai": {
         "name": "Google Sycamore", "max_qubits": 70,
         "backends": ["sycamore_70", "sycamore_53"],
-        "cost_per_shot": 0.0, "free_tier": False, "avg_queue_min": 1440,
+        "price_key": None, "free_tier": False, "avg_queue_min": 1440,
         "native_gates": ["cz", "phased_x", "t"], "connectivity": "sycamore_grid",
         "two_q_fidelity": 0.9940, "t1_us": 22.0, "t2_us": 18.0,
         "gate_1q_err": 0.001, "gate_2q_err": 0.006, "readout_err": 0.02,
@@ -93,7 +96,7 @@ PROVIDERS: dict = {
     "iqm": {
         "name": "IQM Resonance", "max_qubits": 20,
         "backends": ["iqm_spark", "iqm_garnet"],
-        "cost_per_shot": 0.00050, "free_tier": False, "avg_queue_min": 1,
+        "price_key": "iqm_resonance", "free_tier": False, "avg_queue_min": 1,
         "native_gates": ["prx", "cz"], "connectivity": "star_20",
         "two_q_fidelity": 0.9970, "t1_us": 50.0, "t2_us": 40.0,
         "gate_1q_err": 0.001, "gate_2q_err": 0.005, "readout_err": 0.015,
@@ -101,6 +104,13 @@ PROVIDERS: dict = {
 }
 
 import random as _random
+
+
+def _provider_cost(spec: dict, shots: int) -> float | None:
+    """One task's price from the shared table; None when the provider publishes none."""
+    if not spec.get("price_key"):
+        return None
+    return pricing.estimate_amount(spec["price_key"], shots)
 
 
 def _build_noise_model_for_provider(provider_id: str, n_qubits: int) -> "NoiseModel":
@@ -193,7 +203,7 @@ class ProviderJobResult(BaseModel):
     status: str
     submitted_at: str
     n_shots: int
-    cost_usd: float
+    cost_usd: float | None  # None: no public price
     counts: dict
     fidelity_estimate: float
     transpiled_depth: int
@@ -253,7 +263,7 @@ def submit_to_providers(req: ProviderSubmitRequest, db: Session = Depends(get_db
         if pid not in PROVIDERS:
             continue
         spec = PROVIDERS[pid]
-        cost = round(spec["cost_per_shot"] * req.n_shots, 6)
+        cost = _provider_cost(spec, req.n_shots)
 
         if _QISKIT:
             try:
@@ -294,7 +304,7 @@ def submit_to_providers(req: ProviderSubmitRequest, db: Session = Depends(get_db
         raise ValueError("No valid provider IDs submitted.")
 
     best_fid = max(jobs, key=lambda j: j.fidelity_estimate).provider_id
-    lowest_cost = min(jobs, key=lambda j: j.cost_usd).provider_id
+    lowest_cost = min(jobs, key=lambda j: (j.cost_usd is None, j.cost_usd or 0.0)).provider_id
     fastest = min(jobs, key=lambda j: PROVIDERS.get(j.provider_id, {}).get("avg_queue_min", 999)).provider_id
     consensus, agreement = _consensus(jobs)
     batch_id = str(uuid.uuid4())
@@ -313,7 +323,8 @@ def submit_to_providers(req: ProviderSubmitRequest, db: Session = Depends(get_db
 @router.get("")
 def list_providers():
     return {"providers": [
-        {"id": k, **{x: v[x] for x in ["name", "max_qubits", "backends", "cost_per_shot", "free_tier", "avg_queue_min", "two_q_fidelity", "native_gates"]}}
+        {"id": k, **{x: v[x] for x in ["name", "max_qubits", "backends", "price_key", "free_tier", "avg_queue_min", "two_q_fidelity", "native_gates"]},
+         **(pricing.provenance(v["price_key"]) if v["price_key"] else {"price_display": pricing.NOT_PUBLIC})}
         for k, v in PROVIDERS.items()
     ]}
 

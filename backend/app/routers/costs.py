@@ -1,10 +1,7 @@
-"""Compute budget and cost tracking using real provider pricing.
+"""Compute budget and cost tracking.
 
-Pricing sources (verified August 2024):
-  IBM Quantum  — https://quantum.ibm.com/pricing
-  IonQ         — https://ionq.com/pricing
-  Rigetti/OQC  — https://aws.amazon.com/braket/pricing/
-  Quantinuum   — https://azure.microsoft.com/pricing/details/azure-quantum/
+Prices come from ``app/provider_prices.json`` (see ``app/pricing.py``): one
+table with a source URL and a verified date on every entry.
 """
 
 from __future__ import annotations
@@ -23,147 +20,39 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity, log_audit, require_auth
 from ..models import BudgetAlert, JobSubmission, Run
+from .. import pricing
 
 router = APIRouter(prefix="/api/v1/costs", tags=["costs"])
 
 _ID_CHARS = string.ascii_lowercase + string.digits
 
-# Gates that count as two-qubit for pricing purposes
-_TWO_Q = frozenset({
-    "cx", "cz", "ecr", "swap", "rzz", "rxx", "ryy", "cp",
-    "cnot", "ccx", "cswap", "iswap", "dcx", "ch", "crz", "cu",
-})
-
-# ── Real provider pricing (verified August 2024) ──────────────────────────────
-#
-# IBM:        $1.60/second of QPU time  (Standard / Pay-as-you-go plan)
-# IonQ:       $0.30 base + $0.00035/1Q-gate-shot + $0.00097/2Q-gate-shot
-# Rigetti:    $0.0135/task + $0.00035/shot  (via AWS Braket)
-# Quantinuum: $0.10/HQC, ~5 HQC/shot on H1-1  (via Azure Quantum)
-# OQC:        $0.35/task + $0.00035/shot  (via AWS Braket)
-# Simulators: free (Aer/local) or $0.075/task + $0.00075/shot (AWS SV1)
-#
-PROVIDER_PRICING: dict[str, dict] = {
-    "ibm": {
-        "model": "time_based",
-        "usd_per_second": 1.60,
-        "source": "https://quantum.ibm.com/pricing",
-        "note": "Pay-as-you-go. Open plan: 10 min QPU/month free.",
-        "verified": "2024-08",
-    },
-    "ionq": {
-        "model": "gate_shot",
-        "task_usd": 0.30,
-        "one_q_usd": 0.00035,
-        "two_q_usd": 0.00097,
-        "source": "https://ionq.com/pricing",
-        "verified": "2024-08",
-    },
-    "rigetti": {
-        "model": "task_shot",
-        "task_usd": 0.0135,
-        "shot_usd": 0.00035,
-        "source": "https://aws.amazon.com/braket/pricing/",
-        "verified": "2024-08",
-    },
-    "quantinuum": {
-        "model": "hqc",
-        "hqc_per_shot": 5.0,
-        "usd_per_hqc": 0.10,
-        "source": "https://azure.microsoft.com/pricing/details/azure-quantum/",
-        "note": "H1-1 (20-qubit system). H2-1 pricing differs.",
-        "verified": "2024-08",
-    },
-    "oqc": {
-        "model": "task_shot",
-        "task_usd": 0.35,
-        "shot_usd": 0.00035,
-        "source": "https://aws.amazon.com/braket/pricing/",
-        "verified": "2024-08",
-    },
-    "simulator": {
-        "model": "free",
-        "source": "Aer / local simulator — no QPU cost",
-        "verified": "2024-08",
-    },
-    "aer": {
-        "model": "free",
-        "source": "Aer / local simulator — no QPU cost",
-        "verified": "2024-08",
-    },
-    "braket_sv1": {
-        "model": "task_shot",
-        "task_usd": 0.075,
-        "shot_usd": 0.00075,
-        "source": "https://aws.amazon.com/braket/pricing/",
-        "note": "AWS SV1 managed simulator.",
-        "verified": "2024-08",
-    },
-}
+_TWO_Q = pricing.TWO_Q_GATES
 
 # Q-Lab internal credit unit: 1 credit = $0.10 USD (configurable)
 _CREDITS_PER_USD: float = float(os.getenv("QLAB_CREDITS_PER_USD", "10"))
 
 
-def _resolve_provider(value: str | None) -> str:
-    """Map a backend name or provider string to a PROVIDER_PRICING key."""
-    name = (value or "simulator").lower()
-    if "ionq" in name:
-        return "ionq"
-    if "quantinuum" in name or "h1" in name or "h2" in name:
-        return "quantinuum"
-    if "oqc" in name or "oxford" in name:
-        return "oqc"
-    if "rigetti" in name or "aspen" in name:
-        return "rigetti"
-    if "ibm" in name:
-        return "ibm"
-    if "sim" in name or "aer" in name or "sv1" in name or "dm1" in name:
-        return "simulator"
-    if "braket" in name:
-        return "braket_sv1"
-    return "ibm"  # default to IBM as the most common real QPU
+def _resolve_provider(value: str | None) -> str | None:
+    """Map a backend name or provider string to a price entry key (None: no price on file)."""
+    return pricing.resolve(value or "simulator")
 
 
 def _usd_for_circuit(
-    provider_key: str,
+    provider_key: str | None,
     shots: int,
     depth: int,
     qubits: int,
     gate_counts: dict,
-) -> float:
-    """Compute estimated USD cost using the provider's real billing model."""
-    p = PROVIDER_PRICING.get(provider_key, PROVIDER_PRICING["ibm"])
-    model = p["model"]
-
-    if model == "free":
-        return 0.0
-
-    if model == "time_based":
-        # IBM charges per second of QPU time.
-        # Empirical estimate: base overhead (~0.5s) + shots × circuit_time
-        # circuit_time ≈ depth × 0.5μs/layer (superconducting gate ~50-500ns each)
-        circuit_time_s = depth * 0.0000005  # 0.5 μs per layer
-        qpu_s = max(0.5, shots * circuit_time_s + 0.1 * qubits)
-        return round(qpu_s * p["usd_per_second"], 4)
-
-    if model == "gate_shot":
-        # IonQ: per gate per shot, minimum $0.30/circuit
-        one_q = sum(v for k, v in gate_counts.items() if str(k).lower() not in _TWO_Q)
-        two_q = sum(v for k, v in gate_counts.items() if str(k).lower() in _TWO_Q)
-        gate_cost = (one_q * shots * p["one_q_usd"]) + (two_q * shots * p["two_q_usd"])
-        return round(max(p["task_usd"], gate_cost), 4)
-
-    if model == "task_shot":
-        # Rigetti / OQC / AWS managed simulators: per-task + per-shot
-        return round(p["task_usd"] + shots * p["shot_usd"], 4)
-
-    if model == "hqc":
-        # Quantinuum: HQC-based (Hardware Quantum Credits)
-        hqc = shots * p["hqc_per_shot"]
-        return round(hqc * p["usd_per_hqc"], 4)
-
-    return 0.0
+) -> float | None:
+    """Estimated cost of one task from the price table. None when no price is public."""
+    if provider_key is None:
+        return None
+    one_q = sum(v for k, v in gate_counts.items() if str(k).lower() not in _TWO_Q)
+    two_q = sum(v for k, v in gate_counts.items() if str(k).lower() in _TWO_Q)
+    amount = pricing.estimate_amount(
+        provider_key, shots, one_q_gates=one_q, two_q_gates=two_q, depth=depth, qubits=qubits,
+    )
+    return None if amount is None else round(amount, 4)
 
 
 def _run_usd(run: Run) -> float:
@@ -196,7 +85,8 @@ def _run_usd(run: Run) -> float:
     depth = int(fp.get("depth") or 1)
     qubits = int(fp.get("num_qubits") or 1)
     gate_counts = {str(k): int(v) for k, v in (fp.get("gate_counts") or {}).items()}
-    return _usd_for_circuit(provider, shots, depth, qubits, gate_counts)
+    # No public price: counted as 0 in totals (see "unpriced" in the summary).
+    return _usd_for_circuit(provider, shots, depth, qubits, gate_counts) or 0.0
 
 
 def _run_credits(run: Run) -> float:
@@ -213,7 +103,7 @@ def _job_usd(job: JobSubmission) -> float:
     depth = int(meta.get("depth") or 50)
     qubits = int(meta.get("num_qubits") or 1)
     gate_counts = {str(k): int(v) for k, v in (meta.get("gate_counts") or {}).items()}
-    return _usd_for_circuit(provider, shots, depth, qubits, gate_counts)
+    return _usd_for_circuit(provider, shots, depth, qubits, gate_counts) or 0.0
 
 
 def _job_credits(job: JobSubmission) -> float:
@@ -260,15 +150,15 @@ def _jobs_visible_to(identity):
 
 @router.get("/provider-pricing")
 def get_provider_pricing():
-    """Return the real documented pricing for each supported provider."""
+    """Every price Q-Lab uses, each with its source URL, verified date and stale flag."""
+    entries = pricing.table()
     return {
         "credits_per_usd": _CREDITS_PER_USD,
         "usd_per_credit": round(1.0 / _CREDITS_PER_USD, 4),
-        "note": "Pricing verified from provider documentation. Check source URLs for latest rates.",
-        "providers": {
-            key: {k: v for k, v in p.items() if k != "note" or "note" in p}
-            for key, p in PROVIDER_PRICING.items()
-        },
+        "stale_after_days": pricing.STALE_AFTER_DAYS,
+        "note": "Copied from each provider's public pricing page. Check the source URL for current rates.",
+        "providers": {e["id"]: e for e in entries},
+        "stale_entries": [e["id"] for e in entries if e["pricing_stale"]],
     }
 
 
@@ -296,7 +186,7 @@ def cost_summary(
     for run in runs:
         usd = _run_usd(run)
         total_usd += usd
-        provider = _resolve_provider(run.backend)
+        provider = _resolve_provider(run.backend) or "unpriced"
         by_provider.setdefault(provider, {"provider": provider, "total_usd": 0.0, "job_count": 0})
         by_provider[provider]["total_usd"] += usd
         by_provider[provider]["job_count"] += 1
@@ -308,7 +198,7 @@ def cost_summary(
     for job in jobs:
         usd = _job_usd(job)
         total_usd += usd
-        provider = _resolve_provider(job.provider)
+        provider = _resolve_provider(job.provider) or "unpriced"
         by_provider.setdefault(provider, {"provider": provider, "total_usd": 0.0, "job_count": 0})
         by_provider[provider]["total_usd"] += usd
         by_provider[provider]["job_count"] += 1
@@ -334,7 +224,8 @@ def cost_summary(
         "total_usd": round(total_usd, 4),
         "total_credits": total_credits,
         "credits_per_usd": _CREDITS_PER_USD,
-        "pricing_model": "real_documented_rates",
+        "pricing_model": "published_rates",
+        "pricing_stale_entries": [e["id"] for e in pricing.table() if e["pricing_stale"]],
         "by_provider": sorted(by_provider.values(), key=lambda x: -x["total_usd"]),
         "by_project": sorted(by_project.values(), key=lambda x: -x["total_usd"]),
         "monthly_budget_credits": monthly.threshold_credits if monthly else None,
@@ -393,8 +284,12 @@ def estimate_cost(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
-    """Estimate circuit cost using each provider's real documented pricing formula."""
+    """Estimate a circuit's cost from the provider's published price, with source and date."""
     p = _resolve_provider(provider or backend)
+    if p is None:
+        p = _resolve_provider(backend)
+    if p is None:
+        raise HTTPException(404, f"No published price on file for provider '{provider}' / backend '{backend}'")
     gate_counts = {}
     if one_q_gates > 0:
         gate_counts["sx"] = one_q_gates
@@ -402,8 +297,9 @@ def estimate_cost(
         gate_counts["cx"] = two_q_gates
 
     usd = _usd_for_circuit(p, shots, depth, qubits, gate_counts)
-    credits = round(usd * _CREDITS_PER_USD, 4)
-    pricing = PROVIDER_PRICING.get(p, PROVIDER_PRICING["ibm"])
+    credits = round(usd * _CREDITS_PER_USD, 4) if usd is not None else None
+    entry = pricing.PRICES[p]
+    prov = pricing.provenance(p)
 
     if identity and identity.user_id:
         log_audit(db, "cost_oracle.queried", "cost", p, identity=identity, request=request,
@@ -417,11 +313,12 @@ def estimate_cost(
         "qubits": qubits,
         "estimated_usd": usd,
         "estimated_credits": credits,
-        "billing_model": pricing["model"],
-        "pricing_source": pricing["source"],
-        "pricing_verified": pricing.get("verified", "unknown"),
-        "note": pricing.get("note"),
-        "disclaimer": "Pre-run estimate using documented provider rates. Actual billed amount may vary.",
+        "price_display": pricing.NOT_PUBLIC if usd is None else None,
+        "currency": entry.get("currency", "USD"),
+        "billing_model": entry["model"],
+        **prov,
+        "note": entry.get("note"),
+        "disclaimer": "Pre-run estimate from the provider's published rates. Actual billed amount may vary.",
     }
 
 

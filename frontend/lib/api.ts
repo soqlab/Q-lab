@@ -3623,10 +3623,45 @@ export type CostSummary = {
 export type CostTimelineEntry = { date: string; credits: number; jobs: number };
 export type CostTimeline = { period: string; resolution: string; entries: CostTimelineEntry[]; total_credits: number; total_jobs: number };
 
-export type CostEstimate = {
-  provider: string; backend: string; shots: number; depth: number;
-  estimated_credits: number; estimated_usd: number; breakdown: Record<string, unknown>;
+/** Where a price came from and whether it is overdue for a re-check. */
+export type PriceProvenance = {
+  pricing_key: string; pricing_name: string;
+  pricing_source: string; pricing_verified: string;
+  pricing_age_days: number; pricing_stale: boolean; stale_warning: string | null;
 };
+
+export type CostEstimate = PriceProvenance & {
+  provider: string; backend: string; shots: number; depth: number;
+  estimated_credits: number | null; estimated_usd: number | null;
+  price_display: string | null; currency: string; billing_model: string; note: string | null;
+};
+
+export type PriceEntry = PriceProvenance & {
+  id: string; name: string; provider: string; platform: string;
+  model: "task_shot" | "gate_shot" | "time_based" | "per_minute" | "free" | "not_public";
+  currency: string; free_tier: boolean; note?: string; source: string; verified_on: string;
+  per_task_usd?: number; per_shot_usd?: number; per_second?: number; per_minute?: number;
+  usd_per_1q_gate_shot?: number; usd_per_2q_gate_shot?: number; min_usd_per_task?: number;
+};
+
+export type ProviderPricing = {
+  credits_per_usd: number; stale_after_days: number; note: string;
+  providers: Record<string, PriceEntry>; stale_entries: string[];
+};
+
+/** The price table every cost estimate uses (public: no sign-in needed). */
+export async function getProviderPricing(): Promise<ProviderPricing> {
+  const res = await fetch(apiUrl("/api/v1/costs/provider-pricing"), { cache: "no-store" });
+  if (!res.ok) throw new Error("Provider pricing failed");
+  return res.json();
+}
+
+/** Cost of one task for per-task + per-shot or free entries; null when it needs more than a shot count. */
+export function priceForShots(e: PriceEntry, shots: number): number | null {
+  if (e.model === "free") return 0;
+  if (e.model === "task_shot" && e.per_task_usd != null && e.per_shot_usd != null) return e.per_task_usd + shots * e.per_shot_usd;
+  return null;
+}
 
 export type BudgetAlert = {
   alert_id: string; name: string; budget_type: string;
@@ -6788,9 +6823,9 @@ export async function listMethodsTemplates(): Promise<{ templates: object[] }> {
 // ─────────────────────────────────────────────────────────
 // Cost Oracle
 // ─────────────────────────────────────────────────────────
-export interface ProviderCostEstimate {
-  provider_id: string; provider_name: string; cost_per_circuit_usd: number;
-  cost_total_usd: number; cost_note: string; estimated_queue_min: number;
+export interface ProviderCostEstimate extends PriceProvenance {
+  provider_id: string; provider_name: string; cost_per_circuit_usd: number | null;
+  cost_total_usd: number | null; price_display: string | null; cost_note: string; estimated_queue_min: number | null;
   shots_available: boolean; monthly_budget_warning: boolean;
   free_tier: boolean; currency: string;
 }
@@ -6799,6 +6834,7 @@ export interface CostEstimateResult {
   generated_at: string; providers: ProviderCostEstimate[];
   cheapest_provider: string; cheapest_cost_usd: number;
   total_if_all_providers_usd: number; recommendations: string[];
+  stale_warnings: string[];
 }
 export async function estimateProviderCost(req: { n_qubits?: number; circuit_depth?: number; n_shots?: number; n_circuits?: number; provider_ids?: string[] }): Promise<CostEstimateResult> {
   const res = await fetch(apiUrl("/api/v1/cost-oracle/estimate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth";
 import VideoShowcase from "../components/VideoShowcase";
+import { getProviderPricing, priceForShots, type PriceEntry, type ProviderPricing } from "../lib/api";
 
 // ─── Inline CSS injected once ────────────────────────────────────────────────
 const STYLES = `
@@ -600,22 +601,34 @@ const STYLES = `
 `;
 
 // ─── Cost Oracle widget ──────────────────────────────────────────────────────
-const PROVIDERS = [
-  { id: "ibm_free",   name: "IBM Quantum (Free)",    color: "#6929c4", calc: (_q: number, _d: number, shots: number) => shots <= 10000 ? 0 : null },
-  { id: "ionq",       name: "IonQ via AWS Braket",   color: "#0f62fe", calc: (_q: number, _d: number, shots: number) => 0.30 + shots * 0.00097 },
-  { id: "rigetti",    name: "Rigetti via AWS",        color: "#2b5ce6", calc: (_q: number, _d: number, shots: number) => 0.30 + shots * 0.00035 },
-  { id: "azure_ionq", name: "Azure Quantum (IonQ)",  color: "#0078d4", calc: (_q: number, _d: number, shots: number) => shots * 0.000975 },
-  { id: "simulator",  name: "Aer Simulator (local)", color: "#10b981", calc: () => 0 },
+// Prices come from the backend's shared price table (each with source and date);
+// only per-task + per-shot entries are shown, since they need nothing but a shot count.
+const WIDGET_PRICES: { id: string; color: string }[] = [
+  { id: "braket_ionq_forte",      color: "#0f62fe" },
+  { id: "braket_rigetti_cepheus", color: "#2b5ce6" },
+  { id: "braket_iqm_garnet",      color: "#0078d4" },
+  { id: "local_simulator",        color: "#10b981" },
 ];
 
 function CostOracleWidget() {
   const [qubits, setQubits] = useState(2);
   const [depth, setDepth] = useState(5);
   const [shots, setShots] = useState(1024);
+  const [table, setTable] = useState<ProviderPricing | null>(null);
 
-  const estimates = PROVIDERS.map(p => {
-    const cost = p.calc(qubits, depth, shots);
-    return { ...p, cost };
+  useEffect(() => {
+    getProviderPricing().then(setTable).catch(() => setTable(null));
+  }, []);
+
+  const entries = WIDGET_PRICES
+    .map(w => ({ ...w, entry: table?.providers[w.id] }))
+    .filter((w): w is { id: string; color: string; entry: PriceEntry } => !!w.entry);
+  const verified = entries.map(e => e.entry.pricing_verified).sort()[0];
+  const stale = entries.some(e => e.entry.pricing_stale);
+
+  const estimates = entries.map(p => {
+    const cost = priceForShots(p.entry, shots);
+    return { ...p, name: p.entry.name, cost };
   }).sort((a, b) => {
     if (a.cost === null) return 1;
     if (b.cost === null) return -1;
@@ -666,7 +679,10 @@ function CostOracleWidget() {
         ))}
       </div>
       <div style={{ marginTop: 16, fontSize: 11, color: "#334155" }}>
-        Cost per single circuit run. <a href="/register" style={{ color: "#6366f1" }}>Sign up</a> to compare any circuit with full detail.
+        Cost per single circuit run.{" "}
+        {verified && <>Prices from the providers&apos; published rates, checked {verified}{stale ? " (may be out of date)" : ""}.{" "}</>}
+        {!table && <>Prices unavailable right now.{" "}</>}
+        <a href="/register" style={{ color: "#6366f1" }}>Sign up</a> to compare any circuit with full detail.
       </div>
     </div>
   );

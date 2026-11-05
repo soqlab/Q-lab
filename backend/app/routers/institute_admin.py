@@ -230,8 +230,10 @@ def institute_leaderboard(
 # Budget breakdown
 # ---------------------------------------------------------------------------
 
-# Estimated cost per QPU shot in USD (approximate)
-_COST_PER_SHOT_USD = 0.00001
+def _run_cost_usd(run: Run) -> float:
+    """Per-run cost from the shared price table (same estimate as /api/v1/costs)."""
+    from .costs import _run_usd
+    return _run_usd(run)
 
 
 @router.get("/budget")
@@ -260,7 +262,7 @@ def institute_budget(
     for run in all_runs:
         uid = str(run.created_by_user_id) if run.created_by_user_id else None
         shots = int((run.execution or {}).get("shots", 0))
-        cost = shots * _COST_PER_SHOT_USD
+        cost = _run_cost_usd(run)
         if uid and uid in user_to_dept:
             dname = user_to_dept[uid]
             dept_costs[dname]["shots"] += shots
@@ -300,7 +302,7 @@ def institute_budget(
         "breakdown": breakdown,
         "total_cost_usd": round(total_cost, 6),
         "total_cost_formatted": f"${total_cost:.4f}",
-        "cost_model": f"${_COST_PER_SHOT_USD:.5f} per shot (estimated)",
+        "cost_model": "Per-run estimate from each provider's published price (see /api/v1/costs/provider-pricing)",
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -22,6 +22,17 @@ interface CostSummary {
   monthly_trend: Record<string, number>;
   top_10_most_expensive: RunCost[];
   free_vs_paid_pct: { free: number; paid: number };
+  prices_used?: PriceUsed[];
+}
+
+interface PriceUsed {
+  id: string;
+  pricing_name: string;
+  pricing_source: string;
+  pricing_verified: string;
+  pricing_age_days: number;
+  pricing_stale: boolean;
+  stale_warning: string | null;
 }
 
 interface BudgetCheck {
@@ -309,6 +320,28 @@ export default function CostTrackerPage() {
             <div style={{ marginTop: 10, height: 10, background: "#0f172a", borderRadius: 5, overflow: "hidden", display: "flex" }}>
               <div style={{ height: "100%", width: `${summary.free_vs_paid_pct.free}%`, background: "#10b981" }} />
               <div style={{ height: "100%", flex: 1, background: "#3b82f6" }} />
+            </div>
+          </div>
+
+          {/* Where the prices came from */}
+          <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", padding: "1.25rem", marginTop: "1.5rem" }}>
+            <h2 style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600, margin: "0 0 0.75rem 0" }}>Prices used</h2>
+            {(summary.prices_used ?? []).length === 0 ? (
+              <div style={{ color: "#64748b", fontSize: 13 }}>No priced runs yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+                {(summary.prices_used ?? []).map(p => (
+                  <div key={p.id} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+                    <span style={{ color: "#e2e8f0" }}>{p.pricing_name}</span>
+                    <a href={p.pricing_source} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa" }}>source</a>
+                    <span style={{ color: p.pricing_stale ? "#f59e0b" : "#64748b" }}>checked {p.pricing_verified}</span>
+                    {p.stale_warning && <span style={{ color: "#f59e0b", fontSize: 12 }}>{p.stale_warning}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+              Estimates from each provider&apos;s published rates; providers that publish no price are shown as unpriced, not guessed.
             </div>
           </div>
         </>

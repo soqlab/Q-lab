@@ -6,18 +6,20 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import pricing
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/job-scheduler", tags=["job-scheduler"])
 
 NS_SCHEDULES = "job_schedules"
 
+# Prices: shared table (app/provider_prices.json) via price_key.
 BACKENDS = {
-    "ibm_brisbane": {"cost_per_shot":0.0001,"avg_queue_min":12,"2q_fidelity":0.997,"t1":280,"capacity":100,"timezone_offset":0},
-    "ibm_kyoto": {"cost_per_shot":0.0001,"avg_queue_min":8,"2q_fidelity":0.9965,"t1":260,"capacity":80,"timezone_offset":9},
-    "ionq_aria_1": {"cost_per_shot":0.001,"avg_queue_min":30,"2q_fidelity":0.9995,"t1":10000,"capacity":20,"timezone_offset":-5},
-    "rigetti_ankaa_2": {"cost_per_shot":0.00005,"avg_queue_min":5,"2q_fidelity":0.995,"t1":180,"capacity":50,"timezone_offset":-8},
-    "quantinuum_h2": {"cost_per_shot":0.005,"avg_queue_min":60,"2q_fidelity":0.9998,"t1":3000,"capacity":10,"timezone_offset":0},
+    "ibm_brisbane": {"price_key":"ibm_payg","avg_queue_min":12,"2q_fidelity":0.997,"t1":280,"capacity":100,"timezone_offset":0},
+    "ibm_kyoto": {"price_key":"ibm_payg","avg_queue_min":8,"2q_fidelity":0.9965,"t1":260,"capacity":80,"timezone_offset":9},
+    "ionq_aria_1": {"price_key":"azure_ionq_aria","avg_queue_min":30,"2q_fidelity":0.9995,"t1":10000,"capacity":20,"timezone_offset":-5},
+    "rigetti_ankaa_2": {"price_key":"braket_rigetti_cepheus","avg_queue_min":5,"2q_fidelity":0.995,"t1":180,"capacity":50,"timezone_offset":-8},
+    "quantinuum_h2": {"price_key":"azure_quantinuum_h2","avg_queue_min":60,"2q_fidelity":0.9998,"t1":3000,"capacity":10,"timezone_offset":0},
 }
 
 class CircuitJob(BaseModel):
@@ -51,12 +53,15 @@ def optimize(req: ScheduleRequest, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     used_backends: dict = {b:0 for b in BACKENDS}
     total_cost = 0.0; total_fid = 0.0
+    unpriced: set[str] = set()
     for circuit in req.circuits:
         backend_scores = {}
         for bid, bd in BACKENDS.items():
             if req.preferred_backends and bid not in req.preferred_backends: continue
             if circuit.required_fidelity and bd["2q_fidelity"] < circuit.required_fidelity: continue
-            cost = circuit.n_shots * bd["cost_per_shot"]
+            cost = pricing.estimate_amount(bd["price_key"], circuit.n_shots, depth=circuit.circuit_depth, qubits=circuit.n_qubits)
+            if cost is None:
+                unpriced.add(bid); continue  # provider publishes no price
             if req.budget_usd and cost > req.budget_usd / max(len(req.circuits),1): continue
             fidelity = bd["2q_fidelity"] * (1 - circuit.circuit_depth * 0.0001)
             queue_wait = bd["avg_queue_min"] + used_backends[bid] * 2
@@ -79,6 +84,7 @@ def optimize(req: ScheduleRequest, db: Session = Depends(get_db)):
     utilization = {bid: round(count/max(sum(used_backends.values()),1)*100,1) for bid,count in used_backends.items() if count>0}
     bottleneck = max(used_backends, key=used_backends.get) if used_backends else "none"
     recs = []
+    if unpriced: recs.append("Skipped, no public price: " + ", ".join(sorted(unpriced)))
     if bottleneck in used_backends and used_backends[bottleneck] > 3: recs.append(f"Backend {bottleneck} is overloaded — distribute across more backends")
     if total_cost > (req.budget_usd or float("inf")) * 0.8: recs.append("Approaching budget limit — consider reducing shot count")
     sid = str(uuid.uuid4())

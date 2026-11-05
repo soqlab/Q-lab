@@ -1,0 +1,22 @@
+name: Lint
+
+on:
+  push:
+    paths: ['backend/**', 'qlab_sdk/**', 'ruff.toml', '.github/workflows/lint.yml']
+  pull_request:
+    paths: ['backend/**', 'qlab_sdk/**', 'ruff.toml', '.github/workflows/lint.yml']
+
+jobs:
+  ruff:
+    name: ruff (backend + qlab_sdk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install "ruff==0.17.3"
+      - name: Check
+        # --config makes the root ruff.toml apply to both trees.
+        run: ruff check --config ruff.toml --output-format=github backend qlab_sdk

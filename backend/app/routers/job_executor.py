@@ -43,21 +43,19 @@ from ..models import JobSubmission, Run
 router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Cost models (credits per shot per gate layer, approximate)
+# Cost: from the shared price table (app/provider_prices.json)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_COST_PER_SHOT: dict[str, float] = {
-    "ibm": 1.6e-6,       # ~$1.60 per million shots on IBM Eagle
-    "ionq": 0.00097,     # $0.00097 per shot on IonQ Harmony
-    "braket": 0.00075,   # $0.00075 per shot on IonQ via Braket
-    "simulator": 0.0,
-}
+def _estimate_cost(provider: str, shots: int, depth: int, backend: Optional[str] = None) -> Optional[float]:
+    """Estimated cost in Q-Lab credits (see QLAB_CREDITS_PER_USD); None if no price is public."""
+    from .. import pricing
+    from .costs import _CREDITS_PER_USD
 
-
-def _estimate_cost(provider: str, shots: int, depth: int) -> float:
-    base = _COST_PER_SHOT.get(provider, 0.0) * shots
-    depth_factor = max(1.0, depth / 10.0)
-    return round(base * depth_factor, 6)
+    key = pricing.resolve(backend) or pricing.resolve(provider)
+    if key is None:
+        return None
+    usd = pricing.estimate_amount(key, shots, depth=depth)
+    return None if usd is None else round(usd * _CREDITS_PER_USD, 6)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -442,7 +440,7 @@ def submit_job(
 
     # Parse circuit fingerprint
     depth = sum(1 for l in req.qasm.splitlines() if l.strip() and not l.strip().startswith(("//", "OPENQASM", "include", "qreg", "creg", "measure", "barrier")))
-    cost = _estimate_cost(req.provider, req.shots, depth)
+    cost = _estimate_cost(req.provider, req.shots, depth, req.backend)
 
     job = JobSubmission(
         job_id=job_id,

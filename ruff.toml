@@ -1,0 +1,18 @@
+# Lint rules that must pass in CI for backend/ and qlab_sdk/.
+#
+# Start small: only rules that catch real bugs (syntax errors, undefined names,
+# comparisons that are always true/false, misplaced return/yield). The CI job runs
+# `ruff check --config ruff.toml backend qlab_sdk`, so this file applies to both
+# trees even though qlab_sdk/pyproject.toml has its own, broader [tool.ruff]
+# settings for local use. Add rules here once the code passes them.
+target-version = "py310"
+line-length = 100
+extend-exclude = ["frontend", "vscode-extension", "**/node_modules"]
+
+[lint]
+select = [
+  "E9",   # syntax errors, IO errors
+  "F63",  # invalid comparisons (is with a literal, == on a tuple...)
+  "F7",   # return/yield/break/continue in the wrong place
+  "F82",  # undefined names
+]

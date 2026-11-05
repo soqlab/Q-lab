@@ -1,49 +1,61 @@
+"""Cost Oracle: compare what one experiment would cost on each provider.
+
+Every number comes from the shared price table (``app/provider_prices.json``),
+and every row carries that price's source URL, verified date and, when the
+entry is older than 30 days, a stale warning.
+"""
 from __future__ import annotations
-import uuid, math
+import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..store import store_put, store_get, store_list, store_delete, store_seed
+from .. import pricing
+from ..store import store_put, store_list
 
 router = APIRouter(prefix="/api/v1/cost-oracle", tags=["cost-oracle"])
 
 NS = "oracle_costs"
 
-PRICING: dict = {
-    "ibm_quantum_free": {"name": "IBM Quantum (Free)", "cost_per_shot": 0.0, "min_shots": 1, "max_shots": 100000, "monthly_limit_shots": 10000000, "currency": "USD", "free_tier": True, "note": "Free tier via IBM Quantum Network"},
-    "ibm_quantum_premium": {"name": "IBM Quantum (Premium)", "cost_per_shot": 0.0, "cost_per_second": 1.60, "min_shots": 1, "max_shots": 100000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "Dedicated access, billed per QPU second"},
-    "aws_braket_sv1": {"name": "AWS Braket (SV1 Sim)", "cost_per_shot": 0.0, "cost_per_task": 0.075, "cost_per_sim_minute": 0.075, "min_shots": 1, "max_shots": 100000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "SV1 state-vector simulator"},
-    "aws_braket_ionq": {"name": "AWS Braket (IonQ)", "cost_per_shot": 0.00097, "cost_per_task": 0.30, "min_shots": 1, "max_shots": 10000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "$0.30 per task + $0.00097 per shot"},
-    "aws_braket_rigetti": {"name": "AWS Braket (Rigetti)", "cost_per_shot": 0.00035, "cost_per_task": 0.30, "min_shots": 10, "max_shots": 100000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "$0.30 per task + $0.00035 per shot"},
-    "azure_ionq": {"name": "Azure Quantum (IonQ)", "cost_per_shot": 0.000975, "cost_per_qubit_gate": 0.0000975, "min_shots": 1, "max_shots": 10000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "IonQ via Azure, includes free $500 credit for new users"},
-    "azure_quantinuum": {"name": "Azure Quantum (Quantinuum)", "cost_per_hqc": 0.00016, "min_shots": 1, "max_shots": 1000, "monthly_limit_shots": None, "currency": "USD", "free_tier": False, "note": "Billed in HQC units (Honeywell Quantum Credits)"},
-    "iqm_resonance": {"name": "IQM Resonance", "cost_per_shot": 0.00050, "cost_per_circuit": 0.05, "min_shots": 1, "max_shots": 100000, "monthly_limit_shots": None, "currency": "EUR", "free_tier": False, "note": "Academic pricing available on request"},
-}
+# Kept for callers that read the table by this name; it is the shared table.
+PRICING: dict = pricing.PRICES
+
 
 class CostEstimateRequest(BaseModel):
-    n_qubits: int = 5
-    circuit_depth: int = 20
-    n_shots: int = 8192
-    n_circuits: int = 1
-    provider_ids: list[str] = list(PRICING.keys())
+    n_qubits: int = Field(5, ge=1)
+    circuit_depth: int = Field(20, ge=1)
+    n_shots: int = Field(8192, ge=1)
+    n_circuits: int = Field(1, ge=1)
+    # Gate counts per circuit, for gate-shot pricing (IonQ on Azure). When left
+    # out we assume each layer has n_qubits 1-qubit gates and n_qubits//2 2-qubit gates.
+    one_q_gates: Optional[int] = Field(None, ge=0)
+    two_q_gates: Optional[int] = Field(None, ge=0)
+    provider_ids: list[str] = Field(default_factory=lambda: list(pricing.PRICES.keys()))
     experiment_duration_days: int = 1
 
 class ProviderCostEstimate(BaseModel):
     provider_id: str
     provider_name: str
-    cost_per_circuit_usd: float
-    cost_total_usd: float
+    cost_per_circuit_usd: Optional[float]  # None: the provider publishes no price
+    cost_total_usd: Optional[float]
+    price_display: Optional[str] = None    # "not public" when there is no number
     cost_note: str
     estimated_queue_min: Optional[int] = None  # unknown: live queues need the user's provider key
     shots_available: bool
     monthly_budget_warning: bool
     free_tier: bool
     currency: str
+    pricing_key: str
+    pricing_name: str
+    pricing_source: str
+    pricing_verified: str
+    pricing_age_days: int
+    pricing_stale: bool
+    stale_warning: Optional[str] = None
 
 class CostEstimateResult(BaseModel):
     estimate_id: str
@@ -56,6 +68,7 @@ class CostEstimateResult(BaseModel):
     cheapest_cost_usd: float
     total_if_all_providers_usd: float
     recommendations: list[str]
+    stale_warnings: list[str] = []
 
 class BudgetTrackRequest(BaseModel):
     provider_id: str
@@ -63,60 +76,78 @@ class BudgetTrackRequest(BaseModel):
     n_shots: int
     circuit_name: str = ""
 
-def _hqc_estimate(n_qubits: int, depth: int, n_shots: int) -> float:
-    hqc_per_circuit = n_qubits * depth * 0.5 + n_shots * 0.001
-    return hqc_per_circuit * 0.00016
+def _gate_counts(req: CostEstimateRequest) -> tuple[int, int]:
+    one_q = req.one_q_gates if req.one_q_gates is not None else req.n_qubits * req.circuit_depth
+    two_q = req.two_q_gates if req.two_q_gates is not None else (req.n_qubits // 2) * req.circuit_depth
+    return one_q, two_q
 
-def _ibm_seconds_estimate(n_qubits: int, depth: int, n_shots: int) -> float:
-    seconds_per_circuit = (n_qubits * depth * 0.1 + n_shots * 0.000050)
-    return seconds_per_circuit * 1.60
+
+def _describe(key: str, req: CostEstimateRequest, one_q: int, two_q: int) -> str:
+    p = pricing.PRICES[key]
+    m = p["model"]
+    if m in ("time_based", "per_minute"):
+        secs = pricing.estimate_qpu_seconds(req.n_shots, req.circuit_depth, req.n_qubits)
+        return f"~{secs:.1f}s per circuit (Q-Lab time estimate). {p.get('note', '')}".strip()
+    if m == "gate_shot":
+        assumed = "" if req.one_q_gates is not None and req.two_q_gates is not None else " (gate counts assumed)"
+        return f"{one_q} 1q + {two_q} 2q gates x {req.n_shots} shots{assumed}. {p.get('note', '')}".strip()
+    return p.get("note", "")
+
+
+def estimate_rows(req: CostEstimateRequest) -> list[ProviderCostEstimate]:
+    one_q, two_q = _gate_counts(req)
+    rows = []
+    for pid in req.provider_ids:
+        if pid not in pricing.PRICES:
+            continue
+        p = pricing.PRICES[pid]
+        per = pricing.estimate_amount(
+            pid, req.n_shots, one_q_gates=one_q, two_q_gates=two_q,
+            depth=req.circuit_depth, qubits=req.n_qubits,
+        )
+        total = None if per is None else round(per * req.n_circuits, 6)
+        rows.append(ProviderCostEstimate(
+            provider_id=pid, provider_name=p["name"],
+            cost_per_circuit_usd=None if per is None else round(per, 6),
+            cost_total_usd=total,
+            price_display=pricing.NOT_PUBLIC if per is None else None,
+            cost_note=_describe(pid, req, one_q, two_q),
+            shots_available=True,
+            monthly_budget_warning=bool(total and total > 100.0),
+            free_tier=p.get("free_tier", False),
+            currency=p.get("currency", "USD"),
+            **pricing.provenance(pid),
+        ))
+    return rows
+
 
 @router.post("/estimate", response_model=CostEstimateResult)
 def estimate_cost(req: CostEstimateRequest):
-    estimates = []
-    for pid in req.provider_ids:
-        if pid not in PRICING:
-            continue
-        p = PRICING[pid]
-        if pid == "ibm_quantum_free":
-            cost_per = 0.0; note = "Free (10M shots/month limit)"
-        elif pid == "ibm_quantum_premium":
-            cost_per = _ibm_seconds_estimate(req.n_qubits, req.circuit_depth, req.n_shots); note = f"~{_ibm_seconds_estimate(req.n_qubits, req.circuit_depth, req.n_shots)/1.60:.1f}s QPU time × $1.60/s"
-        elif pid == "azure_quantinuum":
-            cost_per = _hqc_estimate(req.n_qubits, req.circuit_depth, req.n_shots); note = f"~{_hqc_estimate(req.n_qubits, req.circuit_depth, req.n_shots)/0.00016:.0f} HQC × $0.00016/HQC"
-        else:
-            task_cost = p.get("cost_per_task", 0.0)
-            shot_cost = p.get("cost_per_shot", 0.0) * req.n_shots
-            cost_per = task_cost + shot_cost
-            note = p.get("note", "")
-        total = cost_per * req.n_circuits
-        estimates.append(ProviderCostEstimate(
-            provider_id=pid, provider_name=p["name"],
-            cost_per_circuit_usd=round(cost_per, 6),
-            cost_total_usd=round(total, 6),
-            cost_note=note,
-            shots_available=req.n_shots <= p.get("max_shots", 100000),
-            monthly_budget_warning=total > 100.0,
-            free_tier=p.get("free_tier", False),
-            currency=p.get("currency", "USD"),
-        ))
-    cheapest = min(estimates, key=lambda e: e.cost_total_usd)
+    estimates = estimate_rows(req)
+    # Cheapest and totals only over USD prices that are public.
+    comparable = [e for e in estimates if e.cost_total_usd is not None and e.currency == "USD"]
+    cheapest = min(comparable, key=lambda e: e.cost_total_usd) if comparable else None
     recs = []
-    if cheapest.free_tier:
+    if cheapest is not None and cheapest.free_tier:
         recs.append(f"{cheapest.provider_name} offers this at no cost")
     if req.n_shots > 10000:
         recs.append("Consider reducing shots to 8192 — standard error bars achievable with fewer shots")
     if req.n_circuits > 10:
         recs.append("Batch circuits in a single job to minimize per-task overhead costs")
+    hidden = [e.provider_name for e in estimates if e.cost_total_usd is None]
+    if hidden:
+        recs.append("No public price, contact the provider: " + ", ".join(hidden))
+    priced_sort = sorted(estimates, key=lambda e: (e.cost_total_usd is None, e.currency != "USD", e.cost_total_usd or 0.0))
     return CostEstimateResult(
         estimate_id=str(uuid.uuid4()),
         n_qubits=req.n_qubits, n_shots=req.n_shots, n_circuits=req.n_circuits,
         generated_at=datetime.now(timezone.utc).isoformat(),
-        providers=sorted(estimates, key=lambda e: e.cost_total_usd),
-        cheapest_provider=cheapest.provider_id,
-        cheapest_cost_usd=cheapest.cost_total_usd,
-        total_if_all_providers_usd=round(sum(e.cost_total_usd for e in estimates), 4),
+        providers=priced_sort,
+        cheapest_provider=cheapest.provider_id if cheapest else "",
+        cheapest_cost_usd=cheapest.cost_total_usd if cheapest else 0.0,
+        total_if_all_providers_usd=round(sum(e.cost_total_usd for e in comparable), 4),
         recommendations=recs,
+        stale_warnings=sorted({e.stale_warning for e in estimates if e.stale_warning}),
     )
 
 @router.post("/track")
@@ -137,4 +168,4 @@ def get_history(db: Session = Depends(get_db)):
 
 @router.get("/providers")
 def get_providers():
-    return {"providers": [{"id": k, **{x: v[x] for x in ["name","cost_per_shot","free_tier","currency","note"] if x in v}} for k, v in PRICING.items()]}
+    return {"providers": pricing.table(), "stale_after_days": pricing.STALE_AFTER_DAYS}
