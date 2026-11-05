@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 from .client import QLabClient
 from .config import load_config
-from .fingerprint import fingerprint_circuit
+from .fingerprint import fingerprint_circuit, setup_fingerprint, setup_material
 from .context import capture_context
 
 _CLIENT: Optional[QLabClient] = None
@@ -86,8 +86,104 @@ def _pop_transpiler_context() -> dict:
 
 
 def _capture_calibration(backend) -> dict:
+    """Calibration snapshot of a backend.
+
+    Reads backend.properties() when the backend has it (BackendV1, IBM backends, fake
+    backends), and otherwise falls back to backend.target (any BackendV2). Both give the same
+    shape: t1_us, t2_us, readout_errors, gate_errors, gate_durations_us, last_update.
+    """
     if backend is None:
         return {}
+    cal = _calibration_from_properties(backend)
+    if not cal:
+        cal = _calibration_from_target(backend)
+    return cal
+
+
+def _num(value: Any) -> Optional[float]:
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f else None  # drop NaN
+
+
+def _to_us(value: Any, unit: Optional[str]) -> Optional[float]:
+    f = _num(value)
+    if f is None:
+        return None
+    scale = {"s": 1e6, "ms": 1e3, "us": 1.0, "µs": 1.0, "ns": 1e-3}.get((unit or "us").strip())
+    return f * scale if scale is not None else f
+
+
+def _calibration_from_target(backend) -> dict:
+    """Calibration read from a BackendV2 Target. Target values are in seconds."""
+    try:
+        target = getattr(backend, "target", None)
+        if target is None:
+            return {}
+        cal: dict[str, Any] = {}
+
+        t1: dict[str, float] = {}
+        t2: dict[str, float] = {}
+        try:
+            for i, qp in enumerate(target.qubit_properties or []):
+                if qp is None:
+                    continue
+                v1 = _to_us(getattr(qp, "t1", None), "s")
+                v2 = _to_us(getattr(qp, "t2", None), "s")
+                if v1 is not None:
+                    t1[str(i)] = v1
+                if v2 is not None:
+                    t2[str(i)] = v2
+        except Exception:
+            pass
+
+        readout: dict[str, float] = {}
+        gate_errors: dict[str, float] = {}
+        durations: dict[str, float] = {}
+        for name in list(getattr(target, "operation_names", []) or []):
+            try:
+                props_map = target[name]
+            except Exception:
+                continue
+            for qargs, props in (props_map or {}).items():
+                if props is None or qargs is None:
+                    continue
+                error = _num(getattr(props, "error", None))
+                duration = _to_us(getattr(props, "duration", None), "s")
+                if name == "measure":
+                    if error is not None and len(qargs) == 1:
+                        readout[str(qargs[0])] = error
+                    continue
+                key = f"{name}_{'_'.join(str(q) for q in qargs)}"
+                if error is not None:
+                    gate_errors[key] = error
+                if duration is not None:
+                    durations[key] = duration
+
+        if t1:
+            cal["t1_us"] = t1
+        if t2:
+            cal["t2_us"] = t2
+        if readout:
+            cal["readout_errors"] = readout
+        if gate_errors:
+            cal["gate_errors"] = gate_errors
+        if durations:
+            cal["gate_durations_us"] = durations
+        if not cal:
+            return {}
+        now = datetime.now(timezone.utc).isoformat()
+        cal["last_update"] = now
+        cal["snapshot_time"] = now
+        cal["source"] = "target"
+        return cal
+    except Exception:
+        return {}
+
+
+def _calibration_from_properties(backend) -> dict:
     try:
         props_fn = getattr(backend, "properties", None)
         if not callable(props_fn):
@@ -104,10 +200,10 @@ def _capture_calibration(backend) -> dict:
         try:
             for i, qubit_props in enumerate(props.qubits):
                 for param in qubit_props:
-                    if param.name == "T1":
-                        t1[str(i)] = param.value
-                    elif param.name == "T2":
-                        t2[str(i)] = param.value
+                    if param.name in ("T1", "T2"):
+                        us = _to_us(param.value, getattr(param, "unit", "us") or "us")
+                        if us is not None:
+                            (t1 if param.name == "T1" else t2)[str(i)] = us
                     elif param.name == "readout_error":
                         readout_errors[str(i)] = param.value
         except Exception:
@@ -120,26 +216,111 @@ def _capture_calibration(backend) -> dict:
             cal["readout_errors"] = readout_errors
 
         gate_errors: dict[str, float] = {}
+        durations: dict[str, float] = {}
         try:
             for gate in props.gates:
+                key = f"{gate.gate}_{'_'.join(str(q) for q in gate.qubits)}"
                 for param in gate.parameters:
                     if param.name == "gate_error":
-                        key = f"{gate.gate}_{'_'.join(str(q) for q in gate.qubits)}"
                         gate_errors[key] = param.value
+                    elif param.name == "gate_length":
+                        us = _to_us(param.value, getattr(param, "unit", "ns") or "ns")
+                        if us is not None:
+                            durations[key] = us
         except Exception:
             pass
         if gate_errors:
             cal["gate_errors"] = gate_errors
+        if durations:
+            cal["gate_durations_us"] = durations
+        if not cal:
+            return {}
 
         try:
             lu = props.last_update_date
             cal["snapshot_time"] = lu.isoformat() if hasattr(lu, "isoformat") else str(lu)
         except Exception:
             cal["snapshot_time"] = datetime.now(timezone.utc).isoformat()
+        cal["last_update"] = cal["snapshot_time"]
+        cal["source"] = "properties"
 
         return cal
     except Exception:
         return {}
+
+
+_SOURCE_MAX_BYTES = 512 * 1024  # per serialized circuit set; QLAB_SOURCE_MAX_BYTES overrides
+
+
+def _source_cap() -> int:
+    try:
+        return int(os.getenv("QLAB_SOURCE_MAX_BYTES", "") or _SOURCE_MAX_BYTES)
+    except ValueError:
+        return _SOURCE_MAX_BYTES
+
+
+def _circuit_to_qpy(circuits: Any) -> dict[str, Any]:
+    """QPY (base64) of one circuit or a list, with the QPY format version; {} when unavailable.
+
+    Over the size cap only the size is recorded, so a huge circuit never bloats the upload.
+    """
+    try:
+        import base64
+        import io
+        from qiskit import qpy
+    except Exception:
+        return {}
+    try:
+        buf = io.BytesIO()
+        qpy.dump(circuits, buf)
+        raw = buf.getvalue()
+    except Exception as error:
+        return {"error": f"{error.__class__.__name__}: {error}"[:300]}
+    info: dict[str, Any] = {
+        "format": "qpy",
+        "encoding": "base64",
+        "qpy_version": _qpy_file_version(raw),
+        "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+    try:
+        import qiskit
+        info["qiskit_version"] = qiskit.__version__
+    except Exception:
+        pass
+    if len(raw) > _source_cap():
+        info["truncated"] = True
+    else:
+        info["data"] = base64.b64encode(raw).decode("ascii")
+    return info
+
+
+def _qpy_file_version(raw: bytes) -> Optional[int]:
+    # QPY header: b"QISKIT" then one byte with the format version.
+    if len(raw) > 6 and raw[:6] == b"QISKIT":
+        return raw[6]
+    try:
+        from qiskit import qpy
+        return int(qpy.QPY_VERSION)
+    except Exception:
+        return None
+
+
+def _circuit_source(circuit) -> dict[str, Any]:
+    """OpenQASM 3 (or 2) text of a circuit, size-capped."""
+    text, fmt = None, None
+    try:
+        from qiskit import qasm3
+        text, fmt = qasm3.dumps(circuit), "openqasm3"
+    except Exception:
+        try:
+            from qiskit import qasm2
+            text, fmt = qasm2.dumps(circuit), "openqasm2"
+        except Exception:
+            return {}
+    if len(text.encode("utf-8")) > _source_cap():
+        return {"format": fmt, "truncated": True, "bytes": len(text.encode("utf-8"))}
+    return {"format": fmt, "text": text}
 
 
 def _circuit_to_qasm(circuit) -> Optional[str]:
@@ -172,29 +353,145 @@ def _apply_zk_qco(qasm: Optional[str], fingerprint: dict[str, Any]) -> tuple[Opt
         "preserved_fields": ["num_qubits", "num_clbits", "depth", "size", "gate_counts", "non_clifford_ratio"],
     }
 
-def _extract_circuits_from_args(args: tuple, kwargs: dict) -> list[Any]:
-    circuits = []
+def _iter_pubs(args: tuple, kwargs: dict):
+    """Yield (circuit, pub) for every circuit passed to run(); pub is None for a bare circuit.
 
+    A pub is a primitive V2 PUB: a tuple whose first item is the circuit, or a
+    SamplerPub/EstimatorPub object with a .circuit attribute.
+    """
     # Sampler/Estimator usually receive circuits in args or kwargs.
     candidates = list(args)
-
-    for key in ["circuits", "pubs", "circuit"]:
+    for key in ["circuits", "pubs", "circuit", "run_input"]:
         if key in kwargs:
             candidates.append(kwargs[key])
 
-    for candidate in candidates:
-        if _looks_like_circuit(candidate):
-            circuits.append(candidate)
-        elif isinstance(candidate, (list, tuple)):
-            for item in candidate:
-                if _looks_like_circuit(item):
-                    circuits.append(item)
-                elif isinstance(item, (list, tuple)) and item:
-                    # Primitive V2 PUB-like tuples can contain circuit first.
-                    if _looks_like_circuit(item[0]):
-                        circuits.append(item[0])
+    def _one(item):
+        if _looks_like_circuit(item):
+            return item, None
+        if isinstance(item, (list, tuple)) and item and _looks_like_circuit(item[0]):
+            return item[0], item
+        inner = getattr(item, "circuit", None)
+        if inner is not None and _looks_like_circuit(inner):
+            return inner, item
+        return None, None
 
-    return circuits
+    for candidate in candidates:
+        circuit, pub = _one(candidate)
+        if circuit is not None and pub is None:
+            yield circuit, None
+            continue
+        if circuit is not None and not isinstance(pub, (list, tuple)):
+            yield circuit, pub  # a single Pub object
+            continue
+        if isinstance(candidate, (list, tuple)):
+            for item in candidate:
+                circuit, pub = _one(item)
+                if circuit is not None:
+                    yield circuit, pub
+
+
+def _extract_circuits_from_args(args: tuple, kwargs: dict) -> list[Any]:
+    return [circuit for circuit, _ in _iter_pubs(args, kwargs)]
+
+
+def _positive_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 and n == value else None
+
+
+def _positive_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    f = _num(value)
+    return f if f is not None and f > 0 else None
+
+
+def _option(obj: Any, *path: str) -> Any:
+    """obj.a.b..., tolerating missing attributes, dict options and runtime's Unset."""
+    for name in path:
+        if obj is None:
+            return None
+        obj = obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+    return obj
+
+
+def _is_estimator(primitive: Any) -> bool:
+    return any("Estimator" in c.__name__ for c in type(primitive).__mro__)
+
+
+def _default_shots(obj: Any, kind: str) -> tuple[Optional[int], Optional[float]]:
+    """The shots (and, for an Estimator, the precision) a run() uses when none are passed."""
+    if kind == "backend":
+        return _positive_int(_option(obj, "options", "shots")), None
+    shots = None
+    for path in (("default_shots",), ("options", "default_shots"), ("_options", "default_shots"),
+                 ("options", "shots"), ("_options", "shots")):
+        try:
+            shots = _positive_int(_option(obj, *path))
+        except Exception:
+            shots = None
+        if shots is not None:
+            break
+    precision = None
+    if _is_estimator(obj):
+        for path in (("default_precision",), ("options", "default_precision"),
+                     ("_options", "default_precision")):
+            try:
+                precision = _positive_float(_option(obj, *path))
+            except Exception:
+                precision = None
+            if precision is not None:
+                break
+    return shots, precision
+
+
+def _extract_shots(obj: Any, kind: str, args: tuple, kwargs: dict) -> list[dict[str, Any]]:
+    """Shots/precision of each circuit passed to run(), in the order of _extract_circuits_from_args.
+
+    Priority: a value inside the pub, then the run() keyword, then the object's default.
+    """
+    estimator = kind != "backend" and _is_estimator(obj)
+    try:
+        default_shots, default_precision = _default_shots(obj, kind)
+    except Exception:
+        default_shots, default_precision = None, None
+    kw_shots = _positive_int(kwargs.get("shots"))
+    kw_precision = _positive_float(kwargs.get("precision")) if estimator else None
+
+    out: list[dict[str, Any]] = []
+    for _circuit, pub in _iter_pubs(args, kwargs):
+        pub_shots = pub_precision = None
+        if pub is not None:
+            if isinstance(pub, (list, tuple)):
+                # SamplerPub: (circuit, parameter_values, shots); EstimatorPub: (circuit, observables, parameter_values, precision)
+                if estimator and len(pub) >= 4:
+                    pub_precision = _positive_float(pub[3])
+                elif not estimator and len(pub) >= 3:
+                    pub_shots = _positive_int(pub[2])
+            else:
+                pub_shots = _positive_int(getattr(pub, "shots", None))
+                pub_precision = _positive_float(getattr(pub, "precision", None))
+        entry: dict[str, Any] = {}
+        if pub_shots is not None:
+            entry.update(shots=pub_shots, shots_source="pub")
+        elif kw_shots is not None:
+            entry.update(shots=kw_shots, shots_source="run")
+        elif default_shots is not None and not (estimator and (pub_precision or kw_precision)):
+            entry.update(shots=default_shots, shots_source="default")
+        if estimator:
+            precision = pub_precision or kw_precision
+            if precision is None and "shots" not in entry:
+                precision = default_precision
+            if precision is not None:
+                entry["precision"] = precision
+                entry["precision_source"] = "pub" if pub_precision else ("run" if kw_precision else "default")
+        out.append(entry)
+    return out
 
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
@@ -337,18 +634,42 @@ def _capture_circuit(
     qasm = _circuit_to_qasm(circuit)
     fingerprint = fingerprint_circuit(circuit, qasm=qasm)
     upload_qasm, upload_fingerprint, privacy = _apply_zk_qco(qasm, fingerprint)
+    context = capture_context(include_pip_freeze=_CONFIG["include_pip_freeze"])
+    transpiler = dict(transpiler or {})
+    if privacy:
+        # Hash-only mode: no circuit source leaves the machine, in any format.
+        for key in ("qpy", "qasm"):
+            transpiler.pop(key, None)
+
+    try:
+        versions = dict(context.get("library_versions") or {})
+        versions.setdefault("qlab-sdk", _sdk_version())
+        exe = execution or {}
+        params = parameters or {}
+        material = setup_material(
+            upload_fingerprint,
+            backend_name=backend_name,
+            transpiler_settings=transpiler.get("settings") or {},
+            shots=_positive_int(exe.get("shots")) or _positive_int(params.get("shots")),
+            precision=_positive_float(exe.get("precision")),
+            package_versions=versions,
+        )
+        context["setup_fingerprint"] = setup_fingerprint(material)
+        context["setup"] = material
+    except Exception:
+        pass
 
     payload = {
         "run_id": run_id,
         "circuit_name": getattr(circuit, "name", None),
         "qasm": upload_qasm,
         "fingerprint": upload_fingerprint,
-        "context": capture_context(include_pip_freeze=_CONFIG["include_pip_freeze"]),
+        "context": context,
         "backend": backend_name,
         "parameters": _sanitize(parameters or {}),
         "execution": _sanitize(execution or {}),
         "calibration": _sanitize(calibration or {}),
-        "transpiler": _sanitize(transpiler or {}),
+        "transpiler": _sanitize(transpiler),
         "timing": timing or {},
         "project": _CONFIG["project"],
         "tags": list(_CONFIG["tags"]),
@@ -918,6 +1239,7 @@ def _wrap_run(cls, kind: str) -> None:
         backend_obj = self if kind == "backend" else _primitive_backend(self)
         backend_name = _name_of(backend_obj) or (None if kind == "backend" else type(self).__name__)
         circuits: list[Any] = []
+        shots: list[dict] = []
         parameters: dict = {}
         calibration: dict = {}
         transpiler_ctx: dict = {}
@@ -929,17 +1251,23 @@ def _wrap_run(cls, kind: str) -> None:
             transpiler_ctx = _pop_transpiler_context()
         except Exception:
             pass
+        try:
+            shots = _extract_shots(self, kind, args, kwargs)
+        except Exception:
+            shots = []
+        if len(shots) != len(circuits):
+            shots = [{}] * len(circuits)
 
         _LOCAL.depth = getattr(_LOCAL, "depth", 0) + 1
         try:
             job = original_run(self, *args, **kwargs)
         except Exception as error:
-            for circuit in circuits:
+            for circuit, shot_info in zip(circuits, shots):
                 _capture_circuit(
                     circuit,
                     backend_name=backend_name,
                     parameters=parameters,
-                    execution=_error_metadata(error),
+                    execution={**_error_metadata(error), **shot_info},
                     status="failed",
                     calibration=calibration,
                     transpiler=transpiler_ctx,
@@ -955,13 +1283,13 @@ def _wrap_run(cls, kind: str) -> None:
                 circuit,
                 backend_name=backend_name,
                 parameters=parameters,
-                execution=execution,
+                execution={**execution, **shot_info},
                 status="submitted",
                 calibration=calibration,
                 transpiler=transpiler_ctx,
                 timing={"submit_time": submit_time},
             )
-            for circuit in circuits
+            for circuit, shot_info in zip(circuits, shots)
         ]
         _patch_job_result(job, run_ids, circuits, backend_name)
         return job
@@ -1180,14 +1508,22 @@ def _patch_transpile() -> None:
                 if k in kwargs and kwargs[k] is not None
             }
 
-            # Capture pre-transpile circuit stats
+            # Capture pre-transpile circuit stats and source (QPY + OpenQASM)
             before: dict = {}
+            qpy_before: dict = {}
+            qasm_before: dict = {}
             try:
                 circuit = args[0] if args else kwargs.get("circuits")
+                first = None
                 if _looks_like_circuit(circuit):
-                    before = _circuit_stats(circuit)
+                    first = circuit
                 elif isinstance(circuit, (list, tuple)) and circuit and _looks_like_circuit(circuit[0]):
-                    before = _circuit_stats(circuit[0])
+                    first = circuit[0]
+                if first is not None:
+                    before = _circuit_stats(first)
+                    if not _CONFIG.get("zk_qco"):
+                        qpy_before = _circuit_to_qpy(first)
+                        qasm_before = _circuit_source(first)
             except Exception:
                 pass
 
@@ -1198,12 +1534,17 @@ def _patch_transpile() -> None:
 
             # Capture post-transpile circuit stats
             after: dict = {}
+            qpy_after: dict = {}
+            qasm_after: dict = {}
             try:
                 tc = result if _looks_like_circuit(result) else (
                     result[0] if isinstance(result, (list, tuple)) and result and _looks_like_circuit(result[0]) else None
                 )
                 if tc is not None:
                     after = _circuit_stats(tc)
+                    if not _CONFIG.get("zk_qco"):
+                        qpy_after = _circuit_to_qpy(tc)
+                        qasm_after = _circuit_source(tc)
             except Exception:
                 pass
 
@@ -1211,6 +1552,8 @@ def _patch_transpile() -> None:
                 "settings": settings,
                 "before": before,
                 "after": after,
+                "qpy": {"before": qpy_before, "after": qpy_after},
+                "qasm": {"before": qasm_before, "after": qasm_after},
                 "start_time": start_time,
                 "end_time": datetime.now(timezone.utc).isoformat(),
                 "duration_ms": duration_ms,

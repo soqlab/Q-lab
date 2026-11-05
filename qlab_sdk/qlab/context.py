@@ -26,6 +26,7 @@ def _capture_library_versions() -> dict[str, str]:
         "qiskit-ibm-provider",
         "qiskit-aer",
         "qiskit-terra",
+        "qlab-sdk",
     ]
     try:
         import importlib.metadata

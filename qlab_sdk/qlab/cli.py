@@ -13,6 +13,7 @@ Usage:
     qlab run download <run_id> [--output path.zip]
     qlab push <circuit.qasm> [--name N] [--project P] [--backend B] [--shots N]
     qlab circuit-diff <run_id_1> <run_id_2> [--json]
+    qlab ci check --run <run_id> --baseline <run_id> [--margin M] [--alpha A] [--junit report.xml]
     qlab config show
     qlab config set <key> <value>
 
@@ -421,6 +422,60 @@ def cmd_push(args, cfg):
         print(f"ERROR: {e}", file=sys.stderr); sys.exit(1)
 
 
+def _load_counts(cfg: dict, ref: str) -> dict:
+    """Counts of a run ID (fetched from the server) or of a local JSON file.
+
+    The file may hold a counts dict ({"00": 510, "11": 490}) or a run as the API returns it.
+    """
+    from . import ci
+    path = Path(ref)
+    if path.suffix.lower() == ".json" and path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and "results" in data:
+            return ci.counts_of_run(data)
+        return ci.normalize_counts(data)
+    return ci.counts_of_run(_get(cfg, f"/api/v1/runs/{ref}"))
+
+
+def cmd_ci_check(args, cfg):
+    """Exit 0 when the run matches the baseline, 1 on a regression, 2 when it cannot check."""
+    import time
+    from . import ci
+
+    t0 = time.monotonic()
+    name = f"{args.run} vs {args.baseline}"
+    case: dict = {"name": name}
+    result: dict = {}
+    code = 0
+    try:
+        run_counts = _load_counts(cfg, args.run)
+        base_counts = _load_counts(cfg, args.baseline)
+        if not run_counts:
+            raise ValueError(f"run {args.run} has no measurement counts")
+        if not base_counts:
+            raise ValueError(f"baseline {args.baseline} has no measurement counts")
+        result = ci.check_counts(run_counts, base_counts, margin=args.margin, alpha=args.alpha)
+        case.update(passed=result["passed"], message=ci.describe(result, args.run, args.baseline))
+        code = 0 if result["passed"] else 1
+    except Exception as e:
+        case.update(passed=None, error=f"{e.__class__.__name__}: {e}", message=str(e))
+        code = 2
+    case["time"] = time.monotonic() - t0
+
+    if args.junit:
+        Path(args.junit).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.junit).write_text(ci.junit_xml([case]), encoding="utf-8")
+
+    if args.json:
+        print(json.dumps({"run": args.run, "baseline": args.baseline, **result,
+                          **({"error": case["error"]} if case.get("error") else {})}, indent=2))
+    elif case.get("error"):
+        print(f"ERROR: {case['error']}", file=sys.stderr)
+    else:
+        print(case["message"])
+    sys.exit(code)
+
+
 def cmd_config_show(args, cfg):
     print(f"  api_url : {cfg['api_url']}")
     print(f"  api_key : {'***' + cfg['api_key'][-4:] if cfg.get('api_key') else '(not set)'}")
@@ -440,7 +495,7 @@ def cmd_config_set(args, cfg):
 # Main entry point
 # ------------------------------------------------------------------
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="qlab",
         description="Q-Lab CLI — quantum experiment tracking from the terminal",
@@ -506,6 +561,25 @@ def main():
     cdiff_p.add_argument("run_id_2")
     cdiff_p.add_argument("--json", action="store_true")
 
+    # ci
+    ci_p = sub.add_parser("ci", help="CI checks against a baseline run")
+    ci_sub = ci_p.add_subparsers(dest="ci_command")
+    chk_p = ci_sub.add_parser(
+        "check",
+        help="Fail when a run's counts drift from a baseline run beyond shot noise",
+        description="Compare a run's measurement counts with a baseline run by total variation "
+                    "distance. Fails (exit 1) when TVD exceeds a shot-noise bound plus --margin; "
+                    "exit 2 when the check cannot run.",
+    )
+    chk_p.add_argument("--run", required=True, help="Run ID to check (or a counts/run .json file)")
+    chk_p.add_argument("--baseline", required=True, help="Baseline run ID (or a counts/run .json file)")
+    chk_p.add_argument("--margin", type=float, default=0.0,
+                       help="Extra TVD allowed on top of the shot-noise bound (default 0)")
+    chk_p.add_argument("--alpha", type=float, default=0.01,
+                       help="False-alarm probability of the shot-noise bound (default 0.01)")
+    chk_p.add_argument("--junit", help="Write a JUnit XML report to this path")
+    chk_p.add_argument("--json", action="store_true")
+
     # config
     cfg_p = sub.add_parser("config", help="CLI configuration")
     cfg_sub = cfg_p.add_subparsers(dest="config_command")
@@ -514,7 +588,7 @@ def main():
     set_p.add_argument("key")
     set_p.add_argument("value")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     cfg = _load_config()
 
     if args.command == "status":
@@ -550,6 +624,11 @@ def main():
         cmd_circuit_diff(args, cfg)
     elif args.command == "push":
         cmd_push(args, cfg)
+    elif args.command == "ci":
+        if args.ci_command == "check":
+            cmd_ci_check(args, cfg)
+        else:
+            ci_p.print_help()
     elif args.command == "config":
         if args.config_command == "show":
             cmd_config_show(args, cfg)

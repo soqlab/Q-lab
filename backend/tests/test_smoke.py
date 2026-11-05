@@ -217,3 +217,44 @@ def test_circuit_diff_same_run():
 def test_circuit_diff_not_found():
     r = client.get(f"/api/v1/runs/{uuid.uuid4()}/diff/{uuid.uuid4()}")
     assert r.status_code == 404
+
+
+def test_sdk_capture_fields_persist():
+    """The SDK's setup fingerprint, shots, QPY source and Target calibration ride in existing
+    JSON columns (context, execution, transpiler, calibration) and must come back unchanged."""
+    run_id = f"capture-{uuid.uuid4().hex[:8]}"
+    setup = {"circuit": "ab" * 32, "backend": "ibm_test", "transpiler": {"optimization_level": 1},
+             "shots": 4000, "precision": None, "packages": {"qiskit": "2.6.2"}}
+    payload = {
+        "run_id": run_id,
+        "backend": "ibm_test",
+        "fingerprint": {"num_qubits": 2, "depth": 3},
+        "context": {"setup_fingerprint": "cd" * 32, "setup": setup},
+        "execution": {"shots": 4000, "shots_source": "run"},
+        "transpiler": {"settings": {"optimization_level": 1},
+                       "qpy": {"before": {"format": "qpy", "encoding": "base64", "qpy_version": 15,
+                                          "data": "UUlTS0lU"}, "after": {}},
+                       "qasm": {"before": {"format": "openqasm3", "text": "OPENQASM 3.0;"}, "after": {}}},
+        "calibration": {"t1_us": {"0": 120.5}, "gate_durations_us": {"cx_0_1": 0.3},
+                        "last_update": "2026-01-01T00:00:00+00:00", "source": "target"},
+        "status": "submitted",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    resp = client.post("/api/v1/runs", json=payload)
+    if resp.status_code == 401:
+        pytest.skip("Push requires auth - skipping unauthenticated push test")
+    assert resp.status_code in (200, 201), resp.text
+
+    data = client.get(f"/api/v1/runs/{run_id}").json()
+    assert data["fingerprint"] == {"num_qubits": 2, "depth": 3}
+    assert data["context"]["setup_fingerprint"] == "cd" * 32
+    assert data["context"]["setup"] == setup
+    assert data["execution"]["shots"] == 4000
+    assert data["transpiler"]["qpy"]["before"]["data"] == "UUlTS0lU"
+    assert data["calibration"]["gate_durations_us"] == {"cx_0_1": 0.3}
+
+    from app.database import SessionLocal
+    from app.models import Run
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        assert db.scalar(select(Run).where(Run.run_id == run_id)).shots == 4000

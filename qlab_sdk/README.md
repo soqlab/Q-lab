@@ -105,7 +105,50 @@ circuit hashes, but does not upload raw QASM.
 
 Captured fields include QASM, circuit fingerprint, git/runtime context, masked
 parameters, backend name, execution metadata, result metadata, project, tags,
-and a shareable dashboard URL.
+and a shareable dashboard URL. In detail:
+
+- **Calibration**: from `backend.properties()` when the backend has it, otherwise
+  from `backend.target` (any BackendV2, e.g. `GenericBackendV2`). Stored as
+  `t1_us`, `t2_us`, `readout_errors` (per qubit), `gate_errors` and
+  `gate_durations_us` (per instruction, keyed `cx_0_1`), and `last_update`.
+  Times are in microseconds (the Target's seconds are converted).
+- **Shots**: `execution.shots` comes from `backend.run(shots=...)`, a Sampler's
+  per-pub shots, `run(shots=...)` or `default_shots`, or the backend's default
+  (`execution.shots_source` says which). Estimators record `execution.precision`
+  (per pub, `run(precision=...)` or `default_precision`).
+- **Setup fingerprint**: `context.setup_fingerprint` is the SHA-256 of a canonical
+  JSON (`context.setup`) of the circuit fingerprint, backend name, transpiler
+  options (optimization level, seed, layout/routing/translation method, basis
+  gates), shots and the versions of qiskit, qiskit-aer, qiskit-ibm-runtime and
+  qlab-sdk. The circuit `fingerprint` is unchanged, so the same circuit on two
+  devices shares a circuit fingerprint but not a setup fingerprint.
+- **Circuit source**: when `transpile()` is used, `transpiler.qpy.before/after`
+  hold the circuit before and after transpilation as base64 QPY (with
+  `qpy_version`, `qiskit_version`, `sha256`), and `transpiler.qasm.before/after`
+  the OpenQASM 3 (or 2) text. Each is capped at 512 KB (`QLAB_SOURCE_MAX_BYTES`);
+  over the cap only the size and hash are kept. Nothing is captured in ZK-QCO mode.
+
+## CI baseline checks
+
+`qlab ci check` compares a run's measurement counts with a baseline run and fails
+the build when the distribution has moved more than shot noise explains:
+
+```bash
+qlab ci check --run $NEW_RUN_ID --baseline $BASELINE_RUN_ID --margin 0.02 --junit reports/qlab.xml
+```
+
+The statistic is the total variation distance (TVD) between the two count
+distributions. The threshold is `eps(n_run) + eps(n_baseline) + margin`, with
+`eps(n) = sqrt((k ln 2 + ln(2/alpha)) / (2n))` for `n` shots and `k` outcomes seen:
+a distribution-free concentration bound (Weissman et al.), so two runs of the same
+setup exceed it with probability at most `alpha` (`--alpha`, default 0.01). More
+shots give a tighter threshold; `--margin` allows for expected drift.
+
+Exit codes: `0` pass, `1` regression, `2` the check could not run (missing run or
+counts). `--junit PATH` writes a JUnit XML report for the CI's test view, `--json`
+prints the numbers. `--run`/`--baseline` also accept a local `.json` file holding a
+counts dict or a run as the API returns it. The command reads runs with
+`GET /api/v1/runs/{id}` (set `QLAB_API_URL` and `QLAB_API_KEY`).
 
 Failed uploads are queued locally and retried by `qlab.flush()` or the next SDK
 startup. Set `QLAB_QUEUE_PATH` or pass `queue_path="..."` to control where the
