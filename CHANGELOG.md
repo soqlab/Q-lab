@@ -6,6 +6,14 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Added
+- SDK: calibration is also captured from `backend.target` (Qiskit 2 backends without
+  `properties()`), in microseconds; shots are recorded for `backend.run` and the V2 primitives; a
+  `setup_fingerprint` covers circuit, backend, transpiler options, shots and package versions; the
+  circuit is stored as QPY before and after transpilation.
+- `qlab ci check`: compares a run with a baseline by TVD against a shot-noise bound and writes
+  JUnit XML for CI.
+
 ### Security
 - The job API (`/api/v1/jobs`) had no sign-in check: anyone could list, read and cancel every user's
   jobs and circuits. It now requires an account and shows people only their own and their
