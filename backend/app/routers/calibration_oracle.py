@@ -8,17 +8,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from .. import ibm_quantum
+from ..illustrative import ILLUSTRATIVE_HEADER, ILLUSTRATIVE_VALUE
 from ..database import get_db
 from ..deps import Identity, get_identity
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/calibration-oracle", tags=["calibration-oracle"])
-
-IBM_RUNTIME_BASE = "https://api.quantum-computing.ibm.com/runtime"
 
 _rng = random.Random(0)
 
@@ -41,17 +41,12 @@ def _ibm_prop(qubit_props: list, name: str) -> Optional[float]:
 
 
 def _fetch_ibm_calibration(backend: str, token: str) -> Optional[dict]:
-    """Call IBM Quantum API for live backend calibration data.
+    """Live backend calibration from IBM, with the user's own key.
 
     Returns a dict matching BackendCalibration shape, or None on any failure.
     """
     try:
-        req = urllib.request.Request(
-            f"{IBM_RUNTIME_BASE}/backends/{backend}/properties",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode())
+        data = ibm_quantum.calibration(backend, token)
     except Exception:
         return None
 
@@ -474,6 +469,7 @@ def _check_alerts(db: Session, backend: str, cal: dict):
 
 @router.get("/{backend}")
 def get_calibration(
+    response: Response,
     backend: str,
     db: Session = Depends(get_db),
     identity: Optional[Identity] = Depends(get_identity),
@@ -510,7 +506,9 @@ def get_calibration(
                     _check_alerts(db, backend, cal)
                     return {**BackendCalibration(**{k: v for k, v in cal.items() if k != "data_source"}).model_dump(), "data_source": "rigetti_api"}
 
-    # Fall back to simulated data
+    # No live data (no provider key saved, or the provider didn't answer): an illustrative example,
+    # marked as such. It raises no alerts: nobody should be paged about an invented qubit.
+    response.headers[ILLUSTRATIVE_HEADER] = ILLUSTRATIVE_VALUE
     _seed_calibrations(db)
     ns = f"{NS_CALIBRATIONS}_{backend}"
     history = store_list(db, ns)
@@ -518,11 +516,11 @@ def get_calibration(
         history = history[-100:]
     cal = _gen_calibration(backend, len(history), history)
     store_put(db, ns, cal["cal_id"], cal)
-    _check_alerts(db, backend, cal)
     return {**BackendCalibration(**cal).model_dump(), "data_source": "simulated"}
 
 @router.get("/{backend}/history")
-def get_history(backend: str, n: int = 20, db: Session = Depends(get_db)):
+def get_history(backend: str, response: Response, n: int = 20, db: Session = Depends(get_db)):
+    response.headers[ILLUSTRATIVE_HEADER] = ILLUSTRATIVE_VALUE  # these are the generated examples
     _seed_calibrations(db)
     history = store_list(db, f"{NS_CALIBRATIONS}_{backend}")[-n:]
     return {"backend": backend, "history": history,

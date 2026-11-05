@@ -45,8 +45,7 @@ class FAIRValidateRequest(BaseModel):
     metadata: dict
 
 
-def _make_doi() -> str:
-    return f"10.5281/zenodo.{random.randint(7000000, 9999999)}"
+NOT_MINTED = "not minted"  # A DOI only exists once a repository issues one: never invent it.
 
 
 def _make_ro_crate(req: FAIRGenerateRequest, doi: str) -> dict:
@@ -162,7 +161,7 @@ def _checklist(score: dict) -> list[dict]:
 @_fair_data_router.post("/generate")
 def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)):
     record_id = str(uuid.uuid4())
-    doi = _make_doi()
+    doi = NOT_MINTED
     score = _fair_score(req)
     record = {
         "record_id": record_id,
@@ -172,7 +171,7 @@ def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)
         "zenodo_metadata": _make_zenodo_metadata(req),
         "fair_score": score,
         "checklist": _checklist(score),
-        "landing_page_url": f"https://zenodo.org/record/{doi.split('.')[-1]}",
+        "landing_page_url": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "_meta": req.model_dump(),
     }

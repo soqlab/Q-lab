@@ -191,7 +191,7 @@ def _dag_from_qiskit(qasm: str) -> Optional[tuple[list, list, dict]]:
         from qiskit.converters import circuit_to_dag
         try:
             from qiskit import qasm2
-            qc = qasm2.loads(qasm)
+            qc = qasm2.loads(qasm, custom_instructions=qasm2.LEGACY_CUSTOM_INSTRUCTIONS)
         except Exception:
             from qiskit import qasm3
             qc = qasm3.loads(qasm)
@@ -610,7 +610,7 @@ def unitary_fidelity(
         def _load(qasm: str):
             try:
                 from qiskit import qasm2
-                return qasm2.loads(qasm)
+                return qasm2.loads(qasm, custom_instructions=qasm2.LEGACY_CUSTOM_INSTRUCTIONS)
             except Exception:
                 from qiskit import qasm3
                 return qasm3.loads(qasm)

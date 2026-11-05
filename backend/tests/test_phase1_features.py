@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database import init_db
@@ -9,7 +10,14 @@ from app.main import app
 
 init_db()
 client = TestClient(app, raise_server_exceptions=False)
-app.dependency_overrides[require_auth] = lambda: Identity(legacy=True)
+
+
+@pytest.fixture(autouse=True)
+def _signed_in():
+    """For this file only: left in place, it would switch off sign-in for every other test."""
+    app.dependency_overrides[require_auth] = lambda: Identity(legacy=True)
+    yield
+    app.dependency_overrides.pop(require_auth, None)
 
 
 def _run_payload(run_id: str | None = None, *, project: str = "phase1-tests", depth: int = 4) -> dict:

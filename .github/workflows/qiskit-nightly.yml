@@ -1,0 +1,46 @@
+name: Qiskit Early Warning
+
+# Auto-tracking Qiskit is the product. The other workflows only run when this repository changes,
+# so a Qiskit release that breaks the SDK would go unnoticed until a user reported it. This runs the
+# SDK tests every night against the latest release and against Qiskit's development branch.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [latest, development]
+        include:
+          - channel: latest
+            qiskit: "qiskit"
+          - channel: development
+            qiskit: "git+https://github.com/Qiskit/qiskit.git"
+    name: SDK · Qiskit ${{ matrix.channel }}
+    # A failure on the development branch is an early warning, not a broken product.
+    continue-on-error: ${{ matrix.channel == 'development' }}
+    defaults:
+      run:
+        working-directory: qlab_sdk
+    env:
+      QLAB_TELEMETRY: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]" qiskit-aer qiskit-ibm-runtime
+      - name: Install Qiskit (${{ matrix.channel }})
+        run: pip install --upgrade "${{ matrix.qiskit }}"
+      - name: Installed Qiskit
+        run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
+      - name: Run tests
+        run: pytest tests/ -q --tb=short

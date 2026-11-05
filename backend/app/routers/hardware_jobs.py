@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from .. import ibm_quantum
+from ..local_sim import simulate_counts
 from ..database import get_db
 from ..deps import Identity, get_identity
 from ..store import store_put, store_get, store_list, store_delete, store_seed
@@ -30,26 +32,8 @@ def _parse_n_qubits(qasm: str) -> int:
     return int(m.group(1)) if m else 2
 
 def _simulate_counts(qasm: str, backend_key: str, n_shots: int, rng: random.Random) -> Dict[str, int]:
-    spec = BACKENDS.get(backend_key, BACKENDS["ibm_nairobi"])
-    n_q = _parse_n_qubits(qasm)
-    n_q = min(n_q, 10)
-    size = 1 << n_q
-    probs = [rng.random() for _ in range(size)]
-    total = sum(probs)
-    probs = [p/total for p in probs]
-    noise = spec["readout_error"]
-    probs = [(1-noise)*p + noise/size for p in probs]
-    total = sum(probs); probs = [p/total for p in probs]
-    counts: Dict[str, int] = {}
-    for _ in range(n_shots):
-        r = rng.random(); cum = 0.0
-        for i, p in enumerate(probs):
-            cum += p
-            if r < cum:
-                key = format(i, f'0{n_q}b')
-                counts[key] = counts.get(key, 0) + 1
-                break
-    return counts
+    """This circuit, run on a local noiseless simulator. The job is marked is_real=False."""
+    return simulate_counts(qasm, n_shots, seed=rng.randint(0, 2 ** 30))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,65 +41,15 @@ def _simulate_counts(qasm: str, backend_key: str, n_shots: int, rng: random.Rand
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _submit_ibm_real(qasm: str, backend_name: str, n_shots: int, token: str) -> str:
-    """Submit a real IBM Quantum job. Returns the IBM job ID."""
-    from qiskit import QuantumCircuit
-    from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
-
-    service = QiskitRuntimeService(token=token, channel="ibm_quantum")
-    qc = QuantumCircuit.from_qasm_str(qasm)
-    backend = service.backend(backend_name)
-    sampler = SamplerV2(mode=backend)
-    job = sampler.run([qc], shots=n_shots)
-    return job.job_id()
+    return ibm_quantum.submit(qasm, backend_name, n_shots, token)
 
 
 def _poll_ibm_job(ibm_job_id: str, token: str) -> dict:
-    """
-    Poll an IBM Quantum job for status and results.
-    Returns: {status, counts?, error?}
-    Possible status values: 'queued', 'running', 'completed', 'failed', 'cancelled'.
-    """
-    from qiskit_ibm_runtime import QiskitRuntimeService
-
-    service = QiskitRuntimeService(token=token, channel="ibm_quantum")
-    job = service.job(ibm_job_id)
-    status_raw = str(job.status()).lower()
-
-    if "done" in status_raw or "completed" in status_raw:
-        out: dict = {"status": "completed"}
-        try:
-            r = job.result()
-            pub_result = r[0]
-            counts: Dict[str, int] = {}
-            # DataBin field names match the circuit's classical register names
-            for fname, val in vars(pub_result.data).items():
-                if hasattr(val, "get_counts"):
-                    counts = val.get_counts()
-                    break
-            out["counts"] = counts
-        except Exception:
-            out["counts"] = {}
-        return out
-    elif "running" in status_raw:
-        return {"status": "running"}
-    elif "error" in status_raw or "failed" in status_raw:
-        msg = ""
-        try:
-            msg = job.error_message()
-        except Exception:
-            pass
-        return {"status": "failed", "error": msg or status_raw}
-    elif "cancelled" in status_raw:
-        return {"status": "cancelled"}
-    else:
-        return {"status": "queued"}
+    return ibm_quantum.job_state(ibm_job_id, token)
 
 
 def _cancel_ibm_job(ibm_job_id: str, token: str) -> None:
-    """Cancel a real IBM Quantum job."""
-    from qiskit_ibm_runtime import QiskitRuntimeService
-    service = QiskitRuntimeService(token=token, channel="ibm_quantum")
-    service.job(ibm_job_id).cancel()
+    ibm_quantum.cancel(ibm_job_id, token)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

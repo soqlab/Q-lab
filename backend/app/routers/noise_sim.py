@@ -154,7 +154,7 @@ def _aer_simulate(qasm: str, cal_parsed: dict, shots: int = 2000) -> Optional[di
         return None
 
     try:
-        qc = qasm2.loads(qasm)
+        qc = qasm2.loads(qasm, custom_instructions=qasm2.LEGACY_CUSTOM_INSTRUCTIONS)
     except Exception:
         return None
 

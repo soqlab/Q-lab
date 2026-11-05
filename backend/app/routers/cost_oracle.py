@@ -2,6 +2,8 @@ from __future__ import annotations
 import uuid, math
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
+from typing import Optional
+
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -37,7 +39,7 @@ class ProviderCostEstimate(BaseModel):
     cost_per_circuit_usd: float
     cost_total_usd: float
     cost_note: str
-    estimated_queue_min: int
+    estimated_queue_min: Optional[int] = None  # unknown: live queues need the user's provider key
     shots_available: bool
     monthly_budget_warning: bool
     free_tier: bool
@@ -71,7 +73,6 @@ def _ibm_seconds_estimate(n_qubits: int, depth: int, n_shots: int) -> float:
 
 @router.post("/estimate", response_model=CostEstimateResult)
 def estimate_cost(req: CostEstimateRequest):
-    import random; rng = random.Random(42)
     estimates = []
     for pid in req.provider_ids:
         if pid not in PRICING:
@@ -94,7 +95,6 @@ def estimate_cost(req: CostEstimateRequest):
             cost_per_circuit_usd=round(cost_per, 6),
             cost_total_usd=round(total, 6),
             cost_note=note,
-            estimated_queue_min=rng.randint(1, 120),
             shots_available=req.n_shots <= p.get("max_shots", 100000),
             monthly_budget_warning=total > 100.0,
             free_tier=p.get("free_tier", False),

@@ -99,7 +99,7 @@ export default function CostOraclePage() {
                     <td style={{ padding: "8px 16px", fontWeight: 500 }}>{p.provider_name}</td>
                     <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace" }}>${p.cost_per_circuit_usd.toFixed(5)}</td>
                     <td style={{ padding: "8px 16px", fontFamily: "ui-monospace,monospace", fontWeight: 600 }}>${p.cost_total_usd.toFixed(4)}</td>
-                    <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{p.estimated_queue_min}</td>
+                    <td style={{ padding: "8px 16px", color: "var(--muted)" }}>{p.estimated_queue_min ?? "–"}</td>
                     <td style={{ padding: "8px 16px" }}>{p.free_tier ? <span style={{ color: "var(--ok)" }}>Yes</span> : <span style={{ color: "var(--muted)" }}>No</span>}</td>
                   </tr>
                 ))}

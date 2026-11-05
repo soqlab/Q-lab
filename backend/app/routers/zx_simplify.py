@@ -45,7 +45,7 @@ def _simplify_pyzx(qasm: str) -> dict:
 def _simplify_qiskit(qasm: str) -> dict:
     from qiskit import qasm2, transpile  # type: ignore
 
-    qc = qasm2.loads(qasm)
+    qc = qasm2.loads(qasm, custom_instructions=qasm2.LEGACY_CUSTOM_INSTRUCTIONS)
     orig_count = qc.size()
     orig_t = sum(
         1 for inst in qc.data if inst.operation.name in ("t", "tdg")

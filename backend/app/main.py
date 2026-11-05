@@ -258,6 +258,7 @@ from .routers import researcher_profiles as researcher_profiles_router
 from .routers import gdpr as gdpr_router
 from .routers import departments as departments_router
 from .routers import sdk_compat as sdk_compat_router
+from .illustrative import ILLUSTRATIVE_HEADER, MarkIllustrativeData
 from .tasks import deliver_webhooks
 
 APP_URL = os.getenv("QLAB_APP_URL", "")
@@ -290,7 +291,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[ILLUSTRATIVE_HEADER],
 )
+app.add_middleware(MarkIllustrativeData)
 
 # ------------------------------------------------------------------
 # Routers

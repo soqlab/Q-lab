@@ -22,6 +22,11 @@ qlab.init(
 # Your normal Qiskit Sampler/Estimator/backend.run code here.
 ```
 
+By default the SDK talks to `http://localhost:8000`, your own server, and never to ours unless you
+say so. To use the hosted service, set `api_url="https://qlab.soqlab.com/qlab-api"` and the API key
+from your account.
+
+
 Or configure Q-Lab with `qlab.toml` and keep notebooks clean:
 
 ```toml

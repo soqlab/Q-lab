@@ -6,7 +6,38 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Security
+- The job API (`/api/v1/jobs`) had no sign-in check: anyone could list, read and cancel every user's
+  jobs and circuits. It now requires an account and shows people only their own and their
+  organisation's. Older jobs, which recorded no owner, are no longer listed.
+
+### Fixed
+- Q-Lab no longer invents DOIs. `doi`, `dataset-publish` and `fair-data` could return made-up DOIs
+  that looked citable. A DOI now only appears after a repository issues one.
+- Calibration forecasts come from the calibration recorded with your own runs. They used to be
+  generated from a hash of the backend name, including a random R².
+- Reproducibility checks crashed on every run, and now compare with a real simulation.
+- `health-forecast` read fields the SDK doesn't send, so SDK runs produced no forecast.
+- Cost Oracle no longer shows random queue times. Simulated hardware jobs run the actual circuit.
+- IBM's old hosts no longer exist, so calibration, queue data, the job executor and the key check
+  couldn't reach IBM. All of them now use IBM's client library with each user's own key.
+- Real IBM Quantum job submission: the backend asked for the "ibm_quantum" channel, which IBM
+  retired and the client refuses. Circuits are now also converted to the backend's own gates before
+  submission, which IBM requires. Tested against a simulated backend, not yet on IBM's hardware.
+- The circuit compiler always fell back to rule-based compilation because it called an API removed
+  in Qiskit 1.0. It now really uses the Qiskit transpiler.
+- Noise simulation, ZX simplification and circuit search refused any circuit containing `sx`, which
+  every circuit transpiled for IBM has, and quietly returned less or nothing.
+- Onboarding no longer offers the raw Render address as a fallback for the hosted API.
+
 ### Changed
+- Pages whose numbers are simulated or sample data now say so in a visible notice, driven by the
+  `X-QLab-Data: illustrative` response header. See `backend/app/illustrative.py`.
+- Q-Lab has no server-wide IBM or IonQ key: `IBM_QUANTUM_TOKEN` and `IONQ_API_KEY` are no longer
+  read. Each user saves their own key under Credentials.
+- The backend runs on Qiskit 2.6, qiskit-aer 0.18 and qiskit-ibm-runtime 0.51, and uses IBM's new
+  `IBMQuantumComputeService` name.
+- A nightly CI job tests the SDK against the latest Qiskit release and its development branch.
 - The SDK's anonymous install ping is sent only when it talks to the hosted service;
   self-hosted setups never contact SOQLAB. It reports the real SDK version.
 

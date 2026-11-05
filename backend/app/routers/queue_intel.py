@@ -10,11 +10,7 @@ Falls back to mock data if IBM_QUANTUM_TOKEN is not configured.
 """
 from __future__ import annotations
 
-import json
 import math
-import os
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -25,67 +21,41 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity
 from ..health_score import compute_health_score
+from .. import ibm_quantum
 from ..models import Run
 
 router = APIRouter(prefix="/api/v1/queue", tags=["queue_intel"])
 
-IBM_TOKEN = os.environ.get("IBM_QUANTUM_TOKEN", "")
-IBM_BASE = "https://api.quantum-computing.ibm.com/runtime"
-
 
 def _resolve_ibm_token(db, identity: Optional[Identity]) -> str:
-    """Return the best available IBM token: user credential > env var > empty."""
+    """The signed-in user's own IBM key, or empty. Q-Lab has no IBM account of its own."""
     if identity and identity.user_id:
         from .credentials import get_active_key_for_user
-        t = get_active_key_for_user(db, "ibm", identity.user_id)
-        if t:
-            return t
-    return IBM_TOKEN
+        return get_active_key_for_user(db, "ibm", identity.user_id) or ""
+    return ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # IBM API helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _ibm_get(path: str, token: str) -> Any:
-    req = urllib.request.Request(
-        f"{IBM_BASE}{path}",
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode())
-
-
 def _fetch_ibm_backends(token: str) -> list[dict]:
     try:
-        data = _ibm_get("/backends", token)
-        backends = data if isinstance(data, list) else data.get("backends", [])
-        return [
-            {
-                "name": b.get("name", "unknown"),
-                "status": b.get("status", {}).get("state", "unknown"),
-                "queue_length": b.get("status", {}).get("pending_jobs", 0),
-                "operational": b.get("status", {}).get("state", "") == "active",
-                "n_qubits": b.get("configuration", {}).get("n_qubits", 0),
-                "basis_gates": b.get("configuration", {}).get("basis_gates", []),
-                "provider": "ibm",
-            }
-            for b in backends
-        ]
+        return ibm_quantum.list_backends(token)
     except Exception:
         return []
 
 
 def _no_token_error() -> dict:
-    """Raise a clear error when IBM_QUANTUM_TOKEN is not configured."""
+    """Raise a clear error when the user has not saved an IBM key."""
     from fastapi import HTTPException
     raise HTTPException(
         status_code=503,
         detail={
-            "error": "IBM_QUANTUM_TOKEN not configured",
-            "message": "Real queue data requires an IBM Quantum API token. "
-                       "Set the IBM_QUANTUM_TOKEN environment variable to enable live backend status.",
-            "docs": "https://docs.quantum.ibm.com/api/runtime",
+            "error": "No IBM Quantum key",
+            "message": "Live queue data uses your own IBM Quantum account. Add your API key under "
+                       "Credentials. You can create one at quantum.cloud.ibm.com.",
+            "docs": "https://quantum.cloud.ibm.com/docs",
         },
     )
 

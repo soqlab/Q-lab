@@ -17,8 +17,8 @@ numpy==2.5.4
 scipy==1.18.1
 matplotlib==3.11.2
 pylatexenc==2.11
-qiskit==1.4.6
-qiskit-aer==0.17.2
-qiskit-ibm-runtime==0.44.1
+qiskit==2.6.2
+qiskit-aer==0.18.2
+qiskit-ibm-runtime==0.51.0
 paramiko==5.1.0
 # Optional: pip install clickhouse-connect  (for ClickHouse analytics — set CLICKHOUSE_URL env var)

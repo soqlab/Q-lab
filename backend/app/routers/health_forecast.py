@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..calibration_history import calibration_metric
 from ..database import get_db
 from ..models import HealthForecast, Run
 
@@ -93,7 +94,7 @@ def _build_forecast(db: Session, backend: str, metric: str, days: int) -> dict[s
     series = []
     ref_time = None
     for r in runs:
-        val = (r.calibration or {}).get(cal_key)
+        val = calibration_metric(r.calibration, cal_key)
         if val is None:
             continue
         if ref_time is None:

@@ -13,7 +13,7 @@ const CORE_EXACT = [
   "/runs", "/projects", "/timeline", "/analytics", "/compare", "/benchmarks", "/reproducibility",
   "/backends", "/calibration", "/intel", "/cost-oracle",
   "/assistant", "/onboarding",
-  "/integrations", "/webhooks", "/offline-export",
+  "/integrations", "/webhooks",
   "/team",
   "/settings", "/settings/policy", "/settings/rbac", "/settings/audit", "/settings/alerts",
   "/settings/notifications", "/credentials", "/gdpr", "/feedback",

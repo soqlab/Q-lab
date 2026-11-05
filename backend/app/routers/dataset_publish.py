@@ -168,36 +168,9 @@ _REPOSITORY_SPECS: dict = {
     "osf":      {"base_url": "https://osf.io/",                           "doi_prefix": "10.17605/OSF.IO/"},
 }
 
-import random
-
-def _sim_record_id(repo: str) -> str:
-    if repo == "zenodo":
-        return str(random.randint(8_000_000, 12_000_000))
-    if repo == "figshare":
-        return str(random.randint(20_000_000, 30_000_000))
-    chars = "abcdefghjkmnpqrstvwxyz23456789"
-    return "".join(random.choices(chars, k=5)).upper()
-
-
-def _sim_status_progression(pub: dict, db: Session) -> dict:
-    created_at = datetime.fromisoformat(pub["created_at"])
-    age = (datetime.now(timezone.utc) - created_at).total_seconds()
-    if pub["status"] in ("published", "failed"):
-        return pub
-    if age < 5:
-        pub["status"] = "pending"
-    elif age < 15:
-        pub["status"] = "minting"
-    else:
-        pub["status"] = "published"
-        if not pub.get("doi"):
-            rid = _sim_record_id(pub["repository"])
-            spec = _REPOSITORY_SPECS.get(pub["repository"], _REPOSITORY_SPECS["zenodo"])
-            pub["doi"] = f"{spec['doi_prefix']}{rid}"
-            pub["url"] = f"{spec['base_url']}{rid}"
-            pub["published_at"] = datetime.now(timezone.utc).isoformat()
-        store_put(db, NS_PUBLICATIONS, pub["pub_id"], pub)
-    return pub
+def _without_invented_doi(pub: dict) -> dict:
+    """Publications that never reached a repository are drafts, whatever older versions recorded."""
+    return {**pub, "status": "draft", "doi": None, "url": None, "published_at": None}
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +196,7 @@ def publish_dataset(body: PublishRequest, db: Session = Depends(get_db)):
     real = False
     doi: Optional[str] = None
     url: Optional[str] = None
-    status = "pending"
+    status = "draft"
     published_at: Optional[str] = None
 
     # Attempt real Zenodo submission
@@ -237,11 +210,11 @@ def publish_dataset(body: PublishRequest, db: Session = Depends(get_db)):
             status = "published"
             published_at = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
-            # Fall through to simulation if API fails
+            # Stays a draft: the repository didn't take it.
             pass
 
-    file_size_mb = round(len(body.run_ids) * random.uniform(1.2, 8.5), 2)
-    record_count = len(body.run_ids) * random.randint(512, 8192)
+    file_size_mb = 0.0  # known once a repository has the files
+    record_count = len(body.run_ids)
 
     pub = DatasetPublication(
         pub_id=pub_id, title=body.title, description=body.description,
@@ -261,7 +234,7 @@ def list_publications(db: Session = Depends(get_db)):
     for p in records:
         p = dict(p)
         if not p.get("real_submission"):
-            p = _sim_status_progression(p, db)
+            p = _without_invented_doi(p)
         pubs.append(p)
     return {"count": len(pubs), "publications": pubs}
 
@@ -273,7 +246,7 @@ def get_publication(pub_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "publication not found")
     pub = dict(pub)
     if not pub.get("real_submission"):
-        pub = _sim_status_progression(pub, db)
+        pub = _without_invented_doi(pub)
     return pub
 
 
@@ -284,7 +257,7 @@ def mint_doi(pub_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "publication not found")
     pub = dict(pub)
 
-    if pub.get("doi"):
+    if pub.get("doi") and pub.get("real_submission"):
         return DOIMintResult(
             pub_id=pub_id, doi=pub["doi"], url=pub["url"] or "",
             record_id=pub["doi"].split(".")[-1],
@@ -313,13 +286,8 @@ def mint_doi(pub_id: str, db: Session = Depends(get_db)):
             return DOIMintResult(pub_id=pub_id, doi=doi, url=url, record_id=record_id,
                                  minted_at=pub["published_at"], real_submission=True)
 
-    # Simulated fallback
-    spec = _REPOSITORY_SPECS.get(pub["repository"], _REPOSITORY_SPECS["zenodo"])
-    rid = _sim_record_id(pub["repository"])
-    doi = f"{spec['doi_prefix']}{rid}"
-    url = f"{spec['base_url']}{rid}"
-    minted_at = datetime.now(timezone.utc).isoformat()
-    pub.update({"doi": doi, "url": url, "status": "published", "published_at": minted_at})
-    store_put(db, NS_PUBLICATIONS, pub_id, pub)
-    return DOIMintResult(pub_id=pub_id, doi=doi, url=url, record_id=rid,
-                         minted_at=minted_at, real_submission=False)
+    raise HTTPException(
+        503,
+        "No DOI was created. Publishing needs a Zenodo token (ZENODO_TOKEN on the server), "
+        "or Zenodo refused the deposit.",
+    )

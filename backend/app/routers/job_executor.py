@@ -2,7 +2,7 @@
 
 Supported providers
 ───────────────────
-• ibm       — IBM Quantum Runtime REST API (Sampler/Estimator primitives)
+• ibm       — IBM Quantum, through IBM's client library (app/ibm_quantum.py)
 • ionq      — IonQ Cloud REST API v0.3
 • braket    — AWS Braket REST API (via urllib, no boto3 required)
 • simulator — Pure-Python statevector simulation (no Qiskit required)
@@ -14,15 +14,14 @@ Flow
 3. On completion: auto-creates a Run record so results appear in the tracker
 4. SSE: publishes job.updated events on the existing event bus
 
-Provider credentials come from environment variables:
-  IBM_QUANTUM_TOKEN, IONQ_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+Provider keys are each user's own, saved under Credentials. Q-Lab has no provider account of its
+own, so jobs and their costs stay on the user's account.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import math
-import os
 import random
 import time
 import urllib.error
@@ -33,10 +32,12 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from .. import ibm_quantum
 from ..database import SessionLocal, get_db
+from ..deps import Identity, require_auth
 from ..models import JobSubmission, Run
 
 router = APIRouter(prefix="/api/v1", tags=["jobs"])
@@ -214,45 +215,10 @@ def _simulate_qasm(qasm: str, shots: int, seed: int = 42) -> dict[str, int]:
 # IBM Quantum Runtime API
 # ─────────────────────────────────────────────────────────────────────────────
 
-_IBM_BASE = "https://api.quantum-computing.ibm.com/runtime"
+def _provider_key(db: Session, provider: str, user_id: Optional[int]) -> str:
+    from .credentials import get_active_key_for_user
 
-
-def _ibm_submit(qasm: str, backend: str, shots: int, token: str) -> str:
-    body = json.dumps({
-        "program_id": "sampler",
-        "backend": backend,
-        "params": {
-            "pubs": [[qasm]],
-            "shots": shots,
-        },
-    }).encode()
-    req = urllib.request.Request(
-        f"{_IBM_BASE}/jobs",
-        data=body,
-        method="POST",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    return data["id"]
-
-
-def _ibm_status(job_id: str, token: str) -> dict[str, Any]:
-    req = urllib.request.Request(
-        f"{_IBM_BASE}/jobs/{job_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read())
-
-
-def _ibm_results(job_id: str, token: str) -> dict[str, Any]:
-    req = urllib.request.Request(
-        f"{_IBM_BASE}/jobs/{job_id}/results",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read())
+    return (get_active_key_for_user(db, provider, user_id) or "") if user_id else ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -305,11 +271,6 @@ def _braket_submit(qasm: str, backend: str, shots: int) -> str:
 # Background poll task
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _map_ibm_status(s: str) -> str:
-    return {"Queued": "queued", "Running": "running", "Completed": "completed",
-            "Failed": "failed", "Cancelled": "cancelled"}.get(s, "queued")
-
-
 def _map_ionq_status(s: str) -> str:
     return {"submitted": "queued", "ready": "queued", "running": "running",
             "completed": "completed", "failed": "failed", "canceled": "cancelled"}.get(s, "queued")
@@ -351,24 +312,22 @@ def _poll_job(job_id: str) -> None:
                 return
             try:
                 if job.provider == "ibm":
-                    token = os.getenv("IBM_QUANTUM_TOKEN", "")
+                    token = _provider_key(db, "ibm", job.created_by_user_id)
                     if not token or not job.provider_job_id:
                         continue
-                    data = _ibm_status(job.provider_job_id, token)
-                    new_status = _map_ibm_status(data.get("status", ""))
-                    job.status = new_status
-                    if new_status == "completed":
-                        res = _ibm_results(job.provider_job_id, token)
-                        counts = res.get("results", [{}])[0].get("data", {}).get("counts", {})
+                    state = ibm_quantum.job_state(job.provider_job_id, token)
+                    job.status = state["status"]
+                    if job.status == "completed":
+                        counts = state["counts"]
                         job.result = {"counts": counts}
                         job.completed_at = datetime.now(timezone.utc)
                         _auto_ingest_result(db, job, counts)
-                    elif new_status == "failed":
-                        job.error_message = data.get("error_message", "Unknown error")
+                    elif job.status == "failed":
+                        job.error_message = state.get("error") or "Unknown error"
                         job.completed_at = datetime.now(timezone.utc)
 
                 elif job.provider == "ionq":
-                    api_key = os.getenv("IONQ_API_KEY", "")
+                    api_key = _provider_key(db, "ionq", job.created_by_user_id)
                     if not api_key or not job.provider_job_id:
                         continue
                     data = _ionq_status(job.provider_job_id, api_key)
@@ -413,6 +372,24 @@ class JobSubmitRequest(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Who may see a job
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _visible_to(identity: Identity):
+    """A user's own jobs and their organisation's. Jobs from before owners were recorded have none."""
+    if identity.org_id:
+        return or_(JobSubmission.created_by_user_id == identity.user_id, JobSubmission.org_id == identity.org_id)
+    return JobSubmission.created_by_user_id == identity.user_id
+
+
+def _own_job(job_id: str, db: Session, identity: Identity) -> JobSubmission:
+    job = db.scalar(select(JobSubmission).where(JobSubmission.job_id == job_id, _visible_to(identity)))
+    if job is None:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -421,6 +398,7 @@ def submit_job(
     req: JobSubmitRequest,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
 ):
     """Submit a quantum circuit to IBM, IonQ, Braket, or the built-in simulator."""
     job_id = f"job-{uuid.uuid4().hex[:16]}"
@@ -429,18 +407,20 @@ def submit_job(
     error_msg: Optional[str] = None
 
     if req.provider == "ibm":
-        token = os.getenv("IBM_QUANTUM_TOKEN", "")
+        token = _provider_key(db, "ibm", identity.user_id)
         if not token:
-            raise HTTPException(422, "IBM_QUANTUM_TOKEN environment variable not set.")
+            raise HTTPException(422, "Add your IBM Quantum API key under Credentials to run on IBM hardware.")
         try:
-            provider_job_id = _ibm_submit(req.qasm, req.backend, req.shots, token)
+            provider_job_id = ibm_quantum.submit(req.qasm, req.backend, req.shots, token)
+        except ibm_quantum.InvalidIBMKey:
+            raise HTTPException(422, "IBM refused your API key. Check it under Credentials.")
         except Exception as e:
             raise HTTPException(502, f"IBM submission failed: {e}")
 
     elif req.provider == "ionq":
-        api_key = os.getenv("IONQ_API_KEY", "")
+        api_key = _provider_key(db, "ionq", identity.user_id)
         if not api_key:
-            raise HTTPException(422, "IONQ_API_KEY environment variable not set.")
+            raise HTTPException(422, "Add your IonQ API key under Credentials to run on IonQ hardware.")
         try:
             provider_job_id = _ionq_submit(req.qasm, req.backend, req.shots, api_key)
         except Exception as e:
@@ -476,6 +456,8 @@ def submit_job(
         project_slug=req.project_slug,
         cost_credits=cost,
         provider_metadata={"depth_estimate": depth},
+        created_by_user_id=identity.user_id,
+        org_id=identity.org_id,
     )
     db.add(job)
     db.commit()
@@ -502,8 +484,9 @@ def list_jobs(
     project: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
 ):
-    q = select(JobSubmission).order_by(JobSubmission.submitted_at.desc())
+    q = select(JobSubmission).where(_visible_to(identity)).order_by(JobSubmission.submitted_at.desc())
     if provider:
         q = q.where(JobSubmission.provider == provider)
     if status:
@@ -515,36 +498,25 @@ def list_jobs(
 
 
 @router.get("/jobs/{job_id}")
-def get_job(job_id: str, db: Session = Depends(get_db)):
-    job = db.scalar(select(JobSubmission).where(JobSubmission.job_id == job_id))
-    if job is None:
-        raise HTTPException(404, "Job not found")
-    return _job_to_dict(job)
+def get_job(job_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
+    return _job_to_dict(_own_job(job_id, db, identity))
 
 
 @router.post("/jobs/{job_id}/cancel")
-def cancel_job(job_id: str, db: Session = Depends(get_db)):
-    job = db.scalar(select(JobSubmission).where(JobSubmission.job_id == job_id))
-    if job is None:
-        raise HTTPException(404, "Job not found")
+def cancel_job(job_id: str, db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
+    job = _own_job(job_id, db, identity)
     if job.status in ("completed", "failed", "cancelled"):
         raise HTTPException(422, f"Cannot cancel job in state '{job.status}'")
     # Attempt provider cancel
     if job.provider == "ibm" and job.provider_job_id:
-        token = os.getenv("IBM_QUANTUM_TOKEN", "")
+        token = _provider_key(db, "ibm", identity.user_id)
         if token:
             try:
-                req = urllib.request.Request(
-                    f"{_IBM_BASE}/jobs/{job.provider_job_id}/cancel",
-                    data=b"",
-                    method="POST",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                urllib.request.urlopen(req, timeout=10)
+                ibm_quantum.cancel(job.provider_job_id, token)
             except Exception:
                 pass
     elif job.provider == "ionq" and job.provider_job_id:
-        api_key = os.getenv("IONQ_API_KEY", "")
+        api_key = _provider_key(db, "ionq", identity.user_id)
         if api_key:
             try:
                 req = urllib.request.Request(
@@ -563,11 +535,14 @@ def cancel_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/jobs/{job_id}/sync")
-def sync_job(job_id: str, background: BackgroundTasks, db: Session = Depends(get_db)):
+def sync_job(
+    job_id: str,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
+):
     """Force a status sync from the provider."""
-    job = db.scalar(select(JobSubmission).where(JobSubmission.job_id == job_id))
-    if job is None:
-        raise HTTPException(404, "Job not found")
+    job = _own_job(job_id, db, identity)
     if job.status in ("completed", "failed", "cancelled"):
         return _job_to_dict(job)
     background.add_task(_poll_job, job_id)
@@ -575,9 +550,8 @@ def sync_job(job_id: str, background: BackgroundTasks, db: Session = Depends(get
 
 
 @router.get("/jobs/stats/summary")
-def job_stats(db: Session = Depends(get_db)):
-    from sqlalchemy import func
-    jobs = db.scalars(select(JobSubmission)).all()
+def job_stats(db: Session = Depends(get_db), identity: Identity = Depends(require_auth)):
+    jobs = db.scalars(select(JobSubmission).where(_visible_to(identity))).all()
     by_status: dict[str, int] = {}
     by_provider: dict[str, int] = {}
     total_cost = 0.0
@@ -623,7 +597,11 @@ from fastapi.responses import StreamingResponse
 
 @router.get("/jobs/{job_id}/stream")
 async def stream_job(job_id: str, db: Session = Depends(get_db)):
-    """Server-Sent Events stream — sends job status updates every 3 s until terminal."""
+    """Server-Sent Events stream — sends job status updates every 3 s until terminal.
+
+    A browser EventSource can't send the Authorization header, so this is the one route that isn't
+    signed in. The job ID, random and only ever given to its owner, is what grants access.
+    """
     job = db.scalar(select(JobSubmission).where(JobSubmission.job_id == job_id))
     if job is None:
         raise HTTPException(404, "Job not found")

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..local_sim import simulate_counts
 from ..database import get_db
 from ..models import ReproducibilityResult, Run
 
@@ -60,29 +61,24 @@ def check_reproducibility(req: ReproRequest, db: Session = Depends(get_db)):
     if run is None:
         raise HTTPException(404, f"Run '{req.run_id}' not found")
 
-    qasm = run.circuit_qasm
+    qasm = run.qasm
     if not qasm:
         raise HTTPException(422, "Run has no circuit QASM stored")
 
     shots = req.shots or run.shots or 1024
     original_counts: dict[str, int] = {}
-    if run.result and isinstance(run.result, dict):
-        original_counts = run.result.get("counts", {})
+    if isinstance(run.results, dict):
+        original_counts = run.results.get("counts", {})
 
     if not original_counts:
         raise HTTPException(422, "Run has no measurement counts to compare against")
-
-    try:
-        from .job_executor import _simulate_qasm
-    except ImportError:
-        raise HTTPException(500, "Simulator unavailable")
 
     rng = random.Random(hash(req.run_id) % (2 ** 31))
     trial_tvds: list[float] = []
 
     for _ in range(req.n_reruns):
         seed = rng.randint(0, 2 ** 30)
-        new_counts = _simulate_qasm(qasm, shots, seed=seed)
+        new_counts = simulate_counts(qasm, shots, seed=seed)
         tvd = _tvd(original_counts, new_counts)
         trial_tvds.append(round(tvd, 4))
 
@@ -108,6 +104,7 @@ def check_reproducibility(req: ReproRequest, db: Session = Depends(get_db)):
 
     return {
         "result_id": result_id,
+        "method": "Stored counts compared with noiseless local simulation, not a rerun on hardware.",
         "original_run_id": req.run_id,
         "n_reruns": req.n_reruns,
         "mean_tvd": round(mean_tvd, 4),

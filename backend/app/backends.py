@@ -16,8 +16,8 @@ QUANTUM_BACKENDS: dict[str, dict] = {
     "ibm": {
         "label": "IBM Quantum",
         "color": "#6929c4",
-        "docs_url": "https://quantum.ibm.com",
-        "credential_hint": "Get your API token at quantum.ibm.com → Account → API Token",
+        "docs_url": "https://quantum.cloud.ibm.com",
+        "credential_hint": "Create an API key at quantum.cloud.ibm.com. Runs and costs stay on your own IBM account.",
     },
     "ionq": {
         "label": "IonQ",

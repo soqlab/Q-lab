@@ -57,7 +57,7 @@ export default function OnboardingPage() {
 
   const apiUrl = typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.host}/qlab-api`
-    : "https://qlab-backend.onrender.com";
+    : "https://qlab.soqlab.com/qlab-api";
 
   useEffect(() => {
     if (!token) return;

@@ -237,14 +237,12 @@ def test_credential(
     result: dict[str, Any] = {"cred_id": cred_id, "provider": c.provider}
     try:
         if c.provider == "ibm":
-            req = urllib.request.Request(
-                "https://auth.quantum-computing.ibm.com/api/users/loginWithToken",
-                data=b'{"apiToken":"' + key.encode() + b'"}',
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            urllib.request.urlopen(req, timeout=10)
-            result["status"] = "valid"
+            from ..ibm_quantum import InvalidIBMKey, check_key
+            try:
+                check_key(key)
+                result["status"] = "valid"
+            except InvalidIBMKey:
+                result["status"] = "invalid"
         elif c.provider == "ionq":
             req = urllib.request.Request(
                 "https://api.ionq.co/v0.3/backends",

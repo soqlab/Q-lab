@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import false, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -249,6 +249,15 @@ def _runs_for_period(db: Session, days: int) -> list[Run]:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+def _jobs_visible_to(identity):
+    """The caller's own jobs and their organisation's."""
+    from .job_executor import _visible_to
+
+    if identity is None or not identity.user_id:
+        return false()
+    return _visible_to(identity)
+
+
 @router.get("/provider-pricing")
 def get_provider_pricing():
     """Return the real documented pricing for each supported provider."""
@@ -274,7 +283,12 @@ def cost_summary(
         "7d": 7, "30d": 30, "90d": 90, "all": 3650,
     }[period]
     runs = _runs_for_period(db, days)
-    jobs = db.scalars(select(JobSubmission).limit(5000)).all() if days > 0 else []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    jobs = db.scalars(
+        select(JobSubmission)
+        .where(JobSubmission.submitted_at >= cutoff, _jobs_visible_to(identity))
+        .limit(5000)
+    ).all() if days > 0 else []
     by_provider: dict[str, dict] = {}
     by_project: dict[str | None, dict] = {}
     total_usd = 0.0
@@ -292,8 +306,6 @@ def cost_summary(
         by_project[project]["job_count"] += 1
 
     for job in jobs:
-        if job.submitted_at and job.submitted_at < datetime.now(timezone.utc) - timedelta(days=days):
-            continue
         usd = _job_usd(job)
         total_usd += usd
         provider = _resolve_provider(job.provider)

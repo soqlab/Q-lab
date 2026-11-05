@@ -10,6 +10,7 @@ import { useAuth } from "../../lib/auth";
 import { usePageTracker } from "../../lib/usePageTracker";
 import { usePathname, useRouter } from "next/navigation";
 import { isCorePath, useLabs } from "../../lib/labs";
+import IllustrativeNotice from "./IllustrativeNotice";
 
 function SWUpdater() {
   useEffect(() => {
@@ -259,6 +260,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <UserMenu />
         </header>
 
+        <IllustrativeNotice />
         <div style={{ flex: 1 }}><LabsGate>{children}</LabsGate></div>
 
         {/* Footer */}

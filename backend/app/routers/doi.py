@@ -176,21 +176,15 @@ def mint_doi(run_id: str, body: MintRequest, db: Session = Depends(get_db)):
             data = resp.json()
             zenodo_record_id = str(data.get("record_id", ""))
             doi = data.get("metadata", {}).get("prereserve_doi", {}).get("doi") or data.get("doi")
-            if not doi and zenodo_record_id:
-                doi = f"10.5281/zenodo.{zenodo_record_id}"
-            status = "minted"
-            minted_at = now
+            # A sandbox deposit is a draft for testing: its DOI resolves nowhere and can't be cited.
+            status = "draft"
         except Exception as exc:
             status = "failed"
             doi = None
             # Store the failure but don't crash — return the record with status=failed
-    else:
-        # Simulation / demo mode
-        doi = f"10.5281/qlab.{run_id[:8]}"
-        status = "draft"
-        minted_at = now
-
-    citation_text = _apa_citation(body.authors, year, body.title, doi) if doi else None
+    # Without a Zenodo token there is no DOI: never invent one. A real, citable DOI comes from
+    # publishing through /api/v1/dataset-publish.
+    citation_text = None
 
     record_data: dict = {
         "doi_record_id": record_id,
@@ -235,6 +229,8 @@ def get_citation(run_id: str, db: Session = Depends(get_db)):
     record = _find_by_run(db, run_id)
     if record is None:
         raise HTTPException(status_code=404, detail="No DOI record found for this run")
+    if record.get("status") != "minted":
+        raise HTTPException(status_code=404, detail="This run has no published DOI to cite yet")
 
     authors = record.get("authors", [])
     year = record.get("minted_at", "")[:4] if record.get("minted_at") else str(datetime.now().year)

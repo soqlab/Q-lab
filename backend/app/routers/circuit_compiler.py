@@ -79,7 +79,7 @@ def _compile_with_qiskit(qasm: str, provider: str, opt_level: int) -> tuple[str,
     """Try Qiskit transpiler; fall back to rule-based if unavailable."""
     warnings: list[str] = []
     try:
-        from qiskit import QuantumCircuit
+        from qiskit import QuantumCircuit, qasm2
         from qiskit.compiler import transpile
 
         basis_map = {
@@ -93,7 +93,7 @@ def _compile_with_qiskit(qasm: str, provider: str, opt_level: int) -> tuple[str,
 
         qc = QuantumCircuit.from_qasm_str(qasm)
         compiled = transpile(qc, basis_gates=basis, optimization_level=opt_level)
-        compiled_qasm = compiled.qasm()
+        compiled_qasm = qasm2.dumps(compiled)
         return compiled_qasm, warnings
 
     except ImportError:

@@ -40,18 +40,7 @@ try:
             "ibm_sherbrooke": FakeSherbrooke,
         }
     except ImportError:
-        try:
-            from qiskit.providers.fake_provider import (
-                FakeBrisbane, FakeKyoto, FakeOsaka, FakeSherbrooke,
-            )
-            _FAKE_BACKENDS = {
-                "ibm_brisbane": FakeBrisbane,
-                "ibm_kyoto": FakeKyoto,
-                "ibm_osaka": FakeOsaka,
-                "ibm_sherbrooke": FakeSherbrooke,
-            }
-        except ImportError:
-            pass
+        pass
 except ImportError:
     pass
 
