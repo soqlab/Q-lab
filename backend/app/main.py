@@ -658,13 +658,13 @@ def _run_to_dict(run: Run, include_health: bool = False) -> Dict[str, Any]:
     return d
 
 
-def _get_or_create_project(db: Session, slug: Optional[str]) -> "Project | None":
+def _get_or_create_project(db: Session, slug: Optional[str], user_id: Optional[int] = None) -> "Project | None":
     if not slug:
         return None
     project = db.scalar(select(Project).where(Project.slug == slug))
     if project:
         return project
-    project = Project(slug=slug, name=slug)
+    project = Project(slug=slug, name=slug, created_by_user_id=user_id)
     db.add(project)
     db.flush()
     return project
@@ -678,7 +678,7 @@ def _find_run(db: Session, run_id: str) -> Run:
 
 
 def _upsert_run(db: Session, payload: RunPayload, identity: Optional[Identity] = None) -> Run:
-    project = _get_or_create_project(db, payload.project)
+    project = _get_or_create_project(db, payload.project, identity.user_id if identity else None)
     run = db.scalar(select(Run).where(Run.run_id == payload.run_id))
 
     if run is None:
@@ -969,6 +969,14 @@ def search_runs(
 # Projects
 # ------------------------------------------------------------------
 
+def _project_visible(db: Session, project: "Project", identity: Optional[Identity]) -> bool:
+    """Yours, or containing a run you can see. (Run queries are already limited to the caller.)"""
+    user_id = identity.user_id if identity else None
+    if user_id is not None and project.created_by_user_id == user_id:
+        return True
+    return db.scalar(select(Run.id).where(Run.project_slug == project.slug).limit(1)) is not None
+
+
 @app.post("/api/v1/projects")
 def create_project(
     payload: ProjectPayload,
@@ -977,8 +985,12 @@ def create_project(
 ):
     project = db.scalar(select(Project).where(Project.slug == payload.slug))
     if project is None:
-        project = Project(slug=payload.slug, name=payload.name or payload.slug, description=payload.description)
+        project = Project(slug=payload.slug, name=payload.name or payload.slug, description=payload.description,
+                          created_by_user_id=identity.user_id)
         db.add(project)
+    elif project.created_by_user_id not in (None, identity.user_id) or not _project_visible(db, project, identity):
+        # Someone else's project: the slug is taken, and its name and description aren't yours to change.
+        raise HTTPException(status_code=409, detail="A project with this slug already exists")
     else:
         project.name = payload.name or project.name
         project.description = payload.description
@@ -993,10 +1005,10 @@ def create_project(
 
 
 @app.get("/api/v1/projects/{slug}/stats")
-def project_stats(slug: str, db: Session = Depends(get_db)):
+def project_stats(slug: str, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
     from .health_score import compute_health_score
     project = db.scalar(select(Project).where(Project.slug == slug))
-    if project is None:
+    if project is None or not _project_visible(db, project, identity):
         raise HTTPException(status_code=404, detail="project not found")
     runs = db.scalars(
         select(Run).where(Run.project_slug == slug).order_by(Run.created_at.asc())
@@ -1050,8 +1062,8 @@ def project_stats(slug: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/projects")
-def list_projects(db: Session = Depends(get_db)):
-    projects = db.scalars(select(Project).order_by(Project.slug)).all()
+def list_projects(db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
+    projects = [p for p in db.scalars(select(Project).order_by(Project.slug)).all() if _project_visible(db, p, identity)]
     return [
         {
             "slug": p.slug,

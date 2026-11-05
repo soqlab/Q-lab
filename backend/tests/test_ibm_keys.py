@@ -175,3 +175,15 @@ def test_cost_summary_counts_only_your_own_jobs():
     mine = client.get("/api/v1/costs/summary", params={"period": "monthly"}, headers=bob)
     assert mine.status_code == 200, mine.text
     assert mine.json()["total_usd"] == 0
+
+
+def test_projects_are_private_to_their_owner_and_runs():
+    alice, bob = _user(), _user()
+    slug = f"secret-{uuid.uuid4().hex[:8]}"
+    assert client.post("/api/v1/projects", headers=alice, json={"slug": slug, "name": "Alice's"}).status_code == 200
+    assert slug in [p["slug"] for p in client.get("/api/v1/projects", headers=alice).json()]
+    assert slug not in [p["slug"] for p in client.get("/api/v1/projects", headers=bob).json()]
+    assert client.get(f"/api/v1/projects/{slug}/stats", headers=bob).status_code == 404
+    takeover = client.post("/api/v1/projects", headers=bob, json={"slug": slug, "name": "Bob's now"})
+    assert takeover.status_code == 409
+    assert client.get(f"/api/v1/projects/{slug}/stats", headers=alice).json()["name"] == "Alice's"

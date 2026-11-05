@@ -99,6 +99,12 @@ def _ensure_compat_columns() -> None:
                 "UPDATE users SET email_verified = TRUE WHERE verify_token IS NULL AND email_verified = FALSE"
             ))
 
+    if "projects" in tables:
+        project_cols = {c["name"] for c in inspector.get_columns("projects")}
+        if "created_by_user_id" not in project_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN created_by_user_id INTEGER"))
+
     if "audit_logs" in tables:
         audit_cols = {c["name"] for c in inspector.get_columns("audit_logs")}
         with engine.begin() as conn:

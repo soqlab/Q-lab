@@ -152,6 +152,9 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Who created it. Projects from before this was recorded have none: they're visible to whoever
+    # can see a run in them.
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
     runs: Mapped[list["Run"]] = relationship(back_populates="project")
 

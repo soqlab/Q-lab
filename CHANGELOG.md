@@ -13,16 +13,18 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   circuit is stored as QPY before and after transpilation.
 - `qlab ci check`: compares a run with a baseline by TVD against a shot-noise bound and writes
   JUnit XML for CI.
-### Removed
-- The old `sdk/` folder: a stale duplicate of the `qlab-sdk` package (0.1.0) that pointed at a
-  retired server. The SDK is `qlab_sdk/`.
-
-### Added
 - CI runs ruff on `backend/` and `qlab_sdk/` (`ruff.toml`: syntax errors and undefined names).
 - Tests for the core tracking API: runs, projects, compare, search, API keys, and checks that
   one user cannot read, change or delete another's runs.
 
+### Removed
+- The old `sdk/` folder: a stale duplicate of the `qlab-sdk` package (0.1.0) that pointed at a
+  retired server. The SDK is `qlab_sdk/`.
+
 ### Security
+- Projects were shared across every account: anyone could list all project names and rename or
+  redescribe someone else's project. A project is now visible to its creator and to whoever can
+  see a run in it; another user's slug is refused.
 - The job API (`/api/v1/jobs`) had no sign-in check: anyone could list, read and cancel every user's
   jobs and circuits. It now requires an account and shows people only their own and their
   organisation's. Older jobs, which recorded no owner, are no longer listed.
