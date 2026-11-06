@@ -227,7 +227,6 @@ from .routers import dataset_publish as dataset_publish_router
 from .routers import rl_optimizer as rl_optimizer_router
 from .routers import synthetic_data as synthetic_data_router
 from .routers import live_monitor as live_monitor_router
-from .routers import cost_arbitrage as cost_arbitrage_router
 from .routers import process_tomo as process_tomo_router
 from .routers import conference as conference_router
 from .routers import learn as learn_router
@@ -503,7 +502,6 @@ app.include_router(dataset_publish_router.router)
 app.include_router(rl_optimizer_router.router)
 app.include_router(synthetic_data_router.router)
 app.include_router(live_monitor_router.router)
-app.include_router(cost_arbitrage_router.router)
 app.include_router(process_tomo_router.router)
 app.include_router(conference_router.router)
 app.include_router(learn_router.router)

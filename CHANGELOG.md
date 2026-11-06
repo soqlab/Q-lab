@@ -17,7 +17,19 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 - Tests for the core tracking API: runs, projects, compare, search, API keys, and checks that
   one user cannot read, change or delete another's runs.
 
+### Changed
+- Six Labs tools no longer return invented numbers. The XEB Certifier (was Advantage Certifier)
+  scores each run's recorded counts with linear XEB against the exact ideal distribution of its
+  stored circuit. Environment Snapshots show what the SDK recorded with each run. Backend Compare
+  compares runs you recorded of the same circuit on different backends, instead of simulating
+  them under the backends' names. Entanglement Map and Ideal State Analysis (was State
+  Tomography) compute from the exact statevector of the circuit and say it is the ideal state,
+  not a hardware measurement. Each response names its source, and none is marked illustrative.
+- The run page's evolutionary optimizer panel (illustrative) shows only with Labs on.
+
 ### Removed
+- Cost Arbitrage: its device error rates, T1, fidelity, queue times and availability were random.
+  Cost Oracle quotes the published prices.
 - The old `sdk/` folder: a stale duplicate of the `qlab-sdk` package (0.1.0) that pointed at a
   retired server. The SDK is `qlab_sdk/`.
 

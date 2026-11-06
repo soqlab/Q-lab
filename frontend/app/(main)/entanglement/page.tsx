@@ -72,14 +72,13 @@ function EntanglementGraph({ result }: { result: EntanglementMapResult }) {
 
 export default function EntanglementPage() {
   const [qasm, setQasm] = useState(PRESET);
-  const [nQubits, setNQubits] = useState(4);
   const [result, setResult] = useState<EntanglementMapResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
     setLoading(true); setError(null);
-    try { setResult(await mapEntanglement({ qasm, n_qubits: nQubits })); }
+    try { setResult(await mapEntanglement({ qasm })); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
@@ -94,8 +93,9 @@ export default function EntanglementPage() {
           <GitBranch size={28} color="#10b981" /> Entanglement Topology Animator
         </h1>
         <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-          Maps bipartite entanglement entropy per qubit at each circuit depth layer. Watch entanglement
-          propagate through CX gates in real-time. Computes von Neumann entropy and final topology graph.
+          Each qubit&apos;s entanglement entropy with the rest of the register after every layer of your circuit,
+          and the pairs that share mutual information. Computed exactly from the ideal (noiseless) statevector;
+          not a measurement of hardware.
         </p>
       </div>
       {error && <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>{error}</div>}
@@ -106,11 +106,6 @@ export default function EntanglementPage() {
             <h3 style={{ color: "#e2e8f0", fontWeight: 600, marginBottom: "0.75rem" }}>Circuit Input</h3>
             <textarea value={qasm} onChange={e => setQasm(e.target.value)} rows={10}
               style={{ display: "block", width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#e2e8f0", padding: "0.5rem", fontFamily: "monospace", fontSize: "0.75rem", boxSizing: "border-box", resize: "vertical", marginBottom: 12 }} />
-            <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 14 }}>
-              Qubits to analyze: <span style={{ color: "#10b981", fontWeight: 700 }}>{nQubits}</span>
-              <input type="range" min={2} max={8} value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-                style={{ display: "block", width: "100%", marginTop: 4, accentColor: "#10b981" }} />
-            </label>
             <button onClick={run} disabled={loading}
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "0.7rem", cursor: "pointer", fontWeight: 600, opacity: loading ? 0.6 : 1 }}>
               <Play size={15} /> {loading ? "Mapping…" : "Animate Entanglement"}

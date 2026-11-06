@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, Coins, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { isCorePath, useLabs } from "../../lib/labs";
 
@@ -78,7 +78,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/global-cal", icon: Globe, label: "Global Cal DB" },
       { href: "/providers", icon: Server, label: "Multi-Provider" },
       { href: "/costs", icon: DollarSign, label: "QPU Costs" },
-      { href: "/cost-arbitrage", icon: Coins, label: "Cost Arbitrage" },
       { href: "/cost-oracle", icon: DollarSign, label: "Cost Oracle" },
     ],
   },
@@ -109,7 +108,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
     defaultOpen: false,
     items: [
       { href: "/qec", icon: Shield, label: "QEC Synthesizer" },
-      { href: "/statetomo", icon: Atom, label: "State Tomography" },
+      { href: "/statetomo", icon: Atom, label: "Ideal State Analysis" },
       { href: "/tomography", icon: Scan, label: "Tomography" },
       { href: "/gate-tomo", icon: Scan, label: "Gate Tomography" },
       { href: "/process-tomo", icon: Scan, label: "Process Tomography" },

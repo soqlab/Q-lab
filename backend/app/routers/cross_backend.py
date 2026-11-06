@@ -1,200 +1,145 @@
-"""Cross-Backend Comparison — run the same circuit on multiple backends and compare.
+"""Cross-backend comparison of the user's own recorded runs of one circuit.
 
-Flow:
-1. POST /api/v1/cross-backend/compare — submit the same QASM to N providers/backends
-2. Results are stored as JobSubmission rows under a shared comparison_id
-3. GET /api/v1/cross-backend/{comparison_id} — retrieve comparison results
+Q-Lab does not run anything here. It takes runs the user already captured (the same circuit on
+different backends), and compares the counts each backend actually returned:
 
-Metrics compared:
-  - success_probability
-  - estimated cost
-  - backend queue length (from queue_intel)
-  - health score delta
+  - total variation distance (TVD) between every pair of runs;
+  - when the run stores its circuit, the TVD and Hellinger fidelity of each run's counts to the
+    exact ideal distribution of that circuit (statevector simulation).
+
+GET lists groups of the user's runs that share a circuit and span at least two backends. Runs
+without recorded counts are reported, never filled in.
 """
 from __future__ import annotations
 
-import json
-import uuid
-from datetime import datetime, timezone
+import hashlib
+import math
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..database import get_db, SessionLocal
-from ..models import JobSubmission, Run
+from ..database import get_db
+from ..local_sim import ideal_probabilities
+from ..models import Run
 
 router = APIRouter(prefix="/api/v1/cross-backend", tags=["cross_backend"])
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Comparison record (stored in JSON within the job metadata)
-# ─────────────────────────────────────────────────────────────────────────────
-
-# We piggyback on JobSubmission.provider_metadata to store comparison_id.
-# A comparison is just a group of jobs sharing the same comparison_id tag.
+SOURCE = ("Counts recorded with your runs. Ideal distribution, where shown, from an exact statevector "
+          "simulation of the run's stored circuit.")
 
 
-def _get_comparison_jobs(db: Session, comparison_id: str) -> list[JobSubmission]:
-    """Find all jobs tagged with this comparison_id."""
-    all_jobs = db.scalars(select(JobSubmission)).all()
-    return [j for j in all_jobs if (j.provider_metadata or {}).get("comparison_id") == comparison_id]
+def circuit_key(run: Run) -> Optional[str]:
+    """Identifies the circuit: the SDK's QASM hash, else a hash of the stored QASM."""
+    fp = run.fingerprint if isinstance(run.fingerprint, dict) else {}
+    if fp.get("qasm_sha256"):
+        return str(fp["qasm_sha256"])
+    if run.qasm:
+        return hashlib.sha256(run.qasm.encode("utf-8")).hexdigest()
+    return None
 
 
-def _job_summary(job: JobSubmission) -> dict[str, Any]:
-    res = job.result or {}
-    counts = res.get("counts", {})
-    total = sum(int(v) for v in counts.values()) if counts else 0
-    sp = res.get("success_probability")
-    if sp is None and counts and total > 0:
-        sp = max(int(v) for v in counts.values()) / total
-    return {
-        "job_id": job.job_id,
-        "backend": job.backend,
-        "provider": job.provider,
-        "status": job.status,
-        "shots": job.shots,
-        "success_probability": round(float(sp), 4) if sp is not None else None,
-        "cost_credits": job.cost_credits,
-        "error_message": job.error_message,
-        "counts": dict(sorted(counts.items(), key=lambda x: -int(x[1]))[:8]) if counts else {},
-        "submitted_at": job.submitted_at.isoformat() if job.submitted_at else None,
-        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
-    }
+def _distribution(counts: dict[str, Any]) -> dict[str, float]:
+    clean = {str(k).replace(" ", ""): float(v) for k, v in counts.items() if float(v) > 0}
+    total = sum(clean.values())
+    return {k: v / total for k, v in clean.items()} if total > 0 else {}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Job submission helpers (reuse simulator from job_executor)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _submit_local(qasm: str, backend: str, provider: str, shots: int,
-                  comparison_id: str, circuit_name: str, db: Session) -> JobSubmission:
-    """Create a JobSubmission record and run it via the simulator for mock providers."""
-    from .job_executor import _simulate_qasm, _estimate_cost
-    import random
-
-    job_id = f"job-{uuid.uuid4().hex[:12]}"
-    # Run simulator for non-real providers
-    seed = hash(backend + qasm) % (2 ** 31)
-    counts = _simulate_qasm(qasm, shots, seed=abs(seed))
-    total = sum(counts.values()) or 1
-    sp = max(counts.values()) / total
-    depth_hint = max(1, qasm.count("\n") // 3)
-    cost = _estimate_cost(provider, shots, depth_hint)
-
-    job = JobSubmission(
-        job_id=job_id,
-        provider=provider,
-        provider_job_id=f"sim-{uuid.uuid4().hex[:8]}",
-        backend=backend,
-        shots=shots,
-        status="completed",
-        qasm=qasm,
-        circuit_name=circuit_name,
-        result={"counts": counts, "success_probability": round(sp, 4)},
-        cost_credits=cost,
-        provider_metadata={"comparison_id": comparison_id},
-        completed_at=datetime.now(timezone.utc),
-    )
-    db.add(job)
-    return job
+def tvd(p: dict[str, float], q: dict[str, float]) -> float:
+    return 0.5 * sum(abs(p.get(k, 0.0) - q.get(k, 0.0)) for k in set(p) | set(q))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pydantic models
-# ─────────────────────────────────────────────────────────────────────────────
-
-class BackendTarget(BaseModel):
-    provider: str = "simulator"
-    backend: str
+def hellinger_fidelity(p: dict[str, float], q: dict[str, float]) -> float:
+    return sum(math.sqrt(p[k] * q[k]) for k in set(p) & set(q)) ** 2
 
 
 class CompareRequest(BaseModel):
-    qasm: str
-    targets: list[BackendTarget] = Field(min_length=2, max_length=6)
-    shots: int = Field(default=1024, ge=128, le=8192)
-    circuit_name: str = ""
+    run_ids: list[str] = Field(min_length=2, max_length=12)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("")
-def create_comparison(req: CompareRequest, db: Session = Depends(get_db)):
-    """Submit QASM to multiple backends and return a comparison_id."""
-    comparison_id = f"cmp-{uuid.uuid4().hex[:12]}"
-    jobs = []
-    for target in req.targets:
-        job = _submit_local(
-            req.qasm, target.backend, target.provider,
-            req.shots, comparison_id, req.circuit_name, db,
-        )
-        jobs.append(job)
-    db.commit()
+def compare_runs(req: CompareRequest, db: Session = Depends(get_db)):
+    run_ids = list(dict.fromkeys(req.run_ids))
+    if len(run_ids) < 2:
+        raise HTTPException(status_code=422, detail="Choose at least two different runs.")
+    found = {r.run_id: r for r in db.scalars(select(Run).where(Run.run_id.in_(run_ids)))}
+    missing = [rid for rid in run_ids if rid not in found]
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Run(s) not found: {', '.join(missing)}")
+
+    rows, dists, skipped, warnings = [], {}, [], []
+    ideal_cache: dict[str, Optional[dict[str, float]]] = {}
+    for rid in run_ids:
+        run = found[rid]
+        dist = _distribution((run.results or {}).get("counts") or {})
+        if not dist:
+            skipped.append({"run_id": rid, "reason": "The run has no recorded counts."})
+            continue
+        dists[rid] = dist
+        key = circuit_key(run)
+        ideal = None
+        if run.qasm and key:
+            if key not in ideal_cache:
+                try:
+                    ideal_cache[key] = ideal_probabilities(run.qasm)
+                except ValueError as exc:
+                    ideal_cache[key] = None
+                    warnings.append(f"No ideal distribution for run {rid}: {exc}")
+            ideal = ideal_cache[key]
+        shots = sum(int(v) for v in ((run.results or {}).get("counts") or {}).values())
+        rows.append({
+            "run_id": rid,
+            "backend": run.backend,
+            "created_at": run.created_at.isoformat() if run.created_at else None,
+            "circuit_key": key,
+            "shots": shots,
+            "top_bitstring": max(dist, key=lambda k: dist[k]),
+            "tvd_to_ideal": None if ideal is None else round(tvd(dist, ideal), 6),
+            "hellinger_fidelity_to_ideal": None if ideal is None else round(hellinger_fidelity(dist, ideal), 6),
+        })
+
+    keys = {r["circuit_key"] for r in rows}
+    same_circuit = len(keys) == 1 and None not in keys
+    if not same_circuit and len(rows) > 1:
+        warnings.append("These runs are not all of the same circuit, so their outputs need not agree.")
+
+    pairwise = [
+        {"run_a": a["run_id"], "run_b": b["run_id"], "tvd": round(tvd(dists[a["run_id"]], dists[b["run_id"]]), 6)}
+        for i, a in enumerate(rows) for b in rows[i + 1:]
+    ]
+    scored = [r for r in rows if r["hellinger_fidelity_to_ideal"] is not None]
+    best = max(scored, key=lambda r: r["hellinger_fidelity_to_ideal"]) if scored else None
     return {
-        "comparison_id": comparison_id,
-        "n_backends": len(jobs),
-        "status": "all_submitted",
-        "jobs": [{"job_id": j.job_id, "backend": j.backend, "provider": j.provider} for j in jobs],
-    }
-
-
-@router.get("/{comparison_id}")
-def get_comparison(comparison_id: str, db: Session = Depends(get_db)):
-    """Retrieve comparison results for a given comparison_id."""
-    jobs = _get_comparison_jobs(db, comparison_id)
-    if not jobs:
-        raise HTTPException(404, "Comparison not found")
-
-    summaries = [_job_summary(j) for j in jobs]
-    completed = [s for s in summaries if s["success_probability"] is not None]
-
-    # Compute winner by success_probability
-    winner = max(completed, key=lambda s: s["success_probability"] or 0) if completed else None
-
-    # Cost comparison
-    costs = {s["backend"]: s["cost_credits"] for s in summaries if s["cost_credits"] is not None}
-    cheapest = min(costs, key=lambda k: costs[k]) if costs else None
-
-    return {
-        "comparison_id": comparison_id,
-        "n_backends": len(jobs),
-        "backends": summaries,
-        "winner_by_fidelity": winner["backend"] if winner else None,
-        "winner_by_cost": cheapest,
-        "metrics_table": [
-            {
-                "backend": s["backend"],
-                "provider": s["provider"],
-                "success_probability": s["success_probability"],
-                "cost_credits": s["cost_credits"],
-                "top_bitstring": list(s["counts"].keys())[0] if s["counts"] else None,
-                "status": s["status"],
-            }
-            for s in summaries
-        ],
+        "same_circuit": same_circuit,
+        "runs": rows,
+        "skipped": skipped,
+        "pairwise_tvd": pairwise,
+        "best_by_fidelity": None if best is None else {"run_id": best["run_id"], "backend": best["backend"]},
+        "warnings": warnings,
+        "source": SOURCE,
     }
 
 
 @router.get("")
-def list_comparisons(limit: int = 20, db: Session = Depends(get_db)):
-    """List recent comparison IDs."""
-    all_jobs = db.scalars(
-        select(JobSubmission).order_by(JobSubmission.submitted_at.desc()).limit(500)
-    ).all()
-    seen: dict[str, dict] = {}
-    for j in all_jobs:
-        cid = (j.provider_metadata or {}).get("comparison_id")
-        if cid and cid not in seen:
-            seen[cid] = {
-                "comparison_id": cid,
-                "n_backends": 0,
-                "submitted_at": j.submitted_at.isoformat() if j.submitted_at else None,
-                "circuit_name": j.circuit_name,
-            }
-        if cid:
-            seen[cid]["n_backends"] += 1
-    return list(seen.values())[:limit]
+def list_comparable(limit: int = 1000, db: Session = Depends(get_db)):
+    """Your circuits that have recorded runs on two or more backends."""
+    runs = db.scalars(select(Run).order_by(Run.created_at.desc()).limit(max(1, min(limit, 5000))))
+    groups: dict[str, dict] = {}
+    for run in runs:
+        key = circuit_key(run)
+        if not key or not run.backend or not (run.results or {}).get("counts"):
+            continue
+        g = groups.setdefault(key, {"circuit_key": key, "circuit_name": run.circuit_name,
+                                    "backends": [], "run_ids": [], "latest_at": None})
+        g["run_ids"].append(run.run_id)
+        if run.backend not in g["backends"]:
+            g["backends"].append(run.backend)
+        if g["latest_at"] is None and run.created_at:
+            g["latest_at"] = run.created_at.isoformat()
+        g["circuit_name"] = g["circuit_name"] or run.circuit_name
+    return {
+        "source": SOURCE,
+        "groups": [g for g in groups.values() if len(g["backends"]) >= 2],
+    }

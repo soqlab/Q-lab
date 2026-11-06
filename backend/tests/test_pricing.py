@@ -158,14 +158,6 @@ def test_scheduler_skips_backends_without_a_public_price():
     assert any("quantinuum_h2" in rec for rec in r.json()["recommendations"])
 
 
-def test_arbitrage_quotes_use_published_prices():
-    r = client.post("/api/v1/cost-arbitrage/quote", json={"n_shots": 1000, "circuit_depth": 3, "n_qubits": 2})
-    assert r.status_code == 200, r.text
-    quotes = {q["backend"]: q for q in r.json()}
-    assert "quantinuum_h2" not in quotes  # not public
-    assert quotes["rigetti_ankaa_2"]["estimated_total_usd"] == pytest.approx(0.725)
-
-
 def test_providers_list_says_not_public():
     rows = {p["id"]: p for p in client.get("/api/v1/providers").json()["providers"]}
     assert rows["google_quantum_ai"]["price_display"] == "not public"

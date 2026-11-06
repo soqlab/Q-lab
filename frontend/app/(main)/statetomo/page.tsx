@@ -61,16 +61,14 @@ function DensityMatrix({ dm }: { dm: { re: number[][]; im: number[][] } }) {
 
 export default function StateTomographyPage() {
   const [qasm, setQasm] = useState(PRESET);
-  const [nQubits, setNQubits] = useState(2);
   const [target, setTarget] = useState("");
-  const [shots, setShots] = useState(1024);
   const [result, setResult] = useState<TomoResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
     setLoading(true); setError(null);
-    try { setResult(await analyzeStateTomography({ qasm, n_qubits: nQubits, target_state: target || undefined, shots })); }
+    try { setResult(await analyzeStateTomography({ qasm, target_state: target || undefined })); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
@@ -82,11 +80,12 @@ export default function StateTomographyPage() {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem" }}>
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 10 }}>
-          <Atom size={28} color="#8b5cf6" /> Quantum State Tomography
+          <Atom size={28} color="#8b5cf6" /> Ideal State Analysis
         </h1>
         <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-          Reconstructs the full density matrix ρ from simulated Pauli measurements across X, Y, Z bases.
-          Computes purity, von Neumann entropy, and per-qubit Bloch vectors.
+          The exact noiseless state of your circuit: each qubit&apos;s reduced density matrix, Bloch vector,
+          purity and entanglement entropy, and the fidelity to a target state. Computed by statevector simulation;
+          this is not tomography of hardware, and no measurements are taken.
         </p>
       </div>
       {error && <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>{error}</div>}
@@ -100,16 +99,6 @@ export default function StateTomographyPage() {
               <textarea value={qasm} onChange={e => setQasm(e.target.value)} rows={9}
                 style={{ display: "block", width: "100%", marginTop: 4, background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#e2e8f0", padding: "0.5rem", fontFamily: "monospace", fontSize: "0.75rem", boxSizing: "border-box", resize: "vertical" }} />
             </label>
-            <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 10 }}>
-              Qubits to reconstruct: <span style={{ color: "#8b5cf6", fontWeight: 700 }}>{nQubits}</span>
-              <input type="range" min={1} max={6} value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-                style={{ display: "block", width: "100%", marginTop: 4, accentColor: "#8b5cf6" }} />
-            </label>
-            <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 10 }}>
-              Shots per basis: <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{shots}</span>
-              <input type="range" min={64} max={8192} step={64} value={shots} onChange={e => setShots(Number(e.target.value))}
-                style={{ display: "block", width: "100%", marginTop: 4, accentColor: "#3b82f6" }} />
-            </label>
             <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 12 }}>
               Compare to target:
               <select value={target} onChange={e => setTarget(e.target.value)}
@@ -119,7 +108,7 @@ export default function StateTomographyPage() {
             </label>
             <button onClick={run} disabled={loading}
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#8b5cf6", color: "#fff", border: "none", borderRadius: 8, padding: "0.7rem", cursor: "pointer", fontWeight: 600, opacity: loading ? 0.6 : 1 }}>
-              <Atom size={15} /> {loading ? "Reconstructing…" : "Run Tomography"}
+              <Atom size={15} /> {loading ? "Computing…" : "Analyze"}
             </button>
           </div>
         </div>
@@ -129,9 +118,9 @@ export default function StateTomographyPage() {
             <div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.75rem", marginBottom: "1rem" }}>
                 {[
-                  { label: "Purity", value: result.purity.toFixed(4), color: result.is_pure ? "#10b981" : result.is_mixed ? "#ef4444" : "#f59e0b" },
-                  { label: "Von Neumann S", value: result.von_neumann_entropy.toFixed(4), color: "#3b82f6" },
-                  { label: "Total Shots", value: result.total_shots.toLocaleString(), color: "#64748b" },
+                  { label: "Mean qubit purity", value: result.purity.toFixed(4), color: result.is_pure ? "#10b981" : result.is_mixed ? "#ef4444" : "#f59e0b" },
+                  { label: "Mean qubit entropy", value: result.von_neumann_entropy.toFixed(4), color: "#3b82f6" },
+                  { label: "Qubits", value: String(result.n_qubits), color: "#64748b" },
                   { label: "Fidelity", value: result.fidelity_to_target !== null ? result.fidelity_to_target.toFixed(4) : "N/A", color: "#f59e0b" },
                 ].map(m => (
                   <div key={m.label} style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "0.75rem", textAlign: "center" }}>
@@ -183,7 +172,7 @@ export default function StateTomographyPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 420, color: "#475569" }}>
               <Atom size={60} style={{ opacity: 0.12, marginBottom: 16 }} />
-              <p>Run tomography to reconstruct ρ, purity, and Bloch vectors from Pauli measurements.</p>
+              <p>Analyze a circuit to see its ideal per-qubit states, purities and Bloch vectors.</p>
             </div>
           )}
         </div>

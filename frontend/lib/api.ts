@@ -4491,43 +4491,36 @@ export async function deleteDecoherenceAlert(alertId: string): Promise<void> {
 // Cross-Backend Comparison
 // ------------------------------------------------------------------
 
-export type BackendTarget = { provider: string; backend: string };
-
-export type ComparisonJob = {
-  job_id: string; backend: string; provider: string; status: string;
-  shots: number; success_probability: number | null; cost_credits: number | null;
-  counts: Record<string, number>; error_message: string | null;
-  submitted_at: string | null; completed_at: string | null;
+/** One of your recorded runs, compared with the others and (when its circuit is stored) with the ideal. */
+export type ComparedRun = {
+  run_id: string; backend: string | null; created_at: string | null; circuit_key: string | null; shots: number;
+  top_bitstring: string; tvd_to_ideal: number | null; hellinger_fidelity_to_ideal: number | null;
 };
 
 export type ComparisonResult = {
-  comparison_id: string; n_backends: number;
-  backends: ComparisonJob[];
-  winner_by_fidelity: string | null; winner_by_cost: string | null;
-  metrics_table: { backend: string; provider: string; success_probability: number | null; cost_credits: number | null; top_bitstring: string | null; status: string }[];
+  same_circuit: boolean; runs: ComparedRun[]; skipped: { run_id: string; reason: string }[];
+  pairwise_tvd: { run_a: string; run_b: string; tvd: number }[];
+  best_by_fidelity: { run_id: string; backend: string | null } | null;
+  warnings: string[]; source: string;
 };
 
-export async function createComparison(req: {
-  qasm: string; targets: BackendTarget[]; shots?: number; circuit_name?: string;
-}): Promise<{ comparison_id: string; n_backends: number; jobs: { job_id: string; backend: string }[] }> {
+export type ComparableGroup = {
+  circuit_key: string; circuit_name: string | null; backends: string[]; run_ids: string[]; latest_at: string | null;
+};
+
+export async function compareRecordedRuns(runIds: string[]): Promise<ComparisonResult> {
   const res = await fetch(apiUrl("/api/v1/cross-backend"), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ run_ids: runIds }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function getComparison(comparisonId: string): Promise<ComparisonResult> {
-  const res = await fetch(apiUrl(`/api/v1/cross-backend/${comparisonId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Comparison not found");
-  return res.json();
-}
-
-export async function listComparisons(): Promise<{ comparison_id: string; n_backends: number; submitted_at: string | null; circuit_name: string | null }[]> {
+export async function listComparableGroups(): Promise<{ source: string; groups: ComparableGroup[] }> {
   const res = await fetch(apiUrl("/api/v1/cross-backend"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Comparisons failed");
+  if (!res.ok) throw new Error("Could not list comparable runs");
   return res.json();
 }
 
@@ -4875,8 +4868,9 @@ export type DensityMatrix = { re: number[][]; im: number[][] };
 export type TomoResult = {
   tomo_id: string;
   n_qubits: number;
-  shots_per_basis: number;
-  total_shots: number;
+  /** Always null: the state is computed exactly, nothing is measured. */
+  shots_per_basis: number | null;
+  total_shots: number | null;
   bloch_vectors: BlochVector[];
   density_matrix: DensityMatrix;
   purity: number;
@@ -4886,6 +4880,9 @@ export type TomoResult = {
   pauli_expectations: Record<string, number>;
   fidelity_to_target: number | null;
   target_state: string | null;
+  global_state_entropy: number;
+  method: string;
+  source: string;
   created_at: string;
 };
 
@@ -4996,6 +4993,8 @@ export type EntanglementMapResult = {
   final_entangled_pairs: { q1: number; q2: number }[];
   n_entangled_pairs: number;
   is_fully_entangled: boolean;
+  method: string;
+  source: string;
   created_at: string;
 };
 
@@ -8106,32 +8105,6 @@ export async function getBackendDriftHistory(backend: string): Promise<Calibrati
 export async function watchBackend(req: { backend: string; threshold_t1_us?: number; threshold_cx_error?: number; email?: string }): Promise<MonitorAlertSubscription> {
   const res = await fetch(apiUrl("/api/v1/live-monitor/watch"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Backend Cost Arbitrage  /api/v1/cost-arbitrage
-// ─────────────────────────────────────────────────────────
-export interface BackendQuote { backend: string; provider: string; cost_per_shot_usd: number; min_shots: number; estimated_total_usd: number; queue_wait_min: number; cx_error: number; t1_us: number; fidelity_score: number; available: boolean; }
-export interface ArbitrageRecommendation { rec_id: string; circuit_description: string; n_shots: number; budget_usd: number; target_fidelity: number; winner_backend: string; winner_quote: BackendQuote; all_quotes: BackendQuote[]; savings_vs_default_usd: number; savings_pct: number; reasoning: string; created_at: string; }
-export async function getArbitrageRecommendation(req: { circuit_description: string; n_shots: number; budget_usd: number; target_fidelity?: number; prefer_speed?: boolean }): Promise<ArbitrageRecommendation> {
-  const res = await fetch(apiUrl("/api/v1/cost-arbitrage/recommend"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getBackendQuotes(req: { n_shots: number; circuit_depth: number; n_qubits: number }): Promise<BackendQuote[]> {
-  const res = await fetch(apiUrl("/api/v1/cost-arbitrage/quote"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getMarketSnapshot(): Promise<{ snapshot_id: string; taken_at: string; quotes: BackendQuote[] }> {
-  const res = await fetch(apiUrl("/api/v1/cost-arbitrage/market"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getArbitrageSavingsHistory(): Promise<{ rec_id: string; backend_chosen: string; savings_usd: number; date: string }[]> {
-  const res = await fetch(apiUrl("/api/v1/cost-arbitrage/savings-history"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
   return res.json();
 }
 
