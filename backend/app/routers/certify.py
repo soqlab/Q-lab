@@ -1,36 +1,73 @@
+"""Fidelity certificate: does the hardware's output carry the circuit's signal, or is it noise?
+
+For each evidence run, Q-Lab takes the counts recorded with the run and the exact ideal
+probabilities of the run's stored circuit (statevector simulation), and computes the linear
+cross-entropy benchmark (Arute et al., Nature 574, 2019):
+
+    F = 2^n * mean over shots of P_ideal(x) - 1
+
+F is about 1 for a perfect device and 0 for output that is uniformly random. The null hypothesis
+is "the samples are uniform noise"; under it the mean of 2^n P_ideal(x) has expectation 1 and
+variance (2^n * sum_x P_ideal(x)^2 - 1) / shots, which gives a z-score per run. Runs are combined
+with Stouffer's method. Nothing here is estimated or randomised: the same runs give the same
+certificate. A certificate says the signal is present; it does not establish a quantum advantage.
+
+Certificates recorded before this (with invented statistics) have no "runs" field and are hidden.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional, List
+import math
+import uuid
 from datetime import datetime, timezone
-import uuid, random, math
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..store import store_put, store_get, store_list, store_delete
+from ..deps import Identity, get_identity
+from ..local_sim import ideal_probabilities
+from ..models import Run
+from ..run_scope import current_scope, visible
+from ..store import store_delete, store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/certify", tags=["certify"])
 
 NS = "certifications"
+SOURCE = ("Counts recorded with your runs, compared with exact ideal probabilities from a "
+          "statevector simulation of each run's stored circuit.")
+
+
+class RunEvidence(BaseModel):
+    run_id: str
+    backend: Optional[str] = None
+    n_bits: int
+    shots: int
+    linear_xeb: float
+    null_std_error: float
+    z_score: float
+
+
+class SkippedRun(BaseModel):
+    run_id: str
+    reason: str
 
 
 class CertificationResult(BaseModel):
     cert_id: str
     name: str
-    claim_type: str
-    backend: str
-    n_qubits: int
-    classical_runtime_sec: float
-    quantum_runtime_sec: float
-    speedup_factor: float
-    statistical_test: str
-    test_statistic: float
-    p_value: float
+    statistic: str = "linear_xeb"
+    runs: list[RunEvidence]
+    skipped: list[SkippedRun]
+    linear_xeb: Optional[float]
+    combined_z: Optional[float]
+    p_value: Optional[float]
     confidence_level: float
     certified: bool
-    certificate_url: Optional[str] = None
-    methodology_notes: List[str]
+    source: str = SOURCE
+    methodology_notes: list[str]
     created_at: str
 
 
@@ -38,166 +75,147 @@ class CertSummary(BaseModel):
     cert_id: str
     name: str
     certified: bool
-    speedup_factor: float
-    p_value: float
+    linear_xeb: Optional[float]
+    p_value: Optional[float]
+    n_runs: int
     created_at: str
 
 
 class CertifyRequest(BaseModel):
-    name: str
-    claim_type: str
-    backend: str
-    n_qubits: int
-    classical_runtime_sec: float
-    quantum_runtime_sec: float
-    statistical_test: str
-    confidence_level: float = 0.95
-    evidence_run_ids: List[str]
+    name: str = Field(min_length=1, max_length=200)
+    evidence_run_ids: list[str] = Field(min_length=1, max_length=50)
+    confidence_level: float = Field(default=0.95, gt=0.5, lt=1.0)
 
 
-def _compute_test_statistic(
-    statistical_test: str,
-    n_qubits: int,
-    speedup_factor: float,
-    evidence_run_ids: List[str],
-) -> tuple[float, float]:
-    n_samples = max(len(evidence_run_ids), 1)
-
-    if statistical_test == "cross_entropy":
-        ideal_xeb = 1.0
-        noise_scale = math.exp(-0.03 * n_qubits)
-        raw_xeb = noise_scale * speedup_factor / (speedup_factor + 0.5)
-        jitter = random.gauss(0, 0.02 / math.sqrt(n_samples))
-        test_stat = round(max(0.0, min(raw_xeb + jitter, 1.0)), 5)
-        threshold = 0.001
-        z = (test_stat - threshold) / (0.05 / math.sqrt(n_samples))
-        p_value = round(max(1e-12, 1 - _norm_cdf(z)), 6)
-
-    elif statistical_test == "total_variation":
-        tv_ideal = 0.0
-        noise_tv = 0.5 * (1 - math.exp(-0.04 * n_qubits))
-        jitter = random.gauss(0, 0.015 / math.sqrt(n_samples))
-        test_stat = round(max(0.0, min(noise_tv + jitter, 1.0)), 5)
-        threshold = 0.3
-        z = (threshold - test_stat) / (0.04 / math.sqrt(n_samples))
-        p_value = round(max(1e-12, 1 - _norm_cdf(z)), 6)
-
-    elif statistical_test == "linear_xeb":
-        fidelity_per_gate = math.exp(-0.005 * n_qubits)
-        circuit_depth = random.randint(20, 60)
-        linear_xeb = fidelity_per_gate ** circuit_depth
-        jitter = random.gauss(0, 0.01 / math.sqrt(n_samples))
-        test_stat = round(max(0.0, min(linear_xeb + jitter + 0.05 * speedup_factor, 1.0)), 5)
-        threshold = 1 / (2 ** n_qubits)
-        z = (test_stat - threshold) / (0.03 / math.sqrt(n_samples))
-        p_value = round(max(1e-12, 1 - _norm_cdf(z)), 6)
-
-    else:
-        test_stat = round(random.uniform(0.1, 0.9), 5)
-        p_value = round(random.uniform(0.001, 0.1), 6)
-
-    return test_stat, p_value
+def _norm_sf(z: float) -> float:
+    """P(Z > z) for a standard normal."""
+    return 0.5 * math.erfc(z / math.sqrt(2))
 
 
-def _norm_cdf(x: float) -> float:
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2)))
+def _bitstring(key: str, n_bits: int) -> Optional[str]:
+    key = str(key).replace(" ", "")
+    if key.lower().startswith("0x"):
+        try:
+            return format(int(key, 16), f"0{n_bits}b")
+        except ValueError:
+            return None
+    return key if len(key) == n_bits and set(key) <= {"0", "1"} else None
 
 
-def _methodology_notes(
-    claim_type: str,
-    statistical_test: str,
-    n_qubits: int,
-    backend: str,
-    evidence_run_ids: List[str],
-    certified: bool,
-) -> List[str]:
-    notes = [
-        f"Claim type '{claim_type}' evaluated on {n_qubits}-qubit register using backend '{backend}'.",
-        f"Statistical test: {statistical_test}. Evidence drawn from {len(evidence_run_ids)} experimental run(s): {', '.join(evidence_run_ids[:3])}{'...' if len(evidence_run_ids) > 3 else ''}.",
-        "Classical runtime estimated via direct Schrödinger simulation on equivalent CPU cluster (no GPU acceleration).",
-        "Quantum runtime measured as wall-clock time from job submission to result retrieval, averaged across evidence runs.",
-        f"Certification threshold set at α = {1 - 0.95:.2f} (two-tailed). {'Null hypothesis rejected.' if certified else 'Null hypothesis NOT rejected — insufficient evidence for claimed advantage.'}",
-    ]
-    if claim_type == "speedup":
-        notes.append("Speedup factor defined as classical_runtime_sec / quantum_runtime_sec; does not account for classical pre/post-processing overhead.")
-    elif claim_type == "sampling_advantage":
-        notes.append("Sampling advantage evaluated by comparing output distribution total variation distance against the Porter-Thomas prediction for a Haar-random circuit.")
-    elif claim_type == "optimization":
-        notes.append("Optimization advantage measured as approximation ratio improvement over best classical heuristic (GUROBI) within equal wall-clock budget.")
-    if not certified:
-        notes.append("Recommendation: Increase shot count, extend evidence run set, or reduce circuit noise before resubmitting for certification.")
-    return notes
+def linear_xeb(counts: dict[str, int], ideal: dict[str, float], n_bits: int) -> tuple[float, float, int]:
+    """(F, standard error of F under the uniform-noise null, shots used)."""
+    dim = 2 ** n_bits
+    shots = 0
+    total = 0.0
+    for key, c in counts.items():
+        bits = _bitstring(key, n_bits)
+        if bits is None:
+            raise ValueError(f"Outcome '{key}' does not match the circuit's {n_bits} classical bits.")
+        shots += int(c)
+        total += int(c) * ideal.get(bits, 0.0)
+    if shots <= 0:
+        raise ValueError("The run has no recorded shots.")
+    xeb = dim * total / shots - 1.0
+    null_var = dim * sum(p * p for p in ideal.values()) - 1.0
+    return xeb, math.sqrt(max(null_var, 0.0) / shots), shots
+
+
+def _evaluate(run: Run) -> RunEvidence:
+    counts = (run.results or {}).get("counts") or {}
+    if not run.qasm:
+        raise ValueError("The run has no stored circuit (QASM), so its ideal distribution is unknown.")
+    if not counts:
+        raise ValueError("The run has no recorded counts.")
+    ideal = ideal_probabilities(run.qasm)
+    n_bits = len(next(iter(ideal)))
+    xeb, se, shots = linear_xeb(counts, ideal, n_bits)
+    if se < 1e-9:
+        raise ValueError("The circuit's ideal output is uniform, so XEB cannot tell signal from noise.")
+    return RunEvidence(run_id=run.run_id, backend=run.backend, n_bits=n_bits, shots=shots,
+                       linear_xeb=round(xeb, 6), null_std_error=round(se, 6), z_score=round(xeb / se, 4))
+
+
+def _owned(record: dict) -> bool:
+    return "runs" in record and visible(record.get("owner_user_id"), record.get("owner_org_id"), current_scope())
 
 
 @router.post("/certify", response_model=CertificationResult)
-def certify(req: CertifyRequest, db: Session = Depends(get_db)) -> CertificationResult:
-    cert_id = str(uuid.uuid4())
-    speedup_factor = round(req.classical_runtime_sec / max(req.quantum_runtime_sec, 1e-6), 4)
-    test_stat, p_value = _compute_test_statistic(
-        req.statistical_test,
-        req.n_qubits,
-        speedup_factor,
-        req.evidence_run_ids,
-    )
+def certify(req: CertifyRequest, db: Session = Depends(get_db),
+            identity: Optional[Identity] = Depends(get_identity)) -> CertificationResult:
+    run_ids = list(dict.fromkeys(req.evidence_run_ids))
+    found = {r.run_id: r for r in db.scalars(select(Run).where(Run.run_id.in_(run_ids)))}
+    missing = [rid for rid in run_ids if rid not in found]
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Run(s) not found: {', '.join(missing)}")
+
+    evidence: list[RunEvidence] = []
+    skipped: list[SkippedRun] = []
+    for rid in run_ids:
+        try:
+            evidence.append(_evaluate(found[rid]))
+        except ValueError as exc:
+            skipped.append(SkippedRun(run_id=rid, reason=str(exc)))
+
     alpha = 1.0 - req.confidence_level
-    certified = p_value < alpha and speedup_factor > 1.0
-    certificate_url = (
-        f"/api/v1/certify/certificate/{cert_id}" if certified else None
-    )
-    notes = _methodology_notes(
-        req.claim_type,
-        req.statistical_test,
-        req.n_qubits,
-        req.backend,
-        req.evidence_run_ids,
-        certified,
-    )
-    result = CertificationResult(
-        cert_id=cert_id,
-        name=req.name,
-        claim_type=req.claim_type,
-        backend=req.backend,
-        n_qubits=req.n_qubits,
-        classical_runtime_sec=req.classical_runtime_sec,
-        quantum_runtime_sec=req.quantum_runtime_sec,
-        speedup_factor=speedup_factor,
-        statistical_test=req.statistical_test,
-        test_statistic=test_stat,
-        p_value=p_value,
-        confidence_level=req.confidence_level,
-        certified=certified,
-        certificate_url=certificate_url,
-        methodology_notes=notes,
+    combined_z = p_value = mean_xeb = None
+    certified = False
+    if evidence:
+        combined_z = sum(e.z_score for e in evidence) / math.sqrt(len(evidence))
+        p_value = _norm_sf(combined_z)
+        mean_xeb = sum(e.linear_xeb * e.shots for e in evidence) / sum(e.shots for e in evidence)
+        certified = p_value < alpha
+
+    if certified:
+        verdict = "Null hypothesis rejected: the output carries the ideal circuit's signal."
+    elif evidence:
+        verdict = "Null hypothesis not rejected."
+    else:
+        verdict = "No run had both a stored circuit and recorded counts, so no test was made."
+    notes = [
+        f"{len(evidence)} of {len(run_ids)} run(s) could be evaluated.",
+        "Null hypothesis: the measured outcomes are uniformly random (a fully depolarised device).",
+        f"Significance level alpha = {alpha:.3g}, one-sided. {verdict}",
+        "This certifies agreement with the ideal circuit, not a computational speedup or quantum advantage.",
+    ]
+    record = CertificationResult(
+        cert_id=str(uuid.uuid4()), name=req.name, runs=evidence, skipped=skipped,
+        linear_xeb=None if mean_xeb is None else round(mean_xeb, 6),
+        combined_z=None if combined_z is None else round(combined_z, 4),
+        p_value=None if p_value is None else float(f"{p_value:.6g}"),
+        confidence_level=req.confidence_level, certified=certified, methodology_notes=notes,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
-    store_put(db, NS, cert_id, result.model_dump())
-    return result
+    store_put(db, NS, record.cert_id, {
+        **record.model_dump(),
+        "owner_user_id": identity.user_id if identity else None,
+        "owner_org_id": identity.org_id if identity else None,
+    })
+    return record
 
 
-@router.get("/certifications", response_model=List[CertSummary])
-def list_certifications(db: Session = Depends(get_db)) -> List[CertSummary]:
+@router.get("/certifications", response_model=list[CertSummary])
+def list_certifications(db: Session = Depends(get_db)) -> list[CertSummary]:
     return [
-        CertSummary(
-            cert_id=c["cert_id"],
-            name=c["name"],
-            certified=c["certified"],
-            speedup_factor=c["speedup_factor"],
-            p_value=c["p_value"],
-            created_at=c["created_at"],
-        )
-        for c in store_list(db, NS)
+        CertSummary(cert_id=c["cert_id"], name=c["name"], certified=c["certified"],
+                    linear_xeb=c.get("linear_xeb"), p_value=c.get("p_value"),
+                    n_runs=len(c["runs"]), created_at=c["created_at"])
+        for c in store_list(db, NS) if _owned(c)
     ]
+
+
+def _get_owned(db: Session, cert_id: str) -> dict:
+    c = store_get(db, NS, cert_id)
+    if not c or not _owned(c):
+        raise HTTPException(status_code=404, detail=f"Certification {cert_id} not found.")
+    return c
 
 
 @router.get("/certification/{cert_id}", response_model=CertificationResult)
 def get_certification(cert_id: str, db: Session = Depends(get_db)) -> CertificationResult:
-    c = store_get(db, NS, cert_id)
-    if not c:
-        raise HTTPException(status_code=404, detail=f"Certification {cert_id} not found.")
-    return CertificationResult(**c)
+    return CertificationResult(**_get_owned(db, cert_id))
 
 
 @router.delete("/certification/{cert_id}", status_code=204)
 def delete_certification(cert_id: str, db: Session = Depends(get_db)) -> None:
-    if not store_delete(db, NS, cert_id):
-        raise HTTPException(status_code=404, detail=f"Certification {cert_id} not found.")
+    _get_owned(db, cert_id)
+    store_delete(db, NS, cert_id)

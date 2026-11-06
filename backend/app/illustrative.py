@@ -15,9 +15,9 @@ ILLUSTRATIVE_VALUE = "illustrative"
 
 ILLUSTRATIVE_ROUTERS = frozenset({
     # Invented results: nothing is run on the user's input.
-    "advantage", "anomaly_physics", "autopilot", "backend_emulator", "bayes_opt", "certify", "circuit_ai",
+    "advantage", "anomaly_physics", "autopilot", "backend_emulator", "bayes_opt", "circuit_ai",
     "circuit_knitting", "collab_notebook", "copilot", "cost_arbitrage", "cross_backend", "cross_bench",
-    "dd_optimizer", "density_matrix", "entanglement_map", "environment_snapshot", "error_mitigate",
+    "dd_optimizer", "density_matrix", "entanglement_map", "error_mitigate",
     "evo_optimizer", "fair_data", "gate_tomo", "global_cal", "grant_proposal", "institute", "job_scheduler",
     "live_monitor", "methods_gen", "mirror_circuit", "noise_marketplace", "oed", "offline_export",
     "optimizer_hub", "paper_draft", "paper_replication", "process_tomo", "pulse_control", "qaoa_solver", "qfm",

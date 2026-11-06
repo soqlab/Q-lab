@@ -159,7 +159,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/complexity", icon: TrendingUp, label: "Complexity Analyzer" },
       { href: "/advantage", icon: Zap, label: "Advantage Detector" },
       { href: "/advantage-timeline", icon: Timer, label: "Advantage Timeline" },
-      { href: "/certify", icon: BadgeCheck, label: "Advantage Certifier" },
+      { href: "/certify", icon: BadgeCheck, label: "XEB Certifier" },
       { href: "/resource-estimator", icon: Award, label: "Resource Estimator" },
       { href: "/optimizer-hub", icon: Trophy, label: "Optimizer Hub" },
       { href: "/hpc-bridge", icon: Server, label: "HPC Bridge" },

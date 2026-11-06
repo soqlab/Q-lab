@@ -6772,30 +6772,33 @@ export async function getProviderBatch(batchId: string): Promise<MultiProviderRe
 // Environment Snapshots
 // ─────────────────────────────────────────────────────────
 export interface EnvPackage { name: string; version: string; source: string; }
+/** The environment the Q-Lab SDK recorded with a run. `recorded` is false when the run carries none. */
 export interface EnvironmentSnapshot {
-  env_id: string; captured_at: string; python_version: string; platform: string;
-  architecture: string; cpu_count: number; packages: EnvPackage[];
-  env_hash: string; qiskit_version: string; numpy_version: string;
-  backend_firmware: string | null; cuda_available: boolean;
-  total_ram_gb: number; run_id: string | null;
+  run_id: string; captured_at: string | null; backend: string | null; recorded: boolean;
+  python_version: string | null; platform: string | null; git_commit: string | null; git_branch: string | null;
+  setup_fingerprint: string | null; packages: EnvPackage[]; env_hash: string | null; source: string;
+}
+export interface EnvSnapshotSummary {
+  run_id: string; captured_at: string | null; backend: string | null; python_version: string | null;
+  n_packages: number; env_hash: string | null;
 }
 export interface EnvDiff {
-  env_a: string; env_b: string; added: EnvPackage[]; removed: EnvPackage[];
+  run_a: string; run_b: string; added: EnvPackage[]; removed: EnvPackage[];
   changed: Array<{ name: string; from: string; to: string }>;
-  identical: boolean; hash_match: boolean; reproducibility_score: number;
-  risk_level: string; warnings: string[];
+  python_changed: boolean; platform_changed: boolean; git_commit_changed: boolean;
+  identical: boolean; warnings: string[]; source: string;
 }
-export async function captureEnvironment(req: { run_id?: string; backend_firmware?: string }): Promise<EnvironmentSnapshot> {
-  const res = await fetch(apiUrl("/api/v1/environment/capture"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
+export async function listEnvironmentSnapshots(): Promise<{ source: string; snapshots: EnvSnapshotSummary[] }> {
+  const res = await fetch(apiUrl("/api/v1/environment"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-export async function getEnvironmentSnapshot(envId: string): Promise<EnvironmentSnapshot> {
-  const res = await fetch(apiUrl(`/api/v1/environment/${envId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get snapshot failed");
+export async function getEnvironmentSnapshot(runId: string): Promise<EnvironmentSnapshot> {
+  const res = await fetch(apiUrl(`/api/v1/environment/runs/${encodeURIComponent(runId)}`), { cache: "no-store", headers: authHeaders() });
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-export async function diffEnvironments(req: { env_id_a: string; env_id_b: string }): Promise<EnvDiff> {
+export async function diffEnvironments(req: { run_id_a: string; run_id_b: string }): Promise<EnvDiff> {
   const res = await fetch(apiUrl("/api/v1/environment/diff"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -8280,15 +8283,21 @@ export async function getCIPipelineRuns(pipelineId: string): Promise<CIPipelineR
 }
 
 // ─────────────────────────────────────────────────────────
-// Quantum Advantage Certifier  /api/v1/certify
+// Fidelity Certifier  /api/v1/certify  (linear XEB of your runs' counts against the ideal circuit)
 // ─────────────────────────────────────────────────────────
-export interface CertificationResult { cert_id: string; name: string; claim_type: string; backend: string; n_qubits: number; classical_runtime_sec: number; quantum_runtime_sec: number; speedup_factor: number; statistical_test: string; test_statistic: number; p_value: number; confidence_level: number; certified: boolean; certificate_url?: string; methodology_notes: string[]; created_at: string; }
-export async function certifyAdvantage(req: { name: string; claim_type: string; backend: string; n_qubits: number; classical_runtime_sec: number; quantum_runtime_sec: number; statistical_test: string; confidence_level?: number; evidence_run_ids: string[] }): Promise<CertificationResult> {
+export interface CertRunEvidence { run_id: string; backend: string | null; n_bits: number; shots: number; linear_xeb: number; null_std_error: number; z_score: number; }
+export interface CertificationResult {
+  cert_id: string; name: string; statistic: string; runs: CertRunEvidence[]; skipped: { run_id: string; reason: string }[];
+  linear_xeb: number | null; combined_z: number | null; p_value: number | null; confidence_level: number;
+  certified: boolean; source: string; methodology_notes: string[]; created_at: string;
+}
+export interface CertSummary { cert_id: string; name: string; certified: boolean; linear_xeb: number | null; p_value: number | null; n_runs: number; created_at: string; }
+export async function certifyRuns(req: { name: string; evidence_run_ids: string[]; confidence_level?: number }): Promise<CertificationResult> {
   const res = await fetch(apiUrl("/api/v1/certify/certify"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-export async function listCertifications(): Promise<{ cert_id: string; name: string; certified: boolean; speedup_factor: number; p_value: number; created_at: string }[]> {
+export async function listCertifications(): Promise<CertSummary[]> {
   const res = await fetch(apiUrl("/api/v1/certify/certifications"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
