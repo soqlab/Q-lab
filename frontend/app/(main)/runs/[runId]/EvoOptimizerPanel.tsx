@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fetchEvoOptimizer, EvoOptimizerResult, EvoCandidate } from "../../../../lib/api";
+import { useLabs } from "../../../../lib/labs";
 
 const MUTATION_LABELS: Record<string, string> = {
   gate_cancel:    "Gate cancel",
@@ -112,7 +113,14 @@ function CandidateCard({ cand, rank, baseline }: { cand: EvoCandidate; rank: num
   );
 }
 
+// The optimizer's output is illustrative (backend/app/illustrative.py), so the panel is a Labs
+// feature even though it sits on the core run page: hidden unless Labs is on.
 export default function EvoOptimizerPanel({ runId }: { runId: string }) {
+  const [labs] = useLabs();
+  return labs ? <EvoOptimizer runId={runId} /> : null;
+}
+
+function EvoOptimizer({ runId }: { runId: string }) {
   const [data, setData] = useState<EvoOptimizerResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
