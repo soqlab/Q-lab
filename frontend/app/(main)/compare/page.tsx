@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { GitCompare, Search } from "lucide-react";
-import { compareRuns, CompareResult, fetchRuns, fetchRunMetricsData, QLabRun, MetricPoint, RunMetricsResponse } from "../../../lib/api";
+import { compareRuns, CompareResult, explainRunDiff, ExplainDiffResult, fetchRuns, fetchRunMetricsData, QLabRun, MetricPoint, RunMetricsResponse } from "../../../lib/api";
+import ExplainDiffPanel from "../../../components/ExplainDiffPanel";
 
 // ------------------------------------------------------------------
 // Field diff table
@@ -277,6 +278,8 @@ export default function ComparePage() {
   const [leftRunId, setLeftRunId] = useState("");
   const [rightRunId, setRightRunId] = useState("");
   const [result, setResult] = useState<CompareResult | null>(null);
+  const [explanation, setExplanation] = useState<ExplainDiffResult | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [compared, setCompared] = useState<{ left: string; right: string } | null>(null);
 
@@ -297,12 +300,21 @@ export default function ComparePage() {
   async function runCompare() {
     if (!leftRunId || !rightRunId) return;
     setError(null);
+    setExplainError(null);
+    const explaining = explainRunDiff(leftRunId, rightRunId).then(
+      (r) => { setExplanation(r); },
+      (err: unknown) => {
+        setExplanation(null);
+        setExplainError(err instanceof Error ? err.message : "Could not explain the difference");
+      },
+    );
     try {
       setResult(await compareRuns(leftRunId, rightRunId));
       setCompared({ left: leftRunId, right: rightRunId });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Comparison failed");
     }
+    await explaining;
   }
 
   const runOptions = useMemo(
@@ -371,6 +383,9 @@ export default function ComparePage() {
               </div>
             ))}
           </section>
+
+          {explanation ? <ExplainDiffPanel result={explanation} /> : null}
+          {explainError ? <div className="empty" style={{ color: "var(--danger)" }}>{explainError}</div> : null}
 
           {/* Metrics overlay — most technically powerful section */}
           <MetricsComparePanel

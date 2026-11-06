@@ -311,8 +311,85 @@ export async function fetchRunHealth(runId: string): Promise<Record<string, numb
 // ------------------------------------------------------------------
 
 export async function compareRuns(leftRunId: string, rightRunId: string): Promise<CompareResult> {
-  const res = await fetch(apiUrl(`/api/v1/runs/compare/${leftRunId}/${rightRunId}/json`), { cache: "no-store" });
+  const res = await fetch(apiUrl(`/api/v1/runs/compare/${leftRunId}/${rightRunId}/json`), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to compare runs");
+  return res.json();
+}
+
+// Why two runs differ: shot noise, compiler changes, calibration drift.
+export type DiffVerdict = "explains" | "plausible" | "too_small" | "ruled_out" | "cant_tell";
+
+export type ValueChange = { a: number | null; b: number | null; delta: number | null; relative: number | null };
+
+export type FidelityEstimate = {
+  value: number | null;
+  upper_bound: number | null;
+  covered_operations: number;
+  total_operations: number;
+  missing: string[];
+  missing_count: number;
+};
+
+export type ExplainDiffResult = {
+  a: { run_id: string; backend: string | null; circuit_name: string | null; created_at: string | null };
+  b: { run_id: string; backend: string | null; circuit_name: string | null; created_at: string | null };
+  observed: { tvd: number; hellinger: number; tvd_interval_95: [number, number] } | null;
+  noise: {
+    shots: { a: number; b: number };
+    recorded_shots: { a: number | null; b: number | null };
+    outcomes: number;
+    observed_tvd: number;
+    observed_hellinger: number;
+    observed_tvd_interval_95: [number, number];
+    expected_tvd_from_shot_noise: number;
+    expected_tvd_analytic: number;
+    shot_noise_tvd_95th_percentile: number;
+    excess_tvd: number;
+    p_value: number;
+    significant: boolean;
+    alpha: number;
+    method: Record<string, string | number>;
+  } | null;
+  compiler: {
+    a: Record<string, unknown>;
+    b: Record<string, unknown>;
+    circuit_changed: boolean | null;
+    setup_changed: boolean;
+    changes: { field: string; label: string; a: unknown; b: unknown; source: string }[];
+    not_recorded: string[];
+    same_logical_circuit: boolean | null;
+    circuit_source: { a: string | null; b: string | null };
+  };
+  calibration: {
+    snapshots: Record<"a" | "b", { recorded: boolean; snapshot_time: string | null; source: string | null; note?: string }>;
+    restricted_to_used: boolean;
+    used?: Record<"a" | "b", { qubits: number[]; edges: number[][] } | null>;
+    changed: boolean | null;
+    qubits: ({ qubit: number; used_by: string[] } & Record<"t1_us" | "t2_us" | "readout_errors", ValueChange>)[];
+    gates: ({ gate: string; qubits: number; used_by: string[] } & ValueChange)[];
+    fidelity: {
+      a: FidelityEstimate;
+      b: FidelityEstimate;
+      a_circuit_b_calibration: FidelityEstimate;
+      change: number | null;
+      calibration_effect: number | null;
+      compiler_effect: number | null;
+    } | null;
+  };
+  attribution: {
+    summary: string;
+    factors: { factor: "noise" | "compiler" | "calibration"; verdict: DiffVerdict; text: string }[];
+    other_differences: string[];
+  };
+  sources: Record<string, string[]>;
+};
+
+export async function explainRunDiff(runA: string, runB: string): Promise<ExplainDiffResult> {
+  const res = await fetch(apiUrl(`/api/v1/runs/${encodeURIComponent(runA)}/explain-diff/${encodeURIComponent(runB)}`), {
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to explain the difference");
   return res.json();
 }
 
