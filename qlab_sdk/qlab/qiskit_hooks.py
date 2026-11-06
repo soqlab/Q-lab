@@ -806,6 +806,12 @@ def flush(timeout: float = 5.0) -> None:
         _CLIENT.flush(timeout=timeout)
 
 
+def _auth_headers() -> dict[str, str]:
+    """The API key header for calls the SDK makes itself, outside QLabClient."""
+    key = _CLIENT.api_key if _CLIENT is not None else None
+    return {"X-QLab-API-Key": key} if key else {}
+
+
 def expect(
     run_id: str,
     state: str,
@@ -840,7 +846,7 @@ def expect(
     try:
         import urllib.request, json as _json
         url = f"{_CONFIG['api_url'].rstrip('/')}/api/v1/runs/{run_id}"
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=_auth_headers()), timeout=5) as resp:
             run_data = _json.loads(resp.read())
         results = run_data.get("results") or {}
 
@@ -905,7 +911,7 @@ def expect(
         req = urllib.request.Request(
             f"{_CONFIG['api_url'].rstrip('/')}/api/v1/runs/{run_id}/assertions",
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **_auth_headers()},
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
@@ -1103,8 +1109,7 @@ def _shadow_simulate(circuit: Any, real_counts: dict, shots: int, run_id: str) -
             req = urllib.request.Request(
                 f"{_CONFIG['api_url'].rstrip('/')}/api/v1/runs/{run_id}/shadow",
                 data=payload,
-                headers={"Content-Type": "application/json",
-                         **({"X-QLab-API-Key": _CLIENT.api_key} if _CLIENT is not None and _CLIENT.api_key else {})},
+                headers={"Content-Type": "application/json", **_auth_headers()},
                 method="POST",
             )
             urllib.request.urlopen(req, timeout=20)

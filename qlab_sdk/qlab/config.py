@@ -9,8 +9,11 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
 
     try:
         import tomllib
-    except Exception:
-        return {}
+    except ImportError:  # Python 3.10: tomllib arrived in 3.11
+        try:
+            import tomli as tomllib
+        except ImportError:
+            return {}
 
     try:
         with path.open("rb") as file:

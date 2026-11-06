@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["httpx>=0.24"]
+dependencies = ["httpx>=0.24", "tomli>=1.1; python_version < '3.11'"]
 
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
@@ -32,7 +32,7 @@ braket = ["amazon-braket-sdk>=1.80"]
 ionq = ["qiskit>=1.0", "qiskit-ionq>=1.0"]
 jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
 all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
-dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]
+dev   = ["build", "twine", "pytest", "pytest-asyncio", "pytest-cov", "ruff"]
 
 [project.urls]
 Homepage   = "https://github.com/soqlab/Q-lab"
