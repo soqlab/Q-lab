@@ -198,7 +198,7 @@ with qlab.RunContext("bell-circuit", project="my-project") as run:
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "#94a3b8" }}>Works in any Python 3.9+ environment.</p>
         <CodeBlock code={installCode} lang="bash" />
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>
-          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>pip install "git+https://github.com/soqlab/Q-lab.git#subdirectory=qlab_sdk" qiskit qiskit-aer</code>
+          With Qiskit: <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>{`pip install "git+https://github.com/soqlab/Q-lab.git#subdirectory=qlab_sdk" qiskit qiskit-aer`}</code>
         </p>
       </Step>
 

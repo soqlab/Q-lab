@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 
 /**
@@ -10,35 +10,32 @@ import { usePathname } from "next/navigation";
  * fetch is wrapped when this module loads, not in an effect: child pages start fetching in their own
  * effects, which run before a parent's.
  */
-let notify: (() => void) | null = null;
-let pending = false;
+// The page that last received illustrative data. A new page earns its own notice.
+let illustrativePath: string | null = null;
+const listeners = new Set<() => void>();
 
 if (typeof window !== "undefined") {
   const original = window.fetch.bind(window);
   window.fetch = async (...args: Parameters<typeof fetch>) => {
     const response = await original(...args);
-    if (response.headers.get("x-qlab-data") === "illustrative") {
-      if (notify) notify();
-      else pending = true;
+    if (response.headers.get("x-qlab-data") === "illustrative" && illustrativePath !== window.location.pathname) {
+      illustrativePath = window.location.pathname;
+      listeners.forEach((listener) => listener());
     }
     return response;
   };
 }
 
+function subscribe(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => { listeners.delete(onChange); };
+}
+
 export default function IllustrativeNotice() {
   const pathname = usePathname();
-  const [shown, setShown] = useState(false);
+  const seenOn = useSyncExternalStore(subscribe, () => illustrativePath, () => null);
 
-  useEffect(() => {
-    notify = () => setShown(true);
-    if (pending) { pending = false; setShown(true); }
-    return () => { notify = null; };
-  }, []);
-
-  // A new page earns its own notice.
-  useEffect(() => { setShown(false); }, [pathname]);
-
-  if (!shown) return null;
+  if (seenOn !== pathname) return null;
   return (
     <div
       role="status"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * Labs: Q-Lab's experimental tools are hidden until the user turns Labs on.
@@ -30,28 +30,30 @@ export function isCorePath(pathname: string): boolean {
 const KEY = "qlab_labs";
 const EVENT = "qlab-labs-change";
 
+// The choice when localStorage is unavailable (private mode): it then applies to this page only.
+let unsaved: boolean | null = null;
+
 function read(): boolean {
-  try { return localStorage.getItem(KEY) === "1"; } catch { return false; }
+  try { return localStorage.getItem(KEY) === "1"; } catch { return unsaved ?? false; }
 }
+
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener(EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => { window.removeEventListener(EVENT, onChange); window.removeEventListener("storage", onChange); };
+}
+
+const noSubscription = () => () => {};
 
 /**
  * Whether Labs is on in this browser, a setter that updates every component using it, and whether
  * the saved choice has been read yet (it lives in localStorage, so not during the first render).
  */
 export function useLabs(): [boolean, (on: boolean) => void, boolean] {
-  const [on, setOn] = useState(false);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setOn(read());
-    setReady(true);
-    const sync = () => setOn(read());
-    window.addEventListener(EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => { window.removeEventListener(EVENT, sync); window.removeEventListener("storage", sync); };
-  }, []);
+  const on = useSyncExternalStore(subscribe, read, () => false);
+  const ready = useSyncExternalStore(noSubscription, () => true, () => false);
   const set = useCallback((v: boolean) => {
-    try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { /* private mode: applies to this page only */ }
-    setOn(v);
+    try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { unsaved = v; }
     window.dispatchEvent(new Event(EVENT));
   }, []);
   return [on, set, ready];
