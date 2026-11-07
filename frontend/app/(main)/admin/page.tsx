@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
@@ -82,8 +83,8 @@ function Unauthorized() {
           No sneaking past him — he hasn&apos;t blinked in years.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <a href="/" className="button" style={{ textDecoration: "none" }}>← Take me home</a>
-          <a href="/runs" className="button secondary" style={{ textDecoration: "none" }}>View my runs</a>
+          <Link href="/" className="button" style={{ textDecoration: "none" }}>← Take me home</Link>
+          <Link href="/runs" className="button secondary" style={{ textDecoration: "none" }}>View my runs</Link>
         </div>
         <p style={{ marginTop: 20, fontSize: 12, color: "var(--muted)" }}>
           If you think this is a mistake, ask an admin to update your role.
@@ -159,12 +160,14 @@ function UsersTab({ token }: { token: string }) {
   const [working, setWorking] = useState<number | null>(null);
   const [activity, setActivity] = useState<UserActivity | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
+  // When the list was loaded: "Active" means a login in the 7 days before it (render stays pure).
+  const [loadedAt, setLoadedAt] = useState(0);
 
   async function load() {
     setLoading(true);
     try {
       const res = await fetch("/qlab-api/api/v1/admin/users", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setUsers(await res.json());
+      if (res.ok) { setUsers(await res.json()); setLoadedAt(Date.now()); }
     } finally {
       setLoading(false);
     }
@@ -227,7 +230,7 @@ function UsersTab({ token }: { token: string }) {
             </thead>
             <tbody>
               {users.map(u => {
-                const daysSince = u.last_login_at ? (Date.now() - new Date(u.last_login_at).getTime()) / 86400000 : null;
+                const daysSince = u.last_login_at ? (loadedAt - new Date(u.last_login_at).getTime()) / 86400000 : null;
                 const statusLabel = !u.is_active ? "Disabled" : !u.last_login_at ? "Never logged in" : u.login_count === 1 ? "One-time" : daysSince !== null && daysSince < 7 ? "Active" : "Inactive";
                 const statusColor = !u.is_active ? "var(--danger)" : !u.last_login_at ? "var(--muted)" : u.login_count === 1 ? "#f59e0b" : daysSince !== null && daysSince < 7 ? "#10b981" : "var(--muted)";
                 return (
@@ -466,9 +469,12 @@ function AnalyticsTab({ token }: { token: string }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  // A new period or token shows the loading state at once (adjusted while rendering, not in the effect).
+  const query = `${token}|${days}`;
+  const [loadedQuery, setLoadedQuery] = useState(query);
+  if (query !== loadedQuery) { setLoadedQuery(query); setLoading(true); }
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/qlab-api/api/v1/admin/analytics?days=${days}`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
@@ -587,9 +593,12 @@ function RunsAnalyticsTab({ token }: { token: string }) {
   const [data, setData] = useState<RunsStatsData | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  // A new period or token shows the loading state at once (adjusted while rendering, not in the effect).
+  const query = `${token}|${days}`;
+  const [loadedQuery, setLoadedQuery] = useState(query);
+  if (query !== loadedQuery) { setLoadedQuery(query); setLoading(true); }
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/qlab-api/api/v1/admin/runs-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [token, days]);
@@ -698,9 +707,12 @@ function AIUsageTab({ token }: { token: string }) {
   const [data, setData] = useState<AIStatsData | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  // A new period or token shows the loading state at once (adjusted while rendering, not in the effect).
+  const query = `${token}|${days}`;
+  const [loadedQuery, setLoadedQuery] = useState(query);
+  if (query !== loadedQuery) { setLoadedQuery(query); setLoading(true); }
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/qlab-api/api/v1/admin/ai-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [token, days]);
@@ -792,9 +804,12 @@ function SecurityTab({ token }: { token: string }) {
   const [data, setData] = useState<SecurityData | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  // A new period or token shows the loading state at once (adjusted while rendering, not in the effect).
+  const query = `${token}|${days}`;
+  const [loadedQuery, setLoadedQuery] = useState(query);
+  if (query !== loadedQuery) { setLoadedQuery(query); setLoading(true); }
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/qlab-api/api/v1/admin/security-stats?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [token, days]);

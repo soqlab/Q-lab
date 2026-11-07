@@ -133,24 +133,25 @@ export default function TimelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
   const [statusFilter, setStatusFilter] = useState("");
+  // When the runs were loaded: the time window is measured back from it (render stays pure).
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
-    setLoading(true);
     searchRuns({ page_size: 500, sort_by: "created_at", sort_order: "desc" })
       .then(r => setRuns(r.items))
       .catch(e => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
+      .finally(() => { setNow(Date.now()); setLoading(false); });
   }, []);
 
   // Group by project
   const filtered = useMemo(() => {
-    const cutoff = Date.now() - days * 86400000;
+    const cutoff = now - days * 86400000;
     return runs.filter(r => {
       if (new Date(r.created_at).getTime() < cutoff) return false;
       if (statusFilter && r.status !== statusFilter) return false;
       return true;
     });
-  }, [runs, days, statusFilter]);
+  }, [runs, days, statusFilter, now]);
 
   const byProject = useMemo(() => {
     const map: Record<string, QLabRun[]> = {};
@@ -163,11 +164,11 @@ export default function TimelinePage() {
   }, [filtered]);
 
   const { minMs, maxMs } = useMemo(() => {
-    if (!filtered.length) return { minMs: Date.now() - days * 86400000, maxMs: Date.now() };
+    if (!filtered.length) return { minMs: now - days * 86400000, maxMs: now };
     const times = filtered.map(r => new Date(r.created_at).getTime());
     const pad = (Math.max(...times) - Math.min(...times)) * 0.03 || 86400000;
     return { minMs: Math.min(...times) - pad, maxMs: Math.max(...times) + pad };
-  }, [filtered, days]);
+  }, [filtered, days, now]);
 
   const laneW = 900; // logical width for time mapping
 

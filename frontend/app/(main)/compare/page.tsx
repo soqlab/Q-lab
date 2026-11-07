@@ -204,9 +204,12 @@ function MetricsComparePanel({
   const [rightData, setRightData] = useState<RunMetricsResponse | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // Other runs show the loading state at once (adjusted while rendering, not in the effect).
+  const pair = `${leftRunId}|${rightRunId}`;
+  const [loadedPair, setLoadedPair] = useState(pair);
+  if (pair !== loadedPair) { setLoadedPair(pair); setLoading(true); }
 
   useEffect(() => {
-    setLoading(true);
     Promise.all([
       fetchRunMetricsData(leftRunId).catch(() => null),
       fetchRunMetricsData(rightRunId).catch(() => null),

@@ -56,10 +56,15 @@ function CircuitDiagram({ runId }: { runId: string }) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   // Fetched rather than linked: runs are private, and an <img src> cannot send the sign-in token.
   const [src, setSrc] = useState<string | undefined>(undefined);
+  // Another run starts loading again (adjusted while rendering, not in the effect)
+  const [prevRunId, setPrevRunId] = useState(runId);
+  if (runId !== prevRunId) {
+    setPrevRunId(runId);
+    setState("loading");
+  }
   useEffect(() => {
     let objectUrl: string | undefined;
     let cancelled = false;
-    setState("loading");
     fetch(qlabApiPath(`/api/v1/runs/${runId}/circuit.svg`))
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
       .then((blob) => {

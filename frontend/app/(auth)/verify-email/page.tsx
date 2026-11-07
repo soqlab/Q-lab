@@ -10,15 +10,14 @@ function VerifyEmailContent() {
   const token = searchParams.get("token") ?? "";
   const router = useRouter();
   const { clearSession } = useAuth();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [message, setMessage] = useState("");
+  const [fetchStatus, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [fetchMessage, setMessage] = useState("");
+  // Without a token there is nothing to verify.
+  const status = token ? fetchStatus : "error";
+  const message = token ? fetchMessage : "No verification token found. Please use the link from your email.";
 
   useEffect(() => {
-    if (!token) {
-      setStatus("error");
-      setMessage("No verification token found. Please use the link from your email.");
-      return;
-    }
+    if (!token) return;
     fetch(`/qlab-api/auth/verify-email?token=${encodeURIComponent(token)}`)
       .then(async res => {
         const data = await res.json();

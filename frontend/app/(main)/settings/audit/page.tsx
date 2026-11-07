@@ -20,15 +20,23 @@ export default function AuditPage() {
   const [filterResource, setFilterResource] = useState("");
   const LIMIT = 50;
 
-  const load = (off = 0) => {
-    setLoading(true);
+  const fetchLog = (off: number) =>
     getAuditLog({ action: filterAction || undefined, resource_type: filterResource || undefined, limit: LIMIT, offset: off })
       .then(r => { setItems(r.items); setTotal(r.total); setOffset(off); setErr(""); })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+
+  const load = (off = 0) => {
+    setLoading(true);
+    void fetchLog(off);
   };
 
-  useEffect(() => { load(0); }, [filterAction, filterResource]);
+  // A filter change shows the loading state at once (adjusted while rendering, not in the effect).
+  const filterKey = JSON.stringify([filterAction, filterResource]);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setLoading(true); }
+
+  useEffect(() => { void fetchLog(0); }, [filterAction, filterResource]);
 
   return (
     <div style={{ padding: 24, maxWidth: 1100 }}>

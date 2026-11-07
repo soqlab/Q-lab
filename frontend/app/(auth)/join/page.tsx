@@ -13,15 +13,18 @@ function JoinInner() {
   const { token: authToken, user } = useAuth();
 
   const [info, setInfo] = useState<InviteInfo | null>(null);
-  const [validating, setValidating] = useState(true);
-  const [validError, setValidError] = useState<string | null>(null);
+  const [checking, setValidating] = useState(true);
+  const [checkError, setValidError] = useState<string | null>(null);
+  // Without a token there is nothing to check.
+  const validating = inviteToken ? checking : false;
+  const validError = inviteToken ? checkError : "No invite token provided.";
 
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!inviteToken) { setValidError("No invite token provided."); setValidating(false); return; }
+    if (!inviteToken) return;
     void validateInvite(inviteToken)
       .then(d => { setInfo(d); setValidating(false); })
       .catch(err => { setValidError(err instanceof Error ? err.message : "Invalid invite"); setValidating(false); });

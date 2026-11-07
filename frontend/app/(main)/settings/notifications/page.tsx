@@ -294,28 +294,32 @@ export default function NotificationsPreferencesPage() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [s, p, h] = await Promise.all([
+  const fetchAll = useCallback(
+    () =>
+      Promise.all([
         apiFetch<EmailStatus>("/notifications/status"),
         apiFetch<NotificationPreferences>("/notifications/preferences"),
         apiFetch<HistoryEntry[]>("/notifications/history"),
-      ]);
-      setStatus(s);
-      setPrefs(p);
-      setHistory(h);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      ])
+        .then(([s, p, h]) => {
+          setStatus(s);
+          setPrefs(p);
+          setHistory(h);
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setLoading(false)),
+    [],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    await fetchAll();
+  }, [fetchAll]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchAll();
+  }, [fetchAll]);
 
   const handleSave = async () => {
     setSaving(true);

@@ -179,32 +179,37 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // A new period (or sign-in) shows the loading state at once (adjusted while rendering, not in the effect).
+  const query = token ? `${token}|${days}` : null;
+  const [loadedQuery, setLoadedQuery] = useState(query);
+  if (query !== loadedQuery) {
+    setLoadedQuery(query);
+    if (query) { setLoading(true); setError(null); }
+  }
+
+  // The requests and the state they set, only in promise callbacks.
+  function load() {
+    return Promise.all([
+      fetchAnalyticsTimeseries(token, { days }).catch(() => []),
+      fetchRunMetrics(token).catch(() => null),
+      fetchHealthTrend({ days }).catch(() => null),
+    ])
+      .then(([s, m, ht]) => {
+        setSeries(s as any);
+        setMetrics(m as any);
+        setHealthTrend(ht);
+        if (!s && !m) setError("Backend is warming up — please refresh in a moment.");
+      })
+      .catch(() => setError("Backend is warming up — please refresh in a moment."))
+      .finally(() => setLoading(false));
+  }
+
   useEffect(() => {
     if (token === undefined) return;
     if (!token) { router.push("/login"); return; }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, days]);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [s, m, ht] = await Promise.all([
-        fetchAnalyticsTimeseries(token, { days }).catch(() => []),
-        fetchRunMetrics(token).catch(() => null),
-        fetchHealthTrend({ days }).catch(() => null),
-      ]);
-      setSeries(s as any);
-      setMetrics(m as any);
-      setHealthTrend(ht);
-      if (!s && !m) setError("Backend is warming up — please refresh in a moment.");
-    } catch {
-      setError("Backend is warming up — please refresh in a moment.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const successRate = metrics ? (metrics.completion_rate * 100).toFixed(1) + "%" : "—";
   const avgHealth = metrics && metrics.average_success_probability != null

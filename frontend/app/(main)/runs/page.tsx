@@ -15,11 +15,14 @@ function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
   const { token } = useAuth();
   const [liveRuns, setLiveRuns] = useState<QLabRun[]>(initialRuns);
 
-  // Poll for fresh backend stats every 30 seconds
-  useEffect(() => {
+  // New runs from the parent replace the polled ones (adjusted while rendering, not in an effect)
+  const [prevInitialRuns, setPrevInitialRuns] = useState(initialRuns);
+  if (initialRuns !== prevInitialRuns) {
+    setPrevInitialRuns(initialRuns);
     setLiveRuns(initialRuns);
-  }, [initialRuns]);
+  }
 
+  // Poll for fresh backend stats every 30 seconds
   useEffect(() => {
     if (!token) return;
     const poll = async () => {
@@ -343,24 +346,26 @@ function RunsInner() {
 
   const esCleanup = useRef<(() => void) | null>(null);
 
-  async function loadRuns() {
+  // The search and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), everything else through loadRuns().
+  function fetchRuns() {
+    const params: Record<string, string | number> = { page_size: 500 };
+    if (q) params.q = q;
+    if (backend) params.backend = backend;
+    if (status) params.status = status;
+    if (project) params.project = project;
+    if (minQubits) params.min_qubits = Number(minQubits);
+    if (maxDepth) params.max_depth = Number(maxDepth);
+    return searchRuns(params)
+      .then((result) => setRuns(result.items))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load runs"))
+      .finally(() => setLoading(false));
+  }
+
+  function loadRuns() {
     setLoading(true);
     setError(null);
-    try {
-      const params: Record<string, string | number> = { page_size: 500 };
-      if (q) params.q = q;
-      if (backend) params.backend = backend;
-      if (status) params.status = status;
-      if (project) params.project = project;
-      if (minQubits) params.min_qubits = Number(minQubits);
-      if (maxDepth) params.max_depth = Number(maxDepth);
-      const result = await searchRuns(params);
-      setRuns(result.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load runs");
-    } finally {
-      setLoading(false);
-    }
+    return fetchRuns();
   }
 
   function connectSSE() {
@@ -375,7 +380,7 @@ function RunsInner() {
   }
 
   useEffect(() => {
-    void loadRuns().then(connectSSE);
+    void fetchRuns().then(connectSSE);
     return () => { if (esCleanup.current) esCleanup.current(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

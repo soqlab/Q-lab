@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Search, Cpu, Loader, Info, GitCompare } from "lucide-react";
@@ -203,11 +203,13 @@ function CircuitSearchPage() {
     }
   }
 
-  // Sync URL anchor param changes (e.g. "Use as anchor" links)
-  useEffect(() => {
+  // Sync URL anchor param changes (e.g. "Use as anchor" links), while rendering
+  const [prevSearchParams, setPrevSearchParams] = useState(searchParams);
+  if (searchParams !== prevSearchParams) {
+    setPrevSearchParams(searchParams);
     const a = searchParams.get("anchor");
     if (a) setAnchorId(a);
-  }, [searchParams]);
+  }
 
   return (
     <main className="page">

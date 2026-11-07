@@ -173,28 +173,34 @@ function SweepBar({ active }: { active: boolean }) {
 export default function IntelPage() {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sweeping, setSweeping] = useState(false);
+  const [sweeping, setSweeping] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function refresh() {
+  // State is set only in promise callbacks: the mount effect calls this directly (sweeping starts true).
+  function request() {
+    return fetch(apiUrl("/api/v1/intel/hardware-status"), { cache: "no-store" })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          setProviders(data);
+          setLastRefresh(new Date());
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+        setTimeout(() => setSweeping(false), 1900);
+      });
+  }
+
+  function refresh() {
     setSweeping(true);
-    try {
-      const res = await fetch(apiUrl("/api/v1/intel/hardware-status"), { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setProviders(data);
-        setLastRefresh(new Date());
-      }
-    } finally {
-      setLoading(false);
-      setTimeout(() => setSweeping(false), 1900);
-    }
+    return request();
   }
 
   useEffect(() => {
-    refresh();
+    request();
   }, []);
 
   useEffect(() => {

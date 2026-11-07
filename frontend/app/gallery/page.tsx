@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { qlabApiPath } from "../../lib/api";
 
@@ -27,8 +28,8 @@ export default function GalleryPage() {
   const [offset, setOffset] = useState(0);
   const PAGE = 24;
 
+  // Loading starts true; the page buttons set it again when they change the offset.
   useEffect(() => {
-    setLoading(true);
     fetch(qlabApiPath(`/api/v1/public/gallery?limit=${PAGE}&offset=${offset}`))
       .then(r => r.json())
       .then(d => { setRuns(d.items ?? []); setTotal(d.total ?? 0); setLoading(false); })
@@ -40,7 +41,7 @@ export default function GalleryPage() {
       {/* Header */}
       <header style={{ background: "#0d1b2a", borderBottom: "1px solid #1e2d3d", padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <a href="/" style={{ color: "#fff", textDecoration: "none", fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px" }}>Q-Lab</a>
+          <Link href="/" style={{ color: "#fff", textDecoration: "none", fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px" }}>Q-Lab</Link>
           <span style={{ marginLeft: 14, color: "#64748b", fontSize: 13 }}>Public Experiment Gallery</span>
         </div>
         <a href="/register" style={{ background: "#6366f1", color: "#fff", padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
@@ -117,14 +118,14 @@ export default function GalleryPage() {
             {/* Pagination */}
             {total > PAGE && (
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}
+                <button disabled={offset === 0} onClick={() => { setLoading(true); setOffset(Math.max(0, offset - PAGE)); }}
                   style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", cursor: offset > 0 ? "pointer" : "not-allowed", opacity: offset > 0 ? 1 : 0.4, color: "var(--text)", fontSize: 13 }}>
                   ← Previous
                 </button>
                 <span style={{ padding: "8px 14px", fontSize: 13, color: "var(--muted)" }}>
                   {offset + 1}–{Math.min(offset + PAGE, total)} of {total}
                 </span>
-                <button disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}
+                <button disabled={offset + PAGE >= total} onClick={() => { setLoading(true); setOffset(offset + PAGE); }}
                   style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", cursor: offset + PAGE < total ? "pointer" : "not-allowed", opacity: offset + PAGE < total ? 1 : 0.4, color: "var(--text)", fontSize: 13 }}>
                   Next →
                 </button>

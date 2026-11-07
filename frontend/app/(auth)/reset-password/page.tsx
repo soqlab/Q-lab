@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Atom } from "lucide-react";
@@ -13,12 +13,10 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    if (!token) setError("Missing or invalid reset link. Please request a new one.");
-  }, [token]);
+  const error = formError ?? (token ? null : "Missing or invalid reset link. Please request a new one.");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

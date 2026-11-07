@@ -12,15 +12,17 @@ export default function RBACPage() {
   const { user } = useAuth();
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [users, setUsers] = useState<RbacUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [changing, setChanging] = useState<number | null>(null);
 
   const isAdmin = user?.role === "admin" || user?.role === "owner";
+  // Loading only while an admin's lists are fetched; follows isAdmin while rendering, not in the effect.
+  const [loading, setLoading] = useState(isAdmin);
+  const [prevIsAdmin, setPrevIsAdmin] = useState(isAdmin);
+  if (isAdmin !== prevIsAdmin) { setPrevIsAdmin(isAdmin); setLoading(isAdmin); }
 
   const load = () => {
-    if (!isAdmin) { setLoading(false); return; }
-    setLoading(true);
+    if (!isAdmin) return;
     Promise.all([getRbacRoles(), listRbacUsers()])
       .then(([r, u]) => { setRoles(r.roles ?? []); setUsers(u ?? []); setErr(""); })
       .catch((e: unknown) => {
