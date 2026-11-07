@@ -4,11 +4,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import RunMetric
+from ..models import Run, RunMetric
 
 router = APIRouter(prefix="/api/v1/runs", tags=["metrics"])
 
@@ -21,6 +21,17 @@ class MetricPoint(BaseModel):
 
 class MetricsBatch(BaseModel):
     metrics: list[MetricPoint] = Field(..., min_length=1, max_length=500)
+
+
+def _require_visible_run(db: Session, run_id: str) -> None:
+    """404 unless the caller can see the run (the Run query is limited to the caller's runs)."""
+    if db.scalar(select(Run.id).where(Run.run_id == run_id)) is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+
+def _exists_for_anyone(db: Session, run_id: str) -> bool:
+    # A plain SQL query, deliberately outside the per-caller filter on Run.
+    return db.execute(text("SELECT 1 FROM runs WHERE run_id = :r"), {"r": run_id}).first() is not None
 
 
 def _point_out(m: RunMetric) -> dict:
@@ -39,7 +50,13 @@ def log_metrics(
     payload: MetricsBatch,
     db: Session = Depends(get_db),
 ):
-    """Log one or many scalar metrics to a run. No auth required — SDK-facing."""
+    """Log one or many scalar metrics to a run. SDK-facing: sent with the run's API key.
+
+    Writing to someone else's run is refused. A run that does not exist yet is accepted, because the
+    SDK uploads the run and its first metrics from separate threads and the metrics can arrive first.
+    """
+    if db.scalar(select(Run.id).where(Run.run_id == run_id)) is None and _exists_for_anyone(db, run_id):
+        raise HTTPException(status_code=404, detail="run not found")
     rows = [
         RunMetric(
             run_id=run_id,
@@ -64,6 +81,7 @@ def get_metrics(
     Returns metrics grouped by name.
     Each group is sorted by step (if present) then by logged_at.
     """
+    _require_visible_run(db, run_id)
     rows = db.scalars(
         select(RunMetric)
         .where(RunMetric.run_id == run_id)
@@ -92,6 +110,7 @@ def clear_metrics(
     db: Session = Depends(get_db),
 ):
     """Delete all metrics for a run (or just one named metric)."""
+    _require_visible_run(db, run_id)
     q = select(RunMetric).where(RunMetric.run_id == run_id)
     if name:
         q = q.where(RunMetric.name == name)

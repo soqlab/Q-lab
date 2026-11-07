@@ -19,8 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import Identity, get_identity, require_auth
+from ..deps import Identity, require_auth, require_role
 from ..models import Run
+from ..outbound import UnsafeURL, is_safe_url, require_safe_url
 from ..store import store_delete, store_get, store_list, store_put
 
 APP_URL = os.getenv("QLAB_APP_URL", "")
@@ -198,9 +199,14 @@ def _handle_help() -> dict:
 async def save_slack_config(
     payload: SlackConfigPayload,
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_role("owner", "admin")),
 ):
-    """Save Slack/Teams config, verifying the Slack bot token."""
+    """Save Slack/Teams config, verifying the Slack bot token. Owner/admin only: it is server-wide."""
+    if payload.teams_webhook_url:
+        try:
+            require_safe_url(payload.teams_webhook_url)
+        except UnsafeURL as exc:
+            raise HTTPException(status_code=422, detail=f"teams_webhook_url: {exc}") from None
     bot_name: Optional[str] = None
     team_name: Optional[str] = None
     verified = False
@@ -244,7 +250,7 @@ async def save_slack_config(
 @router.get("/config")
 def get_slack_config(
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
 ):
     """Get current Slack/Teams config."""
     config = _get_config(db)
@@ -325,7 +331,7 @@ async def slack_slash_command(
 async def slack_notify(
     body: NotifyBody,
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
 ):
     """Send a proactive notification to Slack."""
     config = _get_config(db)
@@ -372,13 +378,15 @@ async def slack_notify(
 async def teams_notify(
     body: TeamsNotifyBody,
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
 ):
     """Send a message to Microsoft Teams via incoming webhook."""
     config = _get_config(db)
     webhook_url = (config or {}).get("teams_webhook_url")
     if not webhook_url:
         raise HTTPException(status_code=400, detail="Teams webhook URL not configured")
+    if not is_safe_url(webhook_url):  # checked again at send time: DNS can change after saving
+        raise HTTPException(status_code=400, detail="Teams webhook URL points to a private or internal address")
 
     card: dict[str, Any] = {
         "@type": "MessageCard",
@@ -400,7 +408,7 @@ async def teams_notify(
 @router.get("/test")
 async def slack_test(
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
 ):
     """Send a test message to verify Slack configuration."""
     config = _get_config(db)

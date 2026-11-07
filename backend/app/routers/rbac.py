@@ -189,18 +189,19 @@ def audit_log(
     db: Session = Depends(get_db),
 ):
     """Paginated audit log (researcher+ only)."""
-    q = select(AuditLog).order_by(AuditLog.created_at.desc())
+    from sqlalchemy import func
+
+    q = select(AuditLog)
     if identity.org_id:
         q = q.where(AuditLog.org_id == identity.org_id)
+    else:
+        q = q.where(AuditLog.user_id == identity.user_id)
     if action:
         q = q.where(AuditLog.action == action)
     if resource_type:
         q = q.where(AuditLog.resource_type == resource_type)
-    total = db.scalar(
-        select(__import__('sqlalchemy', fromlist=['func']).func.count())
-        .select_from(AuditLog)
-    ) or 0
-    logs = db.scalars(q.offset(offset).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    logs = db.scalars(q.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)).all()
     return {
         "total": total,
         "offset": offset,

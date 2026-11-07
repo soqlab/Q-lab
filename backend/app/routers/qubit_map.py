@@ -108,9 +108,10 @@ def qubit_map(run_id: str, db: Session = Depends(get_db)):
     overhead = _routing_overhead(transpiler, fingerprint)
     num_qubits = fingerprint.get("num_qubits") or 0
 
-    # Build qubit quality map from calibration
+    # Build qubit quality map from calibration: for the circuit's qubits and for every physical
+    # qubit the layout maps onto (those can be numbered well beyond num_qubits).
     qubit_quality: dict[int, dict] = {}
-    for i in range(num_qubits):
+    for i in sorted(set(range(num_qubits)) | set((layout or {}).values())):
         q_key = f"q{i}"
         alt_key = str(i)
         q_data = calibration.get(q_key) or calibration.get(alt_key) or {}

@@ -10,7 +10,9 @@ No quantum platform does multi-provider auto-transpilation today.
 """
 from __future__ import annotations
 
+import ast
 import math
+import operator
 import re
 from typing import Any
 
@@ -180,16 +182,33 @@ _GATE_RE = re.compile(
 )
 
 
+_BINOPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
+
+
+def _angle(node: ast.AST) -> float:
+    """Value of an angle expression: numbers, pi, + - * / and unary minus. Anything else raises."""
+    if isinstance(node, ast.Expression):
+        return _angle(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return float(node.value)
+    if isinstance(node, ast.Name) and node.id == "pi":
+        return math.pi
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        v = _angle(node.operand)
+        return -v if isinstance(node.op, ast.USub) else v
+    if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
+        return _BINOPS[type(node.op)](_angle(node.left), _angle(node.right))
+    raise ValueError("unsupported angle expression")
+
+
 def _parse_params(raw: str | None) -> list[float]:
     if not raw:
         return []
-    parts = [p.strip() for p in raw.split(",")]
     result = []
-    _safe_env = {"__builtins__": {}, "pi": math.pi}
-    for part in parts:
+    for part in (p.strip() for p in raw.split(",")):
         try:
-            val = float(eval(part.replace("pi", str(math.pi)), _safe_env, {}))
-            result.append(val)
+            # Not eval(): angles are user input, and eval() let "9**9**9**9" tie up the server.
+            result.append(_angle(ast.parse(part, mode="eval")) if len(part) <= 100 else 0.0)
         except Exception:
             result.append(0.0)
     return result

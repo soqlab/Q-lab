@@ -29,7 +29,6 @@ def _init_state(n: int, kind: str) -> list:
     size = 1 << n
     state = [complex(0)] * size
     if kind == "neel":
-        idx = int("".join("10" * (n//2) + ("1" if n%2 else ""), 2) if n > 1 else "1", 2)
         idx = 0
         for i in range(n):
             if i % 2 == 0: idx |= (1 << i)

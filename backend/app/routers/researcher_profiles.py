@@ -139,6 +139,33 @@ def _find_profile_by_username(username: str, db: Session) -> Optional[dict[str, 
     return None
 
 
+def _own_profile(user: User, db: Session) -> Optional[dict[str, Any]]:
+    """The caller's profile: the one recorded with their user id, or (profiles saved before ids were
+    recorded) the one under their default username if nobody else owns it."""
+    profiles = store_list(db, NAMESPACE)
+    for p in profiles:
+        if p.get("user_id") == user.id:
+            return p
+    base = _default_username(user)
+    for p in profiles:
+        if p.get("username") == base and p.get("user_id") is None:
+            return p
+    return None
+
+
+def _default_username(user: User) -> str:
+    return user.name.lower().replace(" ", "_") if user.name else f"user_{user.id}"
+
+
+def _free_username(user: User, db: Session) -> str:
+    """Two people can share a name; the second one gets the user id appended."""
+    base = _default_username(user)
+    taken = _find_profile_by_username(base, db)
+    if taken is not None and taken.get("user_id") not in (None, user.id):
+        return f"{base}_{user.id}"
+    return base
+
+
 def _compute_stats(username: str, user_id: Optional[int], db: Session) -> dict[str, Any]:
     """Compute live stats from the runs table for a given username / user_id."""
     q = select(Run)
@@ -235,13 +262,11 @@ def get_my_profile(
     db: Session = Depends(get_db),
 ):
     user = _get_user_by_identity(identity, db)
-    username = user.name.lower().replace(" ", "_") if user.name else f"user_{user.id}"
-
-    profile = _find_profile_by_username(username, db)
+    profile = _own_profile(user, db)
     if not profile:
         raise HTTPException(
             404,
-            detail={"message": "No profile yet. Create one.", "username": username},
+            detail={"message": "No profile yet. Create one.", "username": _free_username(user, db)},
         )
     return profile
 
@@ -254,9 +279,8 @@ def upsert_my_profile(
 ):
     _validate_input(body)
     user = _get_user_by_identity(identity, db)
-    username = user.name.lower().replace(" ", "_") if user.name else f"user_{user.id}"
-
-    existing = _find_profile_by_username(username, db)
+    existing = _own_profile(user, db)
+    username = existing["username"] if existing else _free_username(user, db)
     now = _utcnow_str()
 
     if existing:
@@ -266,6 +290,7 @@ def upsert_my_profile(
             **body.model_dump(),
             "username": username,
             "profile_id": profile_id,
+            "user_id": user.id,
             "updated_at": now,
         }
     else:
@@ -273,6 +298,7 @@ def upsert_my_profile(
         record = {
             "profile_id": profile_id,
             "username": username,
+            "user_id": user.id,
             **body.model_dump(),
             "created_at": now,
             "updated_at": now,

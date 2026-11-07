@@ -30,6 +30,18 @@ class ChangeRolePayload(BaseModel):
     role: str
 
 
+def _expired(expires_at: datetime) -> bool:
+    if expires_at.tzinfo is None:  # SQLite returns naive datetimes; they are stored as UTC
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at < datetime.now(timezone.utc)
+
+
+def _only_owners_touch_owners(identity: Identity, new_role: Optional[str], current_role: Optional[str]) -> None:
+    """An admin may manage researchers, viewers and other admins, but not grant or take away ownership."""
+    if identity.role != "owner" and "owner" in (new_role, current_role):
+        raise HTTPException(status_code=403, detail="Only an owner can grant the owner role or change an owner")
+
+
 # ------------------------------------------------------------------
 # Members
 # ------------------------------------------------------------------
@@ -72,6 +84,7 @@ def change_member_role(
         raise HTTPException(status_code=404, detail="User not found in this org")
     if u.id == identity.user_id:
         raise HTTPException(status_code=400, detail="Cannot change your own role")
+    _only_owners_touch_owners(identity, payload.role, u.role)
     u.role = payload.role
     db.commit()
     return {"id": u.id, "role": u.role}
@@ -88,6 +101,7 @@ def remove_member(
         raise HTTPException(status_code=404, detail="User not found in this org")
     if u.id == identity.user_id:
         raise HTTPException(status_code=400, detail="Cannot remove yourself")
+    _only_owners_touch_owners(identity, None, u.role)
     u.org_id = None
     u.role = "researcher"
     db.commit()
@@ -108,6 +122,7 @@ def invite_member(
         raise HTTPException(status_code=400, detail="You are not part of an organization")
     if payload.role not in VALID_ROLES:
         raise HTTPException(status_code=422, detail=f"Invalid role. Must be one of: {', '.join(sorted(VALID_ROLES))}")
+    _only_owners_touch_owners(identity, payload.role, None)
 
     # Re-use existing pending invite for same email
     existing = db.scalar(
@@ -117,7 +132,7 @@ def invite_member(
             OrgInvite.accepted_at.is_(None),
         )
     )
-    if existing and existing.expires_at > datetime.now(timezone.utc):
+    if existing and not _expired(existing.expires_at):
         return {
             "invite_token": existing.token,
             "invite_url": f"{APP_URL}/join?token={existing.token}",
@@ -215,7 +230,7 @@ def validate_invite(token: str = Query(...), db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Invite not found")
     if invite.accepted_at:
         raise HTTPException(status_code=409, detail="Invite already accepted")
-    if invite.expires_at < datetime.now(timezone.utc):
+    if _expired(invite.expires_at):
         raise HTTPException(status_code=410, detail="Invite has expired")
     org = db.scalar(select(Organization).where(Organization.id == invite.org_id))
     return {
@@ -237,7 +252,7 @@ def accept_invite(
         raise HTTPException(status_code=404, detail="Invite not found")
     if invite.accepted_at:
         raise HTTPException(status_code=409, detail="Invite already accepted")
-    if invite.expires_at < datetime.now(timezone.utc):
+    if _expired(invite.expires_at):
         raise HTTPException(status_code=410, detail="Invite has expired")
 
     u = identity.user

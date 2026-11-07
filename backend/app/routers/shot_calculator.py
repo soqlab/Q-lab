@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/shots", tags=["shot_calculator"])
@@ -165,7 +165,8 @@ def _calculate_single(req: ShotCalcRequest) -> dict:
         moe = prec_in_hartree
 
     else:
-        return {"error": f"Unknown mode: {mode}. Use estimate_probability, detect_change, tomography, or vqe_energy."}
+        raise HTTPException(
+            422, f"Unknown mode: {mode}. Use estimate_probability, detect_change, tomography, or vqe_energy.")
 
     # Readout-adjusted shot count
     readout_adjusted = _adjust_for_readout_error(recommended, readout)

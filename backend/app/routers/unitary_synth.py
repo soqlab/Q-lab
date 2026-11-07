@@ -59,18 +59,21 @@ def _synth_1q(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
     u00_abs = _cabs(m[0][0])
     beta = round(2 * math.atan2(u10_abs, u00_abs), 6)
 
-    # α and γ from phases
-    if u00_abs > 1e-9:
-        phi_00 = math.atan2(m[0][0][1], m[0][0][0])
-    else:
-        phi_00 = 0.0
-    if u10_abs > 1e-9:
-        phi_10 = math.atan2(m[1][0][1], m[1][0][0])
-    else:
-        phi_10 = 0.0
+    # α and γ from phases. With U00 = e^{i(δ-α/2-γ/2)}cos, U10 = e^{i(δ+α/2-γ/2)}sin,
+    # U11 = e^{i(δ+α/2+γ/2)}cos and U01 = -e^{i(δ-α/2+γ/2)}sin:
+    #   α = arg U10 - arg U00,  γ = arg U11 - arg U10.
+    def _arg(c: List[float]) -> float:
+        return math.atan2(c[1], c[0])
 
-    alpha = round(phi_10 - phi_00 + math.pi / 2, 6)
-    gamma = round(phi_00 - phi_10 + math.pi / 2, 6)
+    if u10_abs < 1e-9:      # diagonal: only α+γ matters
+        alpha, gamma = _arg(m[1][1]) - _arg(m[0][0]), 0.0
+    elif u00_abs < 1e-9:    # anti-diagonal: only α-γ matters
+        alpha, gamma = _arg(m[1][0]) - _arg([-m[0][1][0], -m[0][1][1]]), 0.0
+    else:
+        alpha = _arg(m[1][0]) - _arg(m[0][0])
+        gamma = _arg(m[1][1]) - _arg(m[1][0])
+    alpha = round(alpha, 6)
+    gamma = round(gamma, 6)
 
     gates = []
     if abs(gamma) > 1e-6:

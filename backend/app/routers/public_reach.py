@@ -52,10 +52,9 @@ def _badge_svg(label: str, value: str, color: str = "#6366f1") -> str:
 @router.get("/api/v1/badge/runs.svg", include_in_schema=False)
 def badge_runs(db: Session = Depends(get_db)):
     """Embeddable shields-style badge showing total Q-Lab experiment count."""
-    count = db.execute(select(Run.run_id).limit(10000)).rowcount
-    if count is None or count < 0:
-        from sqlalchemy import func
-        count = db.scalar(select(func.count()).select_from(Run)) or 0
+    from sqlalchemy import func
+    # (Result objects from select() have no rowcount; this raised AttributeError on every call.)
+    count = db.scalar(select(func.count()).select_from(Run)) or 0
     label = "tracked on Q-Lab"
     value = f"{count:,} runs" if count != 1 else "1 run"
     svg = _badge_svg(label, value)
@@ -148,7 +147,7 @@ def public_gallery(
                 "health_score": r.health_score,
                 "qubits": (r.fingerprint or {}).get("num_qubits"),
                 "depth": (r.fingerprint or {}).get("depth"),
-                "project": r.project,
+                "project": r.project_slug,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "url": f"{SITE_URL}/share/{r.share_token}",
             }

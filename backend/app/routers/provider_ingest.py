@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, get_identity
 from ..models import Project, Run
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["provider_ingest"])
@@ -94,7 +95,7 @@ def _get_or_create_project(db: Session, slug: Optional[str]) -> Optional[Project
 
 def _save_run(db: Session, run_id: str, circuit_name: Optional[str], qasm: Optional[str],
               backend: Optional[str], counts: dict, shots: int, project_slug: Optional[str],
-              provider: str, extra_context: dict) -> Run:
+              provider: str, extra_context: dict, identity: Optional[Identity] = None) -> Run:
     p = _get_or_create_project(db, project_slug)
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:
@@ -110,6 +111,9 @@ def _save_run(db: Session, run_id: str, circuit_name: Optional[str], qasm: Optio
     run.context = {"provider": provider, **extra_context}
     run.results = {"counts": counts, "shots": shots, "success_probability": _counts_to_sp(counts)}
     run.execution = {"provider": provider}
+    if identity is not None:
+        run.created_by_user_id = identity.user_id
+        run.org_id = identity.org_id
     db.commit()
     db.refresh(run)
     return run
@@ -250,47 +254,52 @@ class AutoIngestRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/cirq")
-def ingest_cirq(req: CirqIngestRequest, db: Session = Depends(get_db)):
+def ingest_cirq(req: CirqIngestRequest, db: Session = Depends(get_db),
+                identity: Optional[Identity] = Depends(get_identity)):
     """Ingest a Google Cirq result JSON."""
     counts, backend, context, shots = _parse_cirq(req.result)
     run_id = _new_run_id()
     run = _save_run(db, run_id, req.circuit_name or "cirq-circuit", req.circuit_qasm,
-                    backend, counts, shots, req.project_slug, "cirq", context)
+                    backend, counts, shots, req.project_slug, "cirq", context, identity)
     return {"run_id": run.run_id, "backend": backend, "shots": shots, "n_outcomes": len(counts)}
 
 
 @router.post("/ionq")
-def ingest_ionq(req: IonQIngestRequest, db: Session = Depends(get_db)):
+def ingest_ionq(req: IonQIngestRequest, db: Session = Depends(get_db),
+                identity: Optional[Identity] = Depends(get_identity)):
     """Ingest an IonQ job result JSON."""
     counts, backend, context, shots = _parse_ionq(req.result)
     run_id = _new_run_id()
     run = _save_run(db, run_id, req.circuit_name or "ionq-circuit", req.circuit_qasm,
-                    backend, counts, shots, req.project_slug, "ionq", context)
+                    backend, counts, shots, req.project_slug, "ionq", context, identity)
     return {"run_id": run.run_id, "backend": backend, "shots": shots, "n_outcomes": len(counts)}
 
 
 @router.post("/braket")
-def ingest_braket(req: BraketIngestRequest, db: Session = Depends(get_db)):
+def ingest_braket(req: BraketIngestRequest, db: Session = Depends(get_db),
+                  identity: Optional[Identity] = Depends(get_identity)):
     """Ingest an AWS Braket task result JSON."""
     counts, backend, context, shots = _parse_braket(req.result)
     run_id = _new_run_id()
     run = _save_run(db, run_id, req.circuit_name or "braket-circuit", req.circuit_qasm,
-                    backend, counts, shots, req.project_slug, "braket", context)
+                    backend, counts, shots, req.project_slug, "braket", context, identity)
     return {"run_id": run.run_id, "backend": backend, "shots": shots, "n_outcomes": len(counts)}
 
 
 @router.post("/openqasm3")
-def ingest_openqasm3(req: OpenQASM3IngestRequest, db: Session = Depends(get_db)):
+def ingest_openqasm3(req: OpenQASM3IngestRequest, db: Session = Depends(get_db),
+                     identity: Optional[Identity] = Depends(get_identity)):
     """Ingest an OpenQASM3 circuit string with optional bitstring counts."""
     counts, context, shots = _parse_openqasm3(req.qasm, req.counts)
     run_id = _new_run_id()
     run = _save_run(db, run_id, req.circuit_name or "openqasm3-circuit", req.qasm,
-                    req.backend or "openqasm3", counts, shots, req.project_slug, "openqasm3", context)
+                    req.backend or "openqasm3", counts, shots, req.project_slug, "openqasm3", context, identity)
     return {"run_id": run.run_id, "backend": req.backend or "openqasm3", "shots": shots}
 
 
 @router.post("/auto")
-def ingest_auto(req: AutoIngestRequest, db: Session = Depends(get_db)):
+def ingest_auto(req: AutoIngestRequest, db: Session = Depends(get_db),
+                identity: Optional[Identity] = Depends(get_identity)):
     """Auto-detect the result format and ingest accordingly."""
     fmt = _auto_detect(req.payload)
     if fmt == "cirq":
@@ -311,7 +320,7 @@ def ingest_auto(req: AutoIngestRequest, db: Session = Depends(get_db)):
         raise HTTPException(422, f"Could not auto-detect format. Detected: '{fmt}'. Use a specific endpoint (/cirq, /ionq, /braket, /openqasm3).")
     run_id = _new_run_id()
     run = _save_run(db, run_id, req.circuit_name or f"{fmt}-circuit", req.circuit_qasm,
-                    backend, counts, shots, req.project_slug, provider, context)
+                    backend, counts, shots, req.project_slug, provider, context, identity)
     return {
         "run_id": run.run_id,
         "detected_format": fmt,

@@ -445,9 +445,10 @@ def verify_fingerprint(
             "error": "No fingerprint stored",
         }
 
-    # Recompute: temporarily null out fingerprint field as we did during locking
+    # Recompute over the record as it was when locked: the fields that change afterwards by design
+    # (linking a run, abandoning) are put back to their lock-time values.
     check = {k: v for k, v in prereg.items() if k != "fingerprint"}
-    check["fingerprint"] = None
+    check.update(status="locked", run_id=None, outcome=None, verdict=None, fingerprint=None)
     computed_fp = _compute_fingerprint(check)
 
     return {

@@ -258,6 +258,8 @@ def submit_tomography(run_id: str, req: TomographySubmit, db: Session = Depends(
 @router.get("/runs/{run_id}/tomography")
 def get_tomography(run_id: str, db: Session = Depends(get_db)):
     """Get the most recent tomography result for a run."""
+    if db.scalar(select(Run).where(Run.run_id == run_id)) is None:  # limited to the caller's runs
+        raise HTTPException(404, "Run not found")
     job = db.scalar(
         select(TomographyJob)
         .where(TomographyJob.run_id == run_id)
