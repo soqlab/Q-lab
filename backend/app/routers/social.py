@@ -125,8 +125,7 @@ def create_or_update_profile(payload: ProfilePayload, db: Session = Depends(get_
 def get_profile(username: str, db: Session = Depends(get_db)):
     _ensure_seeded(db)
     p = _get_profile(db, username)
-    feed = [e["value"] for e in store_list(db, _NS_FEED)
-            if isinstance(e.get("value"), dict) and e["value"].get("actor") == username]
+    feed = [e for e in store_list(db, _NS_FEED) if isinstance(e, dict) and e.get("actor") == username]
     feed.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return {**p, "follower_count": len(p.get("followers", [])),
             "following_count": len(p.get("following", [])), "recent_activity": feed[:5]}
@@ -162,14 +161,7 @@ def follow_user(payload: FollowPayload, db: Session = Depends(get_db)):
 def unfollow_user(payload: FollowPayload, db: Session = Depends(get_db)):
     _ensure_seeded(db)
     fkey = f"{payload.follower}__{payload.following}"
-    if store_get(db, _NS_FOLLOW, fkey):
-        from ..models import GenericRecord
-        from sqlalchemy import select, delete
-        db.execute(delete(GenericRecord).where(
-            GenericRecord.namespace == _NS_FOLLOW,
-            GenericRecord.key == fkey,
-        ))
-        db.commit()
+    if store_delete(db, _NS_FOLLOW, fkey):
         _remove_from_list(db, _NS_PROFILE, payload.following, "followers", payload.follower)
         _remove_from_list(db, _NS_PROFILE, payload.follower, "following", payload.following)
     return {"unfollowed": True, "follower": payload.follower, "following": payload.following}
@@ -180,8 +172,7 @@ def get_feed(username: str, limit: int = 20, db: Session = Depends(get_db)):
     _ensure_seeded(db)
     p = _get_profile(db, username)
     following_set = set(p.get("following", []))
-    all_events = [e["value"] for e in store_list(db, _NS_FEED)
-                  if isinstance(e.get("value"), dict) and e["value"].get("actor") in following_set]
+    all_events = [e for e in store_list(db, _NS_FEED) if isinstance(e, dict) and e.get("actor") in following_set]
     all_events.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return {"username": username, "feed": all_events[:limit], "count": len(all_events[:limit])}
 
@@ -202,8 +193,7 @@ def create_notification(payload: NotifyPayload, db: Session = Depends(get_db)):
 def get_notifications(username: str, unread_only: bool = False, db: Session = Depends(get_db)):
     _ensure_seeded(db)
     _get_profile(db, username)
-    notifs = [e["value"] for e in store_list(db, _NS_NOTIF)
-              if isinstance(e.get("value"), dict) and e["value"].get("user") == username]
+    notifs = [e for e in store_list(db, _NS_NOTIF) if isinstance(e, dict) and e.get("user") == username]
     if unread_only:
         notifs = [n for n in notifs if not n.get("read")]
     notifs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -215,8 +205,7 @@ def discover_researchers(username: Optional[str] = None, limit: int = 5, db: Ses
     _ensure_seeded(db)
     if username:
         _get_profile(db, username)
-    all_profiles = [e["value"] for e in store_list(db, _NS_PROFILE)
-                    if isinstance(e.get("value"), dict) and "username" in e.get("value", {})]
+    all_profiles = [e for e in store_list(db, _NS_PROFILE) if isinstance(e, dict) and "username" in e]
     user_profile = next((p for p in all_profiles if p.get("username") == username), None) if username else None
     skip = (set(user_profile.get("following", [])) | {username}) if user_profile else set()
     user_areas = user_profile.get("research_areas", []) if user_profile else []

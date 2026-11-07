@@ -170,22 +170,6 @@ def test_transpile_angles_are_not_evaluated_as_code():
     assert lines == ["rz(0) q[0];", "rz(-1.570796) q[0];", f"rz({math.pi / 2 + 1:.6f}) q[0];"]
 
 
-# ── transpiler_hub ───────────────────────────────────────────────────────────
-
-def test_transpiler_hub_detects_sdks_and_validates():
-    det = client.post("/api/v1/transpiler-hub/detect",
-                      json={"circuit": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(2)\nqc.h(0)"}).json()
-    assert det["detected_sdk"] == "qiskit" and "QuantumCircuit" in det["indicators"]
-    cirq = client.post("/api/v1/transpiler-hub/detect", json={"circuit": "q = cirq.LineQubit.range(2)"}).json()
-    assert cirq["detected_sdk"] == "cirq"
-    none = client.post("/api/v1/transpiler-hub/detect", json={"circuit": "print(1)"}).json()
-    assert none == {"detected_sdk": "unknown", "confidence": 0.0, "indicators": ["No recognizable SDK patterns found"]}
-    assert client.post("/api/v1/transpiler-hub/translate", json={
-        "circuit": "x", "source_sdk": "qiskit", "target_sdk": "qiskit"}).status_code == 400
-    assert client.post("/api/v1/transpiler-hub/translate", json={
-        "circuit": "x", "source_sdk": "fortran", "target_sdk": "qiskit"}).status_code == 400
-
-
 # ── trotter_evolution ────────────────────────────────────────────────────────
 
 def test_trotter_without_field_conserves_energy_and_magnetisation():

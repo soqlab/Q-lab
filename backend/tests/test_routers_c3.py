@@ -273,8 +273,8 @@ def test_social_follow_notifications_discover_and_unfollow():
     client.post("/api/v1/social/notify", json={"user": b, "type": "mention", "message": "hi"})
     assert client.get(f"/api/v1/social/notifications/{b}?unread_only=true").json()["count"] == 2
 
-    feed = client.get("/api/v1/social/feed/qyang_mit").json()  # follows park_ibm in the sample data
-    assert feed["count"] > 0 and {e["actor"] for e in feed["feed"]} <= {"park_ibm"}
+    feed = client.get(f"/api/v1/social/feed/{a}").json()  # the sample activity is gone; nothing is invented
+    assert feed == {"username": a, "feed": [], "count": 0}
     disc = client.get(f"/api/v1/social/discover?username={a}&limit=100").json()["suggestions"]
     names = [s["username"] for s in disc]
     assert b not in names and a not in names  # already followed / self
@@ -390,38 +390,51 @@ def _prereg() -> dict:
 def test_preregistration_lock_link_and_verify(users):
     """Regression: linking a run changed the stored record, so verify reported the locked
     pre-registration as tampered (valid: false) right after its run was linked."""
-    alice, _ = users
-    p = client.post("/api/v1/prereg", json=_prereg()).json()
+    alice, bob = users
+    p = client.post("/api/v1/prereg", headers=alice, json=_prereg()).json()
     pid = p["prereg_id"]
-    assert client.get(f"/api/v1/prereg/{pid}/verify").status_code == 400  # draft
-    assert client.put(f"/api/v1/prereg/{pid}", json={"n_shots": 2000}).json()["n_shots"] == 2000
-    locked = client.post(f"/api/v1/prereg/{pid}/lock").json()
+    assert "owner" not in p
+    assert client.get(f"/api/v1/prereg/{pid}/verify", headers=alice).status_code == 400  # draft
+    # Regression: pre-registrations needed no sign-in, and anyone could edit, lock, link or abandon
+    # anyone's. Drafts are private; a locked one can be shown and verified by anyone signed in.
+    assert client.post("/api/v1/prereg", json=_prereg()).status_code == 401
+    assert client.get(f"/api/v1/prereg/{pid}", headers=bob).status_code == 404
+    assert client.put(f"/api/v1/prereg/{pid}", headers=bob, json={"n_shots": 1}).status_code == 404
+    assert client.post(f"/api/v1/prereg/{pid}/lock", headers=bob).status_code == 404
+    assert pid not in {x["prereg_id"] for x in client.get("/api/v1/prereg", headers=bob).json()}
+    assert pid in {x["prereg_id"] for x in client.get("/api/v1/prereg", headers=alice).json()}
+    assert client.put(f"/api/v1/prereg/{pid}", headers=alice, json={"n_shots": 2000}).json()["n_shots"] == 2000
+    locked = client.post(f"/api/v1/prereg/{pid}/lock", headers=alice).json()
     assert locked["status"] == "locked" and len(locked["fingerprint"]) == 64
-    assert client.put(f"/api/v1/prereg/{pid}", json={"n_shots": 1}).status_code == 400
-    assert client.get(f"/api/v1/prereg/{pid}/verify").json()["valid"] is True
+    assert client.put(f"/api/v1/prereg/{pid}", headers=alice, json={"n_shots": 1}).status_code == 400
+    assert client.get(f"/api/v1/prereg/{pid}/verify", headers=alice).json()["valid"] is True
+    assert client.get(f"/api/v1/prereg/{pid}/verify", headers=bob).json()["valid"] is True
+    assert client.get(f"/api/v1/prereg/{pid}", headers=bob).json()["status"] == "locked"
 
     rid = push_run(alice)  # counts 500/500 → success_probability 0.5
+    assert client.post(f"/api/v1/prereg/{pid}/link-run/{rid}", headers=bob).status_code == 404
     linked = client.post(f"/api/v1/prereg/{pid}/link-run/{rid}", headers=alice).json()
     assert linked["verdict"] == "confirmed"
     assert linked["outcome"]["hypothesis_results"][0]["actual_value"] == 0.5
-    assert client.get(f"/api/v1/prereg/{pid}/verify").json()["valid"] is True
-    assert client.post(f"/api/v1/prereg/{pid}/abandon", json={"reason": "x"}).status_code == 400
+    assert client.get(f"/api/v1/prereg/{pid}/verify", headers=alice).json()["valid"] is True
+    assert client.post(f"/api/v1/prereg/{pid}/abandon", headers=alice, json={"reason": "x"}).status_code == 400
 
 
-def test_preregistration_detects_tampering_and_validates():
-    p = client.post("/api/v1/prereg", json=_prereg()).json()
+def test_preregistration_detects_tampering_and_validates(users):
+    alice, _ = users
+    p = client.post("/api/v1/prereg", headers=alice, json=_prereg()).json()
     pid = p["prereg_id"]
-    client.post(f"/api/v1/prereg/{pid}/lock")
+    client.post(f"/api/v1/prereg/{pid}/lock", headers=alice)
     with engine.begin() as conn:
         row = conn.execute(text("SELECT id, data FROM generic_records WHERE record_id = :r"), {"r": pid}).first()
         assert '"n_shots": 1000' in row.data
         conn.execute(text("UPDATE generic_records SET data = :d WHERE id = :i"),
                      {"d": row.data.replace('"n_shots": 1000', '"n_shots": 5000'), "i": row.id})
-    assert client.get(f"/api/v1/prereg/{pid}/verify").json()["valid"] is False
+    assert client.get(f"/api/v1/prereg/{pid}/verify", headers=alice).json()["valid"] is False
     bad = {**_prereg(), "hypotheses": []}
-    assert client.post("/api/v1/prereg", json=bad).status_code == 422
-    assert client.post(f"/api/v1/prereg/{pid}/link-run/does-not-exist").status_code == 404
-    assert client.get("/api/v1/prereg/prereg-missing").status_code == 404
+    assert client.post("/api/v1/prereg", headers=alice, json=bad).status_code == 422
+    assert client.post(f"/api/v1/prereg/{pid}/link-run/does-not-exist", headers=alice).status_code == 404
+    assert client.get("/api/v1/prereg/prereg-missing", headers=alice).status_code == 404
 
 
 # ── plugins, talent ──────────────────────────────────────────────────────────
@@ -445,22 +458,23 @@ def test_plugin_publish_filter_and_rate():
     assert cats["analysis"] >= 1
 
 
-def test_talent_matching_score():
-    prof = client.post("/api/v1/talent/profile", json={
+def test_talent_matching_score(users):
+    me, _ = users
+    prof = client.post("/api/v1/talent/profile", headers=me, json={
         "name": "P", "email": "p@example.com", "institution": "U", "role": "postdoc",
         "expertise": ["QAOA", "Error Mitigation"], "publications": 3, "h_index": 2,
         "open_to_opportunities": True, "bio": "b"}).json()
-    job = client.post("/api/v1/talent/job", json={
+    job = client.post("/api/v1/talent/job", headers=me, json={
         "title": f"Postdoc {_uid()}", "institution": "L", "location": "Delft", "type": "postdoc",
         "description": "d", "required_skills": ["QAOA", "VQE"], "preferred_skills": ["Error Mitigation"],
         "contact_email": "j@example.com"}).json()
-    matches = {m["job_id"]: m for m in client.get(f"/api/v1/talent/matches/{prof['profile_id']}").json()}
+    matches = {m["job_id"]: m for m in client.get(f"/api/v1/talent/matches/{prof['profile_id']}", headers=me).json()}
     # 0.65 · 1/2 required + 0.25 · 1/1 preferred + 0.1 role bonus
     assert matches[job["job_id"]]["match_score"] == 0.675
     assert set(matches[job["job_id"]]["matching_skills"]) == {"QAOA", "Error Mitigation"}
-    assert job["job_id"] in {j["job_id"] for j in client.get("/api/v1/talent/jobs?location=delft").json()}
-    assert client.get("/api/v1/talent/matches/missing").status_code == 404
-    assert client.post("/api/v1/talent/profile", json={"name": "x"}).status_code == 422
+    assert job["job_id"] in {j["job_id"] for j in client.get("/api/v1/talent/jobs?location=delft", headers=me).json()}
+    assert client.get("/api/v1/talent/matches/missing", headers=me).status_code == 404
+    assert client.post("/api/v1/talent/profile", headers=me, json={"name": "x"}).status_code == 422
 
 
 # ── public_reach ─────────────────────────────────────────────────────────────
