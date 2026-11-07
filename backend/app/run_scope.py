@@ -27,6 +27,7 @@ UNSCOPED_PREFIXES = (
     "/api/v1/runs/public/",
     "/api/v1/public/",
     "/api/v1/badge/",
+    "/api/v1/peer-review/token/",  # the review token is the reviewer's permission to see that run
 )
 
 _UNSCOPED = object()

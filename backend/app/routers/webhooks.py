@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, require_auth
 from ..models import Webhook
+from ..run_scope import scope_of, visible
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
@@ -29,6 +30,18 @@ class WebhookUpdatePayload(BaseModel):
     events: Optional[List[str]] = None
     is_active: Optional[bool] = None
     project_slug: Optional[str] = None
+
+
+def _yours(wh: Webhook, identity: Identity) -> bool:
+    """Your organisation's webhooks, or, without an organisation, the ones you created."""
+    return visible(wh.created_by_user_id, wh.org_id, scope_of(identity.user_id, identity.org_id))
+
+
+def _find_yours(db: Session, webhook_id: int, identity: Identity) -> Webhook:
+    wh = db.scalar(select(Webhook).where(Webhook.id == webhook_id))
+    if not wh or not _yours(wh, identity):
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    return wh
 
 
 def _wh_dict(wh: Webhook) -> Dict[str, Any]:
@@ -57,6 +70,7 @@ def create_webhook(
 
     wh = Webhook(
         org_id=identity.org_id,
+        created_by_user_id=identity.user_id,
         name=payload.name,
         url=payload.url,
         events=payload.events,
@@ -77,10 +91,8 @@ def list_webhooks(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    query = select(Webhook).order_by(Webhook.created_at.desc())
-    if identity.org_id:
-        query = query.where(Webhook.org_id == identity.org_id)
-    return [_wh_dict(wh) for wh in db.scalars(query).all()]
+    hooks = db.scalars(select(Webhook).order_by(Webhook.created_at.desc())).all()
+    return [_wh_dict(wh) for wh in hooks if _yours(wh, identity)]
 
 
 @router.patch("/{webhook_id}")
@@ -90,11 +102,7 @@ def update_webhook(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    wh = db.scalar(select(Webhook).where(Webhook.id == webhook_id))
-    if not wh:
-        raise HTTPException(status_code=404, detail="Webhook not found")
-    if identity.org_id and wh.org_id != identity.org_id:
-        raise HTTPException(status_code=403)
+    wh = _find_yours(db, webhook_id, identity)
 
     if payload.name is not None:
         wh.name = payload.name
@@ -117,11 +125,7 @@ def delete_webhook(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    wh = db.scalar(select(Webhook).where(Webhook.id == webhook_id))
-    if not wh:
-        raise HTTPException(status_code=404, detail="Webhook not found")
-    if identity.org_id and wh.org_id != identity.org_id:
-        raise HTTPException(status_code=403)
+    wh = _find_yours(db, webhook_id, identity)
     db.delete(wh)
     db.commit()
     return {"deleted": True}

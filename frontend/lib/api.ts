@@ -3061,7 +3061,7 @@ export type NLQSearchResult = {
 
 export async function nlqSearch(q: string, limit = 10): Promise<NLQSearchResult> {
   const params = new URLSearchParams({ q, limit: String(limit) });
-  const res = await fetch(apiUrl(`/api/v1/circuits/search?${params}`), {
+  const res = await fetch(apiUrl(`/api/v1/circuits/natural-search?${params}`), {
     cache: "no-store",
     headers: authHeaders(),
   });

@@ -10,6 +10,16 @@ import httpx
 from .outbound import is_safe_url
 
 
+def receives(wh: Any, run_dict: dict[str, Any]) -> bool:
+    """A webhook gets the events of runs its owner can see: the same rule as app/run_scope.py."""
+    from .run_scope import scope_of, visible
+
+    if wh.created_by_user_id is None and wh.org_id is not None:  # created before webhooks had an owner
+        return run_dict.get("org_id") == wh.org_id
+    return visible(run_dict.get("created_by_user_id"), run_dict.get("org_id"),
+                   scope_of(wh.created_by_user_id, wh.org_id))
+
+
 def deliver_webhooks(run_dict: dict[str, Any], event: str) -> None:
     from .database import SessionLocal
     from .models import Webhook
@@ -22,6 +32,8 @@ def deliver_webhooks(run_dict: dict[str, Any], event: str) -> None:
                 if wh.events and event not in wh.events:
                     continue
                 if wh.project_slug and wh.project_slug != run_dict.get("project"):
+                    continue
+                if not receives(wh, run_dict):
                     continue
                 _post_webhook(wh, event, run_dict, db)
     except Exception:

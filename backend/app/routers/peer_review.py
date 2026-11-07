@@ -96,6 +96,14 @@ def _strip_email(review: dict) -> dict:
     return d
 
 
+def _listed(review: dict) -> dict:
+    """A review as shown in a listing: no email, and no access token (the token lets its holder
+    decide the review, so only the requester, who received it on creation, may hold it)."""
+    d = _strip_email(review)
+    d.pop("access_token", None)
+    return d
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -140,8 +148,10 @@ def submit_review_request(
 
 @router.get("/run/{run_id}")
 def get_reviews_for_run(run_id: str, db: Session = Depends(get_db)):
+    if db.scalar(select(Run).where(Run.run_id == run_id)) is None:  # limited to the caller's runs
+        raise HTTPException(404, "Run not found")
     all_reviews = store_list(db, _NAMESPACE)
-    reviews = [_strip_email(r) for r in all_reviews if r.get("run_id") == run_id]
+    reviews = [_listed(r) for r in all_reviews if r.get("run_id") == run_id]
     return {"run_id": run_id, "count": len(reviews), "reviews": reviews}
 
 
@@ -152,6 +162,7 @@ def get_review_by_token(access_token: str, db: Session = Depends(get_db)):
     if review is None:
         raise HTTPException(404, "Review not found")
 
+    # Unscoped path (run_scope.UNSCOPED_PREFIXES): the token lets its holder see this one run.
     run = db.scalar(select(Run).where(Run.run_id == review["run_id"]))
     run_data = _run_to_provenance(run) if run else None
 
@@ -218,4 +229,7 @@ def verify_signature(signature: str, db: Session = Depends(get_db)):
 @router.get("/my-requests")
 def list_all_requests(db: Session = Depends(get_db)):
     all_reviews = store_list(db, _NAMESPACE)
-    return {"count": len(all_reviews), "reviews": [_strip_email(r) for r in all_reviews]}
+    run_ids = {r.get("run_id") for r in all_reviews}
+    visible = set(db.scalars(select(Run.run_id).where(Run.run_id.in_(run_ids))).all()) if run_ids else set()
+    mine = [_listed(r) for r in all_reviews if r.get("run_id") in visible]
+    return {"count": len(mine), "reviews": mine}

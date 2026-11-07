@@ -127,6 +127,8 @@ class Webhook(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    # The user who created it. Without an organisation a webhook belongs to this user alone.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200))
     url: Mapped[str] = mapped_column(String(2000))
     events: Mapped[list[str]] = mapped_column(JSON, default=list)

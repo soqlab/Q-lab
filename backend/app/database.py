@@ -105,6 +105,14 @@ def _ensure_compat_columns() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN created_by_user_id INTEGER"))
 
+    if "webhooks" in tables:
+        webhook_cols = {c["name"] for c in inspector.get_columns("webhooks")}
+        if "created_by_user_id" not in webhook_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE webhooks ADD COLUMN created_by_user_id INTEGER"))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_webhooks_created_by_user_id ON webhooks(created_by_user_id)"))
+
     if "audit_logs" in tables:
         audit_cols = {c["name"] for c in inspector.get_columns("audit_logs")}
         with engine.begin() as conn:

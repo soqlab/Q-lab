@@ -119,11 +119,9 @@ def _l2(v: list[float]) -> list[float]:
 
 def _safe_angle(s: str) -> float:
     """Parse angle expression such as 'pi/2' or '1.5707' safely."""
-    s = s.strip().replace('pi', str(math.pi))
-    if not re.match(r'^[\d\s.\+\-\*/\(\)eE]+$', s):
-        return 0.0
+    from .job_executor import _angle_value  # not eval(): "9**9**9**9" passed the old regex and hung the server
     try:
-        return float(eval(s))  # noqa: S307 — regex above prevents code injection
+        return _angle_value(s)
     except Exception:
         return 0.0
 
@@ -615,8 +613,9 @@ def unitary_fidelity(
                 from qiskit import qasm3
                 return qasm3.loads(qasm)
 
-        qc1 = _load(r1.qasm)
-        qc2 = _load(r2.qasm)
+        # Stored circuits usually end in measurements, which have no unitary.
+        qc1 = _load(r1.qasm).remove_final_measurements(inplace=False)
+        qc2 = _load(r2.qasm).remove_final_measurements(inplace=False)
         n1, n2 = qc1.num_qubits, qc2.num_qubits
 
         if n1 > 8 or n2 > 8:

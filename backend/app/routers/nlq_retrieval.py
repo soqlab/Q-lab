@@ -229,7 +229,8 @@ def _backend_bonus(feat: dict, run: Run) -> float:
 # Endpoint
 # ──────────────────────────────────────────────────────────────────────
 
-@router.get("/circuits/search")
+# Not /circuits/search: circuit_search registers that path first, so this endpoint was unreachable.
+@router.get("/circuits/natural-search")
 def nlq_search(
     q: str = Query(..., description="Natural language circuit description"),
     limit: int = Query(default=10, ge=1, le=50),

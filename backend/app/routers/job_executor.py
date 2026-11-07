@@ -62,6 +62,39 @@ def _estimate_cost(provider: str, shots: int, depth: int, backend: Optional[str]
 # Pure-Python statevector simulator (supports H, X, Y, Z, CNOT, RZ, RX, RY)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _angle_value(text: str) -> float:
+    """A gate angle such as "pi/2", "-3*pi/4" or "sqrt(2)*0.1": numbers, pi, + - * / ** and sqrt only.
+
+    Never eval(): the QASM comes from the request, and eval with empty builtins can be escaped.
+    """
+    import ast
+    import operator
+
+    ops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+           ast.Div: operator.truediv, ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos}
+
+    def ev(node: ast.AST) -> float:
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+            return float(node.value)
+        if isinstance(node, ast.Name) and node.id == "pi":
+            return math.pi
+        if isinstance(node, ast.BinOp) and type(node.op) in ops:
+            right = ev(node.right)
+            if isinstance(node.op, ast.Pow) and abs(right) > 64:
+                raise ValueError("exponent too large")
+            return ops[type(node.op)](ev(node.left), right)
+        if isinstance(node, ast.UnaryOp) and type(node.op) in ops:
+            return ops[type(node.op)](ev(node.operand))
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "sqrt"
+                and len(node.args) == 1 and not node.keywords):
+            return math.sqrt(ev(node.args[0]))
+        raise ValueError(f"unsupported angle expression: {ast.dump(node)[:80]}")
+
+    if len(text) > 200:
+        raise ValueError("angle expression too long")
+    return ev(ast.parse(text.strip(), mode="eval").body)
+
+
 def _simulate_qasm(qasm: str, shots: int, seed: int = 42) -> dict[str, int]:
     """Minimal QASM2 simulator — handles common single/two-qubit gates."""
     rng = random.Random(seed)
@@ -132,9 +165,8 @@ def _simulate_qasm(qasm: str, shots: int, seed: int = 42) -> dict[str, int]:
         return qbs
 
     def _parse_angle(s: str) -> float:
-        s = s.strip().replace("pi", str(math.pi))
         try:
-            return eval(s, {"__builtins__": {}}, {"pi": math.pi, "sqrt": math.sqrt})  # noqa: S307
+            return _angle_value(s)
         except Exception:
             return 0.0
 
