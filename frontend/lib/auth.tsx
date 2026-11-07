@@ -30,7 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const setSession = useCallback((t: string, u: AuthUser) => {
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const setSession = useCallback(function save(t: string, u: AuthUser) {
     localStorage.setItem(TOKEN_KEY, t);
     localStorage.setItem(USER_KEY, JSON.stringify(u));
     setToken(t);
@@ -40,20 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshTimer.current = setTimeout(async () => {
       try {
         const resp = await refreshToken(t);
-        setSession(resp.access_token, u);
+        save(resp.access_token, u);
       } catch {
         clearSession();
       }
     }, (24 * 60 - 5) * 60 * 1000);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const clearSession = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    setToken(null);
-    setUser(null);
-  }, []);
+  }, [clearSession]);
 
   const refreshUser = useCallback(async () => {
     const t = localStorage.getItem(TOKEN_KEY);
@@ -88,27 +88,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const t = localStorage.getItem(TOKEN_KEY);
-    if (t) {
-      // Verify token is still valid by hitting /auth/me
-      fetchMe(t)
-        .then((u) => setSession(t, u))
-        .catch((err) => {
-          // Only clear the session on a definitive 401 — not on network/server errors
-          if (err instanceof Error && err.message === "401") {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(USER_KEY);
-          } else {
-            // Network error or server down: keep the stored token and let the user in
-            const stored = localStorage.getItem(USER_KEY);
-            const u = stored ? JSON.parse(stored) as AuthUser : null;
-            if (u) setSession(t, u);
-          }
-        })
-        .finally(() => setLoading(false));
-      return;
-    }
-    setLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Verify a stored token is still valid by hitting /auth/me; loading ends either way.
+    const check = t
+      ? fetchMe(t)
+          .then((u) => setSession(t, u))
+          .catch((err) => {
+            // Only clear the session on a definitive 401 — not on network/server errors
+            if (err instanceof Error && err.message === "401") {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+            } else {
+              // Network error or server down: keep the stored token and let the user in
+              const stored = localStorage.getItem(USER_KEY);
+              const u = stored ? JSON.parse(stored) as AuthUser : null;
+              if (u) setSession(t, u);
+            }
+          })
+      : Promise.resolve();
+    check.finally(() => setLoading(false));
+  }, [setSession]);
 
   return (
     <AuthContext.Provider value={{ token, user, loading, setSession, clearSession, refreshUser }}>

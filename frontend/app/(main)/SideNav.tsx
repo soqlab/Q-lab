@@ -2,10 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { isCorePath, useLabs } from "../../lib/labs";
+
+// The sidebar's saved choices live in localStorage; this event tells its readers one changed.
+const NAV_STORAGE_EVENT = "qlab-nav-storage";
+
+function subscribeNavStorage(onChange: () => void): () => void {
+  window.addEventListener(NAV_STORAGE_EVENT, onChange);
+  return () => window.removeEventListener(NAV_STORAGE_EVENT, onChange);
+}
+
+function useStoredItem(key: string): string | null {
+  return useSyncExternalStore(subscribeNavStorage, () => localStorage.getItem(key), () => null);
+}
+
+function storeItem(key: string, value: string) {
+  localStorage.setItem(key, value);
+  window.dispatchEvent(new Event(NAV_STORAGE_EVENT));
+}
 
 type NavItem = { href: string; icon: React.ElementType; label: string; badge?: string };
 
@@ -262,17 +279,11 @@ function NavGroup({
   pathname: string;
 }) {
   const storageKey = `qlab_nav_${label}`;
-  const [open, setOpen] = useState(defaultOpen);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved !== null) setOpen(saved === "1");
-  }, [storageKey]);
+  const saved = useStoredItem(storageKey);
+  const open = saved === null ? defaultOpen : saved === "1";
 
   function toggle() {
-    const next = !open;
-    setOpen(next);
-    localStorage.setItem(storageKey, next ? "1" : "0");
+    storeItem(storageKey, open ? "0" : "1");
   }
 
   const hasActive = items.some((i) => i.href === pathname);
@@ -364,10 +375,10 @@ function AIQuotaBar() {
 function GetStartedBanner() {
   const { token } = useAuth();
   const [hasRuns, setHasRuns] = useState<boolean | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const dismissed = !!useStoredItem("qlab_gs_dismissed");
 
   useEffect(() => {
-    if (localStorage.getItem("qlab_gs_dismissed")) { setDismissed(true); return; }
+    if (localStorage.getItem("qlab_gs_dismissed")) return;
     if (!token) return;
     fetch("/qlab-api/api/v1/runs?limit=1", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
@@ -376,8 +387,7 @@ function GetStartedBanner() {
   }, [token]);
 
   function dismiss() {
-    localStorage.setItem("qlab_gs_dismissed", "1");
-    setDismissed(true);
+    storeItem("qlab_gs_dismissed", "1");
   }
 
   if (dismissed || hasRuns === null || hasRuns === true) return null;

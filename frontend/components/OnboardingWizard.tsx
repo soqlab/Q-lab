@@ -26,15 +26,18 @@ interface OnboardingWizardProps {
 
 export default function OnboardingWizard({ forceShow = false, onDismiss }: OnboardingWizardProps) {
   const router = useRouter();
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(forceShow);
+  // forceShow turning on shows the wizard again (adjusted while rendering, not in an effect)
+  const [prevForceShow, setPrevForceShow] = useState(forceShow);
+  if (forceShow !== prevForceShow) {
+    setPrevForceShow(forceShow);
+    if (forceShow) setVisible(true);
+  }
   const [step, setStep] = useState(1);
   const [demoStatus, setDemoStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   useEffect(() => {
-    if (forceShow) {
-      setVisible(true);
-      return;
-    }
+    if (forceShow) return;
     if (localStorage.getItem(ONBOARDING_KEY) === "1") return;
     // Check run count
     const token = localStorage.getItem(TOKEN_KEY);
@@ -181,7 +184,7 @@ function Step1({ onNext, onDismiss }: { onNext: () => void; onDismiss: () => voi
         Welcome to Q-Lab
       </h2>
       <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 12, fontWeight: 500 }}>
-        The world's most complete quantum experiment tracking platform
+        The world&apos;s most complete quantum experiment tracking platform
       </p>
       <p style={{ fontSize: 15, color: "#374151", marginBottom: 32, lineHeight: 1.6 }}>
         Q-Lab automatically captures your quantum circuits, hardware calibration, and results —
@@ -247,7 +250,7 @@ function Step2({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
         Connect Your Quantum Code
       </h2>
       <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 20 }}>
-        Two lines of code. That's all it takes.
+        Two lines of code. That&apos;s all it takes.
       </p>
       <pre
         style={{
@@ -512,10 +515,10 @@ function Step5({
     <div style={{ textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
       <h2 style={{ fontSize: 26, fontWeight: 700, color: "#111", marginBottom: 8 }}>
-        You're All Set!
+        You&apos;re All Set!
       </h2>
       <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24 }}>
-        Here's what's waiting for you in Q-Lab:
+        Here&apos;s what&apos;s waiting for you in Q-Lab:
       </p>
       <ul
         style={{

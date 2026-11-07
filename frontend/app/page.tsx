@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth";
@@ -888,19 +888,18 @@ function hideBadge(e: React.SyntheticEvent<HTMLImageElement>) {
   if (link) link.style.display = "none";
 }
 
+const noSubscription = () => () => {};
+
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  // False while server rendering and hydrating, true after: the signed-in state is only known in the browser.
+  const mounted = useSyncExternalStore(noSubscription, () => true, () => false);
   const [contactOpen, setContactOpen] = useState(false);
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactMsg, setContactMsg] = useState("");
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   async function handleContactSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -932,10 +931,10 @@ export default function LandingPage() {
       <div className="lp-root">
         {/* ── Navbar ─────────────────────────────────────────────────────── */}
         <nav className="lp-nav">
-          <a href="/" className="lp-logo">
+          <Link href="/" className="lp-logo">
             <span className="lp-logo-icon">⚛</span>
             Q-Lab
-          </a>
+          </Link>
 
           <ul className="lp-nav-links">
             <li><a href="#features">Features</a></li>
