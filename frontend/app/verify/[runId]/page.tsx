@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { getRunProvenance, getRunBadgeUrl, qlabApiPath } from "../../../lib/api";
 
@@ -192,7 +193,7 @@ export default function VerifyPage({ params: paramsPromise }: { params: Promise<
         <div style={{ fontSize: 40 }}>⚠</div>
         <div style={{ fontSize: 20, fontWeight: 700 }}>Experiment not found</div>
         <div style={{ color: "#6b7280", fontSize: 14 }}>{error}</div>
-        <a href="/" style={{ color: "#60a5fa", marginTop: 8 }}>Go to Q-Lab →</a>
+        <Link href="/" style={{ color: "#60a5fa", marginTop: 8 }}>Go to Q-Lab →</Link>
       </div>
     );
   }
@@ -271,12 +272,12 @@ export default function VerifyPage({ params: paramsPromise }: { params: Promise<
             Provenance Certificate
           </span>
         </div>
-        <a
+        <Link
           href="/"
           style={{ color: "#6b7280", fontSize: 13, textDecoration: "none" }}
         >
           Open Q-Lab →
-        </a>
+        </Link>
       </header>
 
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "32px 20px" }}>

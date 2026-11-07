@@ -150,7 +150,7 @@ export default function TranspilePage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 400, color: "#475569" }}>
               <ArrowRightLeft size={60} style={{ opacity: 0.12, marginBottom: 16 }} />
-              <p>Paste a circuit and click "Transpile All Providers" to see decompositions for all quantum hardware vendors.</p>
+              <p>Paste a circuit and click &quot;Transpile All Providers&quot; to see decompositions for all quantum hardware vendors.</p>
             </div>
           )}
         </div>

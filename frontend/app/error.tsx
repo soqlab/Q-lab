@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 function isChunkError(error: Error): boolean {
@@ -99,9 +100,9 @@ export default function Error({
           >
             Try again
           </button>
-          <a href="/runs" className="button secondary" style={{ textDecoration: "none" }}>
+          <Link href="/runs" className="button secondary" style={{ textDecoration: "none" }}>
             ← Back to runs
-          </a>
+          </Link>
         </div>
       </div>
     </main>

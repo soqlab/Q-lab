@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "../../../lib/auth";
 
@@ -63,9 +64,9 @@ export default function FeedbackPage() {
             <button className="button" onClick={() => { setTitle(""); setDesc(""); setCategory(""); setStatus("idle"); }}>
               Submit another
             </button>
-            <a href="/runs" className="button secondary" style={{ textDecoration: "none" }}>
+            <Link href="/runs" className="button secondary" style={{ textDecoration: "none" }}>
               Back to runs
-            </a>
+            </Link>
           </div>
         </div>
       </main>

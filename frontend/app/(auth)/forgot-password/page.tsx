@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
         <h1 className="auth-title">Reset password</h1>
-        <p className="auth-sub">We'll email you a reset link</p>
+        <p className="auth-sub">We&apos;ll email you a reset link</p>
 
         {submitted ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>

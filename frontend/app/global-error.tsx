@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 function isChunkError(error: Error): boolean {
@@ -55,9 +56,9 @@ export default function GlobalError({
           >
             Try again
           </button>
-          <a href="/runs" style={{ padding: "9px 22px", background: "transparent", border: "1px solid #334155", borderRadius: 6, cursor: "pointer", fontSize: 14, color: "#94a3b8", textDecoration: "none" }}>
+          <Link href="/runs" style={{ padding: "9px 22px", background: "transparent", border: "1px solid #334155", borderRadius: 6, cursor: "pointer", fontSize: 14, color: "#94a3b8", textDecoration: "none" }}>
             ← Runs
-          </a>
+          </Link>
         </div>
       </body>
     </html>

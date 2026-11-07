@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import {
   CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp,
@@ -329,9 +330,9 @@ export default function ReviewPage({ params: paramsPromise }: { params: Promise<
             Peer Review
           </span>
         </div>
-        <a href="/" style={{ color: "#7a96b0", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+        <Link href="/" style={{ color: "#7a96b0", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
           <ExternalLink size={13} /> Open Q-Lab
-        </a>
+        </Link>
       </header>
 
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "32px 20px" }}>
@@ -348,7 +349,7 @@ export default function ReviewPage({ params: paramsPromise }: { params: Promise<
             <AlertTriangle size={48} style={{ color: "#f87171", marginBottom: 16, margin: "0 auto 16px" }} />
             <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Review not found</div>
             <div style={{ color: "#7a96b0" }}>{error}</div>
-            <a href="/" style={{ display: "inline-block", marginTop: 20, color: "#60c5ff" }}>Go to Q-Lab →</a>
+            <Link href="/" style={{ display: "inline-block", marginTop: 20, color: "#60c5ff" }}>Go to Q-Lab →</Link>
           </div>
         )}
 

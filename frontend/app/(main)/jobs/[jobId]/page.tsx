@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { getJob, syncJob, cancelJob, JobSubmission } from "../../../../lib/api";
@@ -72,7 +73,7 @@ export default function JobDetailPage() {
   return (
     <div style={{ padding: 24, maxWidth: 900 }}>
       <div style={{ marginBottom: 8, fontSize: 13, color: "#9ca3af" }}>
-        <a href="/jobs" style={{ color: "#6b7280" }}>Jobs</a> / {jobId}
+        <Link href="/jobs" style={{ color: "#6b7280" }}>Jobs</Link> / {jobId}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>

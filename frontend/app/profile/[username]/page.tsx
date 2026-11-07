@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { ExternalLink, MapPin, BookOpen, Globe, Award } from "lucide-react";
 import GithubIcon from "../../../components/GithubIcon";
@@ -178,9 +179,9 @@ export default function PublicProfilePage({ params: paramsPromise }: { params: P
           <div style={{ fontSize: 48, marginBottom: 16 }}>404</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Profile not found</div>
           <div style={{ color: "#64748b" }}>This researcher hasn&apos;t created a public profile yet.</div>
-          <a href="/" style={{ display: "inline-block", marginTop: 20, color: "#38bdf8" }}>
+          <Link href="/" style={{ display: "inline-block", marginTop: 20, color: "#38bdf8" }}>
             Go to Q-Lab →
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -425,9 +426,9 @@ export default function PublicProfilePage({ params: paramsPromise }: { params: P
 
         <footer style={{ textAlign: "center", padding: "32px 0 16px", color: "#334155", fontSize: 12 }}>
           Profile on{" "}
-          <a href="/" style={{ color: "#38bdf8", textDecoration: "none" }}>
+          <Link href="/" style={{ color: "#38bdf8", textDecoration: "none" }}>
             Q-Lab
-          </a>{" "}
+          </Link>{" "}
           · Last updated {new Date(profile.updated_at).toLocaleDateString()}
         </footer>
       </main>
@@ -448,12 +449,12 @@ function TopBar() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <a
+        <Link
           href="/"
           style={{ fontSize: 20, fontWeight: 800, color: "#f1f5f9", textDecoration: "none", letterSpacing: "-0.5px" }}
         >
           Q-Lab
-        </a>
+        </Link>
         <span
           style={{
             background: "#1d6f8f33",

@@ -58,7 +58,7 @@ export default function AutopilotPage() {
           + Launch Mission
         </button>
       </div>
-      <p style={{ color:"var(--muted)" }}>Set a target (e.g. "find ground state energy to 1 mHa") and Q-Lab iterates circuits, adjusts parameters, picks backends, and stops when converged.</p>
+      <p style={{ color:"var(--muted)" }}>Set a target (e.g. &quot;find ground state energy to 1 mHa&quot;) and Q-Lab iterates circuits, adjusts parameters, picks backends, and stops when converged.</p>
 
       {error && <div style={{ color:"var(--danger)", background:"rgba(239,68,68,0.1)", borderRadius:6, padding:12 }}>{error}</div>}
 

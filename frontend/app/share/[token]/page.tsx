@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { fetchPublicRun, healthColor, qlabApiPath, type QLabRun } from "../../../lib/api";
@@ -41,9 +42,9 @@ export default function PublicSharePage({ params: paramsPromise }: { params: Pro
             Shared Run
           </span>
         </div>
-        <a href="/" style={{ color: "#94a3b8", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+        <Link href="/" style={{ color: "#94a3b8", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
           <ExternalLink size={14} /> Open Q-Lab
-        </a>
+        </Link>
       </header>
 
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px" }}>
@@ -54,7 +55,7 @@ export default function PublicSharePage({ params: paramsPromise }: { params: Pro
             <AlertTriangle size={48} style={{ color: "#e74c3c", marginBottom: 16 }} />
             <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Run not found</div>
             <div style={{ color: "#5f6f80" }}>{error}</div>
-            <a href="/" style={{ display: "inline-block", marginTop: 20, color: "#1d6f8f" }}>Go to Q-Lab →</a>
+            <Link href="/" style={{ display: "inline-block", marginTop: 20, color: "#1d6f8f" }}>Go to Q-Lab →</Link>
           </div>
         )}
 
