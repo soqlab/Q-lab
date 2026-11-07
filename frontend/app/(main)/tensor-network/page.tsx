@@ -14,26 +14,30 @@ function formatBytes(bytes: number): string {
 export default function TensorNetworkPage() {
   const [qasm, setQasm] = useState(PRESET_QASM);
   const [maxBondDim, setMaxBondDim] = useState(16);
-  const [method, setMethod] = useState<"svd" | "qr">("svd");
   const [result, setResult] = useState<TensorNetworkResult | null>(null);
+  // The preset is analysed on load, so the page starts out loading.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // The API call, setting state only in promise callbacks: run on mount (loading starts true) and by handleRun.
-  const compute = () =>
-    analyzeTensorNetwork({ qasm, max_bond_dim: maxBondDim, method })
-      .then((res) => setResult(res))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-
-  const handleRun = () => {
+  const handleRun = async () => {
     setLoading(true);
     setError("");
-    void compute();
+    try {
+      const res = await analyzeTensorNetwork({ qasm, max_bond_dim: maxBondDim });
+      setResult(res);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void compute(); }, []);
+  useEffect(() => {
+    analyzeTensorNetwork({ qasm: PRESET_QASM, max_bond_dim: 16 })
+      .then(setResult)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
   const renderBondChart = (dims: number[]) => {
     if (!dims || dims.length === 0) return null;
@@ -149,31 +153,6 @@ export default function TensorNetworkPage() {
               </div>
             </div>
 
-            <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "1rem" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Decompose Method</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {([{ id: "svd", label: "SVD" }, { id: "qr", label: "QR" }] as { id: "svd" | "qr"; label: string }[]).map(m => (
-                  <button
-                    key={m.id}
-                    onClick={() => setMethod(m.id)}
-                    style={{
-                      border: method === m.id ? "1.5px solid #8b5cf6" : "1.5px solid #334155",
-                      borderRadius: 8,
-                      padding: "0.55rem",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                      background: method === m.id ? "#8b5cf618" : "#0f172a",
-                      color: method === m.id ? "#8b5cf6" : "#94a3b8",
-                      fontSize: 14,
-                      width: "100%",
-                    }}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button
               onClick={handleRun}
               disabled={loading}
@@ -236,14 +215,16 @@ export default function TensorNetworkPage() {
                     flex: 1,
                     background: "#1e293b",
                     borderRadius: 10,
-                    border: `1px solid ${result.is_area_law ? "#10b981" : "#f59e0b"}`,
+                    border: `1px solid ${result.fits_bond_dim ? "#10b981" : "#f59e0b"}`,
                     padding: "0.85rem",
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
                   }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: result.is_area_law ? "#10b981" : "#f59e0b" }}>
-                      {result.is_area_law ? "Area Law (MPS efficient)" : result.is_volume_law ? "Volume Law (entanglement-rich)" : "Mixed Entanglement"}
+                    <span style={{ fontWeight: 700, fontSize: 14, color: result.fits_bond_dim ? "#10b981" : "#f59e0b" }}>
+                      {result.fits_bond_dim
+                        ? `Exact MPS: largest Schmidt rank ${result.max_bond_dim_exact} fits D=${result.max_bond_dim_requested}`
+                        : `Truncated: Schmidt rank up to ${result.max_bond_dim_exact} cut to D=${result.max_bond_dim_requested}`}
                     </span>
                   </div>
                 </div>

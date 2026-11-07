@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import get_identity, require_auth, Identity
 from ..models import Run, User
-from ..store import store_delete, store_get, store_list, store_put, store_seed
+from ..store import store_delete, store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/profiles", tags=["researcher-profiles"])
 
@@ -86,116 +86,17 @@ class ProfileInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Seed data
+# Sample profiles from earlier versions
 # ---------------------------------------------------------------------------
 
-_SEED_PROFILES = [
-    ("profile_alice", {
-        "profile_id": "profile_alice",
-        "username": "alice_vqe",
-        "display_name": "Dr. Alice Chen",
-        "title": "Research Scientist",
-        "institution": "MIT",
-        "department": "Physics",
-        "bio": "Specialising in variational quantum eigensolvers and near-term quantum algorithms for chemistry.",
-        "research_interests": ["VQE", "Quantum Chemistry", "Error Mitigation"],
-        "orcid_id": "0000-0001-2345-6789",
-        "google_scholar_url": "https://scholar.google.com/citations?user=alice_vqe",
-        "github_username": "alice-vqe",
-        "website_url": "https://alice-vqe.mit.edu",
-        "location": "Cambridge, MA",
-        "public_profile": True,
-        "show_run_count": True,
-        "show_health_scores": True,
-        "show_recent_circuits": True,
-        "created_at": "2024-01-15T10:00:00Z",
-        "updated_at": "2024-06-01T08:30:00Z",
-    }),
-    ("profile_bob", {
-        "profile_id": "profile_bob",
-        "username": "bob_qaoa",
-        "display_name": "Bob Martinez",
-        "title": "PhD Candidate",
-        "institution": "Stanford University",
-        "department": "Computer Science",
-        "bio": "Working on QAOA for combinatorial optimisation. Interested in noise-adaptive compilation.",
-        "research_interests": ["QAOA", "Combinatorial Optimisation", "Noise Adaptation"],
-        "orcid_id": None,
-        "google_scholar_url": None,
-        "github_username": "bob-qaoa",
-        "website_url": None,
-        "location": "Palo Alto, CA",
-        "public_profile": True,
-        "show_run_count": True,
-        "show_health_scores": True,
-        "show_recent_circuits": True,
-        "created_at": "2024-02-20T14:00:00Z",
-        "updated_at": "2024-05-20T09:00:00Z",
-    }),
-    ("profile_carol", {
-        "profile_id": "profile_carol",
-        "username": "carol_qec",
-        "display_name": "Prof. Carol Nakamura",
-        "title": "Associate Professor",
-        "institution": "TU Delft",
-        "department": "QuTech",
-        "bio": "Quantum error correction, topological codes, and fault-tolerant quantum computing.",
-        "research_interests": ["Error Correction", "Topological Codes", "Fault Tolerance"],
-        "orcid_id": "0000-0002-3456-7890",
-        "google_scholar_url": "https://scholar.google.com/citations?user=carol_qec",
-        "github_username": "carol-qec",
-        "website_url": "https://qutech.nl/carol",
-        "location": "Delft, Netherlands",
-        "public_profile": True,
-        "show_run_count": True,
-        "show_health_scores": True,
-        "show_recent_circuits": True,
-        "created_at": "2023-11-01T08:00:00Z",
-        "updated_at": "2024-04-15T11:00:00Z",
-    }),
-    ("profile_dave", {
-        "profile_id": "profile_dave",
-        "username": "dave_grover",
-        "display_name": "David Kim",
-        "title": "Research Engineer",
-        "institution": "IBM Quantum",
-        "department": "Algorithms",
-        "bio": "Amplitude amplification, Grover search variants, and hardware benchmarking.",
-        "research_interests": ["Grover Search", "Amplitude Amplification", "Benchmarking"],
-        "orcid_id": None,
-        "google_scholar_url": None,
-        "github_username": "dave-grover",
-        "website_url": "https://research.ibm.com/people/david-kim",
-        "location": "Yorktown Heights, NY",
-        "public_profile": True,
-        "show_run_count": True,
-        "show_health_scores": False,
-        "show_recent_circuits": True,
-        "created_at": "2024-03-10T09:00:00Z",
-        "updated_at": "2024-05-30T16:00:00Z",
-    }),
-    ("profile_eve", {
-        "profile_id": "profile_eve",
-        "username": "eve_tomo",
-        "display_name": "Dr. Eve Okonkwo",
-        "title": "Postdoctoral Researcher",
-        "institution": "Oxford University",
-        "department": "Materials",
-        "bio": "Quantum state tomography and characterisation of multi-qubit entangled states.",
-        "research_interests": ["State Tomography", "Entanglement", "Characterisation"],
-        "orcid_id": "0000-0003-4567-8901",
-        "google_scholar_url": "https://scholar.google.com/citations?user=eve_tomo",
-        "github_username": None,
-        "website_url": "https://eve-tomo.physics.ox.ac.uk",
-        "location": "Oxford, UK",
-        "public_profile": True,
-        "show_run_count": True,
-        "show_health_scores": True,
-        "show_recent_circuits": False,
-        "created_at": "2024-01-25T12:00:00Z",
-        "updated_at": "2024-06-05T10:00:00Z",
-    }),
-]
+# Earlier versions inserted five invented researchers (alice_vqe, bob_qaoa, ...) into every
+# database. They are deleted when this router is used; no sample profile is created any more.
+_OLD_SAMPLE_IDS = ["profile_alice", "profile_bob", "profile_carol", "profile_dave", "profile_eve"]
+
+
+def _drop_old_samples(db: Session) -> None:
+    for record_id in _OLD_SAMPLE_IDS:
+        store_delete(db, NAMESPACE, record_id)
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +289,7 @@ def list_profiles(
     sort: str = Query(default="newest", pattern="^(most_runs|best_health|newest)$"),
     db: Session = Depends(get_db),
 ):
-    store_seed(db, NAMESPACE, _SEED_PROFILES)
+    _drop_old_samples(db)
     profiles = store_list(db, NAMESPACE)
     public = [p for p in profiles if p.get("public_profile", True)]
 
@@ -427,7 +328,7 @@ def get_public_runs(
     page: int = Query(default=1, ge=1),
     db: Session = Depends(get_db),
 ):
-    store_seed(db, NAMESPACE, _SEED_PROFILES)
+    _drop_old_samples(db)
     profile = _find_profile_by_username(username, db)
     if not profile or not profile.get("public_profile", True):
         raise HTTPException(404, "Profile not found")
@@ -464,7 +365,7 @@ def get_public_runs(
 
 @router.get("/{username}/stats")
 def get_profile_stats(username: str, db: Session = Depends(get_db)):
-    store_seed(db, NAMESPACE, _SEED_PROFILES)
+    _drop_old_samples(db)
     profile = _find_profile_by_username(username, db)
     if not profile or not profile.get("public_profile", True):
         raise HTTPException(404, "Profile not found")
@@ -541,7 +442,7 @@ def get_profile_stats(username: str, db: Session = Depends(get_db)):
 @router.get("/{username}/badge")
 def get_profile_badge(username: str, db: Session = Depends(get_db)):
     """SVG activity heatmap — 52-week grid of run activity."""
-    store_seed(db, NAMESPACE, _SEED_PROFILES)
+    _drop_old_samples(db)
     profile = _find_profile_by_username(username, db)
     if not profile or not profile.get("public_profile", True):
         raise HTTPException(404, "Profile not found")
@@ -609,7 +510,7 @@ def get_profile_badge(username: str, db: Session = Depends(get_db)):
 
 @router.get("/{username}")
 def get_profile(username: str, db: Session = Depends(get_db)):
-    store_seed(db, NAMESPACE, _SEED_PROFILES)
+    _drop_old_samples(db)
     profile = _find_profile_by_username(username, db)
     if not profile:
         raise HTTPException(404, "Profile not found")

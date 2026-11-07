@@ -189,21 +189,6 @@ export default function CircuitAIPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Score badge */}
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <span
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    padding: "4px 16px",
-                    borderRadius: 999,
-                    ...(debugResult.score >= 80
-                      ? { background: "rgba(16,185,129,0.15)", color: "var(--ok)" }
-                      : debugResult.score >= 50
-                      ? { background: "rgba(245,158,11,0.15)", color: "#f59e0b" }
-                      : { background: "rgba(239,68,68,0.15)", color: "var(--danger)" }),
-                  }}
-                >
-                  Score: {debugResult.score}%
-                </span>
                 <span style={{ fontSize: 13, color: "var(--muted)" }}>
                   {(debugResult.bugs ?? []).length} bug(s) &middot;{" "}
                   {(debugResult.warnings ?? []).length} warning(s)
@@ -389,9 +374,9 @@ export default function CircuitAIPage() {
                 </div>
                 <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 16px", textAlign: "center" }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: "var(--strong)" }}>
-                    +{(optResult.fidelity_improvement * 100).toFixed(1)}%
+                    {optResult.original_two_qubit_gates} → {optResult.optimized_two_qubit_gates}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Fidelity Improvement</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>Two-qubit gates</div>
                 </div>
               </div>
 
@@ -417,7 +402,7 @@ export default function CircuitAIPage() {
                   </h3>
                   <button
                     onClick={() =>
-                      navigator.clipboard.writeText(optResult.optimized_qasm)
+                      navigator.clipboard.writeText(optResult.optimized_qasm ?? "")
                     }
                     style={{ fontSize: 12, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer" }}
                   >

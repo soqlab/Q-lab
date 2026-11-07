@@ -206,7 +206,6 @@ from .routers import fair_data as fair_data_router
 from .routers import causal as causal_router
 from .routers import research_pipeline as research_pipeline_router
 from .routers import grant_proposal as grant_proposal_router
-from .routers import transpiler_hub as transpiler_hub_router
 from .routers import hpc_bridge as hpc_bridge_router
 from .routers import circuit_marketplace as circuit_marketplace_router
 from .routers import institute as institute_router
@@ -471,7 +470,6 @@ app.include_router(fair_data_router.router)
 app.include_router(causal_router.router)
 app.include_router(research_pipeline_router.router)
 app.include_router(grant_proposal_router.router)
-app.include_router(transpiler_hub_router.router)
 app.include_router(hpc_bridge_router.router)
 app.include_router(circuit_marketplace_router.router)
 app.include_router(institute_router.router)

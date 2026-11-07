@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..store import store_put, store_get, store_list
+from ..store import store_delete, store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/social", tags=["social"])
 
@@ -25,66 +25,31 @@ def _now() -> str:
 def _ts(days: int = 0, hours: int = 0) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=days, hours=hours)).isoformat()
 
-# ── Seed data (written to DB once on first request) ───────────────────────────
+# ── Sample records from earlier versions ───────────────────────────────────────
+# Earlier versions wrote invented researchers, follows and feed events into every database.
+# They are deleted the first time this router is used; no sample data is created any more.
 
-_SEED_PROFILES = [
-    ("qyang_mit",        "MIT Lincoln Laboratory",      ["quantum error correction", "surface codes", "fault tolerance"],
-     "Working on scalable fault-tolerant quantum computation using surface codes."),
-    ("chen_stanford",    "Stanford Quantum Computing",  ["variational quantum algorithms", "QAOA", "quantum chemistry"],
-     "Developing hybrid classical-quantum algorithms for near-term devices."),
-    ("ivanova_caltech",  "Caltech IQIM",                ["quantum sensing", "metrology", "entanglement"],
-     "Pushing the limits of quantum sensing with entangled states."),
-    ("park_ibm",         "IBM Quantum",                 ["quantum hardware", "superconducting qubits", "noise mitigation"],
-     "Hardware engineer focused on improving coherence times in superconducting systems."),
-    ("nguyen_cambridge", "University of Cambridge",     ["quantum machine learning", "quantum neural networks", "barren plateaus"],
-     "Investigating trainability and expressibility of quantum machine learning models."),
+_OLD_SAMPLE_USERS = ["qyang_mit", "chen_stanford", "ivanova_caltech", "park_ibm", "nguyen_cambridge"]
+_OLD_SAMPLE_FOLLOWS = [
+    ("chen_stanford", "qyang_mit"), ("ivanova_caltech", "qyang_mit"), ("park_ibm", "chen_stanford"),
+    ("nguyen_cambridge", "chen_stanford"), ("qyang_mit", "park_ibm"), ("ivanova_caltech", "park_ibm"),
 ]
-
-_SEED_FOLLOWS = [
-    ("chen_stanford", "qyang_mit"), ("ivanova_caltech", "qyang_mit"),
-    ("park_ibm", "chen_stanford"),  ("nguyen_cambridge", "chen_stanford"),
-    ("qyang_mit", "park_ibm"),      ("ivanova_caltech", "park_ibm"),
-]
-
-_SEED_EVENTS = [
-    ("qyang_mit",        "experiment",  "Published new experiment: Surface Code Distance-5 Logical Qubit",  6),
-    ("chen_stanford",    "paper",       "New paper: QAOA Performance on MAX-CUT with 50 qubits",            5),
-    ("ivanova_caltech",  "replication", "Replicated arXiv:2312.09085 — GHZ fidelity confirmed",             4),
-    ("park_ibm",         "experiment",  "Noise mitigation benchmarks on ibm_torino updated",                3),
-    ("nguyen_cambridge", "paper",       "Submitted: Barren Plateau Mitigation via Layerwise Learning",      2),
-    ("qyang_mit",        "milestone",   "Reached 1000 successful experiment runs",                          1),
-    ("chen_stanford",    "experiment",  "VQE convergence study on H2 molecule",                             0),
-]
+_CLEANED_KEY = "social_samples_removed_v1"
 
 
 def _ensure_seeded(db: Session) -> None:
-    if store_get(db, _NS_PROFILE, _SEEDED_KEY):
+    """Removes the sample records earlier versions created (once). Creates nothing."""
+    if store_get(db, _NS_PROFILE, _CLEANED_KEY):
         return
-
-    for uname, inst, areas, bio in _SEED_PROFILES:
-        if not store_get(db, _NS_PROFILE, uname):
-            store_put(db, _NS_PROFILE, uname, {
-                "username": uname, "institution": inst,
-                "research_areas": areas, "bio": bio,
-                "created_at": _ts(30), "followers": [], "following": [],
-            })
-
-    for flr, flg in _SEED_FOLLOWS:
-        fkey = f"{flr}__{flg}"
-        if not store_get(db, _NS_FOLLOW, fkey):
-            store_put(db, _NS_FOLLOW, fkey, {"follower": flr, "following": flg, "created_at": _ts(15)})
-            _add_to_list(db, _NS_PROFILE, flg, "followers", flr)
-            _add_to_list(db, _NS_PROFILE, flr, "following", flg)
-
-    for i, (actor, etype, msg, days_ago) in enumerate(_SEED_EVENTS):
-        eid = f"seed_event_{i}"
-        if not store_get(db, _NS_FEED, eid):
-            store_put(db, _NS_FEED, eid, {
-                "event_id": eid, "actor": actor, "type": etype,
-                "message": msg, "created_at": _ts(days_ago),
-            })
-
-    store_put(db, _NS_PROFILE, _SEEDED_KEY, {"done": True})
+    if store_get(db, _NS_PROFILE, _SEEDED_KEY):
+        for uname in _OLD_SAMPLE_USERS:
+            store_delete(db, _NS_PROFILE, uname)
+        for flr, flg in _OLD_SAMPLE_FOLLOWS:
+            store_delete(db, _NS_FOLLOW, f"{flr}__{flg}")
+        for i in range(7):
+            store_delete(db, _NS_FEED, f"seed_event_{i}")
+        store_delete(db, _NS_PROFILE, _SEEDED_KEY)
+    store_put(db, _NS_PROFILE, _CLEANED_KEY, {"done": True})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

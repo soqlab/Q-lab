@@ -73,20 +73,23 @@ function EntanglementGraph({ result }: { result: EntanglementMapResult }) {
 export default function EntanglementPage() {
   const [qasm, setQasm] = useState(PRESET);
   const [result, setResult] = useState<EntanglementMapResult | null>(null);
+  // The preset is mapped on load, so the page starts out loading.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State is set only in the promise callbacks, so the mount effect below can call it.
-  const fetchMap = (source: string) =>
-    mapEntanglement({ qasm: source })
-      .then((r) => { setResult(r); setError(null); })
-      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); })
-      .finally(() => { setLoading(false); });
+  const run = async () => {
+    setLoading(true); setError(null);
+    try { setResult(await mapEntanglement({ qasm })); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  };
 
-  const run = () => { setLoading(true); setError(null); void fetchMap(qasm); };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void fetchMap(PRESET); }, []);
+  useEffect(() => {
+    mapEntanglement({ qasm: PRESET })
+      .then(setResult)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem" }}>

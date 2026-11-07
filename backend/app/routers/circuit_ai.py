@@ -1,19 +1,21 @@
+"""Circuit checks, optimisation and a plain-language summary, computed from the circuit itself.
+
+Statistics (qubits, depth, gate counts) come from parsing the circuit with Qiskit. Optimisation is
+Qiskit's transpiler at optimization level 3 without a target device, and the figures reported are
+measured on the circuit it returns. The checks in /debug are fixed rules on the circuit text.
+Nothing is randomised, and no fidelity gain is claimed: that would need a noise model or hardware.
+"""
 from __future__ import annotations
 import uuid
-import random
 import re
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from sqlalchemy.orm import Session
-
-from ..database import get_db
-from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/circuit-ai", tags=["circuit-ai"])
 
-NS = "circuit_ai_debugs"
+TWO_QUBIT = {"cx", "cy", "cz", "ch", "swap", "iswap", "rzz", "rxx", "ryy", "rzx", "ecr", "cp", "crx", "cry", "crz", "cu", "cu1", "cu3", "dcx"}
 
 class DebugRequest(BaseModel):
     circuit_qasm: str
@@ -29,20 +31,29 @@ class ExplainRequest(BaseModel):
     circuit_qasm: str
     detail_level: Optional[str] = "medium"
 
-def _parse_stats(qasm: str) -> dict:
-    lines = [l.strip() for l in qasm.strip().splitlines() if l.strip() and not l.startswith("//") and not l.startswith("OPENQASM") and not l.startswith("include")]
-    qreg = re.findall(r'qreg\s+\w+\[(\d+)\]', qasm)
-    n_qubits = int(qreg[0]) if qreg else max(1, qasm.count("q["))
-    gates = [l for l in lines if not l.startswith("qreg") and not l.startswith("creg") and not l.startswith("measure") and not l.startswith("barrier")]
-    two_qubit = sum(1 for l in gates if re.match(r'cx|cy|cz|ccx|swap|iswap|rzz|rxx', l, re.I))
-    t_gates = sum(1 for l in gates if re.match(r't\s|tdg\s|t\[|tdg\[', l, re.I))
+def _circuit(qasm: str):
+    from ..local_sim import _parse
+
+    try:
+        return _parse(qasm)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+def _stats_of(circuit) -> dict:
+    ops = circuit.count_ops()
+    gates = {k: v for k, v in ops.items() if k not in ("measure", "barrier", "reset")}
     return {
-        "n_qubits": n_qubits,
-        "depth": max(1, len(gates) // max(n_qubits, 1)),
-        "gate_count": len(gates),
-        "two_qubit_gates": two_qubit,
-        "t_gates": t_gates,
+        "n_qubits": circuit.num_qubits,
+        "depth": circuit.depth(filter_function=lambda inst: inst.operation.name != "barrier"),
+        "gate_count": sum(gates.values()),
+        "two_qubit_gates": sum(v for k, v in gates.items() if k in TWO_QUBIT),
+        "t_gates": gates.get("t", 0) + gates.get("tdg", 0),
     }
+
+
+def _parse_stats(qasm: str) -> dict:
+    return _stats_of(_circuit(qasm))
 
 def _detect_bugs(qasm: str, stats: dict) -> tuple[list, list]:
     bugs = []
@@ -108,51 +119,48 @@ def _detect_algorithm(qasm: str) -> Optional[str]:
     return None
 
 @router.post("/debug")
-def debug_circuit(req: DebugRequest, db: Session = Depends(get_db)):
+def debug_circuit(req: DebugRequest):
     debug_id = str(uuid.uuid4())
     stats = _parse_stats(req.circuit_qasm)
     if req.n_qubits:
         stats["n_qubits"] = req.n_qubits
     bugs, warnings = _detect_bugs(req.circuit_qasm, stats)
-    n_issues = len(bugs) + len(warnings)
-    score = round(max(0.0, 1.0 - 0.08 * n_issues - 0.003 * stats["gate_count"]), 3)
     suggestions = [
         "Run Qiskit transpile with optimization_level=3 before submitting",
         "Use t|ket> CliffordSimplification pass on Clifford subcircuits",
     ]
     if stats["two_qubit_gates"] > 5:
         suggestions.append("Consider compiler-aware qubit mapping to minimize SWAP insertions")
-    record = {"debug_id": debug_id, "bugs": bugs, "warnings": warnings,
-              "suggestions": suggestions, "circuit_stats": stats, "score": score,
-              "debugged_at": datetime.now(timezone.utc).isoformat()}
-    store_put(db, NS, debug_id, record)
-    return record
+    return {"debug_id": debug_id, "bugs": bugs, "warnings": warnings,
+            "suggestions": suggestions, "circuit_stats": stats,
+            "debugged_at": datetime.now(timezone.utc).isoformat()}
 
 @router.post("/optimize")
 def optimize_circuit(req: OptimizeRequest):
-    stats = _parse_stats(req.circuit_qasm)
-    original_depth = stats["depth"]
-    original_gates = stats["gate_count"]
-    reduction = random.uniform(0.18, 0.42)
-    opt_depth = max(1, int(original_depth * (1 - reduction)))
-    gate_reduction = random.uniform(0.12, 0.35)
-    opt_gates = max(1, int(original_gates * (1 - gate_reduction)))
-    applied = ["gate_cancellation", "single_qubit_fusion"]
-    if stats["two_qubit_gates"] > 3:
-        applied.append("two_qubit_block_optimization")
-    if stats["t_gates"] > 5:
-        applied.append("t_gate_reduction")
-    optimized_qasm = req.circuit_qasm.replace("tdg", "t").replace("\n\n", "\n")
+    from qiskit import qasm2, transpile
+
+    circuit = _circuit(req.circuit_qasm)
+    before = _stats_of(circuit)
+    optimized = transpile(circuit, optimization_level=3, seed_transpiler=0)
+    after = _stats_of(optimized)
+    try:
+        optimized_qasm = qasm2.dumps(optimized)
+    except Exception:
+        optimized_qasm = None
     return {
-        "original_depth": original_depth,
-        "optimized_depth": opt_depth,
-        "original_gates": original_gates,
-        "optimized_gates": opt_gates,
-        "depth_reduction_pct": round(reduction * 100, 2),
+        "original_depth": before["depth"],
+        "optimized_depth": after["depth"],
+        "original_gates": before["gate_count"],
+        "optimized_gates": after["gate_count"],
+        "original_two_qubit_gates": before["two_qubit_gates"],
+        "optimized_two_qubit_gates": after["two_qubit_gates"],
+        "depth_reduction_pct": round((1 - after["depth"] / before["depth"]) * 100, 2) if before["depth"] else 0.0,
         "optimized_qasm": optimized_qasm,
-        "optimizations_applied": applied,
-        "fidelity_improvement": round(random.uniform(0.02, 0.09), 4),
+        "optimizations_applied": ["qiskit transpile, optimization_level=3 (no target device)"],
+        "fidelity_improvement": None,
+        "method": "Qiskit transpiler, optimization level 3, seed 0; figures measured on its output.",
     }
+
 
 @router.post("/explain")
 def explain_circuit(req: ExplainRequest):

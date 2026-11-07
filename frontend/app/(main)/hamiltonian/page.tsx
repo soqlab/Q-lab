@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { HamiltonianStudioResult, PauliTerm, engineerHamiltonian, listHamiltonianPresets } from "../../../lib/api";
+import { HamiltonianStudioResult, PauliTerm, engineerHamiltonian } from "../../../lib/api";
 import { FlaskConical, Play, Cpu, Zap } from "lucide-react";
 
 const PRESET_HAMILTONIANS = [
-  { id: "h2", label: "H₂ Molecule" },
-  { id: "lih", label: "LiH" },
-  { id: "h2o", label: "H₂O" },
-  { id: "ising_1d", label: "1D Ising" },
-  { id: "heisenberg", label: "Heisenberg" },
+  { id: "ising_1d", label: "Transverse-field Ising" },
+  { id: "heisenberg", label: "Heisenberg XXX" },
+  { id: "maxcut_ring", label: "MaxCut ring" },
 ];
 
 const ANSATZE = [
@@ -19,7 +17,7 @@ const ANSATZE = [
 ];
 
 export default function HamiltonianPage() {
-  const [preset, setPreset] = useState<string | null>("h2");
+  const [preset, setPreset] = useState<string | null>("ising_1d");
   const [nQubits, setNQubits] = useState(4);
   const [ansatz, setAnsatz] = useState<"hea" | "uccsd" | "qaoa">("hea");
   const [pauliTermsText, setPauliTermsText] = useState('[]');
@@ -80,7 +78,7 @@ export default function HamiltonianPage() {
           <FlaskConical size={28} color="#f59e0b" />
           <div>
             <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800 }}>Hamiltonian Engineering Studio</h1>
-            <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.9rem" }}>Design, analyze, and simulate quantum Hamiltonians with VQE ansatz</p>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.9rem" }}>Exact spectrum of a Pauli-sum Hamiltonian (exact diagonalisation, up to 10 qubits), plus an ansatz circuit</p>
           </div>
         </div>
 
@@ -306,9 +304,8 @@ export default function HamiltonianPage() {
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                      <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700 }}>Recommended Optimizer:</span>
-                      <span style={{ background: "#1e3a5f33", border: "1px solid #3b82f6", color: "#60a5fa", borderRadius: 6, padding: "0.2rem 0.6rem", fontSize: "0.8rem", fontWeight: 700 }}>
-                        {result.recommended_optimizer}
+                      <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                        {result.formula ? `${result.formula}. ` : ""}{result.method}
                       </span>
                     </div>
                   </div>

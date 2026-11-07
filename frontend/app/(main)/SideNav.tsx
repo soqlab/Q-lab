@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useSyncExternalStore } from "react";
-import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, MonitorDot, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, Scissors, ShoppingCart, Building2, Waves, Eye, Microscope, BookText, Database, Bot, Beaker, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Boxes, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { isCorePath, useLabs } from "../../lib/labs";
 
@@ -88,11 +88,9 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/network", icon: Globe, label: "Cal Network" },
       { href: "/cal-forecast", icon: HeartPulse, label: "Cal Forecast" },
       { href: "/compare/backends", icon: GitCompare, label: "Backend Compare" },
-      { href: "/backend-emulator", icon: Cpu, label: "Backend Emulator" },
       { href: "/settings/decoherence", icon: AlertTriangle, label: "Decoherence" },
       { href: "/intel", icon: Scan, label: "Hardware Intel", badge: "LIVE" },
       { href: "/hardware-jobs", icon: Server, label: "Hardware Jobs" },
-      { href: "/global-cal", icon: Globe, label: "Global Cal DB" },
       { href: "/providers", icon: Server, label: "Multi-Provider" },
       { href: "/costs", icon: DollarSign, label: "QPU Costs" },
       { href: "/cost-oracle", icon: DollarSign, label: "Cost Oracle" },
@@ -126,15 +124,10 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
     items: [
       { href: "/qec", icon: Shield, label: "QEC Synthesizer" },
       { href: "/statetomo", icon: Atom, label: "Ideal State Analysis" },
-      { href: "/tomography", icon: Scan, label: "Tomography" },
       { href: "/gate-tomo", icon: Scan, label: "Gate Tomography" },
-      { href: "/process-tomo", icon: Scan, label: "Process Tomography" },
       { href: "/qv", icon: Layers, label: "Quantum Volume" },
-      { href: "/qvbench", icon: Award, label: "QV Benchmarker" },
       { href: "/rb-suite", icon: BarChart3, label: "RB Suite" },
-      { href: "/rb-gst", icon: BarChart2, label: "RB / GST / SPAM" },
       { href: "/xeb", icon: Target, label: "XEB Fidelity" },
-      { href: "/zne-pec", icon: Filter, label: "ZNE / PEC" },
       { href: "/error-mitigate", icon: Filter, label: "Error Mitigation" },
       { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation" },
       { href: "/error-budget", icon: BarChart3, label: "Error Budget" },
@@ -151,7 +144,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/qaoa", icon: Network, label: "QAOA Solver" },
       { href: "/qml", icon: Brain, label: "QML Workbench" },
       { href: "/qml-datasets", icon: Boxes, label: "QML Datasets" },
-      { href: "/quantum-chem", icon: FlaskConical, label: "Quantum Chem" },
       { href: "/quantum-sensing", icon: Navigation, label: "Quantum Sensing" },
       { href: "/quantum-finance", icon: DollarSign, label: "Quantum Finance" },
       { href: "/quantum-network", icon: Wifi, label: "Quantum Network" },
@@ -165,9 +157,7 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/pulse-control", icon: Waves, label: "Pulse Control" },
       { href: "/unitary-synth", icon: Wand2, label: "Unitary Synth" },
       { href: "/transpile", icon: ArrowRightLeft, label: "Transpiler" },
-      { href: "/transpiler-hub", icon: ArrowRightLeft, label: "Transpiler Hub" },
       { href: "/gates", icon: Sliders, label: "Gate Char" },
-      { href: "/ensemble", icon: GitMerge, label: "Backend Ensemble" },
       { href: "/semantic-search", icon: Search, label: "Circuit Sim. Search" },
       { href: "/chaos", icon: AlertOctagon, label: "Chaos Engineering" },
       { href: "/qrng", icon: Shuffle, label: "Quantum RNG" },
@@ -221,7 +211,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/jobs", icon: Play, label: "Job Executor" },
       { href: "/job-scheduler", icon: Timer, label: "Job Scheduler" },
       { href: "/queue", icon: Server, label: "Queue Intel" },
-      { href: "/live-monitor", icon: MonitorDot, label: "Live Monitor" },
       { href: "/ingest", icon: Download, label: "Ingest" },
       { href: "/offline-export", icon: Download, label: "Offline Export" },
       { href: "/environment", icon: Layers, label: "Env Snapshots" },

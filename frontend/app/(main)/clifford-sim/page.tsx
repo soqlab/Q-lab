@@ -13,25 +13,29 @@ const PRESETS = [
 export default function CliffordSimPage() {
   const [qasm, setQasm] = useState(PRESETS[0].qasm);
   const [result, setResult] = useState<CliffordSimResult | null>(null);
+  // The first preset is simulated on load, so the page starts out loading.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
-  // (loading starts true), the Run button through handleRun().
-  const compute = () =>
-    runCliffordSim({ qasm })
-      .then((res) => setResult(res))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-
-  const handleRun = () => {
+  const handleRun = async () => {
     setLoading(true);
     setError("");
-    void compute();
+    try {
+      const res = await runCliffordSim({ qasm });
+      setResult(res);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void compute(); }, []);
+  useEffect(() => {
+    runCliffordSim({ qasm: PRESETS[0].qasm })
+      .then(setResult)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
   const stabChipColor = (s: string) => {
     if (s.startsWith("+")) return "#10b981";
@@ -214,19 +218,19 @@ export default function CliffordSimPage() {
                         <tr>
                           <td style={{ padding: "4px 0", color: "#94a3b8", fontSize: 13 }}>Z₀</td>
                           <td style={{ padding: "4px 0", fontFamily: "monospace", fontSize: 13, color: "#e2e8f0" }}>
-                            {result.pauli_expectation_z0.toFixed(4)}
+                            {result.pauli_expectation_z0 === null ? "n/a" : result.pauli_expectation_z0.toFixed(4)}
                           </td>
                         </tr>
                         <tr>
                           <td style={{ padding: "4px 0", color: "#94a3b8", fontSize: 13 }}>Z₁</td>
                           <td style={{ padding: "4px 0", fontFamily: "monospace", fontSize: 13, color: "#e2e8f0" }}>
-                            {result.pauli_expectation_z1.toFixed(4)}
+                            {result.pauli_expectation_z1 === null ? "n/a" : result.pauli_expectation_z1.toFixed(4)}
                           </td>
                         </tr>
                       </tbody>
                     </table>
                     <div style={{ marginTop: 12, fontSize: 11, color: "#64748b" }}>
-                      Max simulable: {result.max_simulable_qubits} qubits
+                      {result.note ?? result.method}
                     </div>
                   </div>
 

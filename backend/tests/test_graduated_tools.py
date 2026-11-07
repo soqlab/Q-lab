@@ -262,3 +262,185 @@ def test_heavy_outputs_use_the_median_over_all_outcomes():
 
     assert heavy_outputs({"00": 0.5, "11": 0.5}, 2) == {"00", "11"}
     assert heavy_outputs({"00": 0.4, "01": 0.3, "10": 0.2, "11": 0.1}, 2) == {"00", "01"}
+
+
+# ── Hamiltonian studio ────────────────────────────────────────────────────────
+
+def _ham(**body):
+    return client.post("/api/v1/hamiltonian-studio", json=body)
+
+
+def test_hamiltonian_spectrum_is_exact():
+    r = _ham(pauli_terms=[{"pauli_string": "XX", "coefficient": 1}, {"pauli_string": "ZZ", "coefficient": 1}])
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["eigenvalues"] == [-2.0, 0.0, 0.0, 2.0] and out["spectral_gap"] == 2.0
+    assert out["is_commuting"] is True and "Exact diagonalisation" in out["method"]
+    singlet = _ham(preset="heisenberg", n_qubits=2).json()  # singlet -3, triplet +1
+    assert singlet["ground_state_energy"] == -3.0 and singlet["first_excited_energy"] == 1.0
+    tfim = _ham(preset="ising_1d", n_qubits=3).json()
+    assert tfim["n_qubits"] == 3 and tfim["n_pauli_terms"] == 5 and tfim["is_commuting"] is False
+    assert _ham(pauli_terms=[{"pauli_string": "XY", "coefficient": 1}]).json()["is_commuting"] is True
+
+
+def test_hamiltonian_refuses_instead_of_inventing():
+    assert _ham().status_code == 422
+    assert _ham(preset="h2").status_code == 422
+    assert _ham(terms=[{"pauli_string": "ZZ", "coefficient": 1}, {"pauli_string": "Z", "coefficient": 1}]).status_code == 422
+    assert _ham(terms=[{"pauli_string": "ZQ", "coefficient": 1}]).status_code == 422
+
+
+# ── Clifford simulator ────────────────────────────────────────────────────────
+
+def test_clifford_stabilizers_come_from_the_tableau():
+    r = client.post("/api/v1/clifford-sim", json={"qasm": BELL})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert sorted(out["stabilizer_generators"]) == ["+XX", "+ZZ"]
+    assert out["pauli_expectation_z0"] == 0.0 and out["is_clifford_circuit"] is True
+    flipped = client.post("/api/v1/clifford-sim", json={"qasm": HEAD + "x q[0];\nrz(pi/2) q[1];"}).json()
+    assert flipped["pauli_expectation_z0"] == -1.0 and flipped["pauli_expectation_z1"] == 1.0
+    assert flipped["n_gates_non_clifford"] == 0
+    big = "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[60];\nh q[0];\n" + "".join(f"cx q[{i}],q[{i + 1}];\n" for i in range(59))
+    assert client.post("/api/v1/clifford-sim", json={"qasm": big}).json()["n_qubits"] == 60
+
+
+def test_non_clifford_circuit_reports_no_stabilizer_state():
+    out = client.post("/api/v1/clifford-sim", json={"qasm": HEAD + "h q[0];\nt q[0];\ncx q[0],q[1];"}).json()
+    assert out["is_clifford_circuit"] is False and out["magic_state_positions"] == [1]
+    assert out["stabilizer_generators"] == [] and out["pauli_expectation_z0"] is None
+
+
+# ── Tensor network ────────────────────────────────────────────────────────────
+
+def test_tensor_network_uses_the_true_schmidt_decomposition():
+    r = client.post("/api/v1/tensor-network", json={"qasm": BELL})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["bond_dimensions"] == [2] and out["schmidt_coefficients"] == [[0.5, 0.5]]
+    assert abs(out["entanglement_entropies"][0] - math.log(2)) < 1e-6 and out["truncation_error"] == 0.0
+    ghz = client.post("/api/v1/tensor-network", json={"qasm": HEAD + "h q[0];\ncx q[0],q[1];\ncx q[1],q[2];"}).json()
+    assert ghz["exact_bond_dimensions"] == [2, 2]
+    product = client.post("/api/v1/tensor-network", json={"qasm": HEAD + "h q[0];\nh q[1];\nx q[2];"}).json()
+    assert product["exact_bond_dimensions"] == [1, 1] and product["entanglement_entropies"] == [0.0, 0.0]
+    cut = client.post("/api/v1/tensor-network", json={"qasm": BELL, "max_bond_dim": 1}).json()
+    assert cut["fits_bond_dim"] is False and abs(cut["truncation_error"] - 0.5) < 1e-9
+
+
+# ── Circuit AI ────────────────────────────────────────────────────────────────
+
+def test_circuit_optimizer_reports_what_the_transpiler_did():
+    qasm = HEAD + "h q[0];\nh q[0];\ncx q[0],q[1];\ncx q[0],q[1];\nx q[2];"
+    r = client.post("/api/v1/circuit-ai/optimize", json={"circuit_qasm": qasm})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["original_gates"] == 5 and out["optimized_gates"] == 1
+    assert out["original_two_qubit_gates"] == 2 and out["optimized_two_qubit_gates"] == 0
+    assert out["fidelity_improvement"] is None and "x q[2]" in out["optimized_qasm"]
+    stats = client.post("/api/v1/circuit-ai/debug", json={"circuit_qasm": BELL}).json()["circuit_stats"]
+    assert stats == {"n_qubits": 2, "depth": 3, "gate_count": 2, "two_qubit_gates": 1, "t_gates": 0}
+    assert client.post("/api/v1/circuit-ai/optimize", json={"circuit_qasm": "nonsense"}).status_code == 422
+
+
+# ── Run circuit optimizer (evo_optimizer) ─────────────────────────────────────
+
+def test_run_optimizer_returns_real_transpiled_circuits():
+    headers = _user()
+    qasm = HEAD + "h q[0];\nh q[0];\ncx q[0],q[1];\ncx q[0],q[1];\nx q[2];"
+    run_id = _run(headers, {"001": 10}, qasm)
+    r = client.get(f"/api/v1/runs/{run_id}/evo-optimize", headers=headers)
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["baseline"]["size"] == 5 and out["baseline"]["cx_count"] == 2
+    best = out["candidates"][0]
+    assert best["fingerprint"]["size"] == 1 and best["deltas"]["cx_count"] == -2
+    assert "x q[2]" in best["qasm"] and best["mutations_applied"][0].startswith("optimization_level=")
+    assert client.get(f"/api/v1/runs/{run_id}/evo-optimize", headers=_user()).status_code == 404
+    bare = _run(headers, {"0": 1})
+    assert client.get(f"/api/v1/runs/{bare}/evo-optimize", headers=headers).status_code == 422
+
+
+# ── Talent board privacy ──────────────────────────────────────────────────────
+
+def test_talent_profiles_need_sign_in_and_hide_emails_from_others():
+    owner, other = _user(), _user()
+    body = {"name": "A", "email": "a-secret@example.com", "institution": "I", "role": "postdoc", "expertise": ["qec"],
+            "publications": 1, "h_index": 1, "open_to_opportunities": True, "bio": "b"}
+    pid = client.post("/api/v1/talent/profile", headers=owner, json=body).json()["profile_id"]
+    assert client.get("/api/v1/talent/profiles").status_code == 401
+    assert client.get(f"/api/v1/talent/profile/{pid}").status_code == 401
+    seen = {p["profile_id"]: p for p in client.get("/api/v1/talent/profiles", headers=other).json()}
+    assert seen[pid]["email"] is None
+    assert client.get(f"/api/v1/talent/profile/{pid}", headers=other).json()["email"] is None
+    assert client.get(f"/api/v1/talent/profile/{pid}", headers=owner).json()["email"] == "a-secret@example.com"
+
+
+# ── Unitary synthesis (2 and 3 qubits) ───────────────────────────────────────
+
+def _matrix(op) -> list:
+    return [[[float(v.real), float(v.imag)] for v in row] for row in op]
+
+
+def test_two_and_three_qubit_synthesis_reproduce_the_input():
+    from qiskit.quantum_info import Operator, random_unitary
+
+    for n in (2, 3):
+        target = random_unitary(2 ** n, seed=7).data
+        r = client.post("/api/v1/unitary-synth", json={"unitary": _matrix(target)})
+        assert r.status_code == 200, r.text
+        out = r.json()
+        assert out["fidelity_to_target"] > 1 - 1e-6
+        from app.local_sim import _parse
+        circuit = _parse(out["qasm_output"]).remove_final_measurements(inplace=False)
+        overlap = abs((Operator(target).adjoint() & Operator(circuit)).data.trace()) / 2 ** n
+        assert overlap > 1 - 1e-4
+    cnot = [[1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0]]
+    assert client.post("/api/v1/unitary-synth", json={"unitary": [[[v, 0] for v in row] for row in cnot]}).json()["n_cx_gates"] <= 3  # KAK bound
+    bad = [[[1, 0], [1, 0], [0, 0], [0, 0]]] + [[[0, 0]] * 4] * 3
+    assert client.post("/api/v1/unitary-synth", json={"unitary": bad}).status_code == 422
+
+
+# ── Trotter evolution ─────────────────────────────────────────────────────────
+
+def test_trotter_uses_the_chosen_hamiltonian_and_measures_its_error():
+    def run(**kw):
+        r = client.post("/api/v1/trotter", json={"n_qubits": 2, "t_total": 1.0, "n_steps": 10, "initial_state": "all_up", **kw})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    xy = run(hamiltonian="xy_model")
+    assert xy["ground_state_energy_estimate"] == -2.0  # J(XX+YY) on two qubits: eigenvalues -2, 0, 0, 2
+    assert xy["energy_evolution"][0] == 0.0  # |00> is an eigenstate with energy 0, and stays there
+    ising = run(hamiltonian="ising_1d", J=1.0, h=0.5)
+    assert ising["energy_evolution"] != xy["energy_evolution"]
+    assert abs(ising["energy_evolution"][0] - (-1.0)) < 0.05  # <-ZZ - 0.5(X1+X2)> stays near -1 at small t
+    assert ising["max_trotter_error"] > 0 and ising["recommended_n_steps"] is not None
+    finer = run(hamiltonian="ising_1d", J=1.0, h=0.5, n_steps=100)
+    assert finer["max_trotter_error"] < ising["max_trotter_error"]
+    commuting = run(hamiltonian="ising_1d", J=1.0, h=0.0)
+    assert commuting["max_trotter_error"] < 1e-12  # all terms commute: Trotter is exact
+
+
+# ── Sample people are gone (social, researcher profiles) ─────────────────────
+
+def test_no_sample_researchers_are_created_and_old_ones_are_removed():
+    from app.database import SessionLocal
+    from app.store import store_delete, store_put
+
+    db = SessionLocal()
+    try:  # what an earlier version left behind
+        store_delete(db, "social_profile", "social_samples_removed_v1")
+        store_put(db, "researcher_profiles", "profile_alice", {"profile_id": "profile_alice", "username": "alice_vqe"})
+        store_put(db, "social_profile", "social_seeded_v1", {"done": True})
+        store_put(db, "social_profile", "qyang_mit", {"username": "qyang_mit"})
+    finally:
+        db.close()
+    names = {p.get("username") for p in client.get("/api/v1/profiles", headers=_user()).json()["profiles"]}
+    assert "alice_vqe" not in names and "bob_qaoa" not in names
+    assert client.get("/api/v1/social/profile/qyang_mit", headers=_user()).status_code == 404
+    assert client.get("/api/v1/social/profile/chen_stanford", headers=_user()).status_code == 404

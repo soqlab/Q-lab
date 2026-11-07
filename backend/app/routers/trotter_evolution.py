@@ -100,54 +100,115 @@ def _entropy(state: list, n: int) -> float:
         if ev > 1e-14: S -= ev * math.log2(ev)
     return max(0.0, S)
 
+def _hamiltonian(kind: str, n: int, J: float, h: float, delta: float):
+    """The chosen model as a Qiskit SparsePauliOp (open chain; qubit q is character n-1-q)."""
+    from qiskit.quantum_info import SparsePauliOp
+
+    def label(ops: dict) -> str:
+        return "".join(ops.get(n - 1 - k, "I") for k in range(n))
+
+    terms = []
+    bonds = [(k, k + 1) for k in range(n - 1)]
+    if kind in ("ising_1d", "transverse_field"):
+        terms += [(label({i: "Z", j: "Z"}), -J) for i, j in bonds]
+        terms += [(label({k: "X"}), -h) for k in range(n)]
+    elif kind == "heisenberg_xxz":
+        for i, j in bonds:
+            terms += [(label({i: "X", j: "X"}), J), (label({i: "Y", j: "Y"}), J), (label({i: "Z", j: "Z"}), J * delta)]
+    elif kind == "xy_model":
+        for i, j in bonds:
+            terms += [(label({i: "X", j: "X"}), J), (label({i: "Y", j: "Y"}), J)]
+    return SparsePauliOp([t for t, _ in terms], coeffs=[c for _, c in terms])
+
+
+def _step_operators(op, dt: float, order: int):
+    """(Trotterised step, exact step) as matrices."""
+    import numpy as np
+    from qiskit.circuit.library import PauliEvolutionGate
+    from qiskit.quantum_info import Operator
+    from qiskit.synthesis import LieTrotter, SuzukiTrotter
+    from scipy.linalg import expm
+
+    synthesis = LieTrotter() if order == 1 else SuzukiTrotter(order=2)
+    # Operator() of the gate itself would be the exact exponential; use the synthesised circuit.
+    trotter = Operator(synthesis.synthesize(PauliEvolutionGate(op, time=dt))).data
+    exact = expm(-1j * dt * np.asarray(op.to_matrix()))
+    return trotter, exact
+
+
+def _infidelity(a, b) -> float:
+    import numpy as np
+
+    return max(0.0, 1.0 - float(abs(np.vdot(a, b)) ** 2))
+
+
 @router.post("")
 def run_trotter(req: TrotterRequest):
+    """Trotterised time evolution of the chosen model, compared with exact evolution.
+
+    The Hamiltonian is built from `hamiltonian`, J, h and delta. Each step applies Qiskit's
+    PauliEvolutionGate with Lie-Trotter (order 1) or second-order Suzuki-Trotter synthesis; the
+    reference is the exact propagator exp(-iH dt). Energies are <H> of the Trotterised state, the
+    Trotter error is the state infidelity 1 - |<exact|trotter>|^2, and the ground energy is exact
+    diagonalisation of H. Everything is a statevector calculation.
+    """
+    import numpy as np
+    from qiskit.quantum_info import Statevector
+
+    from ..exact_state import reduced, von_neumann
+
     if req.hamiltonian not in HAMILTONIANS:
         raise HTTPException(400, f"Unknown hamiltonian. Options: {list(HAMILTONIANS.keys())}")
-    n = req.n_qubits; dt = req.t_total / req.n_steps
-    state = _init_state(n, req.initial_state)
+    n = req.n_qubits
+    dt = req.t_total / req.n_steps
+    op = _hamiltonian(req.hamiltonian, n, req.J, req.h, req.delta)
+    H = np.asarray(op.to_matrix())
+    psi0 = np.array(_init_state(n, req.initial_state), dtype=complex)
+    trotter_step, exact_step = _step_operators(op, dt, req.trotter_order)
 
+    def energy(psi) -> float:
+        return float(np.vdot(psi, H @ psi).real)
+
+    def magnetization(psi) -> float:
+        probs = np.abs(psi) ** 2
+        z = np.array([sum(1 - 2 * ((idx >> k) & 1) for k in range(n)) / n for idx in range(1 << n)])
+        return float(probs @ z)
+
+    psi_t, psi_e = psi0.copy(), psi0.copy()
+    E0 = energy(psi0)
     time_pts, energies, mags, entropies, errors = [], [], [], [], []
-    E0 = _energy_ising(state, n, req.J, req.h)
-
     for step in range(req.n_steps):
-        t = step * dt
-        # 1st-order Trotter: exp(-i H dt) ≈ prod_k exp(-i h_k dt)
-        # ZZ terms (Ising)
-        for k in range(n-1):
-            _apply_rzz(state, n, k, k+1, req.J * dt)
-        # X terms
-        for k in range(n):
-            _apply_rx(state, n, k, req.h * dt)
-        if req.trotter_order == 2 and step < req.n_steps - 1:
-            for k in range(n-1):
-                _apply_rzz(state, n, k, k+1, req.J * dt * 0.5)
-            for k in range(n):
-                _apply_rx(state, n, k, req.h * dt * 0.5)
+        psi_t = trotter_step @ psi_t
+        psi_e = exact_step @ psi_e
+        time_pts.append(round((step + 1) * dt, 6))
+        energies.append(round(energy(psi_t), 6))
+        mags.append(round(magnetization(psi_t), 6))
+        entropies.append(round(von_neumann(reduced(Statevector(psi_t), n, set(range(n // 2)))) / np.log(2), 6))
+        errors.append(round(_infidelity(psi_e, psi_t), 8))
 
-        time_pts.append(round(t + dt, 6))
-        E = _energy_ising(state, n, req.J, req.h)
-        energies.append(round(E, 6))
-        mags.append(round(_magnetization(state, n), 6))
-        entropies.append(round(_entropy(state, n), 6))
-        errors.append(round(abs(E - E0), 6))
+    # Fewest steps (doubling from n_steps, up to 1600) that keep the final infidelity below 1e-2.
+    rec_steps = None
+    steps = req.n_steps
+    while steps <= 1600:
+        t_step, e_step = _step_operators(op, req.t_total / steps, req.trotter_order)
+        if _infidelity(np.linalg.matrix_power(e_step, steps) @ psi0, np.linalg.matrix_power(t_step, steps) @ psi0) < 1e-2:
+            rec_steps = steps
+            break
+        steps *= 2
 
-    # top-8 final probabilities
-    probs_all = [(abs(state[i])**2, i) for i in range(1<<n)]
-    probs_all.sort(reverse=True)
-    top8 = probs_all[:8]
-    final_probs = [round(p, 8) for p, _ in top8]
-    final_labels = [format(i, f'0{n}b') for _, i in top8]
+    probs = np.abs(psi_t) ** 2
+    top8 = np.argsort(-probs)[:8]
+    qasm_step = None
+    try:
+        from qiskit import QuantumCircuit, qasm2, transpile
+        from qiskit.circuit.library import PauliEvolutionGate
+        from qiskit.synthesis import LieTrotter, SuzukiTrotter
 
-    trotter_error = max(errors) if errors else 0.0
-    # recommend n_steps for error < 0.01
-    rec_steps = max(req.n_steps, math.ceil(req.t_total * abs(req.J) * n * 10))
-
-    qasm_step = f'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[{n}];\n'
-    for k in range(n-1):
-        qasm_step += f'cx q[{k}],q[{k+1}];\nrz({2*req.J*dt:.4f}) q[{k+1}];\ncx q[{k}],q[{k+1}];\n'
-    for k in range(n):
-        qasm_step += f'rx({2*req.h*dt:.4f}) q[{k}];\n'
+        qc = QuantumCircuit(n)
+        qc.append(PauliEvolutionGate(op, time=dt, synthesis=LieTrotter() if req.trotter_order == 1 else SuzukiTrotter(order=2)), range(n))
+        qasm_step = qasm2.dumps(transpile(qc, basis_gates=["cx", "rz", "rx", "ry", "h", "sdg", "s"], optimization_level=0))
+    except Exception:
+        pass
 
     return {
         "sim_id": str(uuid.uuid4()),
@@ -165,15 +226,18 @@ def run_trotter(req: TrotterRequest):
         "magnetization_evolution": mags,
         "entanglement_evolution": entropies,
         "trotter_error_evolution": errors,
-        "final_probabilities": final_probs,
-        "final_state_labels": final_labels,
-        "ground_state_energy_estimate": round(min(energies) if energies else E0, 6),
-        "max_trotter_error": round(trotter_error, 6),
-        "energy_conservation_error": round(abs(energies[-1] - E0) if energies else 0, 6),
+        "final_probabilities": [round(float(probs[i]), 8) for i in top8],
+        "final_state_labels": [format(int(i), f"0{n}b") for i in top8],
+        "ground_state_energy_estimate": round(float(np.linalg.eigvalsh(H)[0]), 6),
+        "max_trotter_error": round(max(errors), 8) if errors else 0.0,
+        "energy_conservation_error": round(abs(energies[-1] - E0), 6) if energies else 0.0,
         "recommended_n_steps": rec_steps,
         "qasm_circuit": qasm_step,
+        "method": ("Statevector: Qiskit PauliEvolutionGate (Lie-Trotter or 2nd-order Suzuki) vs exact exp(-iHt). "
+                   "Trotter error = state infidelity; entanglement = half-chain entropy in bits; ground energy exact."),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+
 
 @router.get("/hamiltonians")
 def list_hamiltonians():

@@ -61,7 +61,7 @@ function CandidateCard({ cand, rank, baseline }: { cand: EvoCandidate; rank: num
           {cand.improvement_pct > 0 ? "+" : ""}{cand.improvement_pct}%
         </span>
         <span style={{ fontSize: 12, color: "#6b7280" }}>
-          fitness {cand.fitness.toFixed(3)}
+          score {cand.fitness.toFixed(3)}
         </span>
         <span style={{ fontSize: 11, color: "#9ca3af" }}>{open ? "▲" : "▼"}</span>
       </button>
@@ -143,9 +143,9 @@ function EvoOptimizer({ runId }: { runId: string }) {
   return (
     <section style={{ marginTop: 28 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Evolutionary Circuit Optimizer</h2>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Circuit Optimizer (Qiskit transpiler)</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-          <label style={{ fontSize: 12, color: "#6b7280" }}>Generations:</label>
+          <label style={{ fontSize: 12, color: "#6b7280" }}>Seeds per level:</label>
           <select
             value={generations}
             onChange={(e) => setGenerations(Number(e.target.value))}
@@ -188,8 +188,8 @@ function EvoOptimizer({ runId }: { runId: string }) {
           </div>
 
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-            Baseline fitness: <strong style={{ color: "#374151" }}>{data.baseline_fitness.toFixed(3)}</strong>
-            {" · "}{data.generations} generations · pop={data.pop_size} · {data.n_qubits} qubits
+            Score = weighted reduction of depth, gates, non-Clifford ratio and 2Q gates vs the original ·{" "}
+            {data.generations} seed(s) per level · {data.pop_size} candidate(s) · {data.n_qubits} qubits
           </div>
 
           {data.candidates.map((c, i) => (

@@ -89,81 +89,50 @@ def _synth_1q(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
 # Returns CNOT + local single-qubit gates (depth 3 structure)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _synth_2q(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
-    """KAK-inspired decomposition of a 4×4 unitary into CNOT + local gates."""
-    # Extract characteristic interaction angles from matrix elements
-    # Using arctan2 of key off-diagonal elements to approximate KAK angles
-    re00, im00 = m[0][0][0], m[0][0][1]
-    re11, im11 = m[1][1][0], m[1][1][1]
-    re22, im22 = m[2][2][0], m[2][2][1]
-    re33, im33 = m[3][3][0], m[3][3][1]
+def _qiskit_synth(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
+    """Exact synthesis with Qiskit: quantum Shannon decomposition (KAK for two qubits),
+    rewritten to CX + U3. Raises ValueError if the matrix is not unitary."""
+    import numpy as np
+    from qiskit import transpile
+    from qiskit.synthesis import qs_decomposition
 
-    theta_x = round(math.atan2(abs(m[0][3][0]), abs(m[0][0][0]) + 1e-9), 6)
-    theta_y = round(math.atan2(abs(m[1][2][0]), abs(m[1][1][0]) + 1e-9), 6)
-    theta_z = round(math.atan2(
-        math.hypot(im00, im33),
-        math.hypot(re00, re33) + 1e-9
-    ), 6)
-
-    # Phase angles for local unitaries before/after
-    phi_a0 = round(math.atan2(im00, re00 + 1e-9), 6)
-    phi_b0 = round(math.atan2(im11, re11 + 1e-9), 6)
-    phi_a1 = round(math.atan2(im22, re22 + 1e-9), 6)
-    phi_b1 = round(math.atan2(im33, re33 + 1e-9), 6)
-
+    u = np.array([[complex(c[0], c[1]) for c in row] for row in m])
+    if not np.allclose(u.conj().T @ u, np.eye(len(u)), atol=1e-6):
+        raise ValueError("The matrix is not unitary.")
+    circuit = transpile(qs_decomposition(u), basis_gates=["cx", "u3"], optimization_level=1, seed_transpiler=0)
     gates: List[Dict[str, Any]] = []
-    # Layer A: local gates on q0 and q1
-    gates.append({"gate": "u3", "qubit": 0, "params": [theta_x, phi_a0, phi_b0]})
-    gates.append({"gate": "u3", "qubit": 1, "params": [theta_y, phi_a1, phi_b1]})
-    # Entangling layer
-    gates.append({"gate": "cx", "qubit": [0, 1], "params": []})
-    # Middle local rotations
-    gates.append({"gate": "rz", "qubit": 0, "params": [2 * theta_z]})
-    gates.append({"gate": "ry", "qubit": 1, "params": [2 * theta_x]})
-    # Second entangling gate
-    gates.append({"gate": "cx", "qubit": [0, 1], "params": []})
-    # Final local layer
-    gates.append({"gate": "ry", "qubit": 0, "params": [-theta_y]})
-    gates.append({"gate": "rz", "qubit": 1, "params": [-theta_z]})
-    # Third CNOT for full KAK coverage
-    gates.append({"gate": "cx", "qubit": [0, 1], "params": []})
+    for inst in circuit.data:
+        qubits = [circuit.find_bit(q).index for q in inst.qubits]
+        gates.append({"gate": inst.operation.name, "qubit": qubits if len(qubits) > 1 else qubits[0],
+                      "params": [float(p) for p in inst.operation.params]})
     return gates
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3-qubit: recursive QSD (quantum Shannon decomposition)
-# ─────────────────────────────────────────────────────────────────────────────
+def _synth_2q(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
+    return _qiskit_synth(m)
+
 
 def _synth_3q(m: List[List[List[float]]]) -> List[Dict[str, Any]]:
-    """Recursive QSD approximation of an 8×8 unitary, depth ~9."""
-    gates: List[Dict[str, Any]] = []
+    return _qiskit_synth(m)
 
-    # Top-level demultiplexing: 3 uniformly controlled rotations
-    # Each UCR ≈ 2 CNOT + 2 Ry; we replicate the recursive structure
-    for target in [0, 1, 2]:
-        ctrl_a = (target + 1) % 3
-        ctrl_b = (target + 2) % 3
 
-        # Extract rotation angles from diagonal blocks
-        idx = target * 2
-        re_d = m[min(idx, 7)][min(idx, 7)][0]
-        im_d = m[min(idx, 7)][min(idx, 7)][1]
-        theta = round(2 * math.atan2(math.hypot(im_d, abs(re_d) - 1),
-                                     math.hypot(re_d, im_d) + 1e-9), 6)
-        phi   = round(math.atan2(im_d, re_d + 1e-9), 6)
+def _fidelity(m: List[List[List[float]]], gates: List[Dict[str, Any]], n_qubits: int) -> float:
+    """|Tr(U^dagger V)|^2 / d^2 between the target and the synthesised circuit (1 = equal up to phase)."""
+    import numpy as np
+    from qiskit import QuantumCircuit
+    from qiskit.quantum_info import Operator
 
-        gates.append({"gate": "ry", "qubit": target, "params": [theta]})
-        gates.append({"gate": "cx", "qubit": [ctrl_a, target], "params": []})
-        gates.append({"gate": "rz", "qubit": target, "params": [phi]})
-        gates.append({"gate": "cx", "qubit": [ctrl_b, target], "params": []})
-        gates.append({"gate": "ry", "qubit": target, "params": [-theta / 2]})
-        gates.append({"gate": "rz", "qubit": target, "params": [-phi / 2]})
-
-    # Add corrective CNOT layer to reach depth 9
-    gates.append({"gate": "cx", "qubit": [0, 2], "params": []})
-    gates.append({"gate": "cx", "qubit": [1, 2], "params": []})
-    gates.append({"gate": "cx", "qubit": [0, 1], "params": []})
-    return gates
+    qc = QuantumCircuit(n_qubits)
+    for g in gates:
+        qs = g["qubit"] if isinstance(g["qubit"], list) else [g["qubit"]]
+        name, params = g["gate"], g.get("params", [])
+        if name == "id":
+            continue
+        getattr(qc, "u" if name == "u3" else name)(*params, *qs)
+    u = np.array([[complex(c[0], c[1]) for c in row] for row in m])
+    v = Operator(qc).data
+    d = len(u)
+    return float(abs(np.trace(u.conj().T @ v)) ** 2 / d ** 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,13 +201,8 @@ def synthesize_unitary(req: UnitarySynthRequest) -> Dict[str, Any]:
 
     unitary_ok = _is_unitary(m)
 
-    # Determinant magnitude (for 2×2 only; approximate for larger)
-    if size == 2:
-        d = _det2(m)
-        det_mag = round(_cabs(d), 5)
-    else:
-        # Approximate: product of diagonal magnitudes
-        det_mag = round(math.prod(_cabs(m[i][i]) for i in range(size)), 5)
+    import numpy as np
+    det_mag = round(float(abs(np.linalg.det(np.array([[complex(c[0], c[1]) for c in row] for row in m])))), 5)
 
     is_su = abs(det_mag - 1.0) < 0.01
 
@@ -247,25 +211,21 @@ def synthesize_unitary(req: UnitarySynthRequest) -> Dict[str, Any]:
         gates = _synth_1q(m)
         method = "zyz_1q"
         fidelity = round(0.9995 + (0.0005 if req.optimize else 0.0), 5)
-    elif n_qubits == 2:
-        gates = _synth_2q(m)
-        method = "kak_2q"
-        fidelity = round(0.998 + (0.001 if req.optimize else 0.0), 5)
     else:
-        gates = _synth_3q(m)
-        method = "qsd_3q"
-        fidelity = round(0.992 + (0.003 if req.optimize else 0.0), 5)
+        try:
+            gates = _synth_2q(m) if n_qubits == 2 else _synth_3q(m)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        method = "qiskit_qsd_kak_2q" if n_qubits == 2 else "qiskit_qsd_3q"
+        fidelity = round(_fidelity(m, gates, n_qubits), 8)
 
     cx_gates = [g for g in gates if g["gate"] == "cx"]
     single_gates = [g for g in gates if g["gate"] != "cx"]
     t_count = sum(1 for g in gates if g["gate"] in ("t", "tdg"))
 
-    # Circuit depth: longest chain (approximate)
-    circuit_depth = {1: 3, 2: 9, 3: 21}[n_qubits]
-    if req.optimize:
-        circuit_depth = max(1, circuit_depth - n_qubits)
-
     qasm_output = _gates_to_qasm(gates, n_qubits)
+    from ..local_sim import _parse
+    circuit_depth = _parse(qasm_output).depth(filter_function=lambda i: i.operation.name != "measure")
 
     return {
         "synth_id": f"usynth-{uuid.uuid4().hex[:12]}",

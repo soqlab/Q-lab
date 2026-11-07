@@ -8,6 +8,7 @@ import uuid, random, math
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
 from ..store import store_put, store_get, store_list, store_delete
 
 router = APIRouter(prefix="/api/v1/talent", tags=["talent"])
@@ -19,7 +20,8 @@ NS_JOBS = "talent_jobs"
 class ResearcherProfile(BaseModel):
     profile_id: str
     name: str
-    email: str
+    # Shown only to the profile's owner; None for everyone else.
+    email: Optional[str] = None
     institution: str
     role: str
     expertise: List[str]
@@ -95,6 +97,14 @@ def _skill_overlap(profile_expertise: List[str], job_skills: List[str]) -> List[
     return list(dict.fromkeys(matches))
 
 
+def _public(profile: dict, identity: Identity) -> ResearcherProfile:
+    """A profile as the caller may see it: the email address only for its owner."""
+    data = dict(profile)
+    if data.get("owner_user_id") is None or data.get("owner_user_id") != identity.user_id:
+        data["email"] = None
+    return ResearcherProfile(**data)
+
+
 def _match_score(profile: dict, job: dict) -> float:
     required_matches = _skill_overlap(profile["expertise"], job["required_skills"])
     preferred_matches = _skill_overlap(profile["expertise"], job["preferred_skills"])
@@ -116,7 +126,8 @@ def _match_score(profile: dict, job: dict) -> float:
 
 
 @router.post("/profile", response_model=ResearcherProfile)
-def create_profile(req: CreateProfileRequest, db: Session = Depends(get_db)) -> ResearcherProfile:
+def create_profile(req: CreateProfileRequest, db: Session = Depends(get_db),
+                   identity: Identity = Depends(require_auth)) -> ResearcherProfile:
     profile_id = str(uuid.uuid4())
     profile = ResearcherProfile(
         profile_id=profile_id,
@@ -133,7 +144,7 @@ def create_profile(req: CreateProfileRequest, db: Session = Depends(get_db)) -> 
         orcid=req.orcid,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
-    store_put(db, NS_PROFILES, profile_id, profile.model_dump())
+    store_put(db, NS_PROFILES, profile_id, {**profile.model_dump(), "owner_user_id": identity.user_id})
     return profile
 
 
@@ -142,6 +153,7 @@ def list_profiles(
     role: Optional[str] = Query(default=None),
     expertise: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
 ) -> List[ResearcherProfile]:
     results = store_list(db, NS_PROFILES)
     if role:
@@ -152,19 +164,21 @@ def list_profiles(
             p for p in results
             if any(expertise_lower in e.lower() for e in p["expertise"])
         ]
-    return [ResearcherProfile(**p) for p in results]
+    return [_public(p, identity) for p in results]
 
 
 @router.get("/profile/{profile_id}", response_model=ResearcherProfile)
-def get_profile(profile_id: str, db: Session = Depends(get_db)) -> ResearcherProfile:
+def get_profile(profile_id: str, db: Session = Depends(get_db),
+                identity: Identity = Depends(require_auth)) -> ResearcherProfile:
     p = store_get(db, NS_PROFILES, profile_id)
     if not p:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found.")
-    return ResearcherProfile(**p)
+    return _public(p, identity)
 
 
 @router.post("/job", response_model=JobListing)
-def create_job(req: CreateJobRequest, db: Session = Depends(get_db)) -> JobListing:
+def create_job(req: CreateJobRequest, db: Session = Depends(get_db),
+               identity: Identity = Depends(require_auth)) -> JobListing:
     job_id = str(uuid.uuid4())
     job = JobListing(
         job_id=job_id,
@@ -190,6 +204,7 @@ def list_jobs(
     type: Optional[str] = Query(default=None),
     location: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_auth),
 ) -> List[JobListing]:
     results = [j for j in store_list(db, NS_JOBS) if j["active"]]
     if type:
@@ -201,7 +216,8 @@ def list_jobs(
 
 
 @router.get("/matches/{profile_id}", response_model=List[Match])
-def get_matches(profile_id: str, db: Session = Depends(get_db)) -> List[Match]:
+def get_matches(profile_id: str, db: Session = Depends(get_db),
+                identity: Identity = Depends(require_auth)) -> List[Match]:
     profile = store_get(db, NS_PROFILES, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found.")

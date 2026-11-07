@@ -5367,10 +5367,12 @@ export type CliffordSimResult = {
   tableau_snapshot: string[][];
   magic_state_count: number;
   magic_state_positions: number[];
-  pauli_expectation_z0: number;
-  pauli_expectation_z1: number;
+  pauli_expectation_z0: number | null;
+  pauli_expectation_z1: number | null;
   simulation_time_us: number;
-  max_simulable_qubits: number;
+  max_simulable_qubits: number | null;
+  method: string;
+  note: string | null;
   created_at: string;
 };
 
@@ -5441,8 +5443,11 @@ export type TensorNetworkResult = {
   memory_bytes_exact: number;
   memory_bytes_mps: number;
   memory_savings_pct: number;
-  is_area_law: boolean;
-  is_volume_law: boolean;
+  is_area_law: boolean | null;
+  is_volume_law: boolean | null;
+  fits_bond_dim: boolean;
+  max_bond_dim_exact: number;
+  method: string;
   decompose_method: string;
   network_diagram: string;
   created_at: string;
@@ -5596,7 +5601,9 @@ export type HamiltonianStudioResult = {
   n_ansatz_params: number;
   ansatz_depth: number;
   eigenvalues: number[];
-  recommended_optimizer: string;
+  preset: string | null;
+  formula: string | null;
+  method: string;
   created_at: string;
 };
 
@@ -5609,7 +5616,7 @@ export async function engineerHamiltonian(req: { pauli_terms?: PauliTerm[]; pres
   return res.json();
 }
 
-export async function listHamiltonianPresets(): Promise<{ id: string; name: string; n_qubits: number; n_terms: number }[]> {
+export async function listHamiltonianPresets(): Promise<{ presets: { key: string; name: string; formula: string }[] }> {
   const res = await fetch(apiUrl("/api/v1/hamiltonian-studio/presets"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Presets failed");
   return res.json();
@@ -7295,8 +7302,8 @@ export async function getPhysicsRules(): Promise<{ rules: { name: string; descri
 // Circuit AI Debugger
 // ─────────────────────────────────────────────────────────
 export interface CircuitBug { line: number; type: string; severity: string; description: string; fix: string; }
-export interface AICircuitDebugResult { debug_id: string; bugs: CircuitBug[]; warnings: { line: number; message: string }[]; suggestions: string[]; circuit_stats: { n_qubits: number; depth: number; gate_count: number; two_qubit_gates: number; t_gates: number }; score: number; }
-export interface CircuitOptimizeResult { original_depth: number; optimized_depth: number; original_gates: number; optimized_gates: number; depth_reduction_pct: number; optimized_qasm: string; optimizations_applied: string[]; fidelity_improvement: number; }
+export interface AICircuitDebugResult { debug_id: string; bugs: CircuitBug[]; warnings: { line: number; message: string }[]; suggestions: string[]; circuit_stats: { n_qubits: number; depth: number; gate_count: number; two_qubit_gates: number; t_gates: number }; }
+export interface CircuitOptimizeResult { original_depth: number; optimized_depth: number; original_gates: number; optimized_gates: number; depth_reduction_pct: number; optimized_qasm: string | null; optimizations_applied: string[]; fidelity_improvement: null; original_two_qubit_gates: number; optimized_two_qubit_gates: number; method: string; }
 export interface CircuitAIExplanation { explanation: string; step_by_step: { gate: string; qubits: number[]; purpose: string }[]; algorithm_detected?: string; use_case: string; }
 export async function debugCircuitAI(req: { circuit_qasm: string; n_qubits?: number; backend?: string }): Promise<AICircuitDebugResult> {
   const res = await fetch(apiUrl("/api/v1/circuit-ai/debug"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
@@ -7524,22 +7531,6 @@ export async function listGrantProposals(): Promise<{ proposals: GrantProposal[]
 // ─────────────────────────────────────────────────────────
 // Universal Quantum Transpiler Hub
 // ─────────────────────────────────────────────────────────
-export interface TranslationResult { translation_id: string; source_sdk: string; target_sdk: string; original_circuit: string; translated_circuit: string; original_gate_count: number; translated_gate_count: number; equivalence_score: number; warnings: string[]; notes: string[]; }
-export async function translateCircuit(req: { circuit: string; source_sdk: string; target_sdk: string; optimize?: boolean; backend?: string }): Promise<TranslationResult> {
-  const res = await fetch(apiUrl("/api/v1/transpiler-hub/translate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function detectCircuitSDK(req: { circuit: string }): Promise<{ detected_sdk: string; confidence: number; indicators: string[] }> {
-  const res = await fetch(apiUrl("/api/v1/transpiler-hub/detect"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listSupportedSDKs(): Promise<{ sdks: { name: string; version: string; description: string }[] }> {
-  const res = await fetch(apiUrl("/api/v1/transpiler-hub/sdks"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
 
 // ─────────────────────────────────────────────────────────
 // HPC Hybrid Bridge
@@ -7911,7 +7902,7 @@ export async function getLearningProgress(user: string): Promise<LearningProgres
 // ─────────────────────────────────────────────────────────
 // Researcher Talent Board  /api/v1/talent
 // ─────────────────────────────────────────────────────────
-export interface ResearcherProfile { profile_id: string; name: string; email: string; institution: string; role: string; expertise: string[]; publications: number; h_index: number; open_to_opportunities: boolean; bio: string; website?: string; orcid?: string; created_at: string; }
+export interface ResearcherProfile { profile_id: string; name: string; email: string | null; institution: string; role: string; expertise: string[]; publications: number; h_index: number; open_to_opportunities: boolean; bio: string; website?: string; orcid?: string; created_at: string; }
 export interface TalentJobListing { job_id: string; title: string; institution: string; location: string; type: string; description: string; required_skills: string[]; preferred_skills: string[]; salary_range?: string; deadline?: string; contact_email: string; posted_at: string; active: boolean; }
 export interface TalentMatch { profile_id: string; job_id: string; match_score: number; matching_skills: string[]; }
 export async function createResearcherProfile(req: { name: string; email: string; institution: string; role: string; expertise: string[]; publications: number; h_index: number; open_to_opportunities: boolean; bio: string; website?: string; orcid?: string }): Promise<ResearcherProfile> {
