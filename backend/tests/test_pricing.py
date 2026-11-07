@@ -82,7 +82,7 @@ def test_stale_after_thirty_days():
     assert fresh["pricing_stale"] is False and fresh["stale_warning"] is None
     old = pricing.provenance("ibm_payg", today=verified + timedelta(days=31))
     assert old["pricing_stale"] is True
-    assert "2026-11-05" in old["stale_warning"] and "ibm.com/quantum/pricing" in old["stale_warning"]
+    assert verified.isoformat() in old["stale_warning"] and "ibm.com/quantum/pricing" in old["stale_warning"]
 
 
 @pytest.fixture
