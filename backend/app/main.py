@@ -626,7 +626,19 @@ class RunUpdatePayload(BaseModel):
 # Helpers
 # ------------------------------------------------------------------
 
+def _run_provider(context: Dict[str, Any]) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Provider ("braket", "ionq", ...) and device details the SDK's provider adapters record
+    in context; (None, None) for runs that carry neither (older SDKs, plain Qiskit)."""
+    provider = context.get("provider")
+    device = context.get("device")
+    return (
+        provider if isinstance(provider, str) and provider else None,
+        device if isinstance(device, dict) and device else None,
+    )
+
+
 def _run_to_dict(run: Run, include_health: bool = False) -> Dict[str, Any]:
+    provider, device = _run_provider(run.context or {})
     d: Dict[str, Any] = {
         "run_id": run.run_id,
         "circuit_name": run.circuit_name,
@@ -634,6 +646,8 @@ def _run_to_dict(run: Run, include_health: bool = False) -> Dict[str, Any]:
         "fingerprint": run.fingerprint or {},
         "context": run.context or {},
         "backend": run.backend,
+        "provider": provider,
+        "device": device,
         "parameters": run.parameters or {},
         "execution": run.execution or {},
         "calibration": run.calibration or {},

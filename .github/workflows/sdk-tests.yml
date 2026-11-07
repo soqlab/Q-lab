@@ -42,3 +42,33 @@ jobs:
         run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
       - name: Run tests
         run: pytest tests/ -v --tb=short --cov=qlab --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
+
+  # Amazon Braket and IonQ adapters (qlab.providers), against the providers' own simulators:
+  # Braket's LocalSimulator, and qiskit-ionq talking to a local stand-in for the IonQ API.
+  # No AWS account or IonQ key is used; see the docstrings of the two test files.
+  providers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    name: Providers · Python ${{ matrix.python-version }} · Braket + IonQ
+    defaults:
+      run:
+        working-directory: qlab_sdk
+    env:
+      QLAB_TELEMETRY: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e ".[dev,braket,ionq]" qiskit-aer
+      - name: Installed provider SDKs
+        run: pip show amazon-braket-sdk amazon-braket-default-simulator qiskit-ionq qiskit | grep -E "^(Name|Version)"
+      - name: Provider tests
+        run: pytest tests/test_braket_capture.py tests/test_ionq_capture.py tests/test_providers_optional.py -v --tb=short
+      # The Qiskit tests again with the provider SDKs installed: their hooks must not change Qiskit capture.
+      - name: Full SDK suite with providers installed
+        run: pytest tests/ -q --tb=short

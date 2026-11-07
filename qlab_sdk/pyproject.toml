@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qlab-sdk"
 version = "0.3.0"
-description = "Passive experiment tracker for Qiskit workflows"
+description = "Passive experiment tracker for Qiskit, Amazon Braket and IonQ workflows"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "SOQLAB", email = "contact@soqlab.com" }]
-keywords = ["qiskit", "quantum", "experiment-tracking", "quantum-computing"]
+keywords = ["qiskit", "amazon-braket", "ionq", "quantum", "experiment-tracking", "quantum-computing"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -27,6 +27,9 @@ dependencies = ["httpx>=0.24"]
 
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
+# Provider adapters (qlab.providers): captured automatically once installed.
+braket = ["amazon-braket-sdk>=1.80"]
+ionq = ["qiskit>=1.0", "qiskit-ionq>=1.0"]
 jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
 all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
 dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]

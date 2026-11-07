@@ -128,6 +128,46 @@ and a shareable dashboard URL. In detail:
   the OpenQASM 3 (or 2) text. Each is capped at 512 KB (`QLAB_SOURCE_MAX_BYTES`);
   over the cap only the size and hash are kept. Nothing is captured in ZK-QCO mode.
 
+## Amazon Braket and IonQ
+
+```bash
+pip install "qlab-sdk[braket]"   # Amazon Braket SDK
+pip install "qlab-sdk[ionq]"     # qiskit-ionq
+```
+
+Nothing else changes: `qlab.init()` hooks whichever of the two is installed (and skips the
+other; `import qlab` never needs them). Each run carries `context.provider` (`"braket"` or
+`"ionq"`) and `context.device`, which the Q-Lab server returns as the run's `provider` and
+`device` fields.
+
+**Braket** (`device.run`, `device.run_batch` on `LocalSimulator`, `AwsDevice` and any other
+`braket.devices.Device`): one run per task specification with the circuit as OpenQASM 3, its
+fingerprint, shots (`0` on simulators by default means exact results), the device name, ARN,
+type, region, qubit count, native gates and Braket noise model, calibration from the device
+properties when published (standardized T1/T2/readout/gate fidelities, or IonQ's provider
+fidelities and timings on Braket; stored as errors, 1 - fidelity), the task id (ARN), and on
+`task.result()` the counts, measured qubits, result-type values and task metadata. Braket
+counts are keyed with `measured_qubits[0]` leftmost, the reverse of Qiskit
+(`results.bit_order`). The backend name is `braket:<device name>` (for example
+`braket:Forte 1`, `braket:SV1`), which Q-Lab's price table resolves.
+
+**IonQ** (`IonQProvider().get_backend("simulator")`, `"qpu.forte-1"`, ...): these are Qiskit
+backends, so the Qiskit capture applies (circuit, transpiled QPY, shots, `execution.job_id`,
+counts); the IonQ hook adds the device (backend and API name, SIMULATOR/QPU, gateset), the
+simulator's noise model (`ideal`, `aria-1`, `forte-1`, ...), error mitigation when set, and on
+QPUs the latest IonQ characterization (SPAM/1q/2q median fidelities, T1/T2, gate times) as
+calibration. Only the qiskit-ionq path is hooked, not raw calls to the IonQ REST API.
+
+Runs submitted through qiskit-braket-provider are recorded once, by the Qiskit hooks, without
+the Braket device details.
+
+What has been tested: CI runs the Braket hooks against Braket's real `LocalSimulator`
+(state-vector and density-matrix, noise models, OpenQASM programs, batches) and the `AwsDevice`
+path with the AWS API calls answered by a fake `AwsSession`; the IonQ hooks run qiskit-ionq
+against a local HTTP stand-in for `api.ionq.co/v0.4` with hand-written responses. No run has
+been made on AWS or IonQ cloud devices with these hooks, so field names in live responses that
+differ from the published schemas would show up as missing calibration, not as an error.
+
 ## CI baseline checks
 
 `qlab ci check` compares a run's measurement counts with a baseline run and fails

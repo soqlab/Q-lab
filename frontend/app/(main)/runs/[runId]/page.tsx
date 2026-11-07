@@ -839,6 +839,9 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
           <KeyValue label="Run ID" value={<code style={{ fontSize: 12 }}>{run.run_id}</code>} />
           <KeyValue label="Project" value={run.project || "—"} />
           <KeyValue label="Backend" value={run.backend || "—"} />
+          {run.provider && <KeyValue label="Provider" value={run.provider} />}
+          {run.device?.arn && <KeyValue label="Device ARN" value={<code style={{ fontSize: 12 }}>{run.device.arn}</code>} />}
+          {run.device?.noise_model && <KeyValue label="Noise model" value={run.device.noise_model} />}
           <KeyValue label="Status" value={<span style={{ fontWeight: 600 }}>{run.status}</span>} />
           <KeyValue label="Benchmark" value={run.benchmark_id || "—"} />
           <KeyValue label="Created" value={new Date(run.created_at).toLocaleString()} />

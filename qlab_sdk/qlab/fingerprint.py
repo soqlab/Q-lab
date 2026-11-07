@@ -69,6 +69,7 @@ def setup_material(
     shots: Optional[int] = None,
     precision: Optional[float] = None,
     package_versions: Optional[Dict[str, str]] = None,
+    extra_packages: tuple = (),
 ) -> Dict[str, Any]:
     """What the setup fingerprint hashes: the circuit plus where and how it was run."""
     settings = transpiler_settings or {}
@@ -82,7 +83,8 @@ def setup_material(
         "transpiler": transpiler,
         "shots": shots,
         "precision": precision,
-        "packages": {k: versions[k] for k in SETUP_PACKAGES if versions.get(k)},
+        # extra_packages: the provider SDK of a Braket or IonQ run (qlab.providers).
+        "packages": {k: versions[k] for k in (*SETUP_PACKAGES, *extra_packages) if versions.get(k)},
     }
 
 

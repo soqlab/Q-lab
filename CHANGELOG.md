@@ -7,6 +7,18 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- SDK: Amazon Braket and IonQ adapters (`pip install qlab-sdk[braket]`, `qlab-sdk[ionq]`), hooked
+  by `qlab.init()` when installed. Braket `device.run`/`run_batch` (LocalSimulator, AwsDevice)
+  record the OpenQASM 3 circuit, shots, device ARN/type/noise model, calibration from the device
+  properties, task id and counts; qiskit-ionq runs add the device, noise model and IonQ
+  characterization. Tested in CI on Braket's LocalSimulator, a fake AwsSession and a local
+  stand-in for the IonQ API; not yet run against AWS or IonQ cloud devices.
+- Runs returned by the API carry `provider` and `device` (from the SDK's provider adapters); the
+  run page shows them.
+- Weekly "Provider Price Check" workflow (`scripts/check_prices.py`): compares the price table
+  with the AWS Braket, Azure Quantum, IBM Quantum and IQM pricing pages, fails with an `::error`
+  per changed price and warns for any page it could not read. Entries record the URL checked and
+  the retrieval date (`price_check`).
 - SDK: calibration is also captured from `backend.target` (Qiskit 2 backends without
   `properties()`), in microseconds; shots are recorded for `backend.run` and the V2 primitives; a
   `setup_fingerprint` covers circuit, backend, transpiler options, shots and package versions; the

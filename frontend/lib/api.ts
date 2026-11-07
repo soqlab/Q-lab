@@ -121,6 +121,15 @@ export type QLabRun = {
   };
   context: Record<string, unknown>;
   backend: string | null;
+  // Set by the SDK's provider adapters (Amazon Braket, IonQ); null for other runs.
+  provider?: string | null;
+  device?: {
+    name?: string;
+    arn?: string;
+    provider_name?: string;
+    type?: string;
+    noise_model?: string;
+  } | null;
   parameters: Record<string, unknown>;
   execution: Record<string, unknown>;
   calibration: Record<string, unknown>;

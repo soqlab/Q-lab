@@ -1,6 +1,6 @@
 name: Qiskit Early Warning
 
-# Auto-tracking Qiskit is the product. The other workflows only run when this repository changes,
+# Auto-tracking Qiskit (and the Braket/IonQ adapters) is the product. The other workflows only run when this repository changes,
 # so a Qiskit release that breaks the SDK would go unnoticed until a user reported it. This runs the
 # SDK tests every night against the latest release and against Qiskit's development branch.
 on:
@@ -44,3 +44,24 @@ jobs:
         run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
       - name: Run tests
         run: pytest tests/ -q --tb=short
+
+  # Provider SDK releases can break the Braket/IonQ hooks the same way; test against the latest.
+  providers:
+    runs-on: ubuntu-latest
+    name: SDK · latest Amazon Braket + qiskit-ionq
+    defaults:
+      run:
+        working-directory: qlab_sdk
+    env:
+      QLAB_TELEMETRY: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install --upgrade -e ".[dev,braket,ionq]" qiskit-aer
+      - name: Installed provider SDKs
+        run: pip show amazon-braket-sdk qiskit-ionq qiskit | grep -E "^(Name|Version)"
+      - name: Run tests
+        run: pytest tests/test_braket_capture.py tests/test_ionq_capture.py tests/test_providers_optional.py -q --tb=short

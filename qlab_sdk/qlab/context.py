@@ -26,6 +26,10 @@ def _capture_library_versions() -> dict[str, str]:
         "qiskit-ibm-provider",
         "qiskit-aer",
         "qiskit-terra",
+        "qiskit-ionq",
+        "amazon-braket-sdk",
+        "amazon-braket-default-simulator",
+        "amazon-braket-schemas",
         "qlab-sdk",
     ]
     try:

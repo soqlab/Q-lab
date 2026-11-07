@@ -630,15 +630,61 @@ def _capture_circuit(
     if _CLIENT is None:
         return ""
 
-    run_id = str(uuid.uuid4())
     qasm = _circuit_to_qasm(circuit)
-    fingerprint = fingerprint_circuit(circuit, qasm=qasm)
+    provider_ctx = _qiskit_provider_context()
+    return _send_capture(
+        circuit_name=getattr(circuit, "name", None),
+        qasm=qasm,
+        fingerprint=fingerprint_circuit(circuit, qasm=qasm),
+        backend_name=backend_name,
+        parameters=parameters,
+        execution=execution,
+        status=status,
+        calibration=calibration,
+        transpiler=transpiler,
+        timing=timing,
+        campaign_id=campaign_id,
+        context_extra=provider_ctx,
+        setup_packages=tuple(provider_ctx.pop("setup_packages", ())),
+    )
+
+
+# Set by _wrap_run for the duration of one patched run(): what provider adapters
+# (qlab.providers.ionq) add to the run's context for that backend.
+def _qiskit_provider_context() -> dict[str, Any]:
+    return dict(getattr(_LOCAL, "provider_context", None) or {})
+
+
+def _send_capture(
+    circuit_name: Optional[str],
+    qasm: Optional[str],
+    fingerprint: dict[str, Any],
+    backend_name: Optional[str] = None,
+    parameters: Optional[dict[str, Any]] = None,
+    execution: Optional[dict[str, Any]] = None,
+    status: str = "submitted",
+    calibration: Optional[dict[str, Any]] = None,
+    transpiler: Optional[dict[str, Any]] = None,
+    timing: Optional[dict[str, Any]] = None,
+    campaign_id: Optional[str] = None,
+    context_extra: Optional[dict[str, Any]] = None,
+    setup_packages: tuple[str, ...] = (),
+    results: Optional[dict[str, Any]] = None,
+) -> str:
+    """Build one run payload and queue it for upload. Shared by every framework adapter:
+    the circuit-specific parts (source text, fingerprint) are computed by the caller."""
+    if _CLIENT is None:
+        return ""
+
+    run_id = str(uuid.uuid4())
     upload_qasm, upload_fingerprint, privacy = _apply_zk_qco(qasm, fingerprint)
     context = capture_context(include_pip_freeze=_CONFIG["include_pip_freeze"])
+    if context_extra:
+        context.update(_sanitize(context_extra))
     transpiler = dict(transpiler or {})
     if privacy:
         # Hash-only mode: no circuit source leaves the machine, in any format.
-        for key in ("qpy", "qasm"):
+        for key in ("qpy", "qasm", "source"):
             transpiler.pop(key, None)
 
     try:
@@ -653,6 +699,7 @@ def _capture_circuit(
             shots=_positive_int(exe.get("shots")) or _positive_int(params.get("shots")),
             precision=_positive_float(exe.get("precision")),
             package_versions=versions,
+            extra_packages=setup_packages,
         )
         context["setup_fingerprint"] = setup_fingerprint(material)
         context["setup"] = material
@@ -661,7 +708,7 @@ def _capture_circuit(
 
     payload = {
         "run_id": run_id,
-        "circuit_name": getattr(circuit, "name", None),
+        "circuit_name": circuit_name,
         "qasm": upload_qasm,
         "fingerprint": upload_fingerprint,
         "context": context,
@@ -671,6 +718,7 @@ def _capture_circuit(
         "calibration": _sanitize(calibration or {}),
         "transpiler": _sanitize(transpiler),
         "timing": timing or {},
+        "results": _sanitize(results or {}),
         "project": _CONFIG["project"],
         "tags": list(_CONFIG["tags"]),
         "status": status,
@@ -1257,40 +1305,51 @@ def _wrap_run(cls, kind: str) -> None:
             shots = []
         if len(shots) != len(circuits):
             shots = [{}] * len(circuits)
+        provider_ctx, provider_cal = _provider_details(backend_obj, kwargs)
+        if provider_cal and not calibration:
+            calibration = provider_cal
 
         _LOCAL.depth = getattr(_LOCAL, "depth", 0) + 1
         try:
             job = original_run(self, *args, **kwargs)
         except Exception as error:
-            for circuit, shot_info in zip(circuits, shots):
-                _capture_circuit(
-                    circuit,
-                    backend_name=backend_name,
-                    parameters=parameters,
-                    execution={**_error_metadata(error), **shot_info},
-                    status="failed",
-                    calibration=calibration,
-                    transpiler=transpiler_ctx,
-                    timing={"submit_time": submit_time},
-                )
+            _LOCAL.provider_context = provider_ctx
+            try:
+                for circuit, shot_info in zip(circuits, shots):
+                    _capture_circuit(
+                        circuit,
+                        backend_name=backend_name,
+                        parameters=parameters,
+                        execution={**_error_metadata(error), **shot_info},
+                        status="failed",
+                        calibration=calibration,
+                        transpiler=transpiler_ctx,
+                        timing={"submit_time": submit_time},
+                    )
+            finally:
+                _LOCAL.provider_context = None
             raise
         finally:
             _LOCAL.depth -= 1
 
         execution = _extract_job_metadata(job)
-        run_ids = [
-            _capture_circuit(
-                circuit,
-                backend_name=backend_name,
-                parameters=parameters,
-                execution={**execution, **shot_info},
-                status="submitted",
-                calibration=calibration,
-                transpiler=transpiler_ctx,
-                timing={"submit_time": submit_time},
-            )
-            for circuit, shot_info in zip(circuits, shots)
-        ]
+        _LOCAL.provider_context = provider_ctx
+        try:
+            run_ids = [
+                _capture_circuit(
+                    circuit,
+                    backend_name=backend_name,
+                    parameters=parameters,
+                    execution={**execution, **shot_info},
+                    status="submitted",
+                    calibration=calibration,
+                    transpiler=transpiler_ctx,
+                    timing={"submit_time": submit_time},
+                )
+                for circuit, shot_info in zip(circuits, shots)
+            ]
+        finally:
+            _LOCAL.provider_context = None
         _patch_job_result(job, run_ids, circuits, backend_name)
         return job
 
@@ -1298,15 +1357,38 @@ def _wrap_run(cls, kind: str) -> None:
     cls.run = patched_run
 
 
-def _patch_family(base, kind: str) -> None:
-    """Wrap run() on base, on every subclass already defined, and on subclasses defined later."""
+# Provider adapters (qlab.providers.*) register here to add their provider name, device
+# details and calibration to runs of their Qiskit backends (qiskit-ionq, qiskit-braket-provider).
+# Each detector gets (backend, run kwargs) and returns None when the backend is not its own,
+# else (context additions, calibration).
+_PROVIDER_DETECTORS: list = []
+
+
+def _provider_details(backend: Any, kwargs: dict) -> tuple[dict[str, Any], dict[str, Any]]:
+    for detect in list(_PROVIDER_DETECTORS):
+        try:
+            found = detect(backend, kwargs)
+        except Exception:
+            found = None
+        if found:
+            ctx, cal = found
+            return dict(ctx or {}), dict(cal or {})
+    return {}, {}
+
+
+def _patch_family(base, kind: str, wrap=None) -> None:
+    """Wrap run() on base, on every subclass already defined, and on subclasses defined later.
+
+    wrap(cls, kind) does the wrapping; Qiskit's _wrap_run by default (qlab.providers.braket
+    passes its own for Braket devices)."""
+    wrap = wrap or _wrap_run
     pending, seen = [base], set()
     while pending:
         cls = pending.pop()
         if cls in seen:
             continue
         seen.add(cls)
-        _wrap_run(cls, kind)
+        wrap(cls, kind)
         try:
             pending.extend(cls.__subclasses__())
         except TypeError:
@@ -1321,10 +1403,19 @@ def _patch_family(base, kind: str) -> None:
             previous.__func__(subclass, **kw)
         else:
             super(base, subclass).__init_subclass__(**kw)
-        _wrap_run(subclass, kind)
+        wrap(subclass, kind)
 
     base.__init_subclass__ = classmethod(hook)
     base._qlab_subclass_hook = True
+
+
+def _patch_providers() -> None:
+    """Hook the provider SDKs that are installed (Amazon Braket, IonQ); see qlab.providers."""
+    try:
+        from . import providers
+        providers.patch_installed()
+    except Exception:
+        pass
 
 
 def _patch_qiskit() -> None:
@@ -1639,6 +1730,7 @@ def init(
 
     _patch_qiskit()
     _patch_transpile()
+    _patch_providers()
 
     _INITIALIZED = True
 
