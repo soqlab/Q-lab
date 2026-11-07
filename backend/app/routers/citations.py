@@ -30,10 +30,12 @@ class CitationPayload(BaseModel):
 # Helpers
 # ------------------------------------------------------------------
 
-def _citation_table_ddl() -> list[str]:
+def _citation_table_ddl(dialect: str = "sqlite") -> list[str]:
+    id_col = "id SERIAL PRIMARY KEY" if dialect == "postgresql" else "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    ts_type = "TIMESTAMP" if dialect == "postgresql" else "DATETIME"
     return [
-        """CREATE TABLE IF NOT EXISTS run_citations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        f"""CREATE TABLE IF NOT EXISTS run_citations (
+            {id_col},
             run_id VARCHAR(64) NOT NULL,
             arxiv_id VARCHAR(32),
             doi VARCHAR(256),
@@ -42,11 +44,25 @@ def _citation_table_ddl() -> list[str]:
             journal VARCHAR(256),
             year INTEGER,
             note TEXT,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            created_at {ts_type} NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""",
         "CREATE INDEX IF NOT EXISTS ix_run_citations_run_id ON run_citations(run_id)",
         "CREATE INDEX IF NOT EXISTS ix_run_citations_arxiv ON run_citations(arxiv_id)",
     ]
+
+
+def _ensure_table(db: Session) -> None:
+    """Create run_citations on first use: no model or migration creates it."""
+    for ddl in _citation_table_ddl(db.get_bind().dialect.name):
+        db.execute(text(ddl))
+    db.commit()
+
+
+def _find_run(db: Session, run_id: str) -> Run:
+    run = db.scalar(select(Run).where(Run.run_id == run_id))  # limited to the caller's runs
+    if run is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return run
 
 
 def _fmt_bibtex(row) -> str:
@@ -91,16 +107,10 @@ def _row_to_dict(row) -> dict:
 # Routes
 # ------------------------------------------------------------------
 
-@router.on_event("startup")  # type: ignore[attr-defined]
-async def _ensure_table():
-    pass  # Handled by main.py startup migration
-
-
 @router.get("/{run_id}/citations")
 def list_citations(run_id: str, db: Session = Depends(get_db)):
-    run = db.scalar(select(Run).where(Run.run_id == run_id))
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
+    _find_run(db, run_id)
+    _ensure_table(db)
     try:
         rows = db.execute(
             text("SELECT * FROM run_citations WHERE run_id = :rid ORDER BY created_at ASC"),
@@ -113,15 +123,15 @@ def list_citations(run_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{run_id}/citations")
 def add_citation(run_id: str, payload: CitationPayload, db: Session = Depends(get_db)):
-    run = db.scalar(select(Run).where(Run.run_id == run_id))
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
+    _find_run(db, run_id)
     if not payload.arxiv_id and not payload.doi and not payload.title:
         raise HTTPException(status_code=422, detail="Provide at least one of: arxiv_id, doi, title")
+    _ensure_table(db)
     try:
         result = db.execute(
             text("""INSERT INTO run_citations (run_id, arxiv_id, doi, title, authors, journal, year, note, created_at)
-                    VALUES (:run_id, :arxiv_id, :doi, :title, :authors, :journal, :year, :note, :now)"""),
+                    VALUES (:run_id, :arxiv_id, :doi, :title, :authors, :journal, :year, :note, :now)
+                    RETURNING id"""),
             {
                 "run_id": run_id,
                 "arxiv_id": payload.arxiv_id,
@@ -134,10 +144,11 @@ def add_citation(run_id: str, payload: CitationPayload, db: Session = Depends(ge
                 "now": datetime.utcnow().isoformat(),
             },
         )
+        new_id = result.scalar_one()
         db.commit()
         row = db.execute(
             text("SELECT * FROM run_citations WHERE id = :id"),
-            {"id": result.lastrowid},
+            {"id": new_id},
         ).mappings().one()
         return _row_to_dict(dict(row))
     except Exception:
@@ -147,24 +158,27 @@ def add_citation(run_id: str, payload: CitationPayload, db: Session = Depends(ge
 
 @router.delete("/{run_id}/citations/{citation_id}")
 def delete_citation(run_id: str, citation_id: int, db: Session = Depends(get_db)):
+    _find_run(db, run_id)  # raw SQL below skips the run visibility filter, so check here
+    _ensure_table(db)
     try:
-        db.execute(
+        result = db.execute(
             text("DELETE FROM run_citations WHERE id = :id AND run_id = :rid"),
             {"id": citation_id, "rid": run_id},
         )
         db.commit()
-        return {"deleted": True, "id": citation_id}
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete citation.")
+    if not result.rowcount:
+        raise HTTPException(status_code=404, detail="citation not found")
+    return {"deleted": True, "id": citation_id}
 
 
 @router.get("/{run_id}/citations/export.bib")
 def export_bibtex(run_id: str, db: Session = Depends(get_db)):
     from fastapi.responses import PlainTextResponse
-    run = db.scalar(select(Run).where(Run.run_id == run_id))
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
+    _find_run(db, run_id)
+    _ensure_table(db)
     try:
         rows = db.execute(
             text("SELECT * FROM run_citations WHERE run_id = :rid ORDER BY created_at ASC"),

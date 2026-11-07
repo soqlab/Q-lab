@@ -39,6 +39,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import require_auth, require_role
 from ..models import Run
 from ..outbound import is_safe_url
 
@@ -253,13 +254,13 @@ def public_calibration(backend: str, db: Session = Depends(get_db)):
 # Authenticated endpoints
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.get("/config")
+@router.get("/config", dependencies=[Depends(require_auth)])
 def get_config():
     """Return this node's network participation config."""
     return _load_cfg()
 
 
-@router.patch("/config")
+@router.patch("/config", dependencies=[Depends(require_role("owner", "admin"))])
 def patch_config(body: ConfigPatch):
     """Toggle opt-in and set a human-readable node label."""
     cfg = _load_cfg()
@@ -273,13 +274,13 @@ def patch_config(body: ConfigPatch):
     return cfg
 
 
-@router.get("/peers")
+@router.get("/peers", dependencies=[Depends(require_auth)])
 def list_peers():
     """List configured peer Q-Lab instances."""
     return {"peers": _load_peers()}
 
 
-@router.post("/peers", status_code=201)
+@router.post("/peers", status_code=201, dependencies=[Depends(require_role("owner", "admin"))])
 def add_peer(body: PeerBody):
     """Add a peer Q-Lab instance URL."""
     url = body.url.rstrip("/")
@@ -304,7 +305,7 @@ def add_peer(body: PeerBody):
     return {"peer": peer, "reachable": status is not None, "peer_status": status}
 
 
-@router.delete("/peers/{peer_id}", status_code=200)
+@router.delete("/peers/{peer_id}", status_code=200, dependencies=[Depends(require_role("owner", "admin"))])
 def remove_peer(peer_id: str):
     peers = _load_peers()
     before = len(peers)
@@ -315,7 +316,7 @@ def remove_peer(peer_id: str):
     return {"removed": peer_id}
 
 
-@router.get("/peers/probe")
+@router.get("/peers/probe", dependencies=[Depends(require_auth)])
 def probe_peers():
     """Check reachability of all configured peers."""
     peers = _load_peers()
@@ -332,7 +333,7 @@ def probe_peers():
     return {"peers": results, "total": len(peers), "reachable": sum(1 for r in results if r["reachable"])}
 
 
-@router.get("/aggregate/{backend}")
+@router.get("/aggregate/{backend}", dependencies=[Depends(require_auth)])
 def aggregate_calibration(backend: str, db: Session = Depends(get_db)):
     """
     Query all configured peers + local data and return a combined
@@ -395,7 +396,7 @@ def aggregate_calibration(backend: str, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/backends")
+@router.get("/backends", dependencies=[Depends(require_auth)])
 def list_network_backends(db: Session = Depends(get_db)):
     """
     Return the union of all backends available across this node + all peers.

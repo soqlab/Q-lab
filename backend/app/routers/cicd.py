@@ -167,9 +167,14 @@ def _extract_qasm_from_push(payload: dict) -> list[tuple[str, str]]:
     return results
 
 
-def _verify_signature(secret: str, body: bytes, sig_header: Optional[str]) -> bool:
-    if not secret or not sig_header:
+def _verify_signature(secret: str, body: bytes, sig_header: Optional[str],
+                      gitlab_token: Optional[str] = None) -> bool:
+    if not secret:
         return True  # no secret configured = skip verification
+    if gitlab_token is not None:  # GitLab sends the secret itself, not an HMAC
+        return hmac.compare_digest(secret, gitlab_token)
+    if not sig_header:
+        return False
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig_header)
 
@@ -255,8 +260,8 @@ async def receive_webhook(integration_id: str, request: Request, db: Session = D
         raise HTTPException(422, "Integration is disabled")
 
     body = await request.body()
-    sig = request.headers.get("X-Hub-Signature-256") or request.headers.get("X-Gitlab-Token")
-    if not _verify_signature(ci.webhook_secret, body, sig):
+    sig = request.headers.get("X-Hub-Signature-256")
+    if not _verify_signature(ci.webhook_secret, body, sig, request.headers.get("X-Gitlab-Token")):
         raise HTTPException(401, "Invalid webhook signature")
 
     try:

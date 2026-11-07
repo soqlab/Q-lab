@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
 from ..models import Campaign, Run
+from ..run_scope import current_scope, visible
 from ..health_score import compute_health_score
 
 router = APIRouter(prefix="/api/v1/campaigns", tags=["campaigns"])
@@ -44,6 +45,14 @@ class CampaignCreate(BaseModel):
     project: Optional[str] = Field(None, max_length=120)
     grid: list[GridAxis] = Field(..., min_length=1, max_length=10)
     tags: list[str] = Field(default_factory=list, max_length=20)
+
+
+def _find_campaign(db: Session, campaign_id: str) -> Campaign:
+    """The campaign, if the caller may see it (same rule as runs); 404 otherwise."""
+    campaign = db.scalar(select(Campaign).where(Campaign.campaign_id == campaign_id))
+    if not campaign or not visible(campaign.created_by_user_id, campaign.org_id, current_scope()):
+        raise HTTPException(404, "Campaign not found")
+    return campaign
 
 
 def _grid_combinations(grid: list[GridAxis]) -> list[dict[str, Any]]:
@@ -160,6 +169,8 @@ def list_campaigns(
 
     results = []
     for c in campaigns:
+        if not visible(c.created_by_user_id, c.org_id, current_scope()):
+            continue
         runs = db.scalars(select(Run).where(Run.benchmark_id == c.campaign_id).limit(500)).all()
         results.append(_campaign_to_dict(c, _compute_run_stats(runs)))
     return results
@@ -171,9 +182,7 @@ def get_campaign(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
-    campaign = db.scalar(select(Campaign).where(Campaign.campaign_id == campaign_id))
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
+    campaign = _find_campaign(db, campaign_id)
 
     runs = db.scalars(select(Run).where(Run.benchmark_id == campaign_id).limit(1000)).all()
     stats = _compute_run_stats(runs)
@@ -256,9 +265,7 @@ def update_campaign_status(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    campaign = db.scalar(select(Campaign).where(Campaign.campaign_id == campaign_id))
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
+    campaign = _find_campaign(db, campaign_id)
     campaign.status = status
     if status == "completed":
         campaign.completed_at = datetime.now(timezone.utc)
@@ -269,9 +276,7 @@ def update_campaign_status(
 @router.get("/{campaign_id}/combinations")
 def get_combinations(campaign_id: str, db: Session = Depends(get_db)):
     """Return just the grid expansion — used by SDK to get the list of runs to submit."""
-    campaign = db.scalar(select(Campaign).where(Campaign.campaign_id == campaign_id))
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
+    campaign = _find_campaign(db, campaign_id)
     grid = [GridAxis(**ax) for ax in (campaign.grid_spec.get("grid") or [])]
     combinations = _grid_combinations(grid)
     return {

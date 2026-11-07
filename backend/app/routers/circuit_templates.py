@@ -16,7 +16,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, get_identity
 from ..models import CircuitTemplate
+from ..run_scope import current_scope, visible
 
 router = APIRouter(prefix="/api/v1/templates", tags=["circuit_templates"])
 
@@ -366,7 +368,8 @@ def get_template(template_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_template(req: TemplateCreate, db: Session = Depends(get_db)):
+def create_template(req: TemplateCreate, db: Session = Depends(get_db),
+                    identity: Optional[Identity] = Depends(get_identity)):
     t = CircuitTemplate(
         template_id=f"tpl-{uuid.uuid4().hex[:12]}",
         name=req.name,
@@ -378,6 +381,8 @@ def create_template(req: TemplateCreate, db: Session = Depends(get_db)):
         tags=req.tags,
         is_builtin=False,
         use_count=0,
+        created_by_user_id=identity.user_id if identity else None,
+        org_id=identity.org_id if identity else None,
     )
     db.add(t)
     db.commit()
@@ -392,5 +397,7 @@ def delete_template(template_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Template not found")
     if t.is_builtin:
         raise HTTPException(403, "Cannot delete built-in templates")
+    if not visible(t.created_by_user_id, t.org_id, current_scope()):
+        raise HTTPException(403, "Only the template's creator can delete it")
     db.delete(t)
     db.commit()

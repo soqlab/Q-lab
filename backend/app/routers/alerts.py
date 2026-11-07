@@ -169,9 +169,13 @@ def _extract_metric(run: Run, metric: str) -> Optional[float]:
     return None
 
 
+def _owned_by(rule: dict, user_id: Optional[int]) -> bool:
+    return rule.get("owner_user_id") == user_id
+
+
 def check_run_against_alerts(run: Run) -> list[str]:
-    """Fire any matching alert rules for a run. Returns list of fired rule names."""
-    rules = [r for r in _load_rules() if r.get("active", True)]
+    """Fire the run owner's matching alert rules. Returns list of fired rule names."""
+    rules = [r for r in _load_rules() if r.get("active", True) and _owned_by(r, run.created_by_user_id)]
     if not rules:
         return []
 
@@ -211,7 +215,8 @@ def check_run_against_alerts(run: Run) -> list[str]:
 
 @router.get("/rules")
 def list_rules(identity: Optional[Identity] = Depends(get_identity)):
-    return _load_rules()
+    user_id = identity.user_id if identity else None
+    return [r for r in _load_rules() if _owned_by(r, user_id)]
 
 
 @router.post("/rules")
@@ -234,6 +239,7 @@ def create_rule(body: AlertRuleCreate, identity: Identity = Depends(require_auth
         "active": body.active,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "fired_count": 0,
+        "owner_user_id": identity.user_id,
     }
     rules.append(rule)
     _save_rules(rules)
@@ -244,7 +250,7 @@ def create_rule(body: AlertRuleCreate, identity: Identity = Depends(require_auth
 def delete_rule(rule_id: int, identity: Identity = Depends(require_auth)):
     rules = _load_rules()
     before = len(rules)
-    rules = [r for r in rules if r.get("id") != rule_id]
+    rules = [r for r in rules if not (r.get("id") == rule_id and _owned_by(r, identity.user_id))]
     if len(rules) == before:
         raise HTTPException(404, "Rule not found")
     _save_rules(rules)
@@ -255,7 +261,7 @@ def delete_rule(rule_id: int, identity: Identity = Depends(require_auth)):
 def toggle_rule(rule_id: int, identity: Identity = Depends(require_auth)):
     rules = _load_rules()
     for r in rules:
-        if r.get("id") == rule_id:
+        if r.get("id") == rule_id and _owned_by(r, identity.user_id):
             r["active"] = not r.get("active", True)
             _save_rules(rules)
             return r

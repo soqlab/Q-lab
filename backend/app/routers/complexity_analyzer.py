@@ -73,13 +73,11 @@ def _measure_circuit(qasm_template: str, n: int) -> Dict[str, float]:
         total += 1
 
         # Assign to the first layer that doesn't use these qubits
-        placed = False
-        for layer in layers:
-            if not layer & gate_qubits:
-                layer |= gate_qubits
-                placed = True
-                break
-        if not placed:
+        # A gate starts after the last layer that uses any of its qubits.
+        last = max((i for i, layer in enumerate(layers) if layer & gate_qubits), default=-1)
+        if last + 1 < len(layers):
+            layers[last + 1] |= gate_qubits
+        else:
             layers.append(set(gate_qubits))
 
     depth = len(layers) if layers else 0

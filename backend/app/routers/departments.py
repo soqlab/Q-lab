@@ -150,15 +150,15 @@ def _get_or_404(db: Session, dept_id: str) -> dict[str, Any]:
 
 
 def _require_admin(identity: Optional[Identity]) -> None:
-    if identity is None:
-        return  # open dev mode
+    if identity is None or identity.user_id is None:
+        raise HTTPException(status_code=401, detail="Sign in to manage departments")
     if identity.role not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="Requires admin or owner role")
 
 
 def _require_owner(identity: Optional[Identity]) -> None:
-    if identity is None:
-        return  # open dev mode
+    if identity is None or identity.user_id is None:
+        raise HTTPException(status_code=401, detail="Sign in to manage departments")
     if identity.role != "owner":
         raise HTTPException(status_code=403, detail="Requires owner role")
 

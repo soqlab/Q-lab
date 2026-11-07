@@ -153,8 +153,10 @@ def _partial_corr(data: dict, var_x: str, var_y: str, conditioning: list[str]) -
 
 def _fisher_z_pvalue(r: float, n: int) -> float:
     """Two-sided p-value for H₀: ρ=0 via Fisher's z-transform."""
-    if n < 4 or abs(r) >= 1.0:
+    if n < 4:
         return 1.0
+    if abs(r) >= 1.0:
+        return 0.0  # perfectly correlated: as dependent as it gets
     z   = 0.5 * math.log((1 + r) / (1 - r + 1e-12))
     se  = 1.0 / math.sqrt(max(1, n - 3))
     t   = abs(z / se)

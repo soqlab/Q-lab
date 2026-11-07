@@ -14,10 +14,12 @@ router = APIRouter(prefix="/api/v1/bayes-uncertainty", tags=["bayes-uncertainty"
 # ---------------------------------------------------------------------------
 
 def _beta_sample(a: float, b: float, rng: random.Random) -> float:
-    """Sample from Beta(a,b) via Johnk's method."""
-    while True:
-        u = rng.random() ** (1.0 / a); v = rng.random() ** (1.0 / b)
-        if u + v <= 1.0: s = u + v; return u / s if s > 0 else 0.5
+    """Sample from Beta(a,b).
+
+    Not Johnk's method: its acceptance rate falls off like 1/C(a+b, a), so with a few hundred
+    shots a request looped for ever and held a worker.
+    """
+    return rng.betavariate(a, b)
 
 def _box_muller(rng: random.Random) -> float:
     while True:

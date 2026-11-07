@@ -113,6 +113,9 @@ def analyze_qasm(qasm: str) -> dict[str, Any]:
     gates = _parse_gates(qasm)
     if not gates:
         raise HTTPException(422, "No gates found in QASM")
+    out_of_range = sorted({q for g in gates for q in g["qubits"] if q >= n_qubits})
+    if out_of_range:
+        raise HTTPException(422, f"Gate on qubit {out_of_range[0]} but the register has {n_qubits} qubits")
 
     gate_counts: dict[str, int] = {}
     for g in gates:

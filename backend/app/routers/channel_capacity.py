@@ -110,7 +110,7 @@ def analyze_channel(req: ChannelRequest):
         "error_correction_overhead": round(overhead, 2) if overhead != float('inf') else None,
         "hashing_bound": round(quantum_cap, 6),
         "threshold_error_rate": threshold,
-        "above_threshold": (req.p_err < threshold) if threshold is not None else None,
+        "above_threshold": ((req.epsilon if ch == "erasure" else req.p_err) < threshold) if threshold is not None else None,
         "superadditivity_possible": quantum_cap > coherent_info,
         "interpretation": f"Channel transmits {round(classical_cap,3)} classical bits/use, {round(quantum_cap,3)} qubits/use (coherent). Entanglement assistance boosts this to {round(entanglement_assisted,3)} bits/use.",
         "created_at": datetime.now(timezone.utc).isoformat(),

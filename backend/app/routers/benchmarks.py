@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity
 from ..models import Benchmark, Run
+from ..run_scope import current_scope, visible
 
 router = APIRouter(prefix="/api/v1/benchmarks", tags=["benchmarks"])
 
@@ -58,6 +59,11 @@ def _compare_runs(runs: List[Dict]) -> Dict[str, Any]:
     return comparison
 
 
+def _visible(bm: Benchmark) -> bool:
+    """A benchmark is seen by whoever can see its owner's runs."""
+    return visible(bm.created_by_user_id, bm.org_id, current_scope())
+
+
 def _avg(d: Dict) -> Optional[float]:
     vals = [v for v in d.values() if v is not None]
     return round(sum(vals) / len(vals), 6) if vals else None
@@ -71,6 +77,8 @@ def create_benchmark(
 ):
     existing = db.scalar(select(Benchmark).where(Benchmark.benchmark_id == payload.benchmark_id))
     if existing:
+        if not _visible(existing):
+            raise HTTPException(status_code=409, detail="A benchmark with this id already exists")
         return _benchmark_to_dict(existing)
 
     bm = Benchmark(
@@ -99,13 +107,13 @@ def list_benchmarks(
     if project:
         query = query.where(Benchmark.project_slug == project)
     benchmarks = db.scalars(query).all()
-    return [_benchmark_to_dict(bm) for bm in benchmarks]
+    return [_benchmark_to_dict(bm) for bm in benchmarks if _visible(bm)]
 
 
 @router.get("/{benchmark_id}")
 def get_benchmark(benchmark_id: str, db: Session = Depends(get_db)):
     bm = db.scalar(select(Benchmark).where(Benchmark.benchmark_id == benchmark_id))
-    if not bm:
+    if not bm or not _visible(bm):
         raise HTTPException(status_code=404, detail="Benchmark not found")
 
     run_ids = bm.run_ids or []

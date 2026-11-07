@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from ..ai_provider import ai_complete, NoAIProviderError
 from ..database import get_db
 from ..deps import get_identity, Identity
+from ..models import Run
+from sqlalchemy import select
 from ..store import store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/conference", tags=["conference"])
@@ -84,6 +86,18 @@ class GenerateAbstractRequest(BaseModel):
 def _fetch_run_context(db: Session, experiment_ids: List[str]) -> str:
     lines = []
     for eid in experiment_ids[:6]:
+        run = db.scalar(select(Run).where(Run.run_id == eid))  # only the caller's runs
+        if run is not None:
+            fp = run.fingerprint or {}
+            from ..health_score import compute_health_score
+            health = compute_health_score({"results": run.results or {}, "calibration": run.calibration or {},
+                                           "fingerprint": fp})
+            lines.append(
+                f"- Run {eid[:8]}: circuit='{run.circuit_name or 'unnamed circuit'}', backend={run.backend or 'unknown'}, "
+                f"qubits={fp.get('num_qubits', '?')}, depth={fp.get('depth', '?')}, "
+                f"health={round(health, 1) if health is not None else '?'}"
+            )
+            continue
         for ns in ("runs", "experiments", "circuit_runs"):
             data = store_get(db, ns, eid)
             if data:
