@@ -149,21 +149,6 @@ def test_job_router_quotes_carry_sources():
     assert all(x["pricing_source"].startswith("https://") for x in rankings.values())
 
 
-def test_scheduler_skips_backends_without_a_public_price():
-    r = client.post("/api/v1/job-scheduler/optimize", json={
-        "circuits": [{"circuit_id": "c1", "n_qubits": 2, "circuit_depth": 3, "n_shots": 1000}],
-    })
-    assert r.status_code == 200, r.text
-    assert all(a["backend"] != "quantinuum_h2" for a in r.json()["assignments"])
-    assert any("quantinuum_h2" in rec for rec in r.json()["recommendations"])
-
-
-def test_providers_list_says_not_public():
-    rows = {p["id"]: p for p in client.get("/api/v1/providers").json()["providers"]}
-    assert rows["google_quantum_ai"]["price_display"] == "not public"
-    assert rows["aws_braket_rigetti"]["pricing_source"] == "https://aws.amazon.com/braket/pricing/"
-
-
 def test_cost_tracker_prices_runs_from_the_table():
     from app.routers.cost_tracker import _estimate_cost
 

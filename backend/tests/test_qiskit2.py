@@ -87,24 +87,6 @@ def test_circuit_search_reads_the_dag():
 
 # ── Simulation ────────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("backend", ["ibm_brisbane", "ibm_kyoto", "ibm_osaka", "ibm_sherbrooke"])
-def test_calibrated_ibm_noise_models_load(backend):
-    from qiskit_aer.noise import NoiseModel
-
-    from app.routers.providers import _FAKE_BACKENDS
-
-    noise = NoiseModel.from_backend(_FAKE_BACKENDS[backend]())
-    assert noise.noise_instructions
-
-
-def test_provider_simulation_is_noisy_not_the_ideal_fallback():
-    from app.routers.providers import _run_on_provider
-
-    counts, *_ = _run_on_provider("aws_braket_ionq", BELL, 4000)
-    assert _only_correlated(counts)
-    assert set(counts) - {"00", "11"}, "no errors at all: this was the ideal-simulation fallback"
-
-
 def test_noise_sim_applies_calibration():
     from app.routers.noise_sim import _aer_simulate
 
@@ -125,14 +107,6 @@ def test_transpiled_circuits_with_sx_are_parsed():
     assert _aer_simulate(qasm, {"qubits": {}, "gate_errors_2q": {}}, shots=50) is not None
     assert _dag_from_qiskit(qasm) is not None
     assert _simplify_qiskit(qasm)["simplified_qasm"]
-
-
-def test_github_ci_runs_a_circuit():
-    from app.routers.github_ci import _run_circuit
-
-    status, _, counts = _run_circuit(BELL, 500, 0.5)
-    assert status
-    assert _only_correlated(counts, 0.99)
 
 
 def test_auto_mitigation_folds_and_simulates():

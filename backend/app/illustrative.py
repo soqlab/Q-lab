@@ -15,20 +15,13 @@ ILLUSTRATIVE_VALUE = "illustrative"
 
 ILLUSTRATIVE_ROUTERS = frozenset({
     # Invented results: nothing is run on the user's input.
-    "advantage", "anomaly_physics", "autopilot", "bayes_opt",
-    "circuit_knitting", "collab_notebook", "copilot", "cross_bench",
-    "dd_optimizer", "error_mitigate",
-    "fair_data", "gate_tomo", "grant_proposal", "institute", "job_scheduler",
-    "methods_gen", "mirror_circuit", "noise_marketplace", "oed", "offline_export",
-    "optimizer_hub", "paper_draft", "paper_replication", "pulse_control", "qaoa_solver", "qfm",
-    "qml_datasets", "qml_workbench", "qv_runner", "rb_suite", "research_pipeline",
-    "rl_optimizer", "spectral_noise", "synthetic_data", "vqe_landscape",
-        # Real calculation with a fallback to invented numbers when something is missing.
-    "causal", "error_budget", "github_ci", "hpc_bridge",
-    "protocol_sim", "providers", "quantum_finance", "quantum_internet", "stats_engine",
+    "advantage", "anomaly_physics", "bayes_opt", "dd_optimizer", "error_mitigate", "fair_data",
+    "gate_tomo", "methods_gen", "mirror_circuit", "oed", "optimizer_hub", "qaoa_solver",
+    "qv_runner", "rb_suite", "vqe_landscape",
+    # Real calculation with a fallback to invented numbers when something is missing.
+    "causal", "error_budget", "protocol_sim", "quantum_finance", "stats_engine",
     # Real flows, showing invented sample records.
-    "benchmark_leaderboard", "challenges", "circuit_ancestry", "collab", "learn", "replication", "research_graph",
-    "templates",
+    "circuit_ancestry", "replication", "research_graph", "templates",
 })
 
 

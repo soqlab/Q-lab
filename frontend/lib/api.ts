@@ -5538,49 +5538,6 @@ export async function analyzeComplexity(req: { sizes: number[]; values: number[]
 }
 
 // ------------------------------------------------------------------
-// 11. QML Workbench
-// ------------------------------------------------------------------
-
-export type QMLTrainEpoch = { epoch: number; loss: number; accuracy: number };
-export type QMLResult = {
-  qml_id: string;
-  task: string;
-  dataset: string;
-  encoding: string;
-  n_qubits: number;
-  n_layers: number;
-  optimizer: string;
-  n_parameters: number;
-  n_training_samples: number;
-  n_test_samples: number;
-  training_history: QMLTrainEpoch[];
-  final_train_loss: number;
-  final_train_accuracy: number;
-  final_test_loss: number;
-  final_test_accuracy: number;
-  kernel_matrix: number[][] | null;
-  n_cx_gates_per_eval: number;
-  circuit_depth: number;
-  quantum_vs_classical_accuracy_gap: number;
-  created_at: string;
-};
-
-export async function runQML(req: { dataset?: string; encoding?: string; n_qubits?: number; n_layers?: number; optimizer?: string; n_epochs?: number; task?: string }): Promise<QMLResult> {
-  const res = await fetch(apiUrl("/api/v1/qml"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listQMLDatasets(): Promise<{ id: string; name: string; n_features: number; n_classes: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/qml/datasets"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Datasets failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
 // 12. Hamiltonian Engineering Studio
 // ------------------------------------------------------------------
 
@@ -6394,44 +6351,6 @@ export async function getTrendingArxiv(): Promise<{ trending: ArxivFeedPaper[]; 
 }
 
 // ────────────────────────────────────────────
-// Circuit Knitting
-// ────────────────────────────────────────────
-export interface CircuitKnittingResult {
-  knitting_id: string;
-  n_qubits: number;
-  n_subcircuits: number;
-  n_cuts: number;
-  cuts_type: string;
-  reconstruction_method: string;
-  fragment_sizes: number[];
-  max_fragment_qubits: number;
-  qubit_savings: number;
-  n_circuit_instances: number;
-  total_shots_required: number;
-  effective_shots: number;
-  overhead_factor: number;
-  sampling_overhead: number;
-  fragment_fidelity: number;
-  full_circuit_fidelity: number;
-  fidelity_improvement: number;
-  estimated_expectation_value: number;
-  reconstruction_error_estimate: number;
-  practical_feasibility: boolean;
-  method_description: string;
-  recommendations: string[];
-  interpretation: string;
-  created_at: string;
-}
-export async function runCircuitKnitting(req: { n_qubits?: number; n_subcircuits?: number; cuts_type?: string; n_shots?: number; noise_level?: number; reconstruction_method?: string; circuit_depth?: number }): Promise<CircuitKnittingResult> {
-  const res = await fetch(apiUrl("/api/v1/circuit-knitting"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ────────────────────────────────────────────
 // Noise Model Builder
 // ────────────────────────────────────────────
 export interface NoiseModelResult {
@@ -6603,39 +6522,6 @@ export async function animateBloch(req: { gate_sequence?: string[]; initial_stat
 export async function listBlochGates(): Promise<{ gates: string[] }> {
   const res = await fetch(apiUrl("/api/v1/bloch/gates"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("List gates failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Multi-Provider Execution
-// ─────────────────────────────────────────────────────────
-export interface ProviderJobResult {
-  job_id: string; provider_id: string; provider_name: string; backend: string;
-  status: string; submitted_at: string; estimated_completion: string;
-  n_shots: number; cost_usd: number; queue_position: number;
-  counts: Record<string, number>; fidelity_estimate: number;
-  transpiled_depth: number; transpiled_gates: number;
-  success: boolean; error_message: string | null;
-}
-export interface MultiProviderResult {
-  batch_id: string; circuit_name: string; n_providers: number; submitted_at: string;
-  jobs: ProviderJobResult[]; best_fidelity_provider: string;
-  lowest_cost_provider: string; fastest_provider: string;
-  consensus_counts: Record<string, number>; agreement_score: number;
-}
-export async function submitToProviders(req: { qasm: string; provider_ids?: string[]; n_shots?: number; circuit_name?: string }): Promise<MultiProviderResult> {
-  const res = await fetch(apiUrl("/api/v1/providers/submit"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listProviders(): Promise<{ providers: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/providers"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List providers failed");
-  return res.json();
-}
-export async function getProviderBatch(batchId: string): Promise<MultiProviderResult> {
-  const res = await fetch(apiUrl(`/api/v1/providers/batch/${batchId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get batch failed");
   return res.json();
 }
 
@@ -6854,57 +6740,6 @@ export async function starRegistryEntry(registryId: string): Promise<{ starred: 
 }
 
 // ─────────────────────────────────────────────────────────
-// Cross-Lab Benchmarking
-// ─────────────────────────────────────────────────────────
-export interface CrossBenchResult {
-  benchmark_id: string; benchmark_name: string; metric: string;
-  higher_is_better: boolean; your_value: number; your_percentile: number;
-  sota_value: number; sota_reference: string; classical_polynomial: number | null;
-  beats_sota: boolean; beats_classical: boolean; rank: number; total_entries: number;
-  gap_to_sota_pct: number; gap_to_classical_pct: number | null;
-  all_entries: Array<{ label: string; value: number; n_qubits: number; backend: string; year: number; doi: string | null }>;
-  verdict: string; generated_at: string;
-}
-export async function compareToBenchmark(req: { benchmark_id: string; your_value: number; n_qubits?: number; backend?: string; label?: string; run_ids?: string[] }): Promise<CrossBenchResult> {
-  const res = await fetch(apiUrl("/api/v1/cross-bench/compare"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listBenchmarks(): Promise<{ benchmarks: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/cross-bench/benchmarks"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List benchmarks failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Noise Model Marketplace
-// ─────────────────────────────────────────────────────────
-export interface NoiseMarketplaceModel {
-  model_id: string; name: string; backend: string; description: string;
-  model_type: string; n_qubits: number; date_captured: string;
-  published_at: string; author: string; institution: string;
-  downloads: number; stars: number; tags: string[];
-  fidelity_error: number; methods: string[];
-  qasm_snippet: string; qiskit_snippet: string; pennylane_snippet: string;
-}
-export async function listNoiseModels(params?: { model_type?: string; backend?: string; sort_by?: string }): Promise<{ models: NoiseMarketplaceModel[]; total: number; stats: Record<string, unknown> }> {
-  const qs = params ? "?" + Object.entries(params).filter(([,v])=>v).map(([k,v])=>`${k}=${v}`).join("&") : "";
-  const res = await fetch(apiUrl(`/api/v1/noise-marketplace/${qs}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List noise models failed");
-  return res.json();
-}
-export async function getNoiseModel(modelId: string): Promise<NoiseMarketplaceModel> {
-  const res = await fetch(apiUrl(`/api/v1/noise-marketplace/${modelId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get noise model failed");
-  return res.json();
-}
-export async function applyNoiseModel(req: { model_id: string; circuit_qasm: string; n_shots?: number }): Promise<{ model_id: string; model_name: string; noiseless_fidelity_estimate: number; noisy_fidelity_estimate: number; fidelity_degradation: number; ideal_counts: Record<string, number>; noisy_counts: Record<string, number>; noise_method: string }> {
-  const res = await fetch(apiUrl(`/api/v1/noise-marketplace/${req.model_id}/apply`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Bayesian Optimization
 // ─────────────────────────────────────────────────────────
 export interface BayesParamSpec { name: string; min_val: number; max_val: number; param_type: string; log_scale: boolean; }
@@ -6974,57 +6809,6 @@ export async function addGraphEdge(req: { source_id: string; target_id: string; 
 }
 
 // ─────────────────────────────────────────────────────────
-// Community Challenges
-// ─────────────────────────────────────────────────────────
-export interface Challenge {
-  challenge_id: string; title: string; description: string; problem_type: string;
-  metric: string; higher_is_better: boolean; target_value: number;
-  baseline_value: number; deadline: string; difficulty: string; prize: string;
-  n_qubits_min: number; n_qubits_max: number; tags: string[];
-  status: string; participants: number; problem_instance: Record<string, unknown>;
-  created_at: string; leader: string | null; leader_value: number | null;
-}
-export interface ChallengeSubmission {
-  submission_id: string; challenge_id: string; value: number; rank: number;
-  percentile: number; submitted_at: string; label: string;
-  n_qubits: number; backend: string; run_ids: string[];
-  notes: string; verified: boolean; metadata: Record<string, unknown>;
-}
-export async function listChallenges(status?: string): Promise<{ challenges: Challenge[]; total: number; active: number; total_participants: number }> {
-  const url = status ? `/api/v1/challenges/?status=${status}` : "/api/v1/challenges/";
-  const res = await fetch(apiUrl(url), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List challenges failed");
-  return res.json();
-}
-export async function getChallengeLeaderboard(challengeId: string): Promise<{ challenge_id: string; metric: string; higher_is_better: boolean; target_value: number; baseline_value: number; entries: object[]; total_entries: number }> {
-  const res = await fetch(apiUrl(`/api/v1/challenges/${challengeId}/leaderboard`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get leaderboard failed");
-  return res.json();
-}
-export async function submitToChallenge(challengeId: string, req: { value: number; label?: string; n_qubits?: number; backend?: string; run_ids?: string[]; notes?: string }): Promise<ChallengeSubmission> {
-  const res = await fetch(apiUrl(`/api/v1/challenges/${challengeId}/submit`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ challenge_id: challengeId, ...req }) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Copilot
-// ─────────────────────────────────────────────────────────
-export interface CopilotMessage { role: string; content: string; timestamp: string; }
-export interface CopilotSession { session_id: string; created_at: string; messages: CopilotMessage[]; context_run_ids: string[]; context_summary: string; }
-export interface CopilotResponse { session_id: string; reply: string; cited_run_ids: string[]; suggested_actions: object[]; confidence: number; follow_up_questions: string[]; }
-export async function chatWithCopilot(req: { session_id?: string; message: string; context_run_ids?: string[] }): Promise<CopilotResponse> {
-  const res = await fetch(apiUrl("/api/v1/copilot/chat"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getCopilotSession(sessionId: string): Promise<CopilotSession> {
-  const res = await fetch(apiUrl(`/api/v1/copilot/${sessionId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get session failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Stats Engine
 // ─────────────────────────────────────────────────────────
 export interface FisherResult { qfi: number; cfi: number; hl_bound: number; sql_bound: number; sensitivity_ratio: number; beating_sql: boolean; beating_hl: boolean; }
@@ -7032,32 +6816,6 @@ export interface StatAnalysisResult { analysis_id: string; created_at: string; n
 export async function runStatAnalysis(req: { samples: { counts: Record<string, number>; n_shots: number; n_qubits: number; label?: string }[]; target_state?: string; confidence_level?: number; n_bootstrap?: number }): Promise<StatAnalysisResult> {
   const res = await fetch(apiUrl("/api/v1/stats-engine/analyze"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Autopilot
-// ─────────────────────────────────────────────────────────
-export interface TerminationCondition { metric: string; target_value: number; tolerance: number; max_iterations: number; max_cost_usd: number; confidence_required: number; }
-export interface AutopilotMission { mission_id: string; name: string; goal: string; status: string; created_at: string; updated_at: string; current_iteration: number; total_runs: number; best_value: number | null; best_params: Record<string, number>; best_run_id: string | null; termination: TerminationCondition; iterations: object[]; decision_log: object[]; total_cost_usd: number; estimated_completion_pct: number; next_action: Record<string, unknown>; converged: boolean; convergence_reason: string | null; }
-export async function startAutopilot(req: { name?: string; goal?: string; backend?: string; termination?: Partial<TerminationCondition>; initial_params?: Record<string, number>; n_shots?: number }): Promise<AutopilotMission> {
-  const res = await fetch(apiUrl("/api/v1/autopilot/start"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function stepAutopilot(req: { mission_id: string; value: number; params: Record<string, number>; run_id: string }): Promise<AutopilotMission> {
-  const res = await fetch(apiUrl("/api/v1/autopilot/step"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getAutopilotMission(missionId: string): Promise<AutopilotMission> {
-  const res = await fetch(apiUrl(`/api/v1/autopilot/${missionId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get mission failed");
-  return res.json();
-}
-export async function listAutopilotMissions(): Promise<{ missions: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/autopilot"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List missions failed");
   return res.json();
 }
 
@@ -7121,41 +6879,6 @@ export async function attemptReplication(req: { claim_id: string; your_value: nu
 }
 
 // ─────────────────────────────────────────────────────────
-// Collaboration Rooms
-// ─────────────────────────────────────────────────────────
-export interface CollabRoom { room_id: string; name: string; experiment_name: string; created_at: string; updated_at: string; status: string; participants: object[]; owner: string; current_params: Record<string, unknown>; current_circuit: string; annotations: object[]; chat: object[]; shared_analysis: Record<string, unknown>; }
-export async function createCollabRoom(req: { name?: string; experiment_name?: string; owner?: string; initial_params?: Record<string, unknown> }): Promise<CollabRoom> {
-  const res = await fetch(apiUrl("/api/v1/collab/create"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function joinCollabRoom(req: { room_id: string; username: string; role?: string }): Promise<CollabRoom> {
-  const res = await fetch(apiUrl("/api/v1/collab/join"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function sendCollabChat(req: { room_id: string; username: string; message: string }): Promise<CollabRoom> {
-  const res = await fetch(apiUrl("/api/v1/collab/chat"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function addCollabAnnotation(req: { room_id: string; username: string; text: string; color?: string }): Promise<CollabRoom> {
-  const res = await fetch(apiUrl("/api/v1/collab/annotate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listCollabRooms(): Promise<{ rooms: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/collab"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List rooms failed");
-  return res.json();
-}
-export async function getCollabRoom(roomId: string): Promise<CollabRoom> {
-  const res = await fetch(apiUrl(`/api/v1/collab/${roomId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get room failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Calibration Forecast
 // ─────────────────────────────────────────────────────────
 export interface ForecastPoint { timestamp: string; hours_ahead: number; t1_predicted_us: number; t2_predicted_us: number; gate_error_predicted: number; confidence_lower: number; confidence_upper: number; alert_level: string; }
@@ -7163,37 +6886,6 @@ export interface CalForecast { forecast_id: string; backend: string; created_at:
 export async function forecastCalibration(req: { backend?: string; horizon_hours?: number; alert_threshold_t1_us?: number; qubit?: number }): Promise<CalForecast> {
   const res = await fetch(apiUrl("/api/v1/cal-forecast/forecast"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Job Scheduler
-// ─────────────────────────────────────────────────────────
-export interface ScheduleAssignment { circuit_id: string; backend: string; estimated_start: string; estimated_end: string; estimated_cost_usd: number; estimated_fidelity: number; queue_position: number; reason: string; score: number; }
-export interface OptScheduleResult { schedule_id: string; created_at: string; objective: string; n_circuits: number; total_cost_usd: number; makespan_min: number; average_fidelity: number; assignments: ScheduleAssignment[]; savings_vs_random_usd: number; bottleneck_backend: string; utilization: Record<string, number>; recommendations: string[]; }
-export async function optimizeJobSchedule(req: { circuits: { circuit_id: string; n_qubits: number; circuit_depth: number; n_shots: number; priority?: string }[]; objective?: string; budget_usd?: number }): Promise<OptScheduleResult> {
-  const res = await fetch(apiUrl("/api/v1/job-scheduler/optimize"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Paper Draft
-// ─────────────────────────────────────────────────────────
-export interface PaperDraft { draft_id: string; created_at: string; title: string; journal_target: string; experiment_type: string; n_runs: number; abstract_text: string; introduction: string; results: string; discussion: string; conclusion: string; methods_section: string; figures: object[]; tables: object[]; bibtex: string; latex_source: string; word_count: number; estimated_pages: number; novelty_score: number; impact_estimate: string; suggested_journals: string[]; checklist: { item: string; done: boolean }[]; }
-export async function generatePaperDraft(req: { title?: string; run_ids?: string[]; experiment_type?: string; journal_target?: string; key_metric?: string; key_value?: number; n_qubits?: number; backend?: string; comparison_baseline?: string; author_list?: string[] }): Promise<PaperDraft> {
-  const res = await fetch(apiUrl("/api/v1/paper-draft/generate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getPaperDraft(draftId: string): Promise<PaperDraft> {
-  const res = await fetch(apiUrl(`/api/v1/paper-draft/${draftId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get draft failed");
-  return res.json();
-}
-export async function listPaperDrafts(): Promise<{ drafts: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/paper-draft"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List drafts failed");
   return res.json();
 }
 
@@ -7232,29 +6924,6 @@ export async function listArxivWatches(): Promise<{ watches: ArxivRadarWatch[]; 
 }
 export async function submitReplicationClaim(req: { title: string; original_value: number; metric: string; methodology?: string; run_id?: string; description?: string; backend?: string; n_qubits?: number }): Promise<ReplicationClaim> {
   const res = await fetch(apiUrl("/api/v1/replication/claim"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Quantum Foundation Model (QFM)
-// ─────────────────────────────────────────────────────────
-export interface QFMCitation { arxiv_id: string; title: string; relevance: number; }
-export interface QFMSession { session_id: string; reply: string; confidence: number; citations: QFMCitation[]; suggested_experiments: string[]; predicted_fidelity?: number; physics_check: { valid: boolean; warnings: string[] }; follow_ups: string[]; }
-export interface QFMFidelityPrediction { predicted_fidelity: number; uncertainty: number; confidence_interval: [number, number]; dominant_noise: string; mitigation_recommended: string; improvement_potential: number; }
-export interface QFMAnomalyExplanation { explanation: string; probable_causes: { cause: string; probability: number; evidence: string }[]; resolution_steps: string[]; similar_cases: string[]; }
-export async function chatQFM(req: { session_id?: string; message: string; context?: Record<string, unknown> }): Promise<QFMSession> {
-  const res = await fetch(apiUrl("/api/v1/qfm/chat"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function predictFidelityQFM(req: { circuit_qasm: string; backend: string; n_qubits: number; depth: number }): Promise<QFMFidelityPrediction> {
-  const res = await fetch(apiUrl("/api/v1/qfm/predict-fidelity"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function explainAnomalyQFM(req: { run_id: string; observed_value: number; expected_value: number; backend: string; context?: string }): Promise<QFMAnomalyExplanation> {
-  const res = await fetch(apiUrl("/api/v1/qfm/explain-anomaly"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -7322,31 +6991,6 @@ export async function explainCircuitAI(req: { circuit_qasm: string; detail_level
 }
 
 // ─────────────────────────────────────────────────────────
-// Benchmark Leaderboard
-// ─────────────────────────────────────────────────────────
-export interface LeaderboardEntry { backend: string; qaoa_ratio: number; vqe_fidelity: number; qft_fidelity: number; ghz_fidelity: number; mirror_fidelity: number; overall_score: number; rank: number; last_updated: string; trend: string; }
-export async function getBenchmarkLeaderboard(): Promise<{ benchmarks: LeaderboardEntry[]; last_run: string; total_backends: number }> {
-  const res = await fetch(apiUrl("/api/v1/benchmark-leaderboard"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getBenchmarkBackendHistory(backend: string): Promise<{ backend: string; history: { date: string; score: number }[]; benchmarks: LeaderboardEntry }> {
-  const res = await fetch(apiUrl(`/api/v1/benchmark-leaderboard/backend/${backend}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function submitBenchmark(req: { backend: string; benchmark_type: string; value: number; n_qubits: number; circuit_depth?: number }): Promise<{ rank: number; message: string }> {
-  const res = await fetch(apiUrl("/api/v1/benchmark-leaderboard/submit"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getBenchmarkRecords(): Promise<{ records: { benchmark: string; backend: string; value: number; date: string }[] }> {
-  const res = await fetch(apiUrl("/api/v1/benchmark-leaderboard/records"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Quantum Social Graph
 // ─────────────────────────────────────────────────────────
 export interface QuantumProfile { username: string; institution: string; research_areas: string[]; bio?: string; followers: number; following: number; recent_activity: { type: string; description: string; date: string }[]; }
@@ -7378,26 +7022,6 @@ export async function getSocialProfile(username: string): Promise<QuantumProfile
 }
 export async function discoverResearchers(): Promise<{ suggestions: QuantumProfile[] }> {
   const res = await fetch(apiUrl("/api/v1/social/discover"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// One-Click Paper Replication
-// ─────────────────────────────────────────────────────────
-export interface PaperReplicationJob { replication_id: string; paper_title: string; paper_authors: string[]; main_claim: string; extracted_circuit_qasm?: string; n_qubits?: number; backend_used: string; status: string; started_at: string; original_value?: number; replicated_value?: number; deviation_sigma?: number; verdict?: string; verdict_detail?: string; statistical_test?: string; p_value?: number; circuit_ran?: boolean; issues?: string[]; }
-export async function startPaperReplication(req: { arxiv_url: string; backend?: string; n_shots?: number }): Promise<PaperReplicationJob> {
-  const res = await fetch(apiUrl("/api/v1/paper-replication/start"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getPaperReplicationJob(replicationId: string): Promise<PaperReplicationJob> {
-  const res = await fetch(apiUrl(`/api/v1/paper-replication/${replicationId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function listPaperReplications(): Promise<{ replications: PaperReplicationJob[] }> {
-  const res = await fetch(apiUrl("/api/v1/paper-replication"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7483,86 +7107,6 @@ export async function identifyConfounders(req: { variables: string[]; outcome: s
 }
 
 // ─────────────────────────────────────────────────────────
-// Research Pipeline
-// ─────────────────────────────────────────────────────────
-export interface PipelineStage { name: string; status: string; started_at?: string; completed_at?: string; artifacts: string[]; notes: string; auto_checks: { check: string; passed: boolean }[]; }
-export interface ResearchPipeline { pipeline_id: string; title: string; hypothesis: string; algorithm: string; backend: string; success_criteria: string; created_at: string; stages: PipelineStage[]; current_stage: string; overall_completion_pct: number; }
-export async function createResearchPipeline(req: { title: string; hypothesis: string; algorithm: string; backend: string; success_criteria: string }): Promise<ResearchPipeline> {
-  const res = await fetch(apiUrl("/api/v1/research-pipeline/create"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function advanceResearchPipeline(pipelineId: string): Promise<ResearchPipeline> {
-  const res = await fetch(apiUrl(`/api/v1/research-pipeline/${pipelineId}/advance`), { method: "POST", headers: authHeaders() });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getResearchPipeline(pipelineId: string): Promise<ResearchPipeline> {
-  const res = await fetch(apiUrl(`/api/v1/research-pipeline/${pipelineId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function listResearchPipelines(): Promise<{ pipelines: ResearchPipeline[] }> {
-  const res = await fetch(apiUrl("/api/v1/research-pipeline"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Grant Proposal Generator
-// ─────────────────────────────────────────────────────────
-export interface GrantProposal { proposal_id: string; title: string; agency: string; sections: { specific_aims: string; significance: string; innovation: string; approach: string; preliminary_results: string; broader_impacts: string; budget_justification: string }; total_word_count: number; estimated_page_count: number; recommended_program: string; success_probability: number; checklist: { item: string; done: boolean }[]; }
-export async function generateGrantProposal(req: { title: string; agency: string; program?: string; pi_name: string; institution: string; key_results: string[]; algorithm: string; backend: string; n_qubits: number; fidelity?: number; budget_total?: number; duration_years?: number }): Promise<GrantProposal> {
-  const res = await fetch(apiUrl("/api/v1/grant-proposal/generate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getGrantProposal(proposalId: string): Promise<GrantProposal> {
-  const res = await fetch(apiUrl(`/api/v1/grant-proposal/${proposalId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function listGrantProposals(): Promise<{ proposals: GrantProposal[] }> {
-  const res = await fetch(apiUrl("/api/v1/grant-proposal"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Universal Quantum Transpiler Hub
-// ─────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────
-// HPC Hybrid Bridge
-// ─────────────────────────────────────────────────────────
-export interface HPCJob { job_id: string; name: string; scheduler: string; n_nodes: number; n_cores_per_node: number; memory_gb: number; walltime_hours: number; status: string; submitted_at: string; estimated_start?: string; started_at?: string; completed_at?: string; quantum_run_id?: string; stdout_excerpt?: string; slurm_id?: string; queue_position?: number; node_allocation?: string; }
-export async function submitHPCJob(req: { name: string; scheduler: string; n_nodes: number; n_cores_per_node: number; memory_gb: number; walltime_hours: number; script: string; quantum_run_id?: string; partition?: string }): Promise<HPCJob> {
-  const res = await fetch(apiUrl("/api/v1/hpc-bridge/job"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getHPCJob(jobId: string): Promise<HPCJob> {
-  const res = await fetch(apiUrl(`/api/v1/hpc-bridge/job/${jobId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function cancelHPCJob(jobId: string): Promise<{ message: string }> {
-  const res = await fetch(apiUrl(`/api/v1/hpc-bridge/job/${jobId}/cancel`), { method: "POST", headers: authHeaders() });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listHPCJobs(): Promise<{ jobs: HPCJob[] }> {
-  const res = await fetch(apiUrl("/api/v1/hpc-bridge/jobs"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function listHPCClusters(): Promise<{ clusters: { name: string; scheduler: string; available_nodes: number; typical_wait_min: number; partitions: string[] }[] }> {
-  const res = await fetch(apiUrl("/api/v1/hpc-bridge/clusters"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Circuit Marketplace
 // ─────────────────────────────────────────────────────────
 export interface MarketplaceListing { listing_id: string; title: string; description: string; category: string; tags: string[]; price_usd: number; author: string; license: string; created_at: string; downloads: number; rating: number; review_count: number; circuit_qasm?: string; }
@@ -7600,76 +7144,6 @@ export async function listMarketplaceCategories(): Promise<{ categories: { name:
 // Institute Dashboard
 // ─────────────────────────────────────────────────────────
 export interface Institute { institute_id: string; name: string; pi: string; members: string[]; budget_usd?: number; created_at: string; }
-export interface InstituteDashboard { institute: Institute; total_runs: number; total_cost_usd: number; budget_remaining?: number; by_member: { member: string; runs: number; cost: number; last_active: string }[]; by_backend: Record<string, number>; by_algorithm: Record<string, number>; productivity_score: number; avg_fidelity: number; publications: number; replications: number; top_result: string; activity_heatmap: { date: string; count: number }[]; }
-export async function setupInstitute(req: { name: string; pi: string; members: string[]; budget_usd?: number }): Promise<Institute> {
-  const res = await fetch(apiUrl("/api/v1/institute/setup"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getInstituteDashboard(instituteId: string): Promise<InstituteDashboard> {
-  const res = await fetch(apiUrl(`/api/v1/institute/${instituteId}/dashboard`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function logInstituteActivity(req: { institute_id: string; member: string; activity_type: string; cost_usd?: number; backend?: string; run_id?: string }): Promise<{ message: string }> {
-  const res = await fetch(apiUrl("/api/v1/institute/log-activity"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listInstitutes(): Promise<{ institutes: Institute[] }> {
-  const res = await fetch(apiUrl("/api/v1/institute"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Offline / Air-Gap Export
-// ─────────────────────────────────────────────────────────
-export interface OfflineExport { export_id: string; status: string; estimated_size_mb: number; components: { name: string; size_mb: number; included: boolean }[]; docker_compose_yaml: string; readme: string; checksum?: string; download_url?: string; classification_level?: string; }
-export async function createOfflineExport(req: { include_data: boolean; include_models: boolean; format: string; classification_level?: string }): Promise<OfflineExport> {
-  const res = await fetch(apiUrl("/api/v1/offline-export/export"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getOfflineExportStatus(exportId: string): Promise<OfflineExport> {
-  const res = await fetch(apiUrl(`/api/v1/offline-export/${exportId}/status`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getExportRequirements(): Promise<{ cpu_cores: number; ram_gb: number; disk_gb: number; os: string[]; docker_version: string; notes: string[] }> {
-  const res = await fetch(apiUrl("/api/v1/offline-export/requirements"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Pulse-Level Control  /api/v1/pulse-control
-// ─────────────────────────────────────────────────────────
-export interface PulseWaveform { waveform_id: string; name: string; type: string; duration_ns: number; amplitude: number; sigma_ns?: number; beta?: number; }
-export interface PulseChannel { channel_id: string; name: string; type: string; frequency_ghz: number; qubit: number; }
-export interface PulseSchedule { schedule_id: string; name: string; backend: string; channels: PulseChannel[]; waveforms: PulseWaveform[]; total_duration_ns: number; gate_fidelity_estimate: number; created_at: string; }
-export interface PulseSimResult { simulation_id: string; schedule_id: string; backend: string; state_fidelity: number; leakage: number; control_error: number; bloch_trajectory: Record<string, number>[]; duration_ns: number; }
-export async function schedulePulse(req: { name: string; backend: string; n_qubits: number; gates: string[]; optimize_drag?: boolean }): Promise<PulseSchedule> {
-  const res = await fetch(apiUrl("/api/v1/pulse-control/schedule"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listPulseSchedules(): Promise<PulseSchedule[]> {
-  const res = await fetch(apiUrl("/api/v1/pulse-control/schedules"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  const data = await res.json();
-  return Array.isArray(data) ? data : (data.schedules ?? []);
-}
-export async function simulatePulse(req: { schedule_id: string; n_shots?: number }): Promise<PulseSimResult> {
-  const res = await fetch(apiUrl("/api/v1/pulse-control/simulate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getBackendNativeGates(name: string): Promise<{ backend: string; native_gates: string[]; basis_gates: string[]; qubit_count: number }> {
-  const res = await fetch(apiUrl(`/api/v1/pulse-control/backends/${name}/native-gates`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
 
 // ─────────────────────────────────────────────────────────
 // Blind Analysis  /api/v1/blind-analysis
@@ -7786,58 +7260,6 @@ export async function mintDOI(pubId: string): Promise<DOIMintResult> {
 }
 
 // ─────────────────────────────────────────────────────────
-// RL Circuit Optimizer  /api/v1/rl-optimizer
-// ─────────────────────────────────────────────────────────
-export interface RLSession { session_id: string; name: string; backend: string; n_qubits: number; algorithm: string; objective: string; episodes: number; status: string; best_reward: number; initial_circuit_depth: number; optimized_circuit_depth: number; depth_reduction_pct: number; gate_fidelity_improvement: number; training_curve: number[]; created_at: string; completed_at?: string; }
-export interface RLOptimizedCircuit { opt_id: string; session_id: string; original_qasm: string; optimized_qasm: string; original_depth: number; optimized_depth: number; original_gate_count: number; optimized_gate_count: number; estimated_fidelity_gain: number; applied_at: string; }
-export async function trainRLOptimizer(req: { name: string; backend: string; n_qubits: number; algorithm: string; objective: string; episodes?: number }): Promise<RLSession> {
-  const res = await fetch(apiUrl("/api/v1/rl-optimizer/train"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listRLSessions(): Promise<RLSession[]> {
-  const res = await fetch(apiUrl("/api/v1/rl-optimizer/sessions"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getRLSession(sessionId: string): Promise<RLSession> {
-  const res = await fetch(apiUrl(`/api/v1/rl-optimizer/session/${sessionId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function applyRLOptimizer(req: { session_id: string; circuit_qasm: string }): Promise<RLOptimizedCircuit> {
-  const res = await fetch(apiUrl("/api/v1/rl-optimizer/apply"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Synthetic Quantum Data  /api/v1/synthetic-data
-// ─────────────────────────────────────────────────────────
-export interface SyntheticDataset { dataset_id: string; name: string; type: string; n_samples: number; n_features: number; n_qubits: number; noise_level: number; backend_model: string; label_distribution: Record<string, number>; feature_stats: Record<string, number>; preview: Record<string, unknown>[]; download_url: string; size_mb: number; created_at: string; }
-export interface SyntheticDatasetStats { dataset_id: string; mean_fidelity: number; std_fidelity: number; class_balance: Record<string, number>; circuit_depth_range: number[]; gate_count_range: number[]; }
-export async function generateSyntheticData(req: { name: string; type: string; n_samples: number; n_qubits: number; noise_level?: number; backend_model?: string; seed?: number }): Promise<SyntheticDataset> {
-  const res = await fetch(apiUrl("/api/v1/synthetic-data/generate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listSyntheticDatasets(): Promise<SyntheticDataset[]> {
-  const res = await fetch(apiUrl("/api/v1/synthetic-data/datasets"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getSyntheticDataset(datasetId: string): Promise<SyntheticDataset> {
-  const res = await fetch(apiUrl(`/api/v1/synthetic-data/dataset/${datasetId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getSyntheticDatasetStats(datasetId: string): Promise<SyntheticDatasetStats> {
-  const res = await fetch(apiUrl(`/api/v1/synthetic-data/dataset/${datasetId}/stats`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Conference Asset Builder  /api/v1/conference
 // ─────────────────────────────────────────────────────────
 export interface ConferenceAsset { asset_id: string; type: string; title: string; venue: string; authors: string[]; experiment_ids: string[]; sections: { title: string; content: string; figures?: string[] }[]; template: string; format: string; file_size_kb: number; download_url: string; created_at: string; }
@@ -7863,38 +7285,6 @@ export async function listConferenceAssets(): Promise<ConferenceAsset[]> {
 }
 export async function getConferenceAsset(assetId: string): Promise<ConferenceAsset> {
   const res = await fetch(apiUrl(`/api/v1/conference/asset/${assetId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Quantum Learning Paths  /api/v1/learn
-// ─────────────────────────────────────────────────────────
-export interface LearningModule { module_id: string; title: string; description: string; type: string; duration_min: number; difficulty: string; tags: string[]; }
-export interface LearningPath { path_id: string; title: string; description: string; level: string; modules: LearningModule[]; total_duration_min: number; prerequisites: string[]; skills_gained: string[]; enrolled_count: number; completion_rate: number; }
-export interface LearningProgress { progress_id: string; user: string; path_id: string; enrolled_at: string; completed_modules: string[]; current_module?: string; pct_complete: number; last_active: string; certificate_url?: string; completed_at?: string; }
-export async function listLearningPaths(): Promise<LearningPath[]> {
-  const res = await fetch(apiUrl("/api/v1/learn/paths"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getLearningPath(pathId: string): Promise<LearningPath> {
-  const res = await fetch(apiUrl(`/api/v1/learn/path/${pathId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function enrollInPath(req: { user: string; path_id: string }): Promise<LearningProgress> {
-  const res = await fetch(apiUrl("/api/v1/learn/enroll"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function completeModule(req: { user: string; path_id: string; module_id: string }): Promise<LearningProgress> {
-  const res = await fetch(apiUrl("/api/v1/learn/complete-module"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getLearningProgress(user: string): Promise<LearningProgress[]> {
-  const res = await fetch(apiUrl(`/api/v1/learn/progress/${user}`), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -7938,32 +7328,6 @@ export async function getTalentMatches(profileId: string): Promise<TalentMatch[]
 }
 
 // ─────────────────────────────────────────────────────────
-// GitHub CI Bridge  /api/v1/github-ci
-// ─────────────────────────────────────────────────────────
-export interface CIPipeline { pipeline_id: string; name: string; repo: string; branch_pattern: string; trigger: string; experiment_template: Record<string, unknown>; backend: string; shots: number; status: string; created_at: string; }
-export interface CIPipelineRun { run_id: string; pipeline_id: string; repo: string; branch: string; commit_sha: string; triggered_by: string; experiment_run_id?: string; status: string; fidelity_threshold: number; achieved_fidelity?: number; duration_sec?: number; log_url: string; started_at: string; completed_at?: string; }
-export async function createCIPipeline(req: { name: string; repo: string; branch_pattern: string; trigger: string; experiment_template: Record<string, unknown>; backend: string; shots: number; fidelity_threshold?: number }): Promise<CIPipeline> {
-  const res = await fetch(apiUrl("/api/v1/github-ci/pipeline"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listCIPipelines(): Promise<CIPipeline[]> {
-  const res = await fetch(apiUrl("/api/v1/github-ci/pipelines"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function triggerCIPipeline(req: { pipeline_id: string; branch?: string; commit_sha?: string; triggered_by?: string }): Promise<CIPipelineRun> {
-  const res = await fetch(apiUrl("/api/v1/github-ci/trigger"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getCIPipelineRuns(pipelineId: string): Promise<CIPipelineRun[]> {
-  const res = await fetch(apiUrl(`/api/v1/github-ci/runs/${pipelineId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Fidelity Certifier  /api/v1/certify  (linear XEB of your runs' counts against the ideal circuit)
 // ─────────────────────────────────────────────────────────
 export interface CertRunEvidence { run_id: string; backend: string | null; n_bits: number; shots: number; linear_xeb: number; null_std_error: number; z_score: number; }
@@ -7986,32 +7350,6 @@ export async function listCertifications(): Promise<CertSummary[]> {
 export async function getCertification(certId: string): Promise<CertificationResult> {
   const res = await fetch(apiUrl(`/api/v1/certify/certification/${certId}`), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Spectral Noise Analyzer  /api/v1/spectral-noise
-// ─────────────────────────────────────────────────────────
-export interface NoisePSD { analysis_id: string; backend: string; qubit: number; metric: string; frequencies_hz: number[]; psd_values: number[]; noise_floor: number; one_over_f_coefficient: number; one_over_f_exponent: number; white_noise_level: number; dominant_frequency?: number; tls_detected: boolean; tls_frequencies: number[]; created_at: string; }
-export interface TLSReport { report_id: string; backend: string; qubit: number; n_tls_detected: number; tls_list: { frequency_ghz: number; coupling_strength: number; coherence_time_us: number }[]; mitigation_suggestions: string[]; created_at: string; }
-export async function analyzeSpectralNoise(req: { backend: string; qubit: number; metric: string; duration_sec?: number }): Promise<NoisePSD> {
-  const res = await fetch(apiUrl("/api/v1/spectral-noise/analyze"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listSpectralAnalyses(): Promise<NoisePSD[]> {
-  const res = await fetch(apiUrl("/api/v1/spectral-noise/analyses"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getSpectralAnalysis(analysisId: string): Promise<NoisePSD> {
-  const res = await fetch(apiUrl(`/api/v1/spectral-noise/analysis/${analysisId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function detectTLS(req: { backend: string; qubit: number }): Promise<TLSReport> {
-  const res = await fetch(apiUrl("/api/v1/spectral-noise/detect-tls"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
@@ -8047,110 +7385,6 @@ export async function logMaintenance(req: { item_id: string; type: string; descr
 export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleEntry[]> {
   const res = await fetch(apiUrl("/api/v1/lab-inventory/schedule"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// QML Dataset Hub  /api/v1/qml-datasets
-// ─────────────────────────────────────────────────────────
-export interface QMLDatasetEntry { dataset_id: string; name: string; description: string; task: string; n_samples: number; n_features: number; n_qubits: number; encoding: string; benchmark_accuracy: number; size_mb: number; license: string; authors: string[]; paper_doi?: string; tags: string[]; download_url: string; created_at: string; }
-export interface QMLBenchmarkRun { run_id: string; dataset_id: string; model_type: string; n_params: number; accuracy: number; f1_score: number; training_time_sec: number; n_qubits_used: number; optimizer: string; created_at: string; }
-export async function listQMLDatasetHub(): Promise<QMLDatasetEntry[]> {
-  const res = await fetch(apiUrl("/api/v1/qml-datasets"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getQMLDatasetEntry(datasetId: string): Promise<QMLDatasetEntry> {
-  const res = await fetch(apiUrl(`/api/v1/qml-datasets/${datasetId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function uploadQMLDataset(req: { name: string; description: string; task: string; n_samples: number; n_features: number; n_qubits: number; encoding: string; license: string; authors: string[]; paper_doi?: string; tags: string[] }): Promise<QMLDatasetEntry> {
-  const res = await fetch(apiUrl("/api/v1/qml-datasets/upload"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function benchmarkQMLDataset(req: { dataset_id: string; model_type: string; n_params: number; optimizer?: string }): Promise<QMLBenchmarkRun> {
-  const res = await fetch(apiUrl("/api/v1/qml-datasets/benchmark"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getQMLDatasetBenchmarks(datasetId: string): Promise<QMLBenchmarkRun[]> {
-  const res = await fetch(apiUrl(`/api/v1/qml-datasets/${datasetId}/benchmarks`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Quantum Internet Simulator  /api/v1/quantum-internet
-// ─────────────────────────────────────────────────────────
-export interface QNode { node_id: string; name: string; type: string; location: string; qubit_count: number; coherence_time_us: number; gate_fidelity: number; }
-export interface QLink { link_id: string; node_a: string; node_b: string; distance_km: number; loss_db_per_km: number; entanglement_rate_hz: number; fidelity: number; }
-export interface QNetwork { network_id: string; name: string; nodes: QNode[]; links: QLink[]; topology: string; created_at: string; }
-export interface EntanglementSimResult { sim_id: string; network_id: string; source_node: string; dest_node: string; path: string[]; n_hops: number; end_to_end_fidelity: number; entanglement_rate_hz: number; success_probability: number; latency_ms: number; bottleneck_link?: string; simulated_at: string; }
-export interface RepeaterPlacement { placement_id: string; network_id: string; n_repeaters: number; placements: { position: string; improvement: number }[]; fidelity_before: number; fidelity_after: number; rate_before: number; rate_after: number; created_at: string; }
-export async function createQuantumNetwork(req: { name: string; nodes: Partial<QNode>[]; links: Partial<QLink>[]; topology: string }): Promise<QNetwork> {
-  const res = await fetch(apiUrl("/api/v1/quantum-internet/network"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listQuantumNetworks(): Promise<QNetwork[]> {
-  const res = await fetch(apiUrl("/api/v1/quantum-internet/networks"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getQuantumNetwork(networkId: string): Promise<QNetwork> {
-  const res = await fetch(apiUrl(`/api/v1/quantum-internet/network/${networkId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function simulateEntanglement(req: { network_id: string; source_node: string; dest_node: string; n_runs?: number }): Promise<EntanglementSimResult> {
-  const res = await fetch(apiUrl("/api/v1/quantum-internet/simulate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function optimizeRepeaters(req: { network_id: string; n_repeaters: number; budget_usd?: number }): Promise<RepeaterPlacement> {
-  const res = await fetch(apiUrl("/api/v1/quantum-internet/optimize-repeaters"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Collaborative Notebooks  /api/v1/collab-notebook
-// ─────────────────────────────────────────────────────────
-export interface CollabCell { cell_id: string; type: string; content: string; outputs: string[]; executed_at?: string; execution_count?: number; }
-export interface CollabNotebook { notebook_id: string; title: string; owner: string; collaborators: string[]; tags: string[]; cells: CollabCell[]; kernel: string; status: string; created_at: string; updated_at: string; }
-export interface CollabExecutionResult { notebook_id: string; cell_id: string; output: string[]; execution_time_ms: number; success: boolean; executed_at: string; }
-export async function createCollabNotebook(req: { title: string; owner: string; collaborators?: string[]; tags?: string[]; kernel?: string }): Promise<CollabNotebook> {
-  const res = await fetch(apiUrl("/api/v1/collab-notebook/notebook"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listCollabNotebooks(owner?: string): Promise<CollabNotebook[]> {
-  const p = new URLSearchParams();
-  if (owner) p.set("owner", owner);
-  const res = await fetch(apiUrl(`/api/v1/collab-notebook/notebooks?${p}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getCollabNotebook(notebookId: string): Promise<CollabNotebook> {
-  const res = await fetch(apiUrl(`/api/v1/collab-notebook/notebook/${notebookId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function addCollabCell(notebookId: string, req: { type: string; content: string }): Promise<CollabNotebook> {
-  const res = await fetch(apiUrl(`/api/v1/collab-notebook/notebook/${notebookId}/cell`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function updateCollabCell(notebookId: string, cellId: string, content: string): Promise<CollabNotebook> {
-  const res = await fetch(apiUrl(`/api/v1/collab-notebook/notebook/${notebookId}/cell/${cellId}`), { method: "PUT", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ content }) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function executeCollabNotebook(notebookId: string, cellId?: string): Promise<CollabExecutionResult[]> {
-  const res = await fetch(apiUrl(`/api/v1/collab-notebook/notebook/${notebookId}/execute`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ cell_id: cellId }) });
-  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
