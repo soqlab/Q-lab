@@ -86,7 +86,10 @@ def get_identity(
         row = db.scalar(select(APIKey).where(APIKey.key_hash == key_hash, APIKey.is_active.is_(True)))
         if not row:
             raise HTTPException(status_code=401, detail="Invalid API key")
-        if row.expires_at and row.expires_at < datetime.now(timezone.utc):
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:  # SQLite returns naive UTC datetimes
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at and expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=401, detail="API key expired")
         row.last_used_at = datetime.now(timezone.utc)
         db.commit()

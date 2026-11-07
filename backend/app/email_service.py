@@ -949,8 +949,12 @@ def send_account_deleted_email(to_email: str, user_name: str) -> bool:
 
 def send_contact_email(name: str, from_email: str, message: str) -> bool:
     """Forward a contact-form submission to the platform owner."""
+    from html import escape
+
     owner = os.getenv("CONTACT_RECIPIENT_EMAIL", "contact@soqlab.com")
-    subject = f"Q-Lab contact from {name}"
+    # Anyone can submit the form: keep their text as text in the email, and on one line in the subject.
+    subject = f"Q-Lab contact from {' '.join(name.split())}"[:200]
+    name, from_email, message = escape(name), escape(from_email), escape(message)
     html = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
                 background:#111827;border-radius:12px;padding:32px;color:#e5e7eb;">
