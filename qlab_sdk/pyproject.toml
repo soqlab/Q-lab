@@ -30,8 +30,8 @@ qiskit = ["qiskit>=1.0"]
 # Provider adapters (qlab.providers): captured automatically once installed.
 braket = ["amazon-braket-sdk>=1.80"]
 ionq = ["qiskit>=1.0", "qiskit-ionq>=1.0"]
-jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
-all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
+jupyter = ["ipython>=8.39.0", "ipywidgets>=7.0"]
+all = ["qiskit>=1.0", "ipython>=8.39.0", "ipywidgets>=7.0"]
 dev   = ["build", "twine", "pytest", "pytest-asyncio", "ruff"]
 
 [project.urls]
