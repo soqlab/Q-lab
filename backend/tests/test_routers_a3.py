@@ -183,65 +183,86 @@ def test_code_export_per_framework():
 
 
 def test_auto_mitigation_selects_and_applies():
-    sel = client.post("/api/v1/auto-mitigation/select", json={"n_qubits": 2, "circuit_depth": 10,
+    me, other = make_user(prefix="a3am"), make_user(prefix="a3am")
+    sel = client.post("/api/v1/auto-mitigation/select", headers=me, json={"n_qubits": 2, "circuit_depth": 10,
                                                               "backend": "ionq_aria"}).json()
     assert sel["strategy"] == "light_readout_zne" and sel["noise_params"]["type"] == "ion_trap"
     assert [t["name"] for t in sel["techniques"]] == ["readout_correction", "ZNE"]
     assert sel["sim_qubits"] == 2 and sel["combined_overhead"] == 3.3
-    big = client.post("/api/v1/auto-mitigation/select", json={"n_qubits": 30, "circuit_depth": 10,
+    big = client.post("/api/v1/auto-mitigation/select", headers=me, json={"n_qubits": 30, "circuit_depth": 10,
                                                               "backend": "ibm_x", "budget_overhead": 2.0}).json()
     assert big["strategy"] == "full_stack_mitigation" and big["sim_qubits"] == 5 and big["combined_overhead"] == 2.0
 
-    applied = client.post("/api/v1/auto-mitigation/apply", json={"recommendation_id": sel["recommendation_id"],
+    applied = client.post("/api/v1/auto-mitigation/apply", headers=me, json={"recommendation_id": sel["recommendation_id"],
                                                                  "circuit_counts": {"00": 600, "11": 400}}).json()
     assert applied["shots_used"] == 1000 and applied["total_overhead"] == 3.3
     assert set(applied["technique_contributions"]) <= {"readout_correction", "ZNE"}
-    history = {h["recommendation_id"] for h in client.get("/api/v1/auto-mitigation/history").json()["recommendations"]}
+    history = {h["recommendation_id"] for h in
+               client.get("/api/v1/auto-mitigation/history", headers=me).json()["recommendations"]}
     assert sel["recommendation_id"] in history
-    assert client.post("/api/v1/auto-mitigation/apply", json={"recommendation_id": "x",
-                                                              "circuit_counts": {}}).status_code == 404
+    assert client.post("/api/v1/auto-mitigation/apply", headers=me, json={"recommendation_id": "x",
+                                                                          "circuit_counts": {}}).status_code == 404
+    # Regression: recommendations (with their requests) were kept in one pool for every caller.
+    assert client.get("/api/v1/auto-mitigation/history").status_code == 401
+    assert client.get("/api/v1/auto-mitigation/history", headers=other).json()["count"] == 0
+    assert client.post("/api/v1/auto-mitigation/apply", headers=other, json={
+        "recommendation_id": sel["recommendation_id"], "circuit_counts": {}}).status_code == 404
 
 
 # ── records kept by the tools ────────────────────────────────────────────────
 
 def test_arxiv_radar_watch_raises_alerts():
-    watch = client.post("/api/v1/arxiv-radar/watch", json={"name": "qaoa", "keywords": ["QAOA"],
+    me, other = make_user(prefix="a3ax"), make_user(prefix="a3ax")
+    watch = client.post("/api/v1/arxiv-radar/watch", headers=me, json={"name": "qaoa", "keywords": ["QAOA"],
                                                           "min_relevance": 0.85}).json()
-    alerts = client.get(f"/api/v1/arxiv-radar/alerts?watch_id={watch['watch_id']}").json()["alerts"]
+    alerts = client.get(f"/api/v1/arxiv-radar/alerts?watch_id={watch['watch_id']}", headers=me).json()["alerts"]
     by_paper = {a["paper_arxiv_id"]: a["alert_type"] for a in alerts}
     # 2402.67890 contradicts (0.89 + 0.05 for the keyword); the two confirming papers score >= 0.91.
     assert by_paper == {"2402.67890": "contradiction", "2401.12345": "confirmation", "2405.33333": "confirmation"}
-    stored = next(w for w in client.get("/api/v1/arxiv-radar/watches").json()["watches"]
+    stored = next(w for w in client.get("/api/v1/arxiv-radar/watches", headers=me).json()["watches"]
                   if w["watch_id"] == watch["watch_id"])
     assert stored["alert_count"] == 3
     found = client.post("/api/v1/arxiv-radar/search", json={"keywords": ["ZNE"], "min_relevance": 0.85}).json()
     assert [p["arxiv_id"] for p in found["results"]][:1] == ["2401.12345"]
     assert "2403.11111" in {p["arxiv_id"] for p in found["results"]}  # 0.82 + 0.05 for ZNE
-    assert client.delete(f"/api/v1/arxiv-radar/watch/{watch['watch_id']}").json() == {"deleted": watch["watch_id"]}
-    assert client.delete(f"/api/v1/arxiv-radar/watch/{watch['watch_id']}").status_code == 404
+    # Regression: watches and their alerts were shared by every caller, who could also delete them.
+    assert client.get("/api/v1/arxiv-radar/watches").status_code == 401
+    assert client.get("/api/v1/arxiv-radar/watches", headers=other).json()["total"] == 0
+    assert client.get(f"/api/v1/arxiv-radar/alerts?watch_id={watch['watch_id']}", headers=other).json()["total"] == 0
+    assert client.delete(f"/api/v1/arxiv-radar/watch/{watch['watch_id']}", headers=other).status_code == 404
+    assert client.delete(f"/api/v1/arxiv-radar/watch/{watch['watch_id']}",
+                         headers=me).json() == {"deleted": watch["watch_id"]}
+    assert client.delete(f"/api/v1/arxiv-radar/watch/{watch['watch_id']}", headers=me).status_code == 404
 
 
 def test_blind_analysis_register_reveal_cancel():
-    reg = client.post("/api/v1/blind-analysis/register", json={
+    me, other = make_user(prefix="a3ba"), make_user(prefix="a3ba")
+    reg = client.post("/api/v1/blind-analysis/register", headers=me, json={
         "title": "ZNE helps", "hypothesis": "ZNE lowers error", "methods": "A/B", "primary_outcome": "error"}).json()
     expected = hashlib.sha256(f"ZNE helps|ZNE lowers error|A/B|{reg['registered_at']}".encode()).hexdigest()
     assert reg["status"] == "registered" and reg["blinded_data_hash"] == expected
     reveal = {"effect_size": 0.4, "p_value": 0.01, "confidence_interval": [0.1, 0.7], "result_summary": "yes"}
-    assert client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal",
+    assert client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", headers=me,
                        json={**reveal, "confidence_interval": [0.1]}).status_code == 422
-    out = client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", json=reveal).json()
+    # Regression: anyone could read, reveal or cancel anyone's blinded registration.
+    assert client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", headers=other, json=reveal).status_code == 404
+    assert client.delete(f"/api/v1/blind-analysis/{reg['reg_id']}", headers=other).status_code == 404
+    assert client.get(f"/api/v1/blind-analysis/registration/{reg['reg_id']}", headers=other).status_code == 404
+    assert client.get("/api/v1/blind-analysis/registrations", headers=other).json()["count"] == 0
+    assert client.get("/api/v1/blind-analysis/registrations").status_code == 401
+    out = client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", headers=me, json=reveal).json()
     assert out["confirmed_hypothesis"] is True
-    stored = client.get(f"/api/v1/blind-analysis/registration/{reg['reg_id']}").json()
+    stored = client.get(f"/api/v1/blind-analysis/registration/{reg['reg_id']}", headers=me).json()
     assert stored["status"] == "revealed" and stored["confirmed_hypothesis"] is True
-    assert client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", json=reveal).status_code == 409
-    assert client.delete(f"/api/v1/blind-analysis/{reg['reg_id']}").status_code == 409
+    assert client.post(f"/api/v1/blind-analysis/{reg['reg_id']}/reveal", headers=me, json=reveal).status_code == 409
+    assert client.delete(f"/api/v1/blind-analysis/{reg['reg_id']}", headers=me).status_code == 409
 
-    other = client.post("/api/v1/blind-analysis/register", json={
+    second = client.post("/api/v1/blind-analysis/register", headers=me, json={
         "title": "t", "hypothesis": "h", "methods": "m", "primary_outcome": "o"}).json()
-    assert client.delete(f"/api/v1/blind-analysis/{other['reg_id']}").json()["status"] == "cancelled"
+    assert client.delete(f"/api/v1/blind-analysis/{second['reg_id']}", headers=me).json()["status"] == "cancelled"
     weak = {**reveal, "p_value": 0.2}
-    assert client.post(f"/api/v1/blind-analysis/{other['reg_id']}/reveal", json=weak).status_code == 409
-    assert client.post("/api/v1/blind-analysis/register", json={
+    assert client.post(f"/api/v1/blind-analysis/{second['reg_id']}/reveal", headers=me, json=weak).status_code == 409
+    assert client.post("/api/v1/blind-analysis/register", headers=me, json={
         "title": " ", "hypothesis": "h", "methods": "m", "primary_outcome": "o"}).status_code == 422
 
 
@@ -303,15 +324,24 @@ def test_circuit_dna_identifies_equivalent_circuits():
 
 
 def test_circuit_embed_index_and_search():
+    me, other = make_user(prefix="a3ce"), make_user(prefix="a3ce")
     name = f"bell-{uuid.uuid4().hex[:6]}"
-    idx = client.post("/api/v1/circuit-embed/index", json={"qasm": BELL, "circuit_name": name}).json()
+    idx = client.post("/api/v1/circuit-embed/index", headers=me, json={"qasm": BELL, "circuit_name": name}).json()
     assert idx["embedding_dim"] == 26 and idx["description"].startswith("2-qubit")
-    r = client.post("/api/v1/circuit-embed/search", json={"query_qasm": BELL, "min_similarity": 0.99}).json()
+    r = client.post("/api/v1/circuit-embed/search", headers=me, json={"query_qasm": BELL, "min_similarity": 0.99}).json()
     match = next(x for x in r["results"] if x["embed_id"] == idx["embed_id"])
     assert match["similarity"] == 1.0 and match["circuit_name"] == name
     t_heavy = HEADER + "qreg q[1];\nt q[0];\nt q[0];\nt q[0];"
-    far = client.post("/api/v1/circuit-embed/search", json={"query_qasm": t_heavy, "min_similarity": 0.99}).json()
+    far = client.post("/api/v1/circuit-embed/search", headers=me,
+                      json={"query_qasm": t_heavy, "min_similarity": 0.99}).json()
     assert idx["embed_id"] not in {x["embed_id"] for x in far["results"]}
+    # Regression: every caller searched (and listed) everyone's indexed circuits.
+    theirs = client.post("/api/v1/circuit-embed/search", headers=other,
+                         json={"query_qasm": BELL, "min_similarity": 0.99}).json()
+    assert idx["embed_id"] not in {x["embed_id"] for x in theirs["results"]}
+    assert "Bell State" in {x["circuit_name"] for x in theirs["results"]}  # the demo circuits stay shared
+    assert idx["embed_id"] not in {e["embed_id"] for e in client.get("/api/v1/circuit-embed/index", headers=other).json()}
+    assert client.post("/api/v1/circuit-embed/index", json={"qasm": BELL}).status_code == 401
 
 
 def test_circuit_evolver_reaches_a_target():

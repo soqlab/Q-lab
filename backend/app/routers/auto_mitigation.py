@@ -8,6 +8,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..store import store_put, store_get, store_list
 
 try:
@@ -224,7 +226,7 @@ def _pick_strategy(n_qubits: int, depth: int, backend: str, budget: float):
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/select")
-def select_mitigation(req: SelectRequest, db: Session = Depends(get_db)):
+def select_mitigation(req: SelectRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     budget = req.budget_overhead or 3.0
     strategy, techniques, overhead, reasoning = _pick_strategy(
         req.n_qubits, req.circuit_depth, req.backend, budget
@@ -266,14 +268,14 @@ def select_mitigation(req: SelectRequest, db: Session = Depends(get_db)):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "request": req.model_dump(),
     }
-    store_put(db, NS, rec_id, record)
+    store_put(db, NS, rec_id, {**record, "owner": owner_key(identity)})
     return record
 
 
 @router.post("/apply")
-def apply_mitigation(req: ApplyRequest, db: Session = Depends(get_db)):
+def apply_mitigation(req: ApplyRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     rec = store_get(db, NS, req.recommendation_id)
-    if rec is None:
+    if not owned_by(rec, identity):
         raise HTTPException(status_code=404, detail="Recommendation not found")
 
     total_shots = sum(req.circuit_counts.values()) if req.circuit_counts else SHOTS
@@ -304,8 +306,8 @@ def apply_mitigation(req: ApplyRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/history")
-def get_history(db: Session = Depends(get_db)):
-    recs = store_list(db, NS)
+def get_history(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    recs = mine(store_list(db, NS), identity)
     return {"count": len(recs), "recommendations": [
         {
             "recommendation_id": r["recommendation_id"],

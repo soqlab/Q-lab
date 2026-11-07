@@ -95,3 +95,25 @@ def test_huge_exponents_are_refused_quickly():
     assert time.monotonic() - start < 1.0
     assert _safe_angle("pi/2") == pytest.approx(1.5707963)
     assert _safe_angle("1.5e0") == 1.5
+
+
+def test_drift_thresholds_and_cost_history_belong_to_their_owner():
+    """Regression: drift thresholds and tracked QPU spending sat in one pool that every caller,
+    signed in or not, could list (and the running total added up everyone's spending)."""
+    alice, bob = make_user(prefix="ownA"), make_user(prefix="ownB")
+    t = client.post("/api/v1/hardware-drift/thresholds", headers=alice,
+                    json={"backend": "ibm_x", "metric": "t1", "warning_pct": 10}).json()
+    assert t["warning_pct"] == 10 and "owner" not in t
+    assert t["threshold_id"] in {x["threshold_id"] for x in
+                                 client.get("/api/v1/hardware-drift/thresholds", headers=alice).json()}
+    assert client.get("/api/v1/hardware-drift/thresholds", headers=bob).json() == []
+    assert client.get("/api/v1/hardware-drift/thresholds").status_code == 401
+
+    spend = {"provider_id": "ibm", "cost_usd": 2.5, "n_shots": 100}
+    assert client.post("/api/v1/cost-oracle/track", headers=alice, json=spend).json()["running_total_usd"] == 2.5
+    assert client.post("/api/v1/cost-oracle/track", headers=alice, json=spend).json()["running_total_usd"] == 5.0
+    assert client.post("/api/v1/cost-oracle/track", headers=bob, json=spend).json()["running_total_usd"] == 2.5
+    mine = client.get("/api/v1/cost-oracle/history", headers=alice).json()
+    assert mine["total_usd"] == 5.0 and mine["by_provider"] == {"ibm": 5.0} and len(mine["history"]) == 2
+    assert all("owner" not in h for h in mine["history"])
+    assert client.get("/api/v1/cost-oracle/history").status_code == 401

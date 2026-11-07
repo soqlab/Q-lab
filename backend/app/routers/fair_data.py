@@ -19,6 +19,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key
 from ..store import store_put, store_get, store_list
 
 # ---------------------------------------------------------------------------
@@ -157,7 +159,7 @@ def _checklist(req: FAIRGenerateRequest) -> list[dict]:
 
 
 @_fair_data_router.post("/generate")
-def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)):
+def generate_fair_record(req: FAIRGenerateRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     record_id = str(uuid.uuid4())
     doi = NOT_MINTED
     score = _fair_score(req)
@@ -172,9 +174,10 @@ def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)
         "landing_page_url": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "_meta": req.model_dump(),
+        "owner": owner_key(identity),
     }
     store_put(db, "fair_data_record", record_id, record)
-    return {k: v for k, v in record.items() if k != "_meta"}
+    return {k: v for k, v in record.items() if k not in ("_meta", "owner")}
 
 
 @_fair_data_router.post("/validate")
@@ -207,15 +210,15 @@ def validate_fair(req: FAIRValidateRequest):
 
 
 @_fair_data_router.get("/{record_id}")
-def get_record(record_id: str, db: Session = Depends(get_db)):
+def get_record(record_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     r = store_get(db, "fair_data_record", record_id)
-    if r is None:
+    if not owned_by(r, identity):
         raise HTTPException(status_code=404, detail="FAIR record not found")
-    return {k: v for k, v in r.items() if k != "_meta"}
+    return {k: v for k, v in r.items() if k not in ("_meta", "owner")}
 
 
 @_fair_data_router.get("/")
-def list_records(db: Session = Depends(get_db)):
+def list_records(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     return [
         {
             "record_id": r["record_id"],
@@ -224,7 +227,7 @@ def list_records(db: Session = Depends(get_db)):
             "fair_score": r["fair_score"]["total"],
             "created_at": r["created_at"],
         }
-        for r in store_list(db, "fair_data_record")
+        for r in mine(store_list(db, "fair_data_record"), identity)
     ]
 
 

@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key
 from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/causal", tags=["causal"])
@@ -326,7 +328,7 @@ def _interpret(ate: float, p: float, treatment: str, outcome: str) -> str:
 # ---------------------------------------------------------------------------
 
 @router.post("/analyze")
-def causal_analyze(req: CausalAnalyzeRequest, db: Session = Depends(get_db)):
+def causal_analyze(req: CausalAnalyzeRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     causal_id = str(uuid.uuid4())
     ate, ate_std, p = _compute_ate(req.data, req.treatment, req.outcome)
     z = 1.96
@@ -351,7 +353,7 @@ def causal_analyze(req: CausalAnalyzeRequest, db: Session = Depends(get_db)):
         "n_samples": len(req.data),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    store_put(db, "causal_analysis", causal_id, result)
+    store_put(db, "causal_analysis", causal_id, {**result, "owner": owner_key(identity)})
     return result
 
 
@@ -412,7 +414,7 @@ def identify_confounders(req: ConfounderRequest):
 
 
 @router.get("")
-def list_analyses(db: Session = Depends(get_db)):
+def list_analyses(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     return [
         {
             "causal_id": a["causal_id"],
@@ -422,5 +424,5 @@ def list_analyses(db: Session = Depends(get_db)):
             "p_value": a["p_value"],
             "created_at": a["created_at"],
         }
-        for a in store_list(db, "causal_analysis")
+        for a in mine(store_list(db, "causal_analysis"), identity)
     ]

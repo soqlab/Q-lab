@@ -215,14 +215,17 @@ def test_nl2qasm_bounds_the_fallback_size():
 
 def test_natural_language_search_ranks_the_matching_run_first(bob):
     """Regression: the endpoint shared GET /api/v1/circuits/search with circuit_search, which is
-    registered first, so the /search/natural page never reached it."""
+    registered first, so the /search/natural page never reached it. And the score was a cosine
+    similarity, 1.0 for a 2-qubit and a 3-qubit run alike when the query named only a qubit count."""
     alice = make_user(prefix="b3nlq")  # a fresh user, so only these two runs compete
-    push_run(alice, circuit_name="bell_pair")
+    bell = push_run(alice, circuit_name="bell_pair")
     ghz = push_run(alice, circuit_name="ghz_three", qasm=GHZ3,
                    fingerprint={"num_qubits": 3, "depth": 4, "size": 6, "gate_counts": {"h": 1, "cx": 2}})
     r = client.get("/api/v1/circuits/natural-search?q=3 qubit ghz circuit", headers=alice).json()
     assert r["parsed_features"]["num_qubits"] == 3
     assert r["results"][0]["run_id"] == ghz and "3 qubits" in r["results"][0]["match_reasons"]
+    scores = {x["run_id"]: x["score"] for x in r["results"]}
+    assert scores[ghz] == 1.0 and scores[bell] == 0.95  # 3/4 of the qubit count, plus the family bonus
     bobs = client.get("/api/v1/circuits/natural-search?q=3 qubit ghz circuit", headers=bob).json()
     assert ghz not in {x["run_id"] for x in bobs["results"]}
     assert client.get("/api/v1/circuits/natural-search").status_code == 422

@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..store import store_put, store_get, store_list
 
 router = APIRouter(prefix="/api/v1/circuit-embed", tags=["circuit_embed"])
@@ -106,8 +108,17 @@ class SearchRequest(BaseModel):
     min_similarity: float = Field(default=0.4, ge=0.0, le=1.0)
 
 
+def _visible_index(db: Session, identity: Identity) -> list[dict]:
+    """The built-in demo circuits plus the circuits you indexed (they used to be shared with everyone)."""
+    index = store_list(db, "circuit_embed_index")
+    if not any("owner" not in e for e in index):  # the demos, whether or not someone indexed first
+        _seed_demos(db)
+        index = store_list(db, "circuit_embed_index")
+    return [e for e in index if "owner" not in e or owned_by(e, identity)]
+
+
 @router.post("/index")
-def index_circuit(req: IndexRequest, db: Session = Depends(get_db)):
+def index_circuit(req: IndexRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     emb = _embed(req.qasm)
     entry = {
         "embed_id": f"emb-{uuid.uuid4().hex[:12]}",
@@ -117,17 +128,15 @@ def index_circuit(req: IndexRequest, db: Session = Depends(get_db)):
         "embedding": emb,
         "description": _describe(req.qasm, emb),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "owner": owner_key(identity),
     }
     store_put(db, "circuit_embed_index", entry["embed_id"], entry)
     return {"embed_id": entry["embed_id"], "description": entry["description"], "embedding_dim": len(emb)}
 
 
 @router.post("/search")
-def search_circuits(req: SearchRequest, db: Session = Depends(get_db)):
-    index = store_list(db, "circuit_embed_index")
-    if not index:
-        _seed_demos(db)
-        index = store_list(db, "circuit_embed_index")
+def search_circuits(req: SearchRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    index = _visible_index(db, identity)
     qe = _embed(req.query_qasm)
     qdesc = _describe(req.query_qasm, qe)
     results = [
@@ -154,10 +163,7 @@ def search_circuits(req: SearchRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/index")
-def list_indexed(db: Session = Depends(get_db)):
-    index = store_list(db, "circuit_embed_index")
-    if not index:
-        _seed_demos(db)
-        index = store_list(db, "circuit_embed_index")
+def list_indexed(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    index = _visible_index(db, identity)
     return [{"embed_id": e["embed_id"], "circuit_name": e["circuit_name"],
              "description": e["description"], "created_at": e["created_at"]} for e in index]

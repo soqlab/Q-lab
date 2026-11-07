@@ -174,16 +174,21 @@ def _norm_val(key: str, val: float) -> float:
 
 
 def _cosine_score(qvec: dict, rvec: dict) -> float:
-    """Cosine similarity between query and run feature vectors (log-scaled)."""
+    """How close the run's features are to the requested ones, 0..1 (1 = equal).
+
+    The mean, over the features both have, of the ratio of the smaller to the larger value (+1 so
+    zeros compare). It used to be a cosine similarity, which is 1.0 for any two positive numbers when
+    the query names one feature, so "3 qubit" ranked a 2-qubit circuit as high as a 3-qubit one.
+    """
     shared = [k for k in _FEAT_KEYS if qvec.get(k) is not None and rvec.get(k) is not None]
     if not shared:
         return 0.0
-    qa = [_norm_val(k, qvec[k]) for k in shared]  # type: ignore[arg-type]
-    ra = [_norm_val(k, rvec[k]) for k in shared]  # type: ignore[arg-type]
-    dot = sum(x * y for x, y in zip(qa, ra))
-    mq  = math.sqrt(sum(x * x for x in qa)) or 1.0
-    mr  = math.sqrt(sum(y * y for y in ra)) or 1.0
-    return round(min(1.0, max(0.0, dot / (mq * mr))), 4)
+    closeness = []
+    for k in shared:
+        scale = 100.0 if k == "non_clifford_ratio" else 1.0  # a ratio in 0..1: compare percentage points
+        q, r = max(0.0, qvec[k]) * scale + 1.0, max(0.0, rvec[k]) * scale + 1.0  # type: ignore[operator]
+        closeness.append(min(q, r) / max(q, r))
+    return round(sum(closeness) / len(closeness), 4)
 
 
 def _family_bonus(feat: dict, run: Run) -> float:

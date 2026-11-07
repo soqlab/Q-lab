@@ -449,17 +449,26 @@ def test_no_sample_researchers_are_created_and_old_ones_are_removed():
 # ── FAIR record score and physics checks ─────────────────────────────────────
 
 def test_fair_score_reflects_what_the_record_has():
+    me, other = _user(), _user()
     body = {"title": "T", "description": "D", "algorithm": "vqe", "backend": "ibm_x", "n_qubits": 2, "n_shots": 100}
-    bare = client.post("/api/v1/fair-data/generate", json=body)
+    bare = client.post("/api/v1/fair-data/generate", headers=me, json=body)
     assert bare.status_code == 200, bare.text
     assert "x-qlab-data" not in bare.headers
     s = bare.json()["fair_score"]
     assert (s["findable"], s["accessible"], s["interoperable"], s["reusable"]) == (0.333, 0.0, 1.0, 0.333)
     assert abs(s["total"] - 0.4165) < 0.001
-    linked = client.post("/api/v1/fair-data/generate", json={**body, "run_id": "r1", "fidelity": 0.9}).json()
+    linked = client.post("/api/v1/fair-data/generate", headers=me, json={**body, "run_id": "r1", "fidelity": 0.9}).json()
     assert linked["fair_score"]["reusable"] == 1.0
-    assert client.post("/api/v1/fair-data/generate", json=body).json()["fair_score"] == s
+    assert client.post("/api/v1/fair-data/generate", headers=me, json=body).json()["fair_score"] == s
     assert not next(c for c in linked["checklist"] if "DOI" in c["item"])["done"]
+    # Regression: FAIR records sat in one shared pool; any caller could list and read everyone's.
+    rid = linked["record_id"]
+    assert "owner" not in linked
+    assert client.post("/api/v1/fair-data/generate", json=body).status_code == 401
+    assert client.get(f"/api/v1/fair-data/{rid}", headers=me).json()["record_id"] == rid
+    assert client.get(f"/api/v1/fair-data/{rid}", headers=other).status_code == 404
+    assert rid in {r["record_id"] for r in client.get("/api/v1/fair-data/", headers=me).json()}
+    assert client.get("/api/v1/fair-data/", headers=other).json() == []
 
 
 def test_physics_checks_are_rules_and_literature_ranking_is_gone():
@@ -523,17 +532,23 @@ def test_advantage_analysis_uses_the_runs_circuit_and_is_private():
 # ── Causal analysis ───────────────────────────────────────────────────────────
 
 def test_causal_analysis_refuses_thin_data_and_reports_only_real_confounders():
+    me, other = _user(), _user()
     thin = {"treatment": "dd", "outcome": "fidelity", "covariates": ["T1"], "data": [{"dd": 1, "fidelity": 0.9}]}
-    r = client.post("/api/v1/causal/analyze", json=thin)
+    r = client.post("/api/v1/causal/analyze", headers=me, json=thin)
     assert r.status_code == 422 and "x-qlab-data" not in r.headers
     rows = [{"dd": i % 2, "fidelity": 0.80 + 0.1 * (i % 2) + 0.001 * i, "T1": 100 + i, "crosstalk": 5} for i in range(12)]
-    out = client.post("/api/v1/causal/analyze", json={**thin, "covariates": ["T1", "crosstalk", "readout_error"], "data": rows}).json()
+    out = client.post("/api/v1/causal/analyze", headers=me,
+                      json={**thin, "covariates": ["T1", "crosstalk", "readout_error"], "data": rows}).json()
     assert abs(out["ate"] - 0.101) < 0.01 and out["p_value"] < 0.001
     assert out["confounders_detected"] == ["T1"]  # crosstalk is constant, readout_error is absent
     assert "noise_model" not in out["causal_graph_nodes"]
     conf = client.post("/api/v1/causal/identify-confounders",
                        json={"variables": ["readout_error"], "outcome": "fidelity", "experiment_log": rows}).json()
     assert conf["suspected_confounders"] == []
+    # Regression: stored analyses were listed for every caller.
+    assert out["causal_id"] in {a["causal_id"] for a in client.get("/api/v1/causal", headers=me).json()}
+    assert client.get("/api/v1/causal", headers=other).json() == []
+    assert client.get("/api/v1/causal").status_code == 401
 
 
 # ── Error budget ──────────────────────────────────────────────────────────────

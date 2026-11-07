@@ -11,6 +11,8 @@ from sqlalchemy import select
 
 from ..calibration_history import calibration_metric
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..models import Run
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
@@ -49,7 +51,7 @@ def _fit(hours: list[float], values: list[float]) -> tuple[float, float, float, 
 
 
 @router.post("/forecast", response_model=CalForecast)
-def forecast(req: ForecastRequest, db: Session = Depends(get_db)):
+def forecast(req: ForecastRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Extrapolate from the calibration snapshots recorded with this user's own runs."""
     runs = db.scalars(
         select(Run).where(Run.backend == req.backend, Run.calibration.isnot(None))
@@ -106,18 +108,19 @@ def forecast(req: ForecastRequest, db: Session = Depends(get_db)):
         optimal_window_end=(datetime.fromisoformat(best.timestamp) + timedelta(hours=2)).isoformat(),
         worst_window_start=worst.timestamp, degradation_alert=degrading, recovery_expected=False,
         recovery_eta_hours=None, model_r2=round(r2, 4), training_points=len(history), recommendations=recs)
-    store_put(db, NS, fid, fc.model_dump())
+    store_put(db, NS, fid, {**fc.model_dump(), "owner": owner_key(identity)})
     return fc
 
-@router.get("/{forecast_id}", response_model=CalForecast)
-def get_forecast(forecast_id: str, db: Session = Depends(get_db)):
-    data = store_get(db, NS, forecast_id)
-    if data is None:
-        raise HTTPException(404, "not found")
-    return CalForecast(**data)
-
+# Before /{forecast_id}, which would otherwise take "backends" as an id.
 @router.get("/backends")
 def list_backends(db: Session = Depends(get_db)):
     """Backends this user has runs with calibration on."""
     names = db.scalars(select(Run.backend).where(Run.calibration.isnot(None), Run.backend.isnot(None)).distinct()).all()
     return {"backends": sorted(names)}
+
+@router.get("/{forecast_id}", response_model=CalForecast)
+def get_forecast(forecast_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    data = store_get(db, NS, forecast_id)
+    if not owned_by(data, identity):
+        raise HTTPException(404, "not found")
+    return CalForecast(**data)

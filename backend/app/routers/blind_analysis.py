@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..store import store_delete, store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/blind-analysis", tags=["blind_analysis"])
@@ -92,7 +94,7 @@ def _infer_confirmation(hypothesis: str, p_value: float, effect_size: float) -> 
 
 
 @router.post("/register", response_model=AnalysisRegistration)
-def register_analysis(body: RegisterRequest, db: Session = Depends(get_db)):
+def register_analysis(body: RegisterRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Pre-register a hypothesis and analysis plan before data collection or unblinding."""
     if not body.title.strip():
         raise HTTPException(status_code=422, detail="title must not be empty")
@@ -117,31 +119,31 @@ def register_analysis(body: RegisterRequest, db: Session = Depends(get_db)):
         results_summary=None,
         confirmed_hypothesis=None,
     )
-    store_put(db, NS_REGISTRATIONS, reg_id, registration.model_dump())
+    store_put(db, NS_REGISTRATIONS, reg_id, {**registration.model_dump(), "owner": owner_key(identity)})
     return registration
 
 
 @router.get("/registrations")
-def list_registrations(db: Session = Depends(get_db)):
-    """List all analysis registrations."""
-    records = store_list(db, NS_REGISTRATIONS)
+def list_registrations(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """List your analysis registrations."""
+    records = [public_view(r) for r in mine(store_list(db, NS_REGISTRATIONS), identity)]
     return {"count": len(records), "registrations": records}
 
 
 @router.get("/registration/{reg_id}", response_model=AnalysisRegistration)
-def get_registration(reg_id: str, db: Session = Depends(get_db)):
+def get_registration(reg_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Retrieve a single registration by ID."""
     record = store_get(db, NS_REGISTRATIONS, reg_id)
-    if not record:
+    if not owned_by(record, identity):
         raise HTTPException(status_code=404, detail="registration not found")
     return record
 
 
 @router.post("/{reg_id}/reveal", response_model=RevealResult)
-def reveal_results(reg_id: str, body: RevealRequest, db: Session = Depends(get_db)):
+def reveal_results(reg_id: str, body: RevealRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Unblind: submit actual results and record whether the hypothesis was confirmed."""
     record = store_get(db, NS_REGISTRATIONS, reg_id)
-    if not record:
+    if not owned_by(record, identity):
         raise HTTPException(status_code=404, detail="registration not found")
     if record["status"] == "cancelled":
         raise HTTPException(status_code=409, detail="registration has been cancelled")
@@ -171,10 +173,10 @@ def reveal_results(reg_id: str, body: RevealRequest, db: Session = Depends(get_d
 
 
 @router.delete("/{reg_id}")
-def cancel_registration(reg_id: str, db: Session = Depends(get_db)):
+def cancel_registration(reg_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Cancel a registered analysis (sets status to cancelled, does not delete)."""
     record = store_get(db, NS_REGISTRATIONS, reg_id)
-    if not record:
+    if not owned_by(record, identity):
         raise HTTPException(status_code=404, detail="registration not found")
     if record["status"] == "revealed":
         raise HTTPException(status_code=409, detail="cannot cancel an already revealed registration")

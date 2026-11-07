@@ -119,6 +119,12 @@ def test_forecast_follows_the_users_own_calibration():
     assert abs(fc["forecasts"][-1]["t1_predicted_us"] - 131.0) < 1
     assert fc["degradation_alert"] is True
     assert client.post("/api/v1/cal-forecast/forecast", headers=headers, json={"backend": backend}).json()["model_r2"] == fc["model_r2"]
+    # Regression: a stored forecast could be read by anyone who had its id.
+    assert client.get(f"/api/v1/cal-forecast/{fc['forecast_id']}", headers=headers).json()["forecast_id"] == fc["forecast_id"]
+    assert client.get(f"/api/v1/cal-forecast/{fc['forecast_id']}", headers=_user()).status_code == 404
+    assert client.get(f"/api/v1/cal-forecast/{fc['forecast_id']}").status_code == 401
+    # Regression: /backends was declared after /{forecast_id}, so it was always "not found".
+    assert backend in client.get("/api/v1/cal-forecast/backends", headers=headers).json()["backends"]
 
 
 def test_one_users_calibration_does_not_feed_anothers_forecast():

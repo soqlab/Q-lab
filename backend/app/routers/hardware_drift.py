@@ -21,6 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owner_key, public_view
 from ..models import Run
 from ..store import store_put, store_get, store_list, store_delete
 
@@ -304,7 +306,7 @@ def get_alerts(backend: str, db: Session = Depends(get_db)):
 
 
 @router.post("/thresholds")
-def create_threshold(payload: DriftThresholdCreate, db: Session = Depends(get_db)):
+def create_threshold(payload: DriftThresholdCreate, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Create a custom drift alert threshold."""
     tid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
@@ -317,14 +319,14 @@ def create_threshold(payload: DriftThresholdCreate, db: Session = Depends(get_db
         "enabled": payload.enabled,
         "created_at": now,
     }
-    store_put(db, "drift_thresholds", tid, data)
+    store_put(db, "drift_thresholds", tid, {**data, "owner": owner_key(identity)})
     return data
 
 
 @router.get("/thresholds")
-def list_thresholds(db: Session = Depends(get_db)):
-    """List all custom drift thresholds."""
-    return store_list(db, "drift_thresholds")
+def list_thresholds(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """List your custom drift thresholds."""
+    return [public_view(t) for t in mine(store_list(db, "drift_thresholds"), identity)]
 
 
 @router.get("/summary")

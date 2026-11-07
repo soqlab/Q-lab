@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owner_key, public_view
 from .. import pricing
 from ..store import store_put, store_list
 
@@ -151,15 +153,16 @@ def estimate_cost(req: CostEstimateRequest):
     )
 
 @router.post("/track")
-def track_cost(req: BudgetTrackRequest, db: Session = Depends(get_db)):
-    entry = {"id": str(uuid.uuid4()), "recorded_at": datetime.now(timezone.utc).isoformat(), **req.model_dump()}
+def track_cost(req: BudgetTrackRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    entry = {"id": str(uuid.uuid4()), "recorded_at": datetime.now(timezone.utc).isoformat(), **req.model_dump(),
+             "owner": owner_key(identity)}
     store_put(db, NS, entry["id"], entry)
-    history = store_list(db, NS)
+    history = mine(store_list(db, NS), identity)
     return {"tracked": True, "running_total_usd": round(sum(h["cost_usd"] for h in history), 4)}
 
 @router.get("/history")
-def get_history(db: Session = Depends(get_db)):
-    history = store_list(db, NS)
+def get_history(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    history = [public_view(h) for h in mine(store_list(db, NS), identity)]
     total = sum(h["cost_usd"] for h in history)
     by_provider: dict = {}
     for h in history:

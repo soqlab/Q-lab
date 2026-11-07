@@ -26,6 +26,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..models import Run
 from ..store import store_get, store_list, store_put
 from ..calibration_utils import per_qubit
@@ -113,6 +115,22 @@ def _compute_fingerprint(prereg: dict[str, Any]) -> str:
 def _get_prereg_or_404(db: Session, prereg_id: str) -> dict[str, Any]:
     rec = store_get(db, _NS, prereg_id)
     if rec is None:
+        raise HTTPException(status_code=404, detail="Pre-registration not found")
+    return rec
+
+
+def _yours(db: Session, prereg_id: str, identity: Identity) -> dict[str, Any]:
+    """A pre-registration you may change. Others' are 404: anyone could edit, lock, link or abandon them."""
+    rec = _get_prereg_or_404(db, prereg_id)
+    if not owned_by(rec, identity):
+        raise HTTPException(status_code=404, detail="Pre-registration not found")
+    return rec
+
+
+def _readable(db: Session, prereg_id: str, identity: Identity) -> dict[str, Any]:
+    """Drafts are private; once locked, a pre-registration can be shown to anyone signed in to verify."""
+    rec = _get_prereg_or_404(db, prereg_id)
+    if rec.get("status") == "draft" and not owned_by(rec, identity):
         raise HTTPException(status_code=404, detail="Pre-registration not found")
     return rec
 
@@ -255,6 +273,7 @@ def _run_outcome_analysis(prereg: dict[str, Any], run: Run) -> tuple[dict, str]:
 @router.post("")
 def create_preregistration(
     body: PreregistrationCreate,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Create a draft pre-registration."""
@@ -283,20 +302,22 @@ def create_preregistration(
         "verdict": None,
         "fingerprint": None,
         "created_at": now,
+        "owner": owner_key(identity),
     }
 
     store_put(db, _NS, prereg_id, prereg)
-    return prereg
+    return public_view(prereg)
 
 
 @router.put("/{prereg_id}")
 def update_preregistration(
     prereg_id: str,
     body: PreregistrationUpdate,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Update a DRAFT pre-registration. Locked pre-registrations cannot be edited."""
-    prereg = _get_prereg_or_404(db, prereg_id)
+    prereg = _yours(db, prereg_id, identity)
 
     if prereg["status"] != "draft":
         raise HTTPException(
@@ -335,16 +356,17 @@ def update_preregistration(
 
     prereg.update(update_data)
     store_put(db, _NS, prereg_id, prereg)
-    return prereg
+    return public_view(prereg)
 
 
 @router.post("/{prereg_id}/lock")
 def lock_preregistration(
     prereg_id: str,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Lock the pre-registration. Irreversible — creates tamper-evident fingerprint."""
-    prereg = _get_prereg_or_404(db, prereg_id)
+    prereg = _yours(db, prereg_id, identity)
 
     if prereg["status"] != "draft":
         raise HTTPException(
@@ -361,17 +383,18 @@ def lock_preregistration(
     prereg["fingerprint"] = fingerprint
 
     store_put(db, _NS, prereg_id, prereg)
-    return prereg
+    return public_view(prereg)
 
 
 @router.get("")
 def list_preregistrations(
     status: Optional[str] = Query(default=None),
     researcher_name: Optional[str] = Query(default=None),
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """List all pre-registrations with optional filters."""
-    all_prereg = store_list(db, _NS)
+    """List your pre-registrations with optional filters."""
+    all_prereg = mine(store_list(db, _NS), identity)
 
     if status:
         all_prereg = [p for p in all_prereg if p.get("status") == status]
@@ -379,26 +402,28 @@ def list_preregistrations(
         rl = researcher_name.lower()
         all_prereg = [p for p in all_prereg if rl in (p.get("researcher_name") or "").lower()]
 
-    return all_prereg
+    return [public_view(p) for p in all_prereg]
 
 
 @router.get("/{prereg_id}")
 def get_preregistration(
     prereg_id: str,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Get a single pre-registration by ID."""
-    return _get_prereg_or_404(db, prereg_id)
+    return public_view(_readable(db, prereg_id, identity))
 
 
 @router.post("/{prereg_id}/link-run/{run_id}")
 def link_run(
     prereg_id: str,
     run_id: str,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Link a completed run to this pre-registration and run automated outcome analysis."""
-    prereg = _get_prereg_or_404(db, prereg_id)
+    prereg = _yours(db, prereg_id, identity)
 
     if prereg["status"] not in ("locked", "run_completed"):
         raise HTTPException(
@@ -418,16 +443,17 @@ def link_run(
     prereg["verdict"] = verdict
 
     store_put(db, _NS, prereg_id, prereg)
-    return prereg
+    return public_view(prereg)
 
 
 @router.get("/{prereg_id}/verify")
 def verify_fingerprint(
     prereg_id: str,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Verify the SHA-256 fingerprint of a locked pre-registration for tamper detection."""
-    prereg = _get_prereg_or_404(db, prereg_id)
+    prereg = _readable(db, prereg_id, identity)
 
     if prereg["status"] == "draft":
         raise HTTPException(
@@ -463,10 +489,11 @@ def verify_fingerprint(
 def abandon_preregistration(
     prereg_id: str,
     body: AbandonBody,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Mark a pre-registration as abandoned with a reason."""
-    prereg = _get_prereg_or_404(db, prereg_id)
+    prereg = _yours(db, prereg_id, identity)
 
     if prereg["status"] == "run_completed":
         raise HTTPException(
@@ -480,4 +507,4 @@ def abandon_preregistration(
     prereg["outcome"]["abandoned_at"] = _now_iso()
 
     store_put(db, _NS, prereg_id, prereg)
-    return prereg
+    return public_view(prereg)

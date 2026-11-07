@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/arxiv-radar", tags=["arxiv-radar"])
@@ -66,7 +68,7 @@ def _score(paper: dict, keywords: list[str], query: str) -> float:
 def _seed_db(db: Session):
     store_seed(db, NS_FEED, [(p["arxiv_id"], p) for p in SEED_PAPERS])
 
-def _check_alerts(watch: ArxivWatch, db: Session) -> None:
+def _check_alerts(watch: ArxivWatch, db: Session, owner: str) -> None:
     feed = store_list(db, NS_FEED)
     for paper_data in feed:
         paper = PaperResult(**paper_data)
@@ -83,19 +85,19 @@ def _check_alerts(watch: ArxivWatch, db: Session) -> None:
         if alert_type:
             aid = str(uuid.uuid4())
             alert = ArxivAlert(alert_id=aid, watch_id=watch.watch_id, paper_arxiv_id=paper.arxiv_id, paper_title=paper.title, alert_type=alert_type, relevance_score=s, triggered_at=datetime.now(timezone.utc).isoformat(), summary=f"{paper.arxiv_id} {alert_type}s your research: {paper.title[:80]}", action_recommended="Read immediately" if s > 0.9 else "Review within 48h")
-            store_put(db, NS_ALERTS, aid, alert.model_dump())
+            store_put(db, NS_ALERTS, aid, {**alert.model_dump(), "owner": owner})
             wd = store_get(db, NS_WATCHES, watch.watch_id)
             if wd:
                 wd["alert_count"] = wd.get("alert_count", 0) + 1
                 store_put(db, NS_WATCHES, watch.watch_id, wd)
 
 @router.post("/watch", response_model=ArxivWatch)
-def create_watch(req: CreateWatchRequest, db: Session = Depends(get_db)):
+def create_watch(req: CreateWatchRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     _seed_db(db)
     wid = str(uuid.uuid4())
     watch = ArxivWatch(watch_id=wid, created_at=datetime.now(timezone.utc).isoformat(), name=req.name, keywords=req.keywords, authors=req.authors, categories=req.categories, alert_on_contradiction=req.alert_on_contradiction, alert_on_confirmation=req.alert_on_confirmation, alert_on_citation=req.alert_on_citation, min_relevance=req.min_relevance, active=True, alert_count=0)
-    store_put(db, NS_WATCHES, wid, watch.model_dump())
-    _check_alerts(watch, db)
+    store_put(db, NS_WATCHES, wid, {**watch.model_dump(), "owner": owner_key(identity)})
+    _check_alerts(watch, db, owner_key(identity))
     return watch
 
 @router.post("/search", response_model=dict)
@@ -117,11 +119,11 @@ def search_papers(req: SearchRequest, db: Session = Depends(get_db)):
     return {"results": results[:req.max_results], "total": len(results), "trending_keywords": ["GHZ", "VQE", "QAOA", "ZNE", "surface_code", "quantum_sensing"]}
 
 @router.get("/alerts")
-def get_alerts(watch_id: str | None = None, db: Session = Depends(get_db)):
-    alerts = [ArxivAlert(**r) for r in store_list(db, NS_ALERTS)]
+def get_alerts(watch_id: str | None = None, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    alerts = [ArxivAlert(**r) for r in mine(store_list(db, NS_ALERTS), identity)]
     if watch_id:
         alerts = [a for a in alerts if a.watch_id == watch_id]
-    all_alerts = [ArxivAlert(**r) for r in store_list(db, NS_ALERTS)]
+    all_alerts = [ArxivAlert(**r) for r in mine(store_list(db, NS_ALERTS), identity)]
     return {"alerts": alerts, "total": len(alerts), "by_type": {t: sum(1 for a in all_alerts if a.alert_type == t) for t in ["contradiction", "confirmation", "citation"]}}
 
 @router.get("/feed")
@@ -135,13 +137,13 @@ def get_feed(category: str | None = None, db: Session = Depends(get_db)):
     return {"papers": papers, "total": len(papers), "trending": [p.title for p in sorted(papers, key=lambda p: p.citations, reverse=True)[:3]]}
 
 @router.get("/watches")
-def list_watches(db: Session = Depends(get_db)):
-    watches = [ArxivWatch(**r) for r in store_list(db, NS_WATCHES)]
+def list_watches(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    watches = [ArxivWatch(**r) for r in mine(store_list(db, NS_WATCHES), identity)]
     return {"watches": watches, "total": len(watches)}
 
 @router.delete("/watch/{watch_id}")
-def delete_watch(watch_id: str, db: Session = Depends(get_db)):
-    if store_get(db, NS_WATCHES, watch_id) is None:
+def delete_watch(watch_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    if not owned_by(store_get(db, NS_WATCHES, watch_id), identity):
         raise HTTPException(404, "watch not found")
     store_delete(db, NS_WATCHES, watch_id)
     return {"deleted": watch_id}
