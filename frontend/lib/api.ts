@@ -6342,33 +6342,24 @@ export async function listCodeFrameworks(): Promise<{ frameworks: Array<{ id: st
 // ────────────────────────────────────────────
 // XEB (Cross-Entropy Benchmarking)
 // ────────────────────────────────────────────
+export interface XEBRun {
+  run_id: string; backend: string | null; n_bits: number; shots: number;
+  linear_xeb: number; null_std_error: number;
+  heavy_output_probability: number; ideal_heavy_output_probability: number;
+}
+/** XEB of your recorded runs against the exact ideal distribution of each run's circuit. */
 export interface XEBResult {
-  xeb_id: string;
-  n_qubits: number;
-  circuit_depth: number;
-  n_circuits: number;
-  n_shots: number;
-  noise_level: number;
-  linear_xeb_fidelity: number;
-  log_xeb_fidelity: number;
-  per_circuit_xeb: number[];
-  heavy_output_probability: number;
-  ideal_heavy_output_threshold: number;
-  collision_probability: number;
-  porter_thomas_kl_divergence: number;
-  effective_noise_per_gate: number;
-  predicted_xeb_from_noise: number;
-  classical_simulation_time_estimate_s: number;
-  quantum_speedup_factor: number;
-  quantum_advantage_certified: boolean;
-  confidence_level: string;
-  google_sycamore_comparison: string;
+  runs: XEBRun[];
+  skipped: { run_id: string; reason: string }[];
+  linear_xeb: number | null;
+  heavy_output_probability: number | null;
+  source: string;
   created_at: string;
 }
-export async function runXEB(req: { n_qubits?: number; circuit_depth?: number; n_circuits?: number; n_shots?: number; noise_level?: number; backend?: string }): Promise<XEBResult> {
+export async function runXEB(runIds: string[]): Promise<XEBResult> {
   const res = await fetch(apiUrl("/api/v1/xeb"), {
     method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ run_ids: runIds }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

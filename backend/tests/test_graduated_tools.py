@@ -228,3 +228,37 @@ def test_ideal_state_analysis_is_exact():
     uniform = client.post("/api/v1/tomography", json={"qasm": HEAD + "h q[0];\nh q[1];\nh q[2];", "target_state": "uniform"})
     assert uniform.json()["fidelity_to_target"] == 1.0
     assert client.post("/api/v1/tomography", json={"qasm": HEAD + "h q[0];", "target_state": "bell"}).status_code == 422
+
+
+# ── XEB ───────────────────────────────────────────────────────────────────────
+
+def test_xeb_scores_recorded_counts():
+    headers = _user()
+    perfect = _run(headers, {"00": 500, "11": 500}, BELL)
+    noisy = _run(headers, {"00": 400, "11": 400, "01": 200}, BELL)
+    bare = _run(headers, {"00": 3})
+    r = client.post("/api/v1/xeb", headers=headers, json={"run_ids": [perfect, noisy, bare]})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    rows = {x["run_id"]: x for x in out["runs"]}
+    assert rows[perfect]["linear_xeb"] == 1.0 and rows[perfect]["heavy_output_probability"] == 1.0
+    assert abs(rows[noisy]["linear_xeb"] - 0.6) < 1e-9 and abs(rows[noisy]["heavy_output_probability"] - 0.8) < 1e-9
+    assert rows[noisy]["ideal_heavy_output_probability"] == 1.0
+    assert [s["run_id"] for s in out["skipped"]] == [bare]
+    assert abs(out["linear_xeb"] - 0.8) < 1e-9
+
+
+def test_xeb_without_usable_runs_gives_no_numbers():
+    headers = _user()
+    bare = _run(headers, {"00": 3})
+    out = client.post("/api/v1/xeb", headers=headers, json={"run_ids": [bare]}).json()
+    assert out["runs"] == [] and out["linear_xeb"] is None and out["heavy_output_probability"] is None
+    assert client.post("/api/v1/xeb", headers=_user(), json={"run_ids": [bare]}).status_code == 404
+
+
+def test_heavy_outputs_use_the_median_over_all_outcomes():
+    from app.xeb_stats import heavy_outputs
+
+    assert heavy_outputs({"00": 0.5, "11": 0.5}, 2) == {"00", "11"}
+    assert heavy_outputs({"00": 0.4, "01": 0.3, "10": 0.2, "11": 0.1}, 2) == {"00", "01"}

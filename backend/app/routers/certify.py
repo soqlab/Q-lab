@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity
 from ..local_sim import ideal_probabilities
+from ..xeb_stats import linear_xeb, norm_sf
 from ..models import Run
 from ..run_scope import current_scope, visible
 from ..store import store_delete, store_get, store_list, store_put
@@ -87,39 +88,6 @@ class CertifyRequest(BaseModel):
     confidence_level: float = Field(default=0.95, gt=0.5, lt=1.0)
 
 
-def _norm_sf(z: float) -> float:
-    """P(Z > z) for a standard normal."""
-    return 0.5 * math.erfc(z / math.sqrt(2))
-
-
-def _bitstring(key: str, n_bits: int) -> Optional[str]:
-    key = str(key).replace(" ", "")
-    if key.lower().startswith("0x"):
-        try:
-            return format(int(key, 16), f"0{n_bits}b")
-        except ValueError:
-            return None
-    return key if len(key) == n_bits and set(key) <= {"0", "1"} else None
-
-
-def linear_xeb(counts: dict[str, int], ideal: dict[str, float], n_bits: int) -> tuple[float, float, int]:
-    """(F, standard error of F under the uniform-noise null, shots used)."""
-    dim = 2 ** n_bits
-    shots = 0
-    total = 0.0
-    for key, c in counts.items():
-        bits = _bitstring(key, n_bits)
-        if bits is None:
-            raise ValueError(f"Outcome '{key}' does not match the circuit's {n_bits} classical bits.")
-        shots += int(c)
-        total += int(c) * ideal.get(bits, 0.0)
-    if shots <= 0:
-        raise ValueError("The run has no recorded shots.")
-    xeb = dim * total / shots - 1.0
-    null_var = dim * sum(p * p for p in ideal.values()) - 1.0
-    return xeb, math.sqrt(max(null_var, 0.0) / shots), shots
-
-
 def _evaluate(run: Run) -> RunEvidence:
     counts = (run.results or {}).get("counts") or {}
     if not run.qasm:
@@ -161,7 +129,7 @@ def certify(req: CertifyRequest, db: Session = Depends(get_db),
     certified = False
     if evidence:
         combined_z = sum(e.z_score for e in evidence) / math.sqrt(len(evidence))
-        p_value = _norm_sf(combined_z)
+        p_value = norm_sf(combined_z)
         mean_xeb = sum(e.linear_xeb * e.shots for e in evidence) / sum(e.shots for e in evidence)
         certified = p_value < alpha
 

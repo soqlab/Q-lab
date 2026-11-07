@@ -36,9 +36,16 @@ def _run(headers, backend, hours_ago, t1, t2=None, counts=None, qasm=None):
 
 # ── The notice ────────────────────────────────────────────────────────────────
 
-def test_illustrative_tools_are_marked_and_real_ones_are_not():
+def test_illustrative_tools_are_marked_and_real_ones_are_not(monkeypatch):
+    # The middleware reads the list on every request, so a listed router is marked whatever its
+    # name; this keeps the test meaningful as the list shrinks towards empty.
+    import app.illustrative as illustrative
+
+    monkeypatch.setattr(illustrative, "ILLUSTRATIVE_ROUTERS", frozenset({"xeb"}))
     assert client.post("/api/v1/xeb", json={}).headers.get("x-qlab-data") == "illustrative"
     assert "x-qlab-data" not in client.get("/health").headers
+    monkeypatch.undo()
+    assert "x-qlab-data" not in client.post("/api/v1/xeb", json={}).headers
 
 
 def test_every_listed_router_exists():

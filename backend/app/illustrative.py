@@ -22,7 +22,7 @@ ILLUSTRATIVE_ROUTERS = frozenset({
     "live_monitor", "methods_gen", "mirror_circuit", "noise_marketplace", "oed", "offline_export",
     "optimizer_hub", "paper_draft", "paper_replication", "process_tomo", "pulse_control", "qaoa_solver", "qfm",
     "qml_datasets", "qml_workbench", "quantum_chem", "qv_runner", "rb_gst", "rb_suite", "research_pipeline",
-    "rl_optimizer", "spectral_noise", "synthetic_data", "tensor_network", "tomography", "vqe_landscape", "xeb",
+    "rl_optimizer", "spectral_noise", "synthetic_data", "tensor_network", "tomography", "vqe_landscape",
     "zne_pec",
     # Real calculation with a fallback to invented numbers when something is missing.
     "causal", "clifford_sim", "ensemble_runner", "error_budget", "github_ci", "hamiltonian_studio", "hpc_bridge",
