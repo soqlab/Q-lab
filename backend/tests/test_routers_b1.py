@@ -68,14 +68,23 @@ def test_dispatch_releases_when_sdk_calibration_meets_threshold(alice, bob, disp
     assert bobs["calibration_failures"] == ["avg_t1_us not present in calibration"]
 
     entry = body["entry_id"]
-    listed = client.get(f"/api/v1/dispatch/queue?backend={backend}&status=pending").json()
-    assert entry in {e["id"] for e in listed["entries"]}
+    listed = client.get(f"/api/v1/dispatch/queue?backend={backend}&status=pending", headers=alice).json()
+    assert entry in {e["id"] for e in listed["entries"]} and "owner" not in listed["entries"][0]
+    # Regression: the queue was global and needed no sign-in; anyone could list, release or cancel
+    # anyone's entries (and their webhook URLs).
+    assert client.get("/api/v1/dispatch/queue").status_code == 401
+    assert client.post("/api/v1/dispatch/queue", json={"circuit_name": "x", "backend": backend}).status_code == 401
+    bob_view = client.get(f"/api/v1/dispatch/queue?backend={backend}", headers=bob).json()
+    assert entry not in {e["id"] for e in bob_view["entries"]} and bob_view["total"] == 1
+    assert client.post(f"/api/v1/dispatch/queue/{entry}/release", headers=bob).status_code == 404
+    assert client.delete(f"/api/v1/dispatch/queue/{entry}", headers=bob).status_code == 404
+    assert client.post("/api/v1/dispatch/check", headers=bob).json()["checked"] == 1  # only his own entry
     released = client.post(f"/api/v1/dispatch/queue/{entry}/release", headers=alice)
     assert released.json()["release_reason"] == "manual_release"
-    assert client.post(f"/api/v1/dispatch/queue/{entry}/release").status_code == 409
-    assert client.delete(f"/api/v1/dispatch/queue/{entry}").status_code == 409
-    assert client.delete("/api/v1/dispatch/queue/dq_missing").status_code == 404
-    assert client.get("/api/v1/dispatch/queue?status=bogus").status_code == 422
+    assert client.post(f"/api/v1/dispatch/queue/{entry}/release", headers=alice).status_code == 409
+    assert client.delete(f"/api/v1/dispatch/queue/{entry}", headers=alice).status_code == 409
+    assert client.delete("/api/v1/dispatch/queue/dq_missing", headers=alice).status_code == 404
+    assert client.get("/api/v1/dispatch/queue?status=bogus", headers=alice).status_code == 422
 
 
 def test_dispatch_check_releases_once_calibration_improves(alice, dispatch_queue):
@@ -187,24 +196,40 @@ def test_suggest_experiment_needs_four_runs_and_uses_their_health(alice, bob):
 
 # ── experiment_registry ──────────────────────────────────────────────────────
 
-def test_registry_publish_star_fork_search():
+def test_registry_publish_star_fork_search(alice, bob):
     title = f"Readout study {uuid.uuid4().hex[:6]}"
-    pub = client.post("/api/v1/registry/", json={"title": title, "description": "readout errors on 5 qubits",
+    pub = client.post("/api/v1/registry/", headers=alice, json={"title": title, "description": "readout errors on 5 qubits",
                                                   "n_qubits": 5, "tags": ["readout"], "doi": "10.1/x"})
     assert pub.status_code == 200, pub.text
     rid = pub.json()["registry_id"]
     assert pub.json()["stars"] == 0 and pub.json()["reproducibility_badge"] is True
 
-    assert client.post(f"/api/v1/registry/{rid}/star?user=ann").json() == {"starred": True, "stars": 1}
-    assert client.post(f"/api/v1/registry/{rid}/star?user=ann").json() == {"starred": False, "stars": 1}
-    fork = client.post(f"/api/v1/registry/{rid}/fork?author=bo").json()
+    assert client.post(f"/api/v1/registry/{rid}/star", headers=bob).json() == {"starred": True, "stars": 1}
+    assert client.post(f"/api/v1/registry/{rid}/star", headers=bob).json() == {"starred": False, "stars": 1}
+    # Regression: stars were counted per ?user= name, so one caller could add any number of them.
+    assert client.post(f"/api/v1/registry/{rid}/star?user=someone-else", headers=bob).json()["stars"] == 1
+    fork = client.post(f"/api/v1/registry/{rid}/fork?author=bo", headers=bob).json()
     assert fork["forked_from"] == rid and fork["title"] == f"Fork of {title}" and fork["stars"] == 0
-    got = client.get(f"/api/v1/registry/{rid}").json()
+    got = client.get(f"/api/v1/registry/{rid}", headers=alice).json()
     assert got["forks"] == 1 and got["views"] == 1
 
-    found = client.post("/api/v1/registry/search", json={"query": title.lower()}).json()
+    found = client.post("/api/v1/registry/search", headers=bob, json={"query": title.lower()}).json()
     assert {r["registry_id"] for r in found["results"]} == {rid, fork["registry_id"]}
-    assert client.get("/api/v1/registry/does-not-exist").status_code == 404
+    assert client.get("/api/v1/registry/does-not-exist", headers=alice).status_code == 404
+
+    # Signed-out callers get nothing; a private entry is its owner's alone (it used to be listed
+    # for everyone by GET /registry).
+    assert client.get("/api/v1/registry").status_code == 401
+    assert client.post("/api/v1/registry/", json={"title": "x", "description": "y"}).status_code == 401
+    secret = client.post("/api/v1/registry/", headers=alice, json={
+        "title": f"Private {title}", "description": "d", "is_public": False}).json()["registry_id"]
+    assert client.get(f"/api/v1/registry/{secret}", headers=alice).status_code == 200
+    assert client.get(f"/api/v1/registry/{secret}", headers=bob).status_code == 404
+    assert client.post(f"/api/v1/registry/{secret}/fork", headers=bob).status_code == 404
+    assert secret not in {e["registry_id"] for e in
+                          client.get("/api/v1/registry?limit=1000", headers=bob).json()["experiments"]}
+    assert secret in {e["registry_id"] for e in
+                      client.get("/api/v1/registry?limit=1000", headers=alice).json()["experiments"]}
 
 
 # ── fair ─────────────────────────────────────────────────────────────────────
@@ -252,17 +277,25 @@ def test_chaos_phase_flips_do_not_change_z_counts_but_bit_flips_do():
 
 # ── federated ────────────────────────────────────────────────────────────────
 
-def test_federated_contribute_validates_and_counts(alice):
+def test_federated_contribute_validates_and_counts(alice, bob):
     algo = f"algo-{uuid.uuid4().hex[:6]}"
     base = {"algorithm": algo, "backend": "ibm_x", "n_qubits": 4, "circuit_depth": 10, "n_shots": 1000,
             "success_probability": 0.9, "health_score": 80.0, "error_rate": 0.01}
-    assert client.post("/api/v1/federated/contribute", json={**base, "success_probability": 1.5}).status_code == 422
-    ok = client.post("/api/v1/federated/contribute", json=base)
+    assert client.post("/api/v1/federated/contribute", headers=alice,
+                       json={**base, "success_probability": 1.5}).status_code == 422
+    ok = client.post("/api/v1/federated/contribute", headers=alice, json=base)
     assert ok.status_code == 200 and ok.json()["algorithm"] == algo
-    found = client.get(f"/api/v1/federated/results?algorithm={algo}").json()
-    assert found["total"] == 1
-    stats = client.get("/api/v1/federated/stats").json()
+    # Regression: a hand-typed result was stored as verified=True.
+    assert ok.json()["verified"] is False
+    # The pool is shared between signed-in users and stays anonymous.
+    found = client.get(f"/api/v1/federated/results?algorithm={algo}", headers=bob).json()
+    assert found["total"] == 1 and "owner" not in found["results"][0]
+    stats = client.get("/api/v1/federated/stats", headers=bob).json()
     assert stats["avg_health_score_by_algorithm"][algo] == 80.0
+    # Regression: the registry needed no sign-in, so anyone could flood it.
+    assert client.post("/api/v1/federated/contribute", json=base).status_code == 401
+    for path in ("/api/v1/federated/results", "/api/v1/federated/stats", "/api/v1/federated/leaderboard"):
+        assert client.get(path).status_code == 401
 
 
 def test_federated_contribution_from_run_reads_sdk_t1(alice, bob):

@@ -1,16 +1,20 @@
 """Google and GitHub OAuth2 login."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
 import os
+import secrets
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Cookie, Depends
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import create_access_token
+from ..auth import SECRET_KEY, create_access_token
 from ..database import get_db
 from ..email_service import send_welcome_email
 from ..models import User
@@ -29,19 +33,61 @@ GOOGLE_REDIRECT = f"{BASE_URL}/auth/google/callback"
 GITHUB_REDIRECT = f"{BASE_URL}/auth/github/callback"
 
 
+# ── Login CSRF protection: state + PKCE ───────────────────────────────────────
+# The start of a sign-in sets a short-lived HttpOnly cookie holding a random state and a PKCE
+# code verifier, signed with the server key. The callback only accepts a code whose state matches
+# that cookie, so a code from someone else's sign-in cannot be planted in a victim's browser, and
+# the provider only redeems the code with the matching verifier.
+
+STATE_COOKIE = "qlab_oauth"
+STATE_MAX_AGE = 600
+
+
+def _sign(value: str) -> str:
+    return hmac.new(SECRET_KEY.encode(), value.encode(), hashlib.sha256).hexdigest()
+
+
+def _start(provider: str, url: str, params: dict) -> RedirectResponse:
+    from urllib.parse import urlencode
+    state = secrets.token_urlsafe(24)
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    params = {**params, "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
+    resp = RedirectResponse(f"{url}?{urlencode(params)}")
+    payload = f"{provider}.{state}.{verifier}"
+    resp.set_cookie(STATE_COOKIE, f"{payload}.{_sign(payload)}", max_age=STATE_MAX_AGE, httponly=True,
+                    secure=BASE_URL.startswith("https://"), samesite="lax", path="/")
+    return resp
+
+
+def _verifier(provider: str, state: str | None, cookie: str | None) -> str | None:
+    """The PKCE verifier when the callback's state matches the cookie, else None."""
+    if not state or not cookie or cookie.count(".") != 3:
+        return None
+    c_provider, c_state, verifier, sig = cookie.split(".")
+    if not hmac.compare_digest(sig, _sign(f"{c_provider}.{c_state}.{verifier}")):
+        return None
+    if c_provider != provider or not hmac.compare_digest(c_state, state):
+        return None
+    return verifier
+
+
+def _finish(resp: RedirectResponse) -> RedirectResponse:
+    resp.delete_cookie(STATE_COOKIE, path="/")
+    return resp
+
+
 # ── Google ────────────────────────────────────────────────────────────────────
 
 @router.get("/google")
 def google_login():
-    from urllib.parse import urlencode
-    params = urlencode({
+    return _start("google", "https://accounts.google.com/o/oauth2/v2/auth", {
         "response_type": "code",
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": GOOGLE_REDIRECT,
         "scope": "openid email profile",
         "prompt": "select_account",
     })
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
 
 
 @router.get("/google/callback")
@@ -49,9 +95,18 @@ def google_callback(
     db: Session = Depends(get_db),
     code: str | None = None,
     error: str | None = None,
+    state: str | None = None,
+    qlab_oauth: str | None = Cookie(default=None),
 ):
     if error or not code:
-        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+        return _finish(RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed"))
+    verifier = _verifier("google", state, qlab_oauth)
+    if verifier is None:
+        return _finish(RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_state"))
+    return _finish(_google_sign_in(db, code, verifier))
+
+
+def _google_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
     try:
         token_res = httpx.post("https://oauth2.googleapis.com/token", data={
             "code": code,
@@ -59,6 +114,7 @@ def google_callback(
             "client_secret": GOOGLE_CLIENT_SECRET,
             "redirect_uri": GOOGLE_REDIRECT,
             "grant_type": "authorization_code",
+            "code_verifier": verifier,
         }, timeout=10)
         token_res.raise_for_status()
         access_token = token_res.json()["access_token"]
@@ -83,13 +139,11 @@ def google_callback(
 
 @router.get("/github")
 def github_login():
-    from urllib.parse import urlencode
-    params = urlencode({
+    return _start("github", "https://github.com/login/oauth/authorize", {
         "client_id": GITHUB_CLIENT_ID,
         "redirect_uri": GITHUB_REDIRECT,
         "scope": "user:email",
     })
-    return RedirectResponse(f"https://github.com/login/oauth/authorize?{params}")
 
 
 @router.get("/github/callback")
@@ -97,15 +151,25 @@ def github_callback(
     db: Session = Depends(get_db),
     code: str | None = None,
     error: str | None = None,
+    state: str | None = None,
+    qlab_oauth: str | None = Cookie(default=None),
 ):
     if error or not code:
-        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+        return _finish(RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed"))
+    verifier = _verifier("github", state, qlab_oauth)
+    if verifier is None:
+        return _finish(RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_state"))
+    return _finish(_github_sign_in(db, code, verifier))
+
+
+def _github_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
     try:
         token_res = httpx.post("https://github.com/login/oauth/access_token", json={
             "client_id": GITHUB_CLIENT_ID,
             "client_secret": GITHUB_CLIENT_SECRET,
             "code": code,
             "redirect_uri": GITHUB_REDIRECT,
+            "code_verifier": verifier,
         }, headers={"Accept": "application/json"}, timeout=10)
         token_res.raise_for_status()
         gh_token = token_res.json().get("access_token")

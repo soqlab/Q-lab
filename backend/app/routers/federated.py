@@ -9,10 +9,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import owner_key, public_view
 from ..store import store_put, store_get, store_list, store_seed
 from ..models import Run
 
-router = APIRouter(prefix="/api/v1/federated", tags=["federated"])
+# The pool is shared between signed-in users on purpose (that is the federation); contributions
+# record who made them, and nothing here is open to signed-out callers.
+router = APIRouter(prefix="/api/v1/federated", tags=["federated"], dependencies=[Depends(require_auth)])
 
 NS = "federated_results"
 
@@ -463,7 +467,8 @@ def _compute_stats(results: List[dict]) -> dict:
 # ------------------------------------------------------------------
 
 @router.post("/contribute", response_model=FederatedResult)
-def contribute(req: ContributeRequest, db: Session = Depends(get_db)) -> FederatedResult:
+def contribute(req: ContributeRequest, identity: Identity = Depends(require_auth),
+               db: Session = Depends(get_db)) -> FederatedResult:
     """Submit an anonymized quantum experiment result to the federated registry."""
     if not _sanity_check(req):
         raise HTTPException(
@@ -489,9 +494,9 @@ def contribute(req: ContributeRequest, db: Session = Depends(get_db)) -> Federat
         error_mitigation=req.error_mitigation,
         tags=req.tags,
         contributed_at=datetime.now(timezone.utc).isoformat(),
-        verified=True,
+        verified=False,  # typed in by hand; only results taken from a stored run are verified
     )
-    store_put(db, NS, result.result_id, result.model_dump())
+    store_put(db, NS, result.result_id, {**result.model_dump(), "owner": owner_key(identity)})
     return result
 
 
@@ -527,7 +532,7 @@ def list_results(
     top_algo = max(set(algos), key=algos.count) if algos else None
 
     return {
-        "results": paginated,
+        "results": [public_view(r) for r in paginated],  # contributions are anonymous
         "total": total,
         "stats": {
             "avg_health_score": avg_hs,
@@ -571,6 +576,7 @@ def stats(db: Session = Depends(get_db)) -> dict:
 def contribute_from_run(
     run_id: str,
     contributed_by: str = "anonymous",
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> FederatedResult:
     """Auto-extract an anonymized result from an existing Q-Lab run and contribute it."""
@@ -648,5 +654,5 @@ def contribute_from_run(
         contributed_at=datetime.now(timezone.utc).isoformat(),
         verified=True,
     )
-    store_put(db, NS, result.result_id, result.model_dump())
+    store_put(db, NS, result.result_id, {**result.model_dump(), "owner": owner_key(identity)})
     return result

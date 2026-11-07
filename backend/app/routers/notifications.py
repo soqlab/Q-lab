@@ -28,6 +28,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db, SessionLocal
+from ..deps import Identity, require_auth
+from ..run_scope import scope_of, visible
 from ..models import NotificationChannel, NotificationLog
 from ..store import store_get, store_put, store_list
 from ..email_service import is_email_configured, send_email, run_complete_email
@@ -166,14 +168,33 @@ def _ch_to_dict(ch: NotificationChannel) -> dict:
     }
 
 
+def _yours(ch: NotificationChannel, identity: Identity) -> bool:
+    """Your organisation's channels, or, without an organisation, the ones you created."""
+    return visible(ch.created_by_user_id, ch.org_id, scope_of(identity.user_id, identity.org_id))
+
+
+def _your_channel(db: Session, channel_id: str, identity: Identity) -> NotificationChannel:
+    ch = db.scalar(select(NotificationChannel).where(NotificationChannel.channel_id == channel_id))
+    if ch is None or not _yours(ch, identity):
+        raise HTTPException(404, "Channel not found")
+    return ch
+
+
+def _me(identity: Identity) -> str:
+    """Key for a person's own settings (preferences, history)."""
+    return str(identity.user_id) if identity.user_id else "shared-key"
+
+
 @router.post("/channels")
-def create_channel(req: ChannelCreate, db: Session = Depends(get_db)):
+def create_channel(req: ChannelCreate, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     if req.channel_type not in {"email", "slack", "webhook"}:
         raise HTTPException(422, f"Unknown channel_type '{req.channel_type}'")
     ch = NotificationChannel(
         channel_id=f"nc-{uuid.uuid4().hex[:12]}",
         name=req.name,
         channel_type=req.channel_type,
+        org_id=identity.org_id,
+        created_by_user_id=identity.user_id,
         config=req.config,
         events=req.events,
         is_active=True,
@@ -185,17 +206,15 @@ def create_channel(req: ChannelCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/channels")
-def list_channels(db: Session = Depends(get_db)):
+def list_channels(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     return [_ch_to_dict(ch) for ch in db.scalars(
         select(NotificationChannel).order_by(NotificationChannel.created_at.desc())
-    ).all()]
+    ).all() if _yours(ch, identity)]
 
 
 @router.patch("/channels/{channel_id}")
-def update_channel(channel_id: str, req: ChannelUpdate, db: Session = Depends(get_db)):
-    ch = db.scalar(select(NotificationChannel).where(NotificationChannel.channel_id == channel_id))
-    if ch is None:
-        raise HTTPException(404, "Channel not found")
+def update_channel(channel_id: str, req: ChannelUpdate, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    ch = _your_channel(db, channel_id, identity)
     if req.name is not None:
         ch.name = req.name
     if req.config is not None:
@@ -209,19 +228,15 @@ def update_channel(channel_id: str, req: ChannelUpdate, db: Session = Depends(ge
 
 
 @router.delete("/channels/{channel_id}", status_code=204)
-def delete_channel(channel_id: str, db: Session = Depends(get_db)):
-    ch = db.scalar(select(NotificationChannel).where(NotificationChannel.channel_id == channel_id))
-    if ch is None:
-        raise HTTPException(404, "Channel not found")
+def delete_channel(channel_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    ch = _your_channel(db, channel_id, identity)
     db.delete(ch)
     db.commit()
 
 
 @router.post("/channels/{channel_id}/test")
-def test_channel(channel_id: str, req: TestPayload, db: Session = Depends(get_db)):
-    ch = db.scalar(select(NotificationChannel).where(NotificationChannel.channel_id == channel_id))
-    if ch is None:
-        raise HTTPException(404, "Channel not found")
+def test_channel(channel_id: str, req: TestPayload, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    ch = _your_channel(db, channel_id, identity)
     status, error = "sent", None
     try:
         cfg = ch.config or {}
@@ -242,9 +257,12 @@ def get_logs(
     channel_id: Optional[str] = None,
     event: Optional[str] = None,
     limit: int = 100,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    q = select(NotificationLog).order_by(NotificationLog.sent_at.desc())
+    yours = [ch.channel_id for ch in db.scalars(select(NotificationChannel)).all() if _yours(ch, identity)]
+    q = (select(NotificationLog).where(NotificationLog.channel_id.in_(yours))
+         .order_by(NotificationLog.sent_at.desc()))
     if channel_id:
         q = q.where(NotificationLog.channel_id == channel_id)
     if event:
@@ -289,11 +307,11 @@ def _prefs_key(user_id: str) -> str:
 
 @router.get("/preferences")
 def get_preferences(
-    user_id: str = "default",
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Get notification preferences for a user (keyed by user_id query param)."""
-    data = store_get(db, _PREFS_NS, _prefs_key(user_id))
+    """Your notification preferences."""
+    data = store_get(db, _PREFS_NS, _prefs_key(_me(identity)))
     if data is None:
         # Return defaults
         return NotificationPreferences(email="").model_dump()
@@ -303,27 +321,25 @@ def get_preferences(
 @router.put("/preferences")
 def update_preferences(
     body: NotificationPreferences,
-    user_id: str = "default",
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Save notification preferences for a user."""
+    """Save your notification preferences."""
     data = body.model_dump()
-    store_put(db, _PREFS_NS, _prefs_key(user_id), data)
+    store_put(db, _PREFS_NS, _prefs_key(_me(identity)), data)
     return data
 
 
 @router.get("/history")
 def get_history(
-    user_id: str = "default",
     limit: int = 50,
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     """Return the last `limit` notification history entries for a user."""
     all_entries: list[dict[str, Any]] = store_list(db, _HISTORY_NS)
-    user_entries = [
-        e for e in all_entries
-        if e.get("user_email") == user_id or e.get("user_email", "").startswith(user_id)
-    ]
+    me = _me(identity)
+    user_entries = [e for e in all_entries if e.get("user_email") == me]
     # Sort newest first
     user_entries.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return user_entries[:limit]
@@ -331,10 +347,11 @@ def get_history(
 
 @router.post("/test")
 def send_test_email(
-    user_id: str = "default",
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> dict:
     """Send a test email to verify SMTP configuration."""
+    user_id = _me(identity)
     prefs = store_get(db, _PREFS_NS, _prefs_key(user_id))
     to_email: str = (prefs or {}).get("email", "")
     if not to_email:

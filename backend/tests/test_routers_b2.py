@@ -134,11 +134,11 @@ def test_grant_report_counts_only_runs_in_the_period(alice, bob):
     push_run(alice, project=project, created_at="2023-01-01T00:00:00+00:00", execution={"shots": 9999})
     push_run(bob, project=project, created_at="2024-06-02T00:00:00+00:00", execution={"shots": 7})
 
-    bad = client.post("/api/v1/grants", json={"name": "g", "agency": "ACME", "grant_number": "1", "pi_name": "p",
+    bad = client.post("/api/v1/grants", headers=alice, json={"name": "g", "agency": "ACME", "grant_number": "1", "pi_name": "p",
                                               "institution": "i", "start_date": "2024-01-01",
                                               "end_date": "2024-12-31"})
     assert bad.status_code == 422
-    grant = client.post("/api/v1/grants", json={"name": "Q", "agency": "NSF", "grant_number": "NSF-1",
+    grant = client.post("/api/v1/grants", headers=alice, json={"name": "Q", "agency": "NSF", "grant_number": "NSF-1",
                                                 "pi_name": "A", "institution": "U", "start_date": "2024-01-01",
                                                 "end_date": "2024-12-31", "project_slugs": [project]}).json()
     report = client.get(f"/api/v1/grants/{grant['grant_id']}/report", headers=alice).json()
@@ -146,9 +146,21 @@ def test_grant_report_counts_only_runs_in_the_period(alice, bob):
     assert s["total_runs"] == 2 and s["successful_runs"] == 1 and s["success_rate"] == 0.5
     assert s["total_shots"] == 1500
     assert [m["month"] for m in report["by_month"]] == ["2024-06", "2024-12"]
-    assert client.get(f"/api/v1/grants/{grant['grant_id']}/report", headers=bob).json()["summary"]["total_runs"] == 1
-    assert client.delete(f"/api/v1/grants/{grant['grant_id']}").json()["deleted"] is True
-    assert client.get(f"/api/v1/grants/{grant['grant_id']}").status_code == 404
+    gid = grant["grant_id"]
+    assert "owner" not in grant and "owner" not in report["grant"]
+    # Regression: grants were global; anyone, signed out included, could list, read, report on,
+    # tag runs to and delete anyone's grants.
+    assert client.get("/api/v1/grants").status_code == 401
+    assert client.get(f"/api/v1/grants/{gid}").status_code == 401
+    assert gid not in {g["grant_id"] for g in client.get("/api/v1/grants", headers=bob).json()}
+    for call in (client.get(f"/api/v1/grants/{gid}", headers=bob),
+                 client.get(f"/api/v1/grants/{gid}/report", headers=bob),
+                 client.get(f"/api/v1/grants/{gid}/report.pdf", headers=bob),
+                 client.delete(f"/api/v1/grants/{gid}", headers=bob)):
+        assert call.status_code == 404
+    assert gid in {g["grant_id"] for g in client.get("/api/v1/grants", headers=alice).json()}
+    assert client.delete(f"/api/v1/grants/{gid}", headers=alice).json()["deleted"] is True
+    assert client.get(f"/api/v1/grants/{gid}", headers=alice).status_code == 404
 
 
 # ── hamiltonian_learning ─────────────────────────────────────────────────────
@@ -465,22 +477,29 @@ def test_lab_assistant_chat_and_private_conversations(monkeypatch, bob):
 
 # ── lab_inventory ────────────────────────────────────────────────────────────
 
-def test_lab_inventory_maintenance_schedule():
+def test_lab_inventory_maintenance_schedule(alice, bob):
     item = {"name": "Dilution fridge", "category": "cryostat", "model": "BF-LD400", "serial_number": "123",
             "location": "Lab 2", "status": "operational", "purchase_date": "2022-01-01"}
-    assert client.post("/api/v1/lab-inventory/item", json={**item, "category": "toaster"}).status_code == 422
-    created = client.post("/api/v1/lab-inventory/item", json=item).json()
+    assert client.post("/api/v1/lab-inventory/item", headers=alice, json={**item, "category": "toaster"}).status_code == 422
+    created = client.post("/api/v1/lab-inventory/item", headers=alice, json=item).json()
     iid = created["item_id"]
     assert client.post("/api/v1/lab-inventory/maintenance",
-                       json={"item_id": iid, "type": "magic", "description": "d", "performed_by": "p",
+                       headers=alice, json={"item_id": iid, "type": "magic", "description": "d", "performed_by": "p",
                              "duration_hours": 1}).status_code == 422
     log = client.post("/api/v1/lab-inventory/maintenance",
-                      json={"item_id": iid, "type": "calibration", "description": "recal", "performed_by": "ann",
+                      headers=alice, json={"item_id": iid, "type": "calibration", "description": "recal", "performed_by": "ann",
                             "duration_hours": 2.5, "next_due": "2020-01-01T00:00:00+00:00"}).json()
     assert log["item_id"] == iid
-    got = client.get(f"/api/v1/lab-inventory/item/{iid}").json()
+    got = client.get(f"/api/v1/lab-inventory/item/{iid}", headers=alice).json()
     assert got["last_maintenance"] == log["logged_at"] and got["next_maintenance"] == "2020-01-01T00:00:00+00:00"
-    entry = next(s for s in client.get("/api/v1/lab-inventory/schedule").json() if s["item_id"] == iid)
+    entry = next(s for s in client.get("/api/v1/lab-inventory/schedule", headers=alice).json() if s["item_id"] == iid)
     assert entry["overdue"] is True and entry["type"] == "calibration"
-    assert iid in {i["item_id"] for i in client.get("/api/v1/lab-inventory/items?category=cryostat").json()}
-    assert client.get("/api/v1/lab-inventory/item/nope").status_code == 404
+    assert iid in {i["item_id"] for i in client.get("/api/v1/lab-inventory/items?category=cryostat", headers=alice).json()}
+    assert client.get("/api/v1/lab-inventory/item/nope", headers=alice).status_code == 404
+    # Regression: the inventory was global and needed no sign-in.
+    assert client.get("/api/v1/lab-inventory/items").status_code == 401
+    assert client.get(f"/api/v1/lab-inventory/item/{iid}", headers=bob).status_code == 404
+    assert iid not in {i["item_id"] for i in client.get("/api/v1/lab-inventory/items", headers=bob).json()}
+    assert iid not in {s["item_id"] for s in client.get("/api/v1/lab-inventory/schedule", headers=bob).json()}
+    assert client.post("/api/v1/lab-inventory/maintenance", headers=bob, json={
+        "item_id": iid, "type": "repair", "description": "x", "performed_by": "b", "duration_hours": 1}).status_code == 404

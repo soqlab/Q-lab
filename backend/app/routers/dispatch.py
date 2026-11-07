@@ -23,6 +23,8 @@ from sqlalchemy.orm import Session
 
 from ..calibration_history import calibration_metric
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import owner_key, public_view
 from ..models import Run
 from ..outbound import is_safe_url
 
@@ -172,7 +174,7 @@ def _release_entry(entry: dict, reason: str, cal: dict | None) -> None:
 # ---------------------------------------------------------------------------
 
 @router.post("/queue", status_code=201)
-def enqueue(body: EnqueueBody, db: Session = Depends(get_db)):
+def enqueue(body: EnqueueBody, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Add a circuit intent to the dispatch queue.
 
     Immediately checks the latest calibration; releases the entry if
@@ -197,6 +199,7 @@ def enqueue(body: EnqueueBody, db: Session = Depends(get_db)):
         "released_at":           None,
         "release_reason":        None,
         "calibration_at_release": None,
+        "owner":       owner_key(identity),
     }
 
     if all_met:
@@ -221,9 +224,11 @@ def enqueue(body: EnqueueBody, db: Session = Depends(get_db)):
 def list_queue(
     backend: Optional[str] = None,
     status:  Optional[str] = Query(None, pattern="^(pending|released|cancelled)$"),
+    identity: Identity = Depends(require_auth),
 ):
-    """List queue entries with optional filters."""
-    entries = _load_queue()
+    """List your queue entries with optional filters."""
+    key = owner_key(identity)
+    entries = [e for e in _load_queue() if e.get("owner") == key]
     filtered = entries
     if backend:
         filtered = [e for e in filtered if e.get("backend") == backend]
@@ -237,18 +242,19 @@ def list_queue(
         "total":    len(entries),
         "pending":  pending,
         "released": released,
-        "entries":  filtered,
+        "entries":  [public_view(e) for e in filtered],
     }
 
 
 @router.post("/check")
-def check_all(db: Session = Depends(get_db)):
+def check_all(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Re-evaluate all pending entries against the latest calibration.
 
     Fires webhooks for newly released entries.
     Returns a summary of what changed.
     """
     entries = _load_queue()
+    key = owner_key(identity)
     checked = 0
     newly_released: list[str] = []
 
@@ -256,7 +262,7 @@ def check_all(db: Session = Depends(get_db)):
     backend_cal_cache: dict[str, dict | None] = {}
 
     for entry in entries:
-        if entry.get("status") != "pending":
+        if entry.get("status") != "pending" or entry.get("owner") != key:
             continue
         checked += 1
         backend = entry["backend"]
@@ -273,7 +279,7 @@ def check_all(db: Session = Depends(get_db)):
                 _fire_webhook(entry["webhook_url"], _build_webhook_payload(entry, cal))
 
     _save_queue(entries)
-    still_pending = sum(1 for e in entries if e.get("status") == "pending")
+    still_pending = sum(1 for e in entries if e.get("status") == "pending" and e.get("owner") == key)
 
     return {
         "checked":       checked,
@@ -284,11 +290,11 @@ def check_all(db: Session = Depends(get_db)):
 
 
 @router.delete("/queue/{entry_id}", status_code=200)
-def cancel_entry(entry_id: str):
+def cancel_entry(entry_id: str, identity: Identity = Depends(require_auth)):
     """Cancel a pending queue entry."""
     entries = _load_queue()
     for entry in entries:
-        if entry["id"] == entry_id:
+        if entry["id"] == entry_id and entry.get("owner") == owner_key(identity):
             if entry["status"] != "pending":
                 raise HTTPException(409, f"Cannot cancel entry with status '{entry['status']}'")
             entry["status"] = "cancelled"
@@ -298,11 +304,11 @@ def cancel_entry(entry_id: str):
 
 
 @router.post("/queue/{entry_id}/release")
-def manual_release(entry_id: str, db: Session = Depends(get_db)):
+def manual_release(entry_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Manually release a pending entry regardless of calibration state."""
     entries = _load_queue()
     for entry in entries:
-        if entry["id"] == entry_id:
+        if entry["id"] == entry_id and entry.get("owner") == owner_key(identity):
             if entry["status"] != "pending":
                 raise HTTPException(409, f"Entry status is already '{entry['status']}'")
             cal = _get_latest_calibration(entry["backend"], db)

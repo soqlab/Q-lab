@@ -19,11 +19,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..models import Run
 from ..health_score import compute_health_score
 from ..store import store_put, store_get, store_list, store_delete
 
 router = APIRouter(prefix="/api/v1/grants", tags=["grants"])
+
+
+def _your_grant(db: Session, grant_id: str, identity: Identity) -> dict:
+    """A grant of yours (or your organisation's); 404 for anyone else's."""
+    grant = store_get(db, _NAMESPACE, grant_id)
+    if not owned_by(grant, identity):
+        raise HTTPException(404, "Grant not found")
+    return grant
 
 _NAMESPACE = "grants"
 _ID_CHARS = string.ascii_lowercase + string.digits
@@ -96,7 +106,7 @@ def _run_in_period(run: Run, start: datetime | None, end: datetime | None) -> bo
 # ---------------------------------------------------------------------------
 
 @router.post("")
-def create_grant(body: GrantCreate, db: Session = Depends(get_db)):
+def create_grant(body: GrantCreate, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     grant_id = _new_grant_id()
     now = datetime.now(timezone.utc).isoformat()
     data: dict[str, Any] = {
@@ -111,28 +121,26 @@ def create_grant(body: GrantCreate, db: Session = Depends(get_db)):
         "project_slugs": body.project_slugs,
         "budget_qpu_credits": body.budget_qpu_credits,
         "created_at": now,
+        "owner": owner_key(identity),
     }
     store_put(db, _NAMESPACE, grant_id, data)
-    return data
+    return public_view(data)
 
 
 @router.get("")
-def list_grants(db: Session = Depends(get_db)):
-    return store_list(db, _NAMESPACE)
+def list_grants(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    return [public_view(g) for g in mine(store_list(db, _NAMESPACE), identity)]
 
 
 @router.get("/{grant_id}")
-def get_grant(grant_id: str, db: Session = Depends(get_db)):
-    grant = store_get(db, _NAMESPACE, grant_id)
-    if grant is None:
-        raise HTTPException(404, "Grant not found")
-    return grant
+def get_grant(grant_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    return public_view(_your_grant(db, grant_id, identity))
 
 
 @router.delete("/{grant_id}")
-def delete_grant(grant_id: str, db: Session = Depends(get_db)):
-    if not store_delete(db, _NAMESPACE, grant_id):
-        raise HTTPException(404, "Grant not found")
+def delete_grant(grant_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    _your_grant(db, grant_id, identity)
+    store_delete(db, _NAMESPACE, grant_id)
     return {"deleted": True, "grant_id": grant_id}
 
 
@@ -232,7 +240,7 @@ def _build_report_data(grant: dict, db: Session) -> dict:
     ]
 
     return {
-        "grant": grant,
+        "grant": public_view(grant),
         "report_generated_at": datetime.now(timezone.utc).isoformat(),
         "reporting_period": {
             "start": grant.get("start_date"),
@@ -268,18 +276,14 @@ def _build_report_data(grant: dict, db: Session) -> dict:
 # ---------------------------------------------------------------------------
 
 @router.get("/{grant_id}/report")
-def get_report(grant_id: str, db: Session = Depends(get_db)):
-    grant = store_get(db, _NAMESPACE, grant_id)
-    if grant is None:
-        raise HTTPException(404, "Grant not found")
+def get_report(grant_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    grant = _your_grant(db, grant_id, identity)
     return _build_report_data(grant, db)
 
 
 @router.get("/{grant_id}/report.pdf", response_class=HTMLResponse)
-def get_report_pdf(grant_id: str, db: Session = Depends(get_db)):
-    grant = store_get(db, _NAMESPACE, grant_id)
-    if grant is None:
-        raise HTTPException(404, "Grant not found")
+def get_report_pdf(grant_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    grant = _your_grant(db, grant_id, identity)
 
     data = _build_report_data(grant, db)
     s = data["summary"]
@@ -403,10 +407,9 @@ def get_report_pdf(grant_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{grant_id}/tag-run/{run_id}")
-def tag_run_to_grant(grant_id: str, run_id: str, db: Session = Depends(get_db)):
-    grant = store_get(db, _NAMESPACE, grant_id)
-    if grant is None:
-        raise HTTPException(404, "Grant not found")
+def tag_run_to_grant(grant_id: str, run_id: str, identity: Identity = Depends(require_auth),
+                     db: Session = Depends(get_db)):
+    grant = _your_grant(db, grant_id, identity)
 
     run = db.scalar(select(Run).where(Run.run_id == run_id))
     if run is None:

@@ -110,27 +110,37 @@ def test_magic_counts_non_clifford_resources(alice):
 
 # ── meta_analysis ────────────────────────────────────────────────────────────
 
-def test_fixed_effects_meta_analysis():
+def test_fixed_effects_meta_analysis(alice, bob):
     def study(effect, se):
-        return client.post("/api/v1/meta-analysis/study", json={
+        return client.post("/api/v1/meta-analysis/study", headers=alice, json={
             "title": f"s{effect}", "authors": ["x"], "year": 2024, "effect_size": effect, "std_error": se,
             "sample_size": 100, "backend": "b", "metric": "fidelity"}).json()["study_id"]
 
     a, b = study(1.0, 0.1), study(2.0, 0.2)
-    assert client.post("/api/v1/meta-analysis/study", json={
+    assert client.post("/api/v1/meta-analysis/study", headers=alice, json={
         "title": "bad", "authors": [], "year": 2024, "effect_size": 1, "std_error": 0, "sample_size": 1,
         "backend": "b", "metric": "fidelity"}).status_code == 422
-    r = client.post("/api/v1/meta-analysis/analyze", json={"name": "m", "metric": "fidelity",
-                                                           "study_ids": [a, b], "model": "fixed"}).json()
+    r = client.post("/api/v1/meta-analysis/analyze", headers=alice, json={
+        "name": "m", "metric": "fidelity", "study_ids": [a, b], "model": "fixed"}).json()
     assert r["pooled_effect"] == pytest.approx(1.2)
     assert r["pooled_se"] == pytest.approx(math.sqrt(1 / 125), abs=1e-6)
     assert r["q_statistic"] == pytest.approx(20.0) and r["i_squared"] == pytest.approx(95.0)
     assert [p["weight"] for p in r["forest_plot_data"]] == [80.0, 20.0]
-    assert client.get(f"/api/v1/meta-analysis/analysis/{r['analysis_id']}").json()["pooled_effect"] == r["pooled_effect"]
-    assert client.post("/api/v1/meta-analysis/analyze", json={"name": "m", "metric": "fidelity",
-                                                              "study_ids": [a]}).status_code == 422
-    assert client.post("/api/v1/meta-analysis/analyze", json={"name": "m", "metric": "t1",
-                                                              "study_ids": [a, b]}).status_code == 422
+    assert client.get(f"/api/v1/meta-analysis/analysis/{r['analysis_id']}",
+                      headers=alice).json()["pooled_effect"] == r["pooled_effect"]
+    assert client.post("/api/v1/meta-analysis/analyze", headers=alice, json={
+        "name": "m", "metric": "fidelity", "study_ids": [a]}).status_code == 422
+    assert client.post("/api/v1/meta-analysis/analyze", headers=alice, json={
+        "name": "m", "metric": "t1", "study_ids": [a, b]}).status_code == 422
+    # Regression: studies and analyses were global and needed no sign-in.
+    assert client.get("/api/v1/meta-analysis/studies").status_code == 401
+    assert client.get(f"/api/v1/meta-analysis/analysis/{r['analysis_id']}", headers=bob).status_code == 404
+    assert client.get("/api/v1/meta-analysis/studies", headers=bob).json()["count"] == 0
+    assert client.get("/api/v1/meta-analysis/analyses", headers=bob).json()["count"] == 0
+    assert client.post("/api/v1/meta-analysis/analyze", headers=bob, json={
+        "name": "m", "metric": "fidelity", "study_ids": [a, b]}).status_code == 404
+    mine = client.get("/api/v1/meta-analysis/studies", headers=alice).json()["studies"]
+    assert {a, b} <= {x["study_id"] for x in mine} and all("owner" not in x for x in mine)
 
 
 # ── milestone_predict ────────────────────────────────────────────────────────
@@ -302,7 +312,7 @@ def test_notes_follow_run_visibility(alice, bob):
 
 # ── notifications ────────────────────────────────────────────────────────────
 
-def test_webhook_channel_masks_its_secret_and_signs_the_test_message(monkeypatch):
+def test_webhook_channel_masks_its_secret_and_signs_the_test_message(monkeypatch, alice, bob):
     """Regression: the webhook signing secret was returned in clear by the channel list."""
     from app import outbound
     from app.routers import notifications
@@ -318,26 +328,42 @@ def test_webhook_channel_masks_its_secret_and_signs_the_test_message(monkeypatch
 
     monkeypatch.setattr(notifications.httpx, "post", fake_post)
     secret = "whsec_very_secret_value"
-    ch = client.post("/api/v1/notifications/channels", json={
+    ch = client.post("/api/v1/notifications/channels", headers=alice, json={
         "name": "ops", "channel_type": "webhook",
         "config": {"url": "https://hooks.example.com/qlab", "secret": secret}}).json()
-    listed = next(c for c in client.get("/api/v1/notifications/channels").json() if c["channel_id"] == ch["channel_id"])
+    listed = next(c for c in client.get("/api/v1/notifications/channels", headers=alice).json() if c["channel_id"] == ch["channel_id"])
     assert secret not in json.dumps(listed) and listed["config"]["url"] == "https://..."
 
-    res = client.post(f"/api/v1/notifications/channels/{ch['channel_id']}/test", json={"message": "ping"}).json()
+    res = client.post(f"/api/v1/notifications/channels/{ch['channel_id']}/test", headers=alice,
+                      json={"message": "ping"}).json()
     assert res["status"] == "sent"
     url, body, headers = sent[-1]
     assert url == "https://hooks.example.com/qlab" and json.loads(body)["data"]["message"] == "ping"
     assert headers["X-Qlab-Signature"] == "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
-    internal = client.post("/api/v1/notifications/channels", json={
+    internal = client.post("/api/v1/notifications/channels", headers=alice, json={
         "name": "bad", "channel_type": "webhook", "config": {"url": "http://localhost:9/x"}}).json()
     monkeypatch.setattr(outbound.socket, "getaddrinfo",
                         lambda host, port, *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", port))])
-    refused = client.post(f"/api/v1/notifications/channels/{internal['channel_id']}/test", json={}).json()
+    refused = client.post(f"/api/v1/notifications/channels/{internal['channel_id']}/test", headers=alice,
+                          json={}).json()
     assert refused["status"] == "failed"
-    assert client.post("/api/v1/notifications/channels", json={"name": "x", "channel_type": "pigeon"}).status_code == 422
-    assert client.delete(f"/api/v1/notifications/channels/{ch['channel_id']}").status_code == 204
+    assert client.post("/api/v1/notifications/channels", headers=alice,
+                       json={"name": "x", "channel_type": "pigeon"}).status_code == 422
+    # Regression: channels, their delivery logs and everyone's preferences were global and needed
+    # no sign-in: anyone could list, change, fire or delete anyone's channels.
+    cid = ch["channel_id"]
+    assert client.get("/api/v1/notifications/channels").status_code == 401
+    assert cid not in {c["channel_id"] for c in client.get("/api/v1/notifications/channels", headers=bob).json()}
+    assert client.patch(f"/api/v1/notifications/channels/{cid}", headers=bob, json={"name": "x"}).status_code == 404
+    assert client.post(f"/api/v1/notifications/channels/{cid}/test", headers=bob, json={}).status_code == 404
+    assert client.delete(f"/api/v1/notifications/channels/{cid}", headers=bob).status_code == 404
+    assert client.get(f"/api/v1/notifications/logs?channel_id={cid}", headers=bob).json() == []
+    client.put("/api/v1/notifications/preferences", headers=alice, json={"email": "alice@example.com"})
+    assert client.get("/api/v1/notifications/preferences", headers=alice).json()["email"] == "alice@example.com"
+    assert client.get("/api/v1/notifications/preferences", headers=bob).json()["email"] == ""
+    assert client.get("/api/v1/notifications/preferences?user_id=1").status_code == 401
+    assert client.delete(f"/api/v1/notifications/channels/{cid}", headers=alice).status_code == 204
 
 
 # ── nps ──────────────────────────────────────────────────────────────────────
@@ -357,10 +383,12 @@ def test_nps_scores_and_admin_report(alice):
 
 # ── oauth ────────────────────────────────────────────────────────────────────
 
-def _fake_oauth(monkeypatch, *, github_email=None, google_info=None):
+def _fake_oauth(monkeypatch, *, github_email=None, google_info=None, token_requests=None):
     from app.routers import oauth
 
     def post(url, **kw):
+        if token_requests is not None:
+            token_requests.append(kw.get("data") or kw.get("json"))
         return httpx.Response(200, json={"access_token": "provider-token"}, request=httpx.Request("POST", url))
 
     def get(url, **kw):
@@ -381,6 +409,13 @@ def _token_from(location: str) -> dict:
     return {k: v[0] for k, v in parse_qs(urlparse(location).query).items()}
 
 
+def _callback(provider: str, code: str):
+    """Start a sign-in (which sets the state cookie on the client) and come back with its state."""
+    start = client.get(f"/auth/{provider}", follow_redirects=False)
+    state = _token_from(start.headers["location"])["state"]
+    return client.get(f"/auth/{provider}/callback?code={code}&state={state}", follow_redirects=False)
+
+
 def test_github_sign_in_creates_then_signs_in_the_user(monkeypatch):
     email = f"gh_{uuid.uuid4().hex[:8]}@example.com"
     _fake_oauth(monkeypatch, github_email=email)
@@ -388,12 +423,12 @@ def test_github_sign_in_creates_then_signs_in_the_user(monkeypatch):
     assert client.get("/auth/github/callback?error=denied", follow_redirects=False).headers["location"].endswith(
         "/login?error=oauth_failed")
 
-    first = client.get("/auth/github/callback?code=abc", follow_redirects=False)
+    first = _callback("github", "abc")
     q = _token_from(first.headers["location"])
     assert q["next"] == "/onboarding"
     me = client.get("/auth/me", headers={"Authorization": f"Bearer {q['token']}"}).json()
     assert me["email"] == email and me["name"] == "Octo Cat"
-    again = _token_from(client.get("/auth/github/callback?code=def", follow_redirects=False).headers["location"])
+    again = _token_from(_callback("github", "def").headers["location"])
     assert again["next"] == "/runs"
 
 
@@ -401,11 +436,58 @@ def test_google_sign_in_requires_a_verified_email(monkeypatch):
     """Regression: a Google account whose email Google had not verified could sign in as that email."""
     email = f"gg_{uuid.uuid4().hex[:8]}@example.com"
     _fake_oauth(monkeypatch, google_info={"email": email, "name": "G", "verified_email": False})
-    r = client.get("/auth/google/callback?code=abc", follow_redirects=False)
+    r = _callback("google", "abc")
     assert r.headers["location"].endswith("/login?error=no_email")
     _fake_oauth(monkeypatch, google_info={"email": email, "name": "G", "verified_email": True})
-    ok = _token_from(client.get("/auth/google/callback?code=abc", follow_redirects=False).headers["location"])
+    ok = _token_from(_callback("google", "abc").headers["location"])
     assert client.get("/auth/me", headers={"Authorization": f"Bearer {ok['token']}"}).json()["email"] == email
+
+
+def test_oauth_callback_requires_the_state_of_this_browsers_sign_in(monkeypatch):
+    """Regression: the callbacks had no state parameter (login CSRF): an attacker could send a victim
+    to /auth/<provider>/callback?code=<the attacker's code> and sign them in as the attacker."""
+    import base64
+
+    from app.routers import oauth
+    token_requests: list = []
+    email = f"st_{uuid.uuid4().hex[:8]}@example.com"
+    _fake_oauth(monkeypatch, github_email=email,
+                google_info={"email": email, "name": "S", "verified_email": True}, token_requests=token_requests)
+    refused = "/login?error=oauth_state"
+
+    client.cookies.clear()
+    assert client.get("/auth/github/callback?code=planted", follow_redirects=False).headers["location"].endswith(refused)
+    assert client.get("/auth/github/callback?code=planted&state=guess",
+                      follow_redirects=False).headers["location"].endswith(refused)
+
+    start = client.get("/auth/github", follow_redirects=False)
+    params = _token_from(start.headers["location"])
+    assert params["code_challenge_method"] == "S256" and len(params["state"]) >= 32
+    cookie = start.headers["set-cookie"]
+    assert "httponly" in cookie.lower() and "samesite=lax" in cookie.lower()
+
+    # Wrong state, a GitHub state used at Google, and a tampered cookie are all refused (a refused
+    # callback also clears the cookie, so it is put back before each attempt).
+    good = client.cookies.get(oauth.STATE_COOKIE)
+    assert client.get("/auth/github/callback?code=x&state=other",
+                      follow_redirects=False).headers["location"].endswith(refused)
+    client.cookies.set(oauth.STATE_COOKIE, good)
+    assert client.get(f"/auth/google/callback?code=x&state={params['state']}",
+                      follow_redirects=False).headers["location"].endswith(refused)
+    client.cookies.set(oauth.STATE_COOKIE, good[:-1] + ("0" if good[-1] != "0" else "1"))
+    assert client.get(f"/auth/github/callback?code=x&state={params['state']}",
+                      follow_redirects=False).headers["location"].endswith(refused)
+    assert token_requests == []  # nothing was redeemed with the provider
+
+    # The real round trip works, sends the PKCE verifier matching the challenge, and clears the cookie.
+    client.cookies.set(oauth.STATE_COOKIE, good)
+    ok = client.get(f"/auth/github/callback?code=x&state={params['state']}", follow_redirects=False)
+    assert "token=" in ok.headers["location"]
+    verifier = token_requests[-1]["code_verifier"]
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    assert challenge == params["code_challenge"]
+    cleared = ok.headers["set-cookie"].lower()  # the state is single-use
+    assert cleared.startswith(f"{oauth.STATE_COOKIE}=") and "max-age=0" in cleared
 
 
 # ── orcid ────────────────────────────────────────────────────────────────────

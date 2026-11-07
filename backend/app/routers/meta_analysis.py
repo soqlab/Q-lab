@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key, public_view
 from ..store import store_delete, store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/meta-analysis", tags=["meta_analysis"])
@@ -201,7 +203,7 @@ def _forest_plot_data(
 
 
 @router.post("/study", response_model=Study)
-def add_study(body: StudyRequest, db: Session = Depends(get_db)):
+def add_study(body: StudyRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Add a study to the meta-analysis database."""
     if body.std_error <= 0:
         raise HTTPException(status_code=422, detail="std_error must be positive")
@@ -222,19 +224,20 @@ def add_study(body: StudyRequest, db: Session = Depends(get_db)):
         doi=body.doi,
         added_at=datetime.now(timezone.utc).isoformat(),
     )
-    store_put(db, NS_STUDIES, study_id, study.model_dump())
+    store_put(db, NS_STUDIES, study_id, {**study.model_dump(), "owner": owner_key(identity)})
     return study
 
 
 @router.get("/studies")
-def list_studies(db: Session = Depends(get_db)):
-    """List all studies in the database."""
-    records = store_list(db, NS_STUDIES)
+def list_studies(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """List your studies (or your organisation's)."""
+    records = [public_view(r) for r in mine(store_list(db, NS_STUDIES), identity)]
     return {"count": len(records), "studies": records}
 
 
 @router.post("/analyze", response_model=MetaAnalysis)
-def run_meta_analysis(body: AnalyzeRequest, db: Session = Depends(get_db)):
+def run_meta_analysis(body: AnalyzeRequest, identity: Identity = Depends(require_auth),
+                      db: Session = Depends(get_db)):
     """Run a fixed or random effects meta-analysis over the specified studies."""
     if body.model not in ("random", "fixed"):
         raise HTTPException(status_code=422, detail="model must be 'random' or 'fixed'")
@@ -245,7 +248,7 @@ def run_meta_analysis(body: AnalyzeRequest, db: Session = Depends(get_db)):
     studies_data = []
     for sid in body.study_ids:
         s = store_get(db, NS_STUDIES, sid)
-        if not s:
+        if not owned_by(s, identity):
             raise HTTPException(status_code=404, detail=f"study '{sid}' not found")
         if s["metric"] != body.metric:
             raise HTTPException(
@@ -287,25 +290,25 @@ def run_meta_analysis(body: AnalyzeRequest, db: Session = Depends(get_db)):
         forest_plot_data=forest,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
-    store_put(db, NS_ANALYSES, analysis_id, analysis.model_dump())
+    store_put(db, NS_ANALYSES, analysis_id, {**analysis.model_dump(), "owner": owner_key(identity)})
     return analysis
 
 
 @router.get("/analyses")
-def list_analyses(db: Session = Depends(get_db)):
-    """List all completed meta-analyses."""
-    records = store_list(db, NS_ANALYSES)
+def list_analyses(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    """List your completed meta-analyses."""
+    records = mine(store_list(db, NS_ANALYSES), identity)
     summaries = [
-        {k: v for k, v in a.items() if k != "forest_plot_data"}
+        {k: v for k, v in a.items() if k not in ("forest_plot_data", "owner")}
         for a in records
     ]
     return {"count": len(records), "analyses": summaries}
 
 
 @router.get("/analysis/{analysis_id}", response_model=MetaAnalysis)
-def get_analysis(analysis_id: str, db: Session = Depends(get_db)):
+def get_analysis(analysis_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Retrieve a single meta-analysis with full forest plot data."""
     analysis = store_get(db, NS_ANALYSES, analysis_id)
-    if not analysis:
+    if not owned_by(analysis, identity):
         raise HTTPException(status_code=404, detail="analysis not found")
     return analysis

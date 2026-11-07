@@ -8,6 +8,8 @@ import uuid, random, math
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import mine, owned_by, owner_key
 from ..store import store_put, store_get, store_list, store_delete
 
 router = APIRouter(prefix="/api/v1/lab-inventory", tags=["Lab Inventory"])
@@ -84,7 +86,7 @@ _VALID_MAINT_TYPES = {"preventive", "corrective", "calibration"}
 
 
 @router.post("/item", response_model=EquipmentItem)
-def create_item(req: CreateItemRequest, db: Session = Depends(get_db)) -> EquipmentItem:
+def create_item(req: CreateItemRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)) -> EquipmentItem:
     if req.category not in _VALID_CATEGORIES:
         raise HTTPException(
             status_code=422,
@@ -113,7 +115,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)) -> Equipm
         linked_backends=req.linked_backends or [],
         created_at=datetime.now(timezone.utc).isoformat(),
     )
-    store_put(db, NS_ITEMS, item_id, item.model_dump())
+    store_put(db, NS_ITEMS, item_id, {**item.model_dump(), "owner": owner_key(identity)})
     return item
 
 
@@ -121,9 +123,10 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)) -> Equipm
 def list_items(
     category: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> List[EquipmentItem]:
-    results = store_list(db, NS_ITEMS)
+    results = mine(store_list(db, NS_ITEMS), identity)
     if category:
         results = [i for i in results if i["category"] == category]
     if status:
@@ -132,17 +135,18 @@ def list_items(
 
 
 @router.get("/item/{item_id}", response_model=EquipmentItem)
-def get_item(item_id: str, db: Session = Depends(get_db)) -> EquipmentItem:
+def get_item(item_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)) -> EquipmentItem:
     item = store_get(db, NS_ITEMS, item_id)
-    if not item:
+    if not owned_by(item, identity):
         raise HTTPException(status_code=404, detail="Equipment item not found")
     return EquipmentItem(**item)
 
 
 @router.post("/maintenance", response_model=MaintenanceLog)
-def log_maintenance(req: CreateMaintenanceRequest, db: Session = Depends(get_db)) -> MaintenanceLog:
+def log_maintenance(req: CreateMaintenanceRequest, identity: Identity = Depends(require_auth), 
+                    db: Session = Depends(get_db)) -> MaintenanceLog:
     item = store_get(db, NS_ITEMS, req.item_id)
-    if not item:
+    if not owned_by(item, identity):
         raise HTTPException(status_code=404, detail="Equipment item not found")
     if req.type not in _VALID_MAINT_TYPES:
         raise HTTPException(
@@ -165,7 +169,7 @@ def log_maintenance(req: CreateMaintenanceRequest, db: Session = Depends(get_db)
         next_due=req.next_due,
         logged_at=now_iso,
     )
-    store_put(db, NS_MAINTENANCE, log_id, log.model_dump())
+    store_put(db, NS_MAINTENANCE, log_id, {**log.model_dump(), "owner": owner_key(identity)})
 
     # Update the item's maintenance timestamps
     item["last_maintenance"] = now_iso
@@ -176,12 +180,12 @@ def log_maintenance(req: CreateMaintenanceRequest, db: Session = Depends(get_db)
 
 
 @router.get("/schedule", response_model=List[MaintenanceSchedule])
-def get_schedule(db: Session = Depends(get_db)) -> List[MaintenanceSchedule]:
+def get_schedule(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)) -> List[MaintenanceSchedule]:
     now_iso = datetime.now(timezone.utc).isoformat()
     schedule: List[MaintenanceSchedule] = []
 
-    all_items = store_list(db, NS_ITEMS)
-    all_logs = store_list(db, NS_MAINTENANCE)
+    all_items = mine(store_list(db, NS_ITEMS), identity)
+    all_logs = mine(store_list(db, NS_MAINTENANCE), identity)
 
     for item in all_items:
         if item.get("next_maintenance"):

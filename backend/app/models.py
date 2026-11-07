@@ -505,6 +505,7 @@ class NotificationChannel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     channel_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200))
     channel_type: Mapped[str] = mapped_column(String(32))
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

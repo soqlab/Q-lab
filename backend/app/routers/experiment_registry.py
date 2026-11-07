@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import uuid, hashlib
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import Identity, require_auth
+from ..ownership import owned_by, owner_key
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/registry", tags=["experiment-registry"])
@@ -82,8 +84,21 @@ def _build_seed_records():
     return records
 
 
+def _can_see(entry: dict | None, identity: Identity) -> bool:
+    """Public entries are for every signed-in user; private ones for their owner only."""
+    return bool(entry) and (entry.get("is_public", True) or owned_by(entry, identity))
+
+
+def _visible_entry(db: Session, registry_id: str, identity: Identity) -> dict:
+    store_seed(db, NS_REGISTRY, _build_seed_records())
+    data = store_get(db, NS_REGISTRY, registry_id)
+    if not _can_see(data, identity):
+        raise HTTPException(404, "experiment not found")
+    return data
+
+
 @router.post("/", response_model=RegistryEntry)
-def publish_experiment(req: PublishRequest, db: Session = Depends(get_db)):
+def publish_experiment(req: PublishRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     rid = str(uuid.uuid4())
     content = f"{req.title}|{req.description}|{req.n_qubits}"
     entry = RegistryEntry(
@@ -94,13 +109,13 @@ def publish_experiment(req: PublishRequest, db: Session = Depends(get_db)):
         forked_from=None, reproducibility_badge=req.doi is not None,
         **req.model_dump(),
     )
-    store_put(db, NS_REGISTRY, rid, entry.model_dump())
+    store_put(db, NS_REGISTRY, rid, {**entry.model_dump(), "owner": owner_key(identity)})
     return entry
 
 @router.post("/search")
-def search_registry(req: SearchRequest, db: Session = Depends(get_db)):
+def search_registry(req: SearchRequest, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     store_seed(db, NS_REGISTRY, _build_seed_records())
-    results = [RegistryEntry(**r) for r in store_list(db, NS_REGISTRY)]
+    results = [RegistryEntry(**r) for r in store_list(db, NS_REGISTRY) if _can_see(r, identity)]
     if req.query:
         q = req.query.lower()
         results = [r for r in results if q in r.title.lower() or q in r.description.lower() or any(q in t for t in r.tags)]
@@ -117,28 +132,24 @@ def search_registry(req: SearchRequest, db: Session = Depends(get_db)):
         results.sort(key=lambda r: r.published_at, reverse=True)
     elif req.sort_by == "forks":
         results.sort(key=lambda r: r.forks, reverse=True)
-    all_entries = store_list(db, NS_REGISTRY)
+    all_entries = [r for r in store_list(db, NS_REGISTRY) if _can_see(r, identity)]
     total = len(results)
     results = results[:req.max_results]
     return {"results": results, "total": total, "returned": len(results),
             "stats": {"total_experiments": len(all_entries), "total_stars": sum(r.get("stars", 0) for r in all_entries), "total_forks": sum(r.get("forks", 0) for r in all_entries)}}
 
 @router.get("/{registry_id}", response_model=RegistryEntry)
-def get_entry(registry_id: str, db: Session = Depends(get_db)):
-    store_seed(db, NS_REGISTRY, _build_seed_records())
-    data = store_get(db, NS_REGISTRY, registry_id)
-    if not data:
-        raise HTTPException(404, "experiment not found")
+def get_entry(registry_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    data = _visible_entry(db, registry_id, identity)
     data["views"] += 1
     store_put(db, NS_REGISTRY, registry_id, data)
     return RegistryEntry(**data)
 
 @router.post("/{registry_id}/star")
-def star_entry(registry_id: str, user: str = "anonymous", db: Session = Depends(get_db)):
-    store_seed(db, NS_REGISTRY, _build_seed_records())
-    data = store_get(db, NS_REGISTRY, registry_id)
-    if not data:
-        raise HTTPException(404, "experiment not found")
+def star_entry(registry_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    data = _visible_entry(db, registry_id, identity)
+    # One star per account. (It was per ?user= name, so anyone could add any number of stars.)
+    user = f"user:{identity.user_id}" if identity.user_id else owner_key(identity)
     star_key = f"{user}:{registry_id}"
     if store_get(db, NS_STARS, star_key):
         return {"starred": False, "stars": data["stars"]}
@@ -148,23 +159,22 @@ def star_entry(registry_id: str, user: str = "anonymous", db: Session = Depends(
     return {"starred": True, "stars": data["stars"]}
 
 @router.post("/{registry_id}/fork", response_model=RegistryEntry)
-def fork_entry(registry_id: str, new_title: str = "", author: str = "anonymous", db: Session = Depends(get_db)):
-    store_seed(db, NS_REGISTRY, _build_seed_records())
-    src = store_get(db, NS_REGISTRY, registry_id)
-    if not src:
-        raise HTTPException(404, "experiment not found")
+def fork_entry(registry_id: str, new_title: str = "", author: str = "anonymous", identity: Identity = Depends(require_auth), 
+               db: Session = Depends(get_db)):
+    src = _visible_entry(db, registry_id, identity)
     new_id = str(uuid.uuid4())
     data = dict(src)
-    data.update({"registry_id": new_id, "stars": 0, "forks": 0, "views": 0, "title": new_title or f"Fork of {src['title']}", "author": author, "forked_from": registry_id, "published_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()})
+    data.update({"registry_id": new_id, "stars": 0, "forks": 0, "views": 0, "title": new_title or f"Fork of {src['title']}", "author": author, "forked_from": registry_id, "owner": owner_key(identity), "published_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()})
     store_put(db, NS_REGISTRY, new_id, data)
     src["forks"] += 1
     store_put(db, NS_REGISTRY, registry_id, src)
     return RegistryEntry(**data)
 
 @router.get("")
-def list_experiments(limit: int = 20, sort_by: str = "stars", db: Session = Depends(get_db)):
+def list_experiments(limit: int = 20, sort_by: str = "stars", identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     store_seed(db, NS_REGISTRY, _build_seed_records())
-    all_entries = [RegistryEntry(**r) for r in store_list(db, NS_REGISTRY)]
+    # Private entries were listed here for everyone, unlike in search.
+    all_entries = [RegistryEntry(**r) for r in store_list(db, NS_REGISTRY) if _can_see(r, identity)]
     results = sorted(all_entries, key=lambda r: r.stars if sort_by == "stars" else r.published_at, reverse=True)[:limit]
     return {"experiments": results, "total": len(all_entries)}
 
