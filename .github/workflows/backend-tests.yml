@@ -27,4 +27,9 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt pytest pytest-cov
       - name: Run tests
-        run: pytest tests -q --cov=app --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
+        run: pytest tests -q --cov=app --cov-fail-under=75 --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
+      - name: Core tracking path coverage
+        # Ingest, run storage, read/compare, auth and run visibility. Raise the floor as tests are added.
+        run: >-
+          coverage report --fail-under=90
+          --include="app/main.py,app/deps.py,app/run_scope.py,app/health_score.py,app/analytics.py,app/events.py,app/auth.py"

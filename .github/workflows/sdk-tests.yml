@@ -42,6 +42,11 @@ jobs:
         run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
       - name: Run tests
         run: pytest tests/ -v --tb=short --cov=qlab --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
+      - name: Core tracking path coverage
+        # Capture (qiskit_hooks, context, fingerprint), upload (client, config) and CI checks.
+        run: >-
+          coverage report --fail-under=85
+          --include="qlab/__init__.py,qlab/ci.py,qlab/client.py,qlab/config.py,qlab/context.py,qlab/fingerprint.py,qlab/qiskit_hooks.py"
 
   # Amazon Braket and IonQ adapters (qlab.providers), against the providers' own simulators:
   # Braket's LocalSimulator, and qiskit-ionq talking to a local stand-in for the IonQ API.
