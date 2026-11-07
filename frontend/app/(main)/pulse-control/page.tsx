@@ -74,20 +74,21 @@ export default function PulseControlPage() {
   const [loadingPast, setLoadingPast] = useState(true);
   const [pastError, setPastError] = useState<string | null>(null);
 
-  const loadPastSchedules = useCallback(async () => {
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly (loadingPast
+  // starts true), later reloads go through loadPastSchedules().
+  const fetchPastSchedules = useCallback(() =>
+    listPulseSchedules()
+      .then((data) => setPastSchedules(data))
+      .catch((e) => setPastError(e instanceof Error ? e.message : "Failed to load schedules"))
+      .finally(() => setLoadingPast(false)), []);
+
+  const loadPastSchedules = useCallback(() => {
     setLoadingPast(true);
     setPastError(null);
-    try {
-      const data = await listPulseSchedules();
-      setPastSchedules(data);
-    } catch (e) {
-      setPastError(e instanceof Error ? e.message : "Failed to load schedules");
-    } finally {
-      setLoadingPast(false);
-    }
-  }, []);
+    return fetchPastSchedules();
+  }, [fetchPastSchedules]);
 
-  useEffect(() => { void loadPastSchedules(); }, [loadPastSchedules]);
+  useEffect(() => { void fetchPastSchedules(); }, [fetchPastSchedules]);
 
   async function handleCompile(e: React.FormEvent) {
     e.preventDefault();

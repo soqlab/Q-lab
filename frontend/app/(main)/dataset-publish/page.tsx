@@ -86,8 +86,12 @@ function PublicationCard({
   const [mintError, setMintError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Keep in sync if parent prop changes (e.g. new pub added at top of list)
-  useEffect(() => { setPub(initialPub); }, [initialPub]);
+  // Keep in sync if parent prop changes (e.g. new pub added at top of list): adjusted while rendering
+  const [prevInitialPub, setPrevInitialPub] = useState(initialPub);
+  if (initialPub !== prevInitialPub) {
+    setPrevInitialPub(initialPub);
+    setPub(initialPub);
+  }
 
   async function handleMintDOI() {
     setMinting(true);
@@ -222,20 +226,21 @@ export default function DatasetPublishPage() {
   const [loadingPubs, setLoadingPubs] = useState(true);
   const [pubsError, setPubsError] = useState<string | null>(null);
 
-  const loadPublications = useCallback(async () => {
-    setLoadingPubs(true);
-    setPubsError(null);
-    try {
-      const data = await listDatasetPublications();
-      setPublications(data);
-    } catch (e) {
-      setPubsError(e instanceof Error ? e.message : "Failed to load publications");
-    } finally {
-      setLoadingPubs(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchPublications = useCallback(() => {
+    return listDatasetPublications()
+      .then((data) => setPublications(data))
+      .catch((e: unknown) => setPubsError(e instanceof Error ? e.message : "Failed to load publications"))
+      .finally(() => setLoadingPubs(false));
   }, []);
 
-  useEffect(() => { void loadPublications(); }, [loadPublications]);
+  const loadPublications = useCallback(() => {
+    setLoadingPubs(true);
+    setPubsError(null);
+    return fetchPublications();
+  }, [fetchPublications]);
+
+  useEffect(() => { void fetchPublications(); }, [fetchPublications]);
 
   async function handlePublish(e: React.FormEvent) {
     e.preventDefault();

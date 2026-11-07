@@ -179,24 +179,26 @@ export default function CostTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadAll = async (mb: number = monthlyBudget) => {
+  // The requests and the state they set, only in promise callbacks (loading starts true on mount).
+  const fetchAll = (mb: number) =>
+    Promise.all([
+      fetch(`${API}/api/v1/cost-tracker/summary`).then(r => r.json()),
+      fetch(`${API}/api/v1/cost-tracker/budget-check?monthly_budget_usd=${mb}`).then(r => r.json()),
+    ])
+      .then(([s, b]) => {
+        setSummary(s);
+        setBudget(b);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load cost data"))
+      .finally(() => setLoading(false));
+
+  const loadAll = (mb: number = monthlyBudget) => {
     setLoading(true);
     setError(null);
-    try {
-      const [s, b] = await Promise.all([
-        fetch(`${API}/api/v1/cost-tracker/summary`).then(r => r.json()),
-        fetch(`${API}/api/v1/cost-tracker/budget-check?monthly_budget_usd=${mb}`).then(r => r.json()),
-      ]);
-      setSummary(s);
-      setBudget(b);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load cost data");
-    } finally {
-      setLoading(false);
-    }
+    return fetchAll(mb);
   };
 
-  useEffect(() => { loadAll(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void fetchAll(monthlyBudget); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const thisMontKey = new Date().toISOString().slice(0, 7);
   const thisMonthSpend = summary?.monthly_trend[thisMontKey] ?? 0;

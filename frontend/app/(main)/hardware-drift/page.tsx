@@ -168,47 +168,50 @@ function MetricCard({ metric, alert, ts }: { metric: string; alert: DriftAlert |
 export default function HardwareDriftPage() {
   const [backend, setBackend] = useState("ibm_sherbrooke");
   const [inputBackend, setInputBackend] = useState("ibm_sherbrooke");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<DriftAlert[]>([]);
   const [timeseries, setTimeseries] = useState<Record<string, TimeseriesData | null>>({});
   const [summaries, setSummaries] = useState<BackendSummary[]>([]);
-  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchData = async (b: string) => {
+  // requestData/requestSummary set state only in promise callbacks, so the mount effect can call them
+  // directly (both loading flags start true); fetchData/fetchSummary also show the loading state.
+  const requestData = (b: string) =>
+    Promise.all([
+      fetch(`${API}/api/v1/hardware-drift/alerts/${encodeURIComponent(b)}`).then(r => r.json()),
+      ...METRICS.map(m =>
+        fetch(`${API}/api/v1/hardware-drift/timeseries/${encodeURIComponent(b)}?metric=${m}&limit=20`)
+          .then(r => r.json())
+          .catch(() => null)
+      ),
+    ])
+      .then(([alertsRes, ...tsResults]) => {
+        setAlerts(alertsRes.alerts ?? []);
+        const tsMap: Record<string, TimeseriesData | null> = {};
+        METRICS.forEach((m, i) => { tsMap[m] = tsResults[i]; });
+        setTimeseries(tsMap);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to fetch drift data"))
+      .finally(() => setLoading(false));
+
+  const fetchData = (b: string) => {
     setLoading(true);
     setError(null);
-    try {
-      const [alertsRes, ...tsResults] = await Promise.all([
-        fetch(`${API}/api/v1/hardware-drift/alerts/${encodeURIComponent(b)}`).then(r => r.json()),
-        ...METRICS.map(m =>
-          fetch(`${API}/api/v1/hardware-drift/timeseries/${encodeURIComponent(b)}?metric=${m}&limit=20`)
-            .then(r => r.json())
-            .catch(() => null)
-        ),
-      ]);
-      setAlerts(alertsRes.alerts ?? []);
-      const tsMap: Record<string, TimeseriesData | null> = {};
-      METRICS.forEach((m, i) => { tsMap[m] = tsResults[i]; });
-      setTimeseries(tsMap);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to fetch drift data");
-    } finally {
-      setLoading(false);
-    }
+    return requestData(b);
   };
 
-  const fetchSummary = async () => {
+  const requestSummary = () =>
+    fetch(`${API}/api/v1/hardware-drift/summary`)
+      .then(r => r.json())
+      .then(res => setSummaries(res.backends ?? []))
+      .catch(() => { /* summary is best-effort */ })
+      .finally(() => setSummaryLoading(false));
+
+  const fetchSummary = () => {
     setSummaryLoading(true);
-    try {
-      const res = await fetch(`${API}/api/v1/hardware-drift/summary`).then(r => r.json());
-      setSummaries(res.backends ?? []);
-    } catch {
-      // summary is best-effort
-    } finally {
-      setSummaryLoading(false);
-    }
+    return requestSummary();
   };
 
   const handleCheck = () => {
@@ -218,8 +221,8 @@ export default function HardwareDriftPage() {
   };
 
   useEffect(() => {
-    fetchData(backend);
-    fetchSummary();
+    requestData(backend);
+    requestSummary();
     // Auto-refresh every 5 minutes
     intervalRef.current = setInterval(() => {
       fetchData(backend);

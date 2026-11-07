@@ -193,7 +193,7 @@ function MyReviewRequests({ reviews, loading, error }: {
                   </div>
                   {r.reviewer_comments && (
                     <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8", background: "#111d2b", borderRadius: 6, padding: "8px 12px" }}>
-                      <em>"{r.reviewer_comments.slice(0, 200)}{r.reviewer_comments.length > 200 ? "…" : ""}"</em>
+                      <em>&ldquo;{r.reviewer_comments.slice(0, 200)}{r.reviewer_comments.length > 200 ? "…" : ""}&rdquo;</em>
                     </div>
                   )}
                   {r.status === "approved" && r.signature && (
@@ -376,17 +376,20 @@ export default function PeerReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const data = await apiFetch("/api/v1/peer-review/my-requests");
-      setReviews(data.reviews ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reviews");
-    } finally { setLoading(false); }
-  }, []);
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly (loading
+  // starts true), the refresh button and the form go through load().
+  const fetchReviews = useCallback(() =>
+    apiFetch("/api/v1/peer-review/my-requests")
+      .then((data) => setReviews(data.reviews ?? []))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load reviews"))
+      .finally(() => setLoading(false)), []);
 
-  useEffect(() => { void load(); }, [load]);
+  const load = useCallback(() => {
+    setLoading(true); setError(null);
+    return fetchReviews();
+  }, [fetchReviews]);
+
+  useEffect(() => { void fetchReviews(); }, [fetchReviews]);
 
   return (
     <main style={{ padding: "24px 28px", background: "#070f1a", minHeight: "100vh", color: "#e2e8f0" }}>

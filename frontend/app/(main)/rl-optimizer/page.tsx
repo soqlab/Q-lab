@@ -86,21 +86,24 @@ export default function RLOptimizerPage() {
   const [applyError, setApplyError] = useState("");
   const [applyResult, setApplyResult] = useState<RLOptimizedCircuit | null>(null);
 
-  const loadSessions = useCallback(async () => {
-    setLoadingSessions(true);
-    try {
-      const s = await listRLSessions();
-      setSessions(s);
-      setSessionsError("");
-      if (s.length > 0 && !applySessionId) setApplySessionId(s[0].session_id);
-    } catch (e) {
-      setSessionsError(e instanceof Error ? e.message : "Failed to load sessions");
-    } finally {
-      setLoadingSessions(false);
-    }
-  }, [applySessionId]);
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly
+  // (loadingSessions starts true), the refresh button goes through loadSessions().
+  const fetchSessions = useCallback(() =>
+    listRLSessions()
+      .then((s) => {
+        setSessions(s);
+        setSessionsError("");
+        if (s.length > 0 && !applySessionId) setApplySessionId(s[0].session_id);
+      })
+      .catch((e) => setSessionsError(e instanceof Error ? e.message : "Failed to load sessions"))
+      .finally(() => setLoadingSessions(false)), [applySessionId]);
 
-  useEffect(() => { void loadSessions(); }, []);
+  const loadSessions = useCallback(() => {
+    setLoadingSessions(true);
+    return fetchSessions();
+  }, [fetchSessions]);
+
+  useEffect(() => { void fetchSessions(); }, []);
 
   const handleTrain = async () => {
     if (!form.name.trim()) { setTrainError("Name is required"); return; }

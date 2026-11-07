@@ -40,18 +40,26 @@ export default function CircuitVersionsPage() {
   const [createForm, setCreateForm] = useState({ circuit_family: "", qasm: SAMPLE_QASM, commit_message: "", tags: "" });
   const [creating, setCreating] = useState(false);
 
-  const loadFamilies = () => {
-    setLoading(true);
+  // The request and the state it sets, only in promise callbacks (loading starts true on mount).
+  const fetchFamilies = () =>
     listCircuitFamilies()
       .then(f => { setFamilies(f); setErr(""); })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+
+  const loadFamilies = () => {
+    setLoading(true);
+    void fetchFamilies();
   };
 
-  useEffect(() => { loadFamilies(); }, []);
+  useEffect(() => { void fetchFamilies(); }, []);
+
+  // Clearing the family clears its versions (adjusted while rendering, not in the effect).
+  const [versionsFamily, setVersionsFamily] = useState(selectedFamily);
+  if (selectedFamily !== versionsFamily) { setVersionsFamily(selectedFamily); if (!selectedFamily) setVersions([]); }
 
   useEffect(() => {
-    if (!selectedFamily) { setVersions([]); return; }
+    if (!selectedFamily) return;
     listCircuitVersions({ family: selectedFamily, limit: 50 })
       .then(setVersions)
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));

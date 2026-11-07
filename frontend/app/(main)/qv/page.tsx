@@ -62,14 +62,19 @@ export default function QVPage() {
   });
   const [trendBackend, setTrendBackend] = useState("ibm_brisbane");
 
-  const load = async () => {
+  // The fetch sets state only in promise callbacks, so the effect can call it directly.
+  const load = () =>
+    Promise.all([listQVResults(), getQVTrend(trendBackend)])
+      .then(([r, t]) => { setResults(r); setTrend(t); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  // A new trend backend shows the loading state at once (set while rendering; loading starts true).
+  const [prevTrendBackend, setPrevTrendBackend] = useState(trendBackend);
+  if (trendBackend !== prevTrendBackend) {
+    setPrevTrendBackend(trendBackend);
     setLoading(true);
-    try {
-      const [r, t] = await Promise.all([listQVResults(), getQVTrend(trendBackend)]);
-      setResults(r); setTrend(t);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
-  };
+  }
 
   useEffect(() => { load(); }, [trendBackend]);
 

@@ -15,18 +15,24 @@ export default function TrotterPage() {
   const [h, setH] = useState(0.5);
   const [initState, setInitState] = useState("neel");
   const [result, setResult] = useState<TrotterResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call, setting state only in promise callbacks: run on mount (loading starts true) and by run().
+  function compute() {
+    return runTrotterEvolution({ hamiltonian, n_qubits: nQubits, t_total: tTotal, n_steps: nSteps, trotter_order: trotterOrder, J, h, initial_state: initState })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await runTrotterEvolution({ hamiltonian, n_qubits: nQubits, t_total: tTotal, n_steps: nSteps, trotter_order: trotterOrder, J, h, initial_state: initState })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const W = 540, H = 160;
   function lineChart(data: number[], color: string) {

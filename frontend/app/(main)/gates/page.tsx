@@ -68,20 +68,31 @@ export default function GatesPage() {
   const [form, setForm] = useState({ backend: "ibm_brisbane", char_type: "t1", qubit: 0, n_qubits: 1 });
   const [activeTab, setActiveTab] = useState<"results" | "summary" | "trend">("results");
 
-  const load = async () => {
+  // State is set only in promise callbacks, so the effect can call this directly.
+  const fetchAll = () =>
+    Promise.all([
+      listGateCharResults({ backend: filterBackend, char_type: filterType }),
+      getGateCharSummary(filterBackend),
+      getGateCharTrend(filterBackend, filterType),
+    ])
+      .then(([r, s, t]) => { setResults(r); setSummary(s); setTrend(t); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  const load = () => {
     setLoading(true);
-    try {
-      const [r, s, t] = await Promise.all([
-        listGateCharResults({ backend: filterBackend, char_type: filterType }),
-        getGateCharSummary(filterBackend),
-        getGateCharTrend(filterBackend, filterType),
-      ]);
-      setResults(r); setSummary(s); setTrend(t);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    return fetchAll();
   };
 
-  useEffect(() => { load(); }, [filterBackend, filterType]);
+  // New filters show the loading state at once (adjusted while rendering, not in the effect).
+  const filterKey = `${filterBackend}|${filterType}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setLoading(true);
+  }
+
+  useEffect(() => { fetchAll(); }, [filterBackend, filterType]);
 
   const handleSubmit = async () => {
     if (!curveData.length) { setError("Add curve data first"); return; }

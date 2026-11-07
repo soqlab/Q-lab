@@ -17,24 +17,24 @@ export default function SyndromeDecoderPage() {
   const [decoder, setDecoder] = useState<"mwpm" | "union_find">("mwpm");
   const [nRounds, setNRounds] = useState(3);
   const [result, setResult] = useState<SyndromeDecoderResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const handleRun = async () => {
+  // The API call, setting state only in promise callbacks: run on mount (loading starts true) and by handleRun.
+  const compute = () =>
+    decodeSyndrome({ code, error_rate: errorRate, decoder, n_rounds: nRounds })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  const handleRun = () => {
     setLoading(true);
     setError("");
-    try {
-      const res = await decodeSyndrome({ code, error_rate: errorRate, decoder, n_rounds: nRounds });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const activeCode = CODES.find(c => c.id === code);
 

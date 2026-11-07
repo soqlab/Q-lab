@@ -7,21 +7,27 @@ export default function NoiseMarketplacePage() {
   const [selected, setSelected] = useState<NoiseMarketplaceModel | null>(null);
   const [applyResult, setApplyResult] = useState<{ fidelity_degradation: number; ideal_counts: Record<string, number>; noisy_counts: Record<string, number>; noise_method: string } | null>(null);
   const [qasm, setQasm] = useState('OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[2];\nh q[0];\ncx q[0],q[1];');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [snippetTab, setSnippetTab] = useState<"qiskit" | "pennylane" | "qasm">("qiskit");
   const [sortBy, setSortBy] = useState("downloads");
 
-  useEffect(() => { load(); }, [sortBy]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const r = await listNoiseModels({ sort_by: sortBy });
-      setModels(r.models);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+  // State is set only in promise callbacks, so the effect can call this directly.
+  function load() {
+    return listNoiseModels({ sort_by: sortBy })
+      .then((r) => setModels(r.models))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }
+
+  // A new sort shows the loading state at once (adjusted while rendering, not in the effect).
+  const [prevSortBy, setPrevSortBy] = useState(sortBy);
+  if (sortBy !== prevSortBy) {
+    setPrevSortBy(sortBy);
+    setLoading(true);
+  }
+
+  useEffect(() => { load(); }, [sortBy]);
 
   async function selectModel(id: string) {
     try {

@@ -21,31 +21,33 @@ export default function RBSuitePage() {
   const [nSeeds, setNSeeds] = useState<number>(30);
   const [interleavedGate, setInterleavedGate] = useState<string>("cx");
   const [result, setResult] = useState<RBSuiteResult | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleRun() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through handleRun().
+  function compute() {
+    const req: Parameters<typeof runRBSuite>[0] = {
+      rb_type: rbType,
+      backend,
+      qubit,
+      n_seeds: nSeeds,
+    };
+    if (rbType === "interleaved") req.interleaved_gate = interleavedGate;
+    return runRBSuite(req)
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function handleRun() {
     setLoading(true);
     setError(null);
-    try {
-      const req: Parameters<typeof runRBSuite>[0] = {
-        rb_type: rbType,
-        backend,
-        qubit,
-        n_seeds: nSeeds,
-      };
-      if (rbType === "interleaved") req.interleaved_gate = interleavedGate;
-      const res = await runRBSuite(req);
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   function buildSVG(r: RBSuiteResult): React.ReactNode {
     const W = 560;

@@ -52,25 +52,28 @@ export default function LiveMonitorPage() {
   const [subResult, setSubResult] = useState<MonitorAlertSubscription | null>(null);
   const [subError, setSubError] = useState("");
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const status = await getLiveStatus();
-      setBackends(status);
-      setLastUpdated(new Date());
-      setError("");
-      if (status.length > 0 && !subForm.backend) {
-        setSubForm(f => ({ ...f, backend: f.backend || status[0].backend }));
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch status");
-    } finally {
-      setLoading(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchStatus = useCallback(() => {
+    return getLiveStatus()
+      .then((status) => {
+        setBackends(status);
+        setLastUpdated(new Date());
+        setError("");
+        if (status.length > 0 && !subForm.backend) {
+          setSubForm(f => ({ ...f, backend: f.backend || status[0].backend }));
+        }
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to fetch status"))
+      .finally(() => setLoading(false));
   }, [subForm.backend]);
 
+  const refresh = useCallback(() => {
+    setLoading(true);
+    return fetchStatus();
+  }, [fetchStatus]);
+
   useEffect(() => {
-    void refresh();
+    void fetchStatus();
     const id = setInterval(() => { void refresh(); }, 30000);
     return () => clearInterval(id);
   }, []);

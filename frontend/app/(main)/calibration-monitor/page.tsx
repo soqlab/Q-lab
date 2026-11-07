@@ -29,6 +29,9 @@ export default function CalibrationMonitorPage() {
   const [history, setHistory] = useState<BackendCalibration[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Choosing a backend shows the loading state at once (adjusted while rendering, not in the effect).
+  const [loadingFor, setLoadingFor] = useState("");
+  if (selected !== loadingFor) { setLoadingFor(selected); if (selected) setLoading(true); }
 
   useEffect(() => {
     listCalibrationBackends()
@@ -42,7 +45,6 @@ export default function CalibrationMonitorPage() {
 
   useEffect(() => {
     if (!selected) return;
-    setLoading(true);
     Promise.all([getCalibration(selected), getCalibrationHistory(selected, 10)])
       .then(([c, h]) => { setCal(c); setHistory(h.history); })
       .catch(e => setError(e instanceof Error ? e.message : String(e)))

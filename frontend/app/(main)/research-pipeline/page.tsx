@@ -371,17 +371,14 @@ export default function ResearchPipelinePage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const loadPipelines = useCallback(async () => {
-    setListLoading(true);
-    try {
-      const data = await listResearchPipelines();
-      setPipelines(data.pipelines);
-    } catch {
-      // non-blocking
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
+  // Loaded on mount (listLoading starts true); state is set in the promise callbacks.
+  const loadPipelines = useCallback(() =>
+    listResearchPipelines()
+      .then((data) => setPipelines(data.pipelines))
+      .catch(() => {
+        // non-blocking
+      })
+      .finally(() => setListLoading(false)), []);
 
   useEffect(() => {
     loadPipelines();

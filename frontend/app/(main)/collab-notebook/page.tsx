@@ -58,8 +58,8 @@ export default function CollabNotebookPage() {
   const [creatingNb, setCreatingNb] = useState(false);
   const [createNbError, setCreateNbError] = useState<string | null>(null);
 
-  // Stable sender id for this session
-  const senderIdRef = useRef(Math.random().toString(36).slice(2));
+  // Stable sender id for this session, made on first send (not during render)
+  const senderIdRef = useRef("");
 
   // ---------------------------------------------------------------------------
   // WebSocket helpers
@@ -132,6 +132,7 @@ export default function CollabNotebookPage() {
   const sendCellUpdate = useCallback((cellId: string, source: string) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
+      if (!senderIdRef.current) senderIdRef.current = Math.random().toString(36).slice(2);
       ws.send(
         JSON.stringify({
           type: "cell_update",
@@ -155,22 +156,22 @@ export default function CollabNotebookPage() {
   // REST data loading
   // ---------------------------------------------------------------------------
 
-  const loadNotebooks = useCallback(async (owner?: string) => {
+  // The request and the state it sets, only in promise callbacks (loadingNotebooks starts true on mount).
+  const fetchNotebooks = useCallback((owner?: string) =>
+    listCollabNotebooks(owner || undefined)
+      .then((data) => setNotebooks(data))
+      .catch(() => setNotebooksError("Failed to load notebooks."))
+      .finally(() => setLoadingNotebooks(false)), []);
+
+  const loadNotebooks = useCallback((owner?: string) => {
     setLoadingNotebooks(true);
     setNotebooksError(null);
-    try {
-      const data = await listCollabNotebooks(owner || undefined);
-      setNotebooks(data);
-    } catch {
-      setNotebooksError("Failed to load notebooks.");
-    } finally {
-      setLoadingNotebooks(false);
-    }
-  }, []);
+    return fetchNotebooks(owner);
+  }, [fetchNotebooks]);
 
   useEffect(() => {
-    loadNotebooks();
-  }, [loadNotebooks]);
+    void fetchNotebooks();
+  }, [fetchNotebooks]);
 
   const handleLoadOwner = () => loadNotebooks(ownerFilter);
 

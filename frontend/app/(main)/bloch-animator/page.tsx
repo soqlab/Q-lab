@@ -17,20 +17,27 @@ export default function BlochAnimatorPage() {
   const [nFrames, setNFrames] = useState(30);
   const [noise, setNoise] = useState(0.0);
   const [result, setResult] = useState<BlochAnimResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [frameIdx, setFrameIdx] = useState(0);
   const [gateInput, setGateInput] = useState("");
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return animateBloch({ gate_sequence: gateSeq, initial_state: initState, n_frames: nFrames, noise_level: noise })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null); setFrameIdx(0);
-    try { setResult(await animateBloch({ gate_sequence: gateSeq, initial_state: initState, n_frames: nFrames, noise_level: noise })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   function applyPreset(name: string) {
     const p = PRESETS[name];

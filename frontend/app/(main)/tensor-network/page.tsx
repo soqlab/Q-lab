@@ -16,24 +16,24 @@ export default function TensorNetworkPage() {
   const [maxBondDim, setMaxBondDim] = useState(16);
   const [method, setMethod] = useState<"svd" | "qr">("svd");
   const [result, setResult] = useState<TensorNetworkResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const handleRun = async () => {
+  // The API call, setting state only in promise callbacks: run on mount (loading starts true) and by handleRun.
+  const compute = () =>
+    analyzeTensorNetwork({ qasm, max_bond_dim: maxBondDim, method })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  const handleRun = () => {
     setLoading(true);
     setError("");
-    try {
-      const res = await analyzeTensorNetwork({ qasm, max_bond_dim: maxBondDim, method });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const renderBondChart = (dims: number[]) => {
     if (!dims || dims.length === 0) return null;

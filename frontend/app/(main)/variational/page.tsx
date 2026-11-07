@@ -68,12 +68,15 @@ export default function VariationalPage() {
   const [addingIter, setAddingIter] = useState(false);
 
   const load = () => {
-    setLoading(true);
     listVariationalRuns({ algorithm: filterAlgo || undefined, limit: 100 })
       .then(r => { setVruns(r); setErr(""); })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
+
+  // A filter change shows the loading state at once (adjusted while rendering; the effect only fetches).
+  const [prevFilterAlgo, setPrevFilterAlgo] = useState(filterAlgo);
+  if (filterAlgo !== prevFilterAlgo) { setPrevFilterAlgo(filterAlgo); setLoading(true); }
 
   useEffect(() => { load(); }, [filterAlgo]);
 

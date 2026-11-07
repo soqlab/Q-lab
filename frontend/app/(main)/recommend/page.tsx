@@ -46,18 +46,24 @@ export default function RecommendPage() {
   const [runId, setRunId] = useState("");
   const [limit, setLimit] = useState(12);
   const [result, setResult] = useState<RecommendationResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeStrategy, setActiveStrategy] = useState<string>("all");
 
-  useEffect(() => { fetchRecommendations(); }, []);
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the button through fetchRecommendations().
+  const compute = () =>
+    getRecommendations(runId || undefined, limit)
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
 
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = () => {
     setLoading(true); setError(null);
-    try { setResult(await getRecommendations(runId || undefined, limit)); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   };
+
+  useEffect(() => { compute(); }, []);
 
   const strategyLists: Record<string, Suggestion[]> = result
     ? {

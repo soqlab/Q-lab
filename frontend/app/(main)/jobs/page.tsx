@@ -122,8 +122,8 @@ export default function JobsPage() {
 
   const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const load = () => {
-    setLoading(true);
+  // State is set only in promise callbacks, so the effect can call this directly.
+  const fetchJobs = () => {
     Promise.all([
       listJobs({ status: filterStatus || undefined, provider: filterProvider || undefined, limit: 100 }),
       getJobStats(),
@@ -133,7 +133,20 @@ export default function JobsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filterStatus, filterProvider]);
+  const load = () => {
+    setLoading(true);
+    fetchJobs();
+  };
+
+  // New filters show the loading state at once (adjusted while rendering, not in the effect).
+  const filterKey = `${filterStatus}|${filterProvider}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setLoading(true);
+  }
+
+  useEffect(() => { fetchJobs(); }, [filterStatus, filterProvider]);
 
   const handleRoute = async () => {
     setRouting(true); setRouteResult(null);

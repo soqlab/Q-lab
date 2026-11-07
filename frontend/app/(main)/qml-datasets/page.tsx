@@ -60,22 +60,23 @@ export default function QMLDatasetsPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  const loadDatasets = useCallback(async () => {
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly (loading
+  // starts true), later reloads go through loadDatasets().
+  const fetchDatasets = useCallback(() =>
+    listQMLDatasetHub()
+      .then((data) => setDatasets(data))
+      .catch(() => setError("Failed to load datasets."))
+      .finally(() => setLoading(false)), []);
+
+  const loadDatasets = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const data = await listQMLDatasetHub();
-      setDatasets(data);
-    } catch {
-      setError("Failed to load datasets.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return fetchDatasets();
+  }, [fetchDatasets]);
 
   useEffect(() => {
-    loadDatasets();
-  }, [loadDatasets]);
+    fetchDatasets();
+  }, [fetchDatasets]);
 
   const handleBenchmarkOpen = async (dataset: QMLDatasetEntry) => {
     setSelectedDataset(dataset);

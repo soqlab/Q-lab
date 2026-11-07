@@ -287,44 +287,38 @@ export default function CarbonPage() {
 
   // Lab summary
   const [summary, setSummary] = useState<SummaryResult | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(true);
 
   // Backend comparison
   const [comparison, setComparison] = useState<BackendComparison[] | null>(null);
-  const [compLoading, setCompLoading] = useState(false);
+  const [compLoading, setCompLoading] = useState(true);
+
+  // Summary and comparison load on mount (both loading flags start true); state is set only in the
+  // promise callbacks.
+  function loadSummary() {
+    return fetch(qlabApiPath(`/api/v1/carbon/summary?region=${region}`), { cache: "no-store" })
+      .then(async (res) => { if (res.ok) setSummary(await res.json()); })
+      .catch(() => { /* non-critical */ })
+      .finally(() => setSummaryLoading(false));
+  }
+
+  function loadComparison() {
+    return fetch(qlabApiPath(`/api/v1/carbon/comparison/backends?region=${region}`), { cache: "no-store" })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          setComparison(data.backends);
+        }
+      })
+      .catch(() => { /* non-critical */ })
+      .finally(() => setCompLoading(false));
+  }
 
   // Load summary + comparison on mount
   useEffect(() => {
     void loadSummary();
     void loadComparison();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadSummary() {
-    setSummaryLoading(true);
-    try {
-      const res = await fetch(qlabApiPath(`/api/v1/carbon/summary?region=${region}`), { cache: "no-store" });
-      if (res.ok) setSummary(await res.json());
-    } catch {
-      // non-critical
-    } finally {
-      setSummaryLoading(false);
-    }
-  }
-
-  async function loadComparison() {
-    setCompLoading(true);
-    try {
-      const res = await fetch(qlabApiPath(`/api/v1/carbon/comparison/backends?region=${region}`), { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setComparison(data.backends);
-      }
-    } catch {
-      // non-critical
-    } finally {
-      setCompLoading(false);
-    }
-  }
 
   async function handleRunCheck() {
     if (!runId.trim()) return;

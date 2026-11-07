@@ -147,25 +147,37 @@ function BrowseTab() {
   const [backend, setBackend] = useState("");
   const [minQubits, setMinQubits] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: Record<string, string | number> = { limit: 500 };
-      if (category) params.algorithm_category = category;
-      if (backend) params.backend = backend;
-      if (minQubits) params.min_qubits = parseInt(minQubits, 10);
-      const res = await getFederatedResults(params as Parameters<typeof getFederatedResults>[0]);
-      setData(res);
-      setPage(0);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load results");
-    } finally {
-      setLoading(false);
-    }
+  // State is set only in promise callbacks, so the effect can call this directly.
+  const fetchResults = useCallback(() => {
+    const params: Record<string, string | number> = { limit: 500 };
+    if (category) params.algorithm_category = category;
+    if (backend) params.backend = backend;
+    if (minQubits) params.min_qubits = parseInt(minQubits, 10);
+    return getFederatedResults(params as Parameters<typeof getFederatedResults>[0])
+      .then((res) => {
+        setData(res);
+        setPage(0);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load results"))
+      .finally(() => setLoading(false));
   }, [category, backend, minQubits]);
 
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return fetchResults();
+  }, [fetchResults]);
+
+  // New filters show the loading state at once (adjusted while rendering, not in the effect).
+  const filterKey = `${category}|${backend}|${minQubits}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setLoading(true);
+    setError(null);
+  }
+
+  useEffect(() => { fetchResults(); }, [fetchResults]);
 
   const results = data?.results ?? [];
   const totalPages = Math.ceil(results.length / PAGE_SIZE);

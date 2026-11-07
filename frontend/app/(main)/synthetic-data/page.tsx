@@ -98,20 +98,21 @@ export default function SyntheticDataPage() {
   const [loadingSelected, setLoadingSelected] = useState(false);
   const [selectedError, setSelectedError] = useState("");
 
+  const fetchDatasets = useCallback(
+    () =>
+      listSyntheticDatasets()
+        .then((ds) => { setDatasets(ds); setDatasetsError(""); })
+        .catch((e) => setDatasetsError(e instanceof Error ? e.message : "Failed to load datasets"))
+        .finally(() => setLoadingDatasets(false)),
+    [],
+  );
+
   const loadDatasets = useCallback(async () => {
     setLoadingDatasets(true);
-    try {
-      const ds = await listSyntheticDatasets();
-      setDatasets(ds);
-      setDatasetsError("");
-    } catch (e) {
-      setDatasetsError(e instanceof Error ? e.message : "Failed to load datasets");
-    } finally {
-      setLoadingDatasets(false);
-    }
-  }, []);
+    await fetchDatasets();
+  }, [fetchDatasets]);
 
-  useEffect(() => { void loadDatasets(); }, []);
+  useEffect(() => { void fetchDatasets(); }, []);
 
   const handleGenerate = async () => {
     if (!form.name.trim()) { setGenerateError("Name is required"); return; }

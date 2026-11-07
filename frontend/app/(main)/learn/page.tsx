@@ -440,17 +440,12 @@ export default function LearnPage() {
   // Completing module: "pathId:moduleId"
   const [completingModule, setCompletingModule] = useState<string | null>(null);
 
-  const loadPaths = useCallback(async () => {
-    setPathsLoading(true);
-    setPathsError(null);
-    try {
-      const data = await listLearningPaths();
-      setPaths(data);
-    } catch {
-      setPathsError("Failed to load learning paths.");
-    } finally {
-      setPathsLoading(false);
-    }
+  // Runs once on mount (loading starts true); state is set only in promise callbacks.
+  const loadPaths = useCallback(() => {
+    return listLearningPaths()
+      .then((data) => setPaths(data))
+      .catch(() => setPathsError("Failed to load learning paths."))
+      .finally(() => setPathsLoading(false));
   }, []);
 
   useEffect(() => {

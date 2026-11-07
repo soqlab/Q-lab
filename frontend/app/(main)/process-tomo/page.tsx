@@ -197,20 +197,20 @@ export default function ProcessTomoPage() {
 
   const displayResult = currentResult ?? selectedResult;
 
-  const loadSummaries = useCallback(async () => {
-    setLoadingSummaries(true);
-    try {
-      const s = await listQPTResults();
-      setSummaries(s);
-      setSummariesError("");
-    } catch (e) {
-      setSummariesError(e instanceof Error ? e.message : "Failed to load results");
-    } finally {
-      setLoadingSummaries(false);
-    }
-  }, []);
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly
+  // (loadingSummaries starts true), the refresh button goes through loadSummaries().
+  const fetchSummaries = useCallback(() =>
+    listQPTResults()
+      .then((s) => { setSummaries(s); setSummariesError(""); })
+      .catch((e) => setSummariesError(e instanceof Error ? e.message : "Failed to load results"))
+      .finally(() => setLoadingSummaries(false)), []);
 
-  useEffect(() => { void loadSummaries(); }, []);
+  const loadSummaries = useCallback(() => {
+    setLoadingSummaries(true);
+    return fetchSummaries();
+  }, [fetchSummaries]);
+
+  useEffect(() => { void fetchSummaries(); }, []);
 
   const handleRunQPT = async () => {
     if (!form.gate_name.trim()) { setRunError("Gate name is required"); return; }

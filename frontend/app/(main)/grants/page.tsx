@@ -161,7 +161,7 @@ function MyGrantsTab({
   if (error) return <div style={{ color: "#f87171", padding: 24 }}>{error}</div>;
   if (!grants.length) return (
     <div style={{ color: "#7a96b0", padding: 40, textAlign: "center" }}>
-      No grants yet. Create one in the "Create Grant" tab.
+      No grants yet. Create one in the &quot;Create Grant&quot; tab.
     </div>
   );
 
@@ -546,17 +546,20 @@ export default function GrantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const data = await apiFetch("/api/v1/grants");
-      setGrants(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load grants");
-    } finally { setLoading(false); }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchGrants = useCallback(() => {
+    return apiFetch("/api/v1/grants")
+      .then((data) => setGrants(data))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load grants"))
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const load = useCallback(() => {
+    setLoading(true); setError(null);
+    return fetchGrants();
+  }, [fetchGrants]);
+
+  useEffect(() => { void fetchGrants(); }, [fetchGrants]);
 
   async function handleDelete(grantId: string) {
     if (!confirm("Delete this grant?")) return;

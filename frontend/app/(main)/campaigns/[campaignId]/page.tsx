@@ -138,16 +138,25 @@ export default function CampaignDetailPage({ params: paramsPromise }: { params: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      setData(await getCampaign(params.campaignId));
-    } catch { setError("Campaign not found"); }
-    finally { setLoading(false); }
+  // The request and the state it sets, only in promise callbacks.
+  function fetchCampaign() {
+    return getCampaign(params.campaignId)
+      .then((d) => setData(d))
+      .catch(() => setError("Campaign not found"))
+      .finally(() => setLoading(false));
   }
 
-  useEffect(() => { void load(); }, [params.campaignId]);
+  function load() {
+    setLoading(true);
+    setError(null);
+    void fetchCampaign();
+  }
+
+  // Another campaign shows the loading state at once (adjusted while rendering, not in the effect).
+  const [shownId, setShownId] = useState(params.campaignId);
+  if (params.campaignId !== shownId) { setShownId(params.campaignId); setLoading(true); setError(null); }
+
+  useEffect(() => { void fetchCampaign(); }, [params.campaignId]);
 
   if (loading) return <main className="page"><div className="empty">Loading…</div></main>;
   if (error || !data) return <main className="page"><div className="empty">{error ?? "Not found"}</div></main>;

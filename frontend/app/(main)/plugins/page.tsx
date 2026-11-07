@@ -209,8 +209,14 @@ export default function PluginsPage() {
   const [sort, setSort] = useState<"downloads" | "rating" | "newest">("downloads");
   const [showPublish, setShowPublish] = useState(false);
 
-  useEffect(() => {
+  // A new sort order shows the loading state at once (set while rendering, not in the effect).
+  const [prevSort, setPrevSort] = useState(sort);
+  if (sort !== prevSort) {
+    setPrevSort(sort);
     setLoading(true);
+  }
+
+  useEffect(() => {
     listPlugins({ sort })
       .then((data) => {
         setPlugins(data);

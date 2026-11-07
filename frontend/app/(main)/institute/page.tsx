@@ -368,26 +368,34 @@ export default function InstitutePage() {
     }
   }, [authHeaders]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [overviewRes, budgetRes] = await Promise.all([
-        fetch("/qlab-api/api/v1/institute-admin/overview", { headers: authHeaders() }),
-        fetch("/qlab-api/api/v1/institute-admin/budget", { headers: authHeaders() }),
-      ]);
-      if (!overviewRes.ok) throw new Error(`Overview fetch failed: ${overviewRes.status}`);
-      if (!budgetRes.ok) throw new Error(`Budget fetch failed: ${budgetRes.status}`);
-      const [ov, bd] = await Promise.all([overviewRes.json(), budgetRes.json()]) as [Overview, BudgetData];
-      setOverview(ov);
-      setBudget(bd);
-      await loadLeaderboard(sortBy);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load institute data");
-    } finally {
-      setLoading(false);
-    }
+  // State is set only in promise callbacks, so the effect can call this directly.
+  const loadData = useCallback(() => {
+    return Promise.all([
+      fetch("/qlab-api/api/v1/institute-admin/overview", { headers: authHeaders() }),
+      fetch("/qlab-api/api/v1/institute-admin/budget", { headers: authHeaders() }),
+    ])
+      .then(async ([overviewRes, budgetRes]) => {
+        if (!overviewRes.ok) throw new Error(`Overview fetch failed: ${overviewRes.status}`);
+        if (!budgetRes.ok) throw new Error(`Budget fetch failed: ${budgetRes.status}`);
+        const [ov, bd] = await Promise.all([overviewRes.json(), budgetRes.json()]) as [Overview, BudgetData];
+        setOverview(ov);
+        setBudget(bd);
+        await loadLeaderboard(sortBy);
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load institute data"))
+      .finally(() => setLoading(false));
   }, [authHeaders, loadLeaderboard, sortBy]);
+
+  // When the effect below is about to reload, show the loading state at once (adjusted while
+  // rendering, not in the effect): same conditions as the effect.
+  const [prevDeps, setPrevDeps] = useState({ token, user, sortBy });
+  if (prevDeps.token !== token || prevDeps.user !== user || prevDeps.sortBy !== sortBy) {
+    setPrevDeps({ token, user, sortBy });
+    if (token && !(user && user.role !== "owner" && user.role !== "admin")) {
+      setLoading(true);
+      setError(null);
+    }
+  }
 
   useEffect(() => {
     if (token === undefined) return;

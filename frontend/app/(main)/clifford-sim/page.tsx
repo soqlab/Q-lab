@@ -13,24 +13,25 @@ const PRESETS = [
 export default function CliffordSimPage() {
   const [qasm, setQasm] = useState(PRESETS[0].qasm);
   const [result, setResult] = useState<CliffordSimResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const handleRun = async () => {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through handleRun().
+  const compute = () =>
+    runCliffordSim({ qasm })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  const handleRun = () => {
     setLoading(true);
     setError("");
-    try {
-      const res = await runCliffordSim({ qasm });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const stabChipColor = (s: string) => {
     if (s.startsWith("+")) return "#10b981";

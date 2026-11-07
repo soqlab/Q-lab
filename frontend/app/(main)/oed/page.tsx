@@ -66,20 +66,21 @@ export default function OEDPage() {
   const [loadingPast, setLoadingPast] = useState(true);
   const [pastError, setPastError] = useState<string | null>(null);
 
-  const loadPastDesigns = useCallback(async () => {
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly (loadingPast
+  // starts true), later reloads go through loadPastDesigns().
+  const fetchPastDesigns = useCallback(() =>
+    listExperimentDesigns()
+      .then((data) => setPastDesigns(data))
+      .catch((e) => setPastError(e instanceof Error ? e.message : "Failed to load designs"))
+      .finally(() => setLoadingPast(false)), []);
+
+  const loadPastDesigns = useCallback(() => {
     setLoadingPast(true);
     setPastError(null);
-    try {
-      const data = await listExperimentDesigns();
-      setPastDesigns(data);
-    } catch (e) {
-      setPastError(e instanceof Error ? e.message : "Failed to load designs");
-    } finally {
-      setLoadingPast(false);
-    }
-  }, []);
+    return fetchPastDesigns();
+  }, [fetchPastDesigns]);
 
-  useEffect(() => { void loadPastDesigns(); }, [loadPastDesigns]);
+  useEffect(() => { void fetchPastDesigns(); }, [fetchPastDesigns]);
 
   async function handleDesign(e: React.FormEvent) {
     e.preventDefault();

@@ -83,25 +83,35 @@ export default function LabInventoryPage() {
   const [addingItem, setAddingItem] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const loadItems = useCallback(async () => {
-    setLoadingItems(true);
-    setItemsError(null);
-    try {
-      const params: { category?: string; status?: string } = {};
-      if (filterCategory) params.category = filterCategory;
-      if (filterStatus) params.status = filterStatus;
-      const data = await listEquipmentItems(params);
-      setItems(data);
-    } catch {
-      setItemsError("Failed to load equipment.");
-    } finally {
-      setLoadingItems(false);
-    }
+  // State is set only in promise callbacks, so the effect can call this directly.
+  const fetchItems = useCallback(() => {
+    const params: { category?: string; status?: string } = {};
+    if (filterCategory) params.category = filterCategory;
+    if (filterStatus) params.status = filterStatus;
+    return listEquipmentItems(params)
+      .then((data) => setItems(data))
+      .catch(() => setItemsError("Failed to load equipment."))
+      .finally(() => setLoadingItems(false));
   }, [filterCategory, filterStatus]);
 
+  const loadItems = useCallback(() => {
+    setLoadingItems(true);
+    setItemsError(null);
+    return fetchItems();
+  }, [fetchItems]);
+
+  // New filters show the loading state at once (adjusted while rendering, not in the effect).
+  const filterKey = `${filterCategory}|${filterStatus}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setLoadingItems(true);
+    setItemsError(null);
+  }
+
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    fetchItems();
+  }, [fetchItems]);
 
   const handleSelectItem = async (id: string) => {
     setLoadingItem(true);

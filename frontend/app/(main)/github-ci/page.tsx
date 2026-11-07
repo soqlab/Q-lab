@@ -201,22 +201,23 @@ export default function GithubCIPage() {
   const [cfError, setCfError] = useState<string | null>(null);
   const [cfSuccess, setCfSuccess] = useState(false);
 
-  const loadPipelines = useCallback(async () => {
-    setPipelinesLoading(true);
-    setPipelinesError(null);
-    try {
-      const data = await listCIPipelines();
-      setPipelines(data);
-    } catch {
-      setPipelinesError("Failed to load CI pipelines.");
-    } finally {
-      setPipelinesLoading(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchPipelines = useCallback(() => {
+    return listCIPipelines()
+      .then((data) => setPipelines(data))
+      .catch(() => setPipelinesError("Failed to load CI pipelines."))
+      .finally(() => setPipelinesLoading(false));
   }, []);
 
+  const loadPipelines = useCallback(() => {
+    setPipelinesLoading(true);
+    setPipelinesError(null);
+    return fetchPipelines();
+  }, [fetchPipelines]);
+
   useEffect(() => {
-    void loadPipelines();
-  }, [loadPipelines]);
+    void fetchPipelines();
+  }, [fetchPipelines]);
 
   async function handleViewRuns(pipelineId: string) {
     if (selectedPipelineId === pipelineId) {

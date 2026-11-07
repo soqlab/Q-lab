@@ -311,45 +311,60 @@ export default function TalentPage() {
   const [pjError, setPjError] = useState<string | null>(null);
   const [pjSuccess, setPjSuccess] = useState(false);
 
+  const fetchResearchers = useCallback(() => {
+    const params: { role?: string; expertise?: string } = {};
+    if (roleFilter !== "all") params.role = roleFilter;
+    if (expertiseFilter.trim()) params.expertise = expertiseFilter.trim();
+    return listResearcherProfiles(params)
+      .then((data) => setResearchers(data))
+      .catch(() => setResearchersError("Failed to load researcher profiles."))
+      .finally(() => setResearchersLoading(false));
+  }, [roleFilter, expertiseFilter]);
+
   const loadResearchers = useCallback(async () => {
     setResearchersLoading(true);
     setResearchersError(null);
-    try {
-      const params: { role?: string; expertise?: string } = {};
-      if (roleFilter !== "all") params.role = roleFilter;
-      if (expertiseFilter.trim()) params.expertise = expertiseFilter.trim();
-      const data = await listResearcherProfiles(params);
-      setResearchers(data);
-    } catch {
-      setResearchersError("Failed to load researcher profiles.");
-    } finally {
-      setResearchersLoading(false);
-    }
-  }, [roleFilter, expertiseFilter]);
+    await fetchResearchers();
+  }, [fetchResearchers]);
+
+  const fetchJobs = useCallback(() => {
+    const params: { type?: string; location?: string } = {};
+    if (jobTypeFilter !== "all") params.type = jobTypeFilter;
+    if (locationFilter.trim()) params.location = locationFilter.trim();
+    return listJobListings(params)
+      .then((data) => setJobs(data))
+      .catch(() => setJobsError("Failed to load job listings."))
+      .finally(() => setJobsLoading(false));
+  }, [jobTypeFilter, locationFilter]);
 
   const loadJobs = useCallback(async () => {
     setJobsLoading(true);
     setJobsError(null);
-    try {
-      const params: { type?: string; location?: string } = {};
-      if (jobTypeFilter !== "all") params.type = jobTypeFilter;
-      if (locationFilter.trim()) params.location = locationFilter.trim();
-      const data = await listJobListings(params);
-      setJobs(data);
-    } catch {
-      setJobsError("Failed to load job listings.");
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [jobTypeFilter, locationFilter]);
+    await fetchJobs();
+  }, [fetchJobs]);
+
+  // Opening a tab, or changing its filters, shows its loading state at once (adjusted while rendering;
+  // the effects below only fetch).
+  const researchersKey = activeTab === "Researchers" ? JSON.stringify([roleFilter, expertiseFilter]) : null;
+  const [prevResearchersKey, setPrevResearchersKey] = useState<string | null>(null);
+  if (researchersKey !== prevResearchersKey) {
+    setPrevResearchersKey(researchersKey);
+    if (researchersKey !== null) { setResearchersLoading(true); setResearchersError(null); }
+  }
+  const jobsKey = activeTab === "Jobs" ? JSON.stringify([jobTypeFilter, locationFilter]) : null;
+  const [prevJobsKey, setPrevJobsKey] = useState<string | null>(null);
+  if (jobsKey !== prevJobsKey) {
+    setPrevJobsKey(jobsKey);
+    if (jobsKey !== null) { setJobsLoading(true); setJobsError(null); }
+  }
 
   useEffect(() => {
-    if (activeTab === "Researchers") void loadResearchers();
-  }, [activeTab, loadResearchers]);
+    if (activeTab === "Researchers") void fetchResearchers();
+  }, [activeTab, fetchResearchers]);
 
   useEffect(() => {
-    if (activeTab === "Jobs") void loadJobs();
-  }, [activeTab, loadJobs]);
+    if (activeTab === "Jobs") void fetchJobs();
+  }, [activeTab, fetchJobs]);
 
   async function handleFindMatches(profileId: string) {
     setLoadingMatchId(profileId);

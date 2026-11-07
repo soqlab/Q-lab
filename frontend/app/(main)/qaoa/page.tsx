@@ -11,18 +11,25 @@ export default function QAOAPage() {
   const [graphType, setGraphType] = useState("random_3reg");
   const [maxIter, setMaxIter] = useState(200);
   const [result, setResult] = useState<QAOAResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return runQAOA({ problem: "maxcut", n_nodes: nNodes, p_layers: pLayers, graph_type: graphType, max_iter: maxIter })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await runQAOA({ problem: "maxcut", n_nodes: nNodes, p_layers: pLayers, graph_type: graphType, max_iter: maxIter })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const W = 540, H = 140;
   function convChart(data: number[]) {

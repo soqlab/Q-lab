@@ -49,7 +49,6 @@ export default function TranspilerHubPage() {
   } | null>(null);
 
   useEffect(() => {
-    setSdksLoading(true);
     listSupportedSDKs()
       .then((data) => setSdks(data.sdks))
       .catch((e: unknown) =>

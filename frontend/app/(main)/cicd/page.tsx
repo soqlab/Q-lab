@@ -43,15 +43,19 @@ export default function CICDPage() {
   const [checkForm, setCheckForm] = useState({ run_id: "", baseline_run_id: "", fidelity_drop_threshold_pct: 2 });
   const [regressionResult, setRegressionResult] = useState<RegressionCheckResult | null>(null);
 
-  const load = () => {
-    setLoading(true);
+  // The requests and the state they set, only in promise callbacks (loading starts true on mount).
+  const fetchAll = () =>
     Promise.all([listCICDIntegrations(), listCICDChecks({ limit: 50 }), listRegressionGates().catch(() => [])])
       .then(([i, c, g]) => { setIntegrations(i); setChecks(c); setGates(g); setErr(""); })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+
+  const load = () => {
+    setLoading(true);
+    void fetchAll();
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void fetchAll(); }, []);
 
   const handleCreate = async () => {
     setCreating(true);

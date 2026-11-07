@@ -510,10 +510,9 @@ export default function DepartmentsPage() {
     return tok ? { Authorization: `Bearer ${tok}` } : {};
   }, [token]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Fetches everything, then sets state only in promise callbacks (the effect calls this directly).
+  const fetchData = useCallback(() => {
+    const fetchAll = async () => {
       const [treeRes, listRes] = await Promise.all([
         fetch("/qlab-api/api/v1/departments/tree", { headers: authHeaders() }),
         fetch("/qlab-api/api/v1/departments", { headers: authHeaders() }),
@@ -522,8 +521,6 @@ export default function DepartmentsPage() {
       if (!listRes.ok) throw new Error(`List fetch failed: ${listRes.status}`);
       const treeData: TreeData = await treeRes.json();
       const deptList: Department[] = await listRes.json();
-      setTree(treeData);
-      setAllDepts(deptList);
 
       // Load analytics for each department in parallel
       const analyticsResults = await Promise.allSettled(
@@ -539,13 +536,30 @@ export default function DepartmentsPage() {
           an[d.id] = res.value;
         }
       });
-      setAnalytics(an);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load departments");
-    } finally {
-      setLoading(false);
-    }
+      return { treeData, deptList, an };
+    };
+    return fetchAll()
+      .then(({ treeData, deptList, an }) => {
+        setTree(treeData);
+        setAllDepts(deptList);
+        setAnalytics(an);
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load departments"))
+      .finally(() => setLoading(false));
   }, [authHeaders]);
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return fetchData();
+  }, [fetchData]);
+
+  // A new token reloads: show the loading state at once (adjusted while rendering, not in the effect).
+  const [prevToken, setPrevToken] = useState(token);
+  if (token !== prevToken) {
+    setPrevToken(token);
+    if (token) { setLoading(true); setError(null); }
+  }
 
   useEffect(() => {
     if (token === undefined) return;
@@ -553,8 +567,8 @@ export default function DepartmentsPage() {
       router.push("/login");
       return;
     }
-    void loadData();
-  }, [token, router, loadData]);
+    void fetchData();
+  }, [token, router, fetchData]);
 
   if (loading) return <main className="page"><div className="empty">Loading departmentsâ€¦</div></main>;
   if (error) return <main className="page"><div className="empty" style={{ color: "var(--danger, #dc2626)" }}>{error}</div></main>;

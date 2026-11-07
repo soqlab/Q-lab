@@ -8,18 +8,25 @@ export default function ResourceEstimatorPage() {
   const [algorithm, setAlgorithm] = useState("shor_2048");
   const [pPhysical, setPPhysical] = useState(0.001);
   const [result, setResult] = useState<ResourceEstimateResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return estimateResources({ algorithm, p_physical: pPhysical })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await estimateResources({ algorithm, p_physical: pPhysical })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const milestone2030 = result?.milestones.find(m => m.year === 2030);
   const milestone2035 = result?.milestones.find(m => m.year === 2035);

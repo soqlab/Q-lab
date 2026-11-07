@@ -30,20 +30,30 @@ export default function DispatchPage() {
   const [checkResult, setCheckResult] = useState<{ released: number; still_pending: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await listDispatchQueue(statusFilter ? { status: statusFilter } : undefined);
-      setEntries(res.entries);
-      setStats({ total: res.total, pending: res.pending, released: res.released });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load queue");
-    } finally {
-      setLoading(false);
-    }
+  // State is set only in promise callbacks, so the effect can call this directly.
+  function fetchQueue() {
+    return listDispatchQueue(statusFilter ? { status: statusFilter } : undefined)
+      .then((res) => {
+        setEntries(res.entries);
+        setStats({ total: res.total, pending: res.pending, released: res.released });
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load queue"))
+      .finally(() => setLoading(false));
   }
 
-  useEffect(() => { void load(); }, [statusFilter]);
+  function load() {
+    setLoading(true);
+    return fetchQueue();
+  }
+
+  // A new filter shows the loading state at once (adjusted while rendering, not in the effect).
+  const [prevFilter, setPrevFilter] = useState(statusFilter);
+  if (statusFilter !== prevFilter) {
+    setPrevFilter(statusFilter);
+    setLoading(true);
+  }
+
+  useEffect(() => { void fetchQueue(); }, [statusFilter]);
 
   async function handleCheck() {
     setChecking(true);

@@ -197,22 +197,24 @@ export default function SpectralNoisePage() {
   const [loadingAnalyses, setLoadingAnalyses] = useState(true);
   const [analysesError, setAnalysesError] = useState<string | null>(null);
 
+  const fetchAnalyses = useCallback(
+    () =>
+      listSpectralAnalyses()
+        .then((data) => setAnalyses(data))
+        .catch(() => setAnalysesError("Failed to load spectral analyses."))
+        .finally(() => setLoadingAnalyses(false)),
+    [],
+  );
+
   const loadAnalyses = useCallback(async () => {
     setLoadingAnalyses(true);
     setAnalysesError(null);
-    try {
-      const data = await listSpectralAnalyses();
-      setAnalyses(data);
-    } catch {
-      setAnalysesError("Failed to load spectral analyses.");
-    } finally {
-      setLoadingAnalyses(false);
-    }
-  }, []);
+    await fetchAnalyses();
+  }, [fetchAnalyses]);
 
   useEffect(() => {
-    loadAnalyses();
-  }, [loadAnalyses]);
+    fetchAnalyses();
+  }, [fetchAnalyses]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);

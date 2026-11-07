@@ -284,22 +284,22 @@ export default function ConferencePage() {
   // Abstract-specific
   const [maxWords, setMaxWords] = useState(300);
 
-  const loadAssets = useCallback(async () => {
+  // The request and the state it sets, only in promise callbacks (assetsLoading starts true on mount).
+  const fetchAssets = useCallback(() =>
+    listConferenceAssets()
+      .then((data) => setAssets(data))
+      .catch(() => setAssetsError("Failed to load conference assets."))
+      .finally(() => setAssetsLoading(false)), []);
+
+  const loadAssets = useCallback(() => {
     setAssetsLoading(true);
     setAssetsError(null);
-    try {
-      const data = await listConferenceAssets();
-      setAssets(data);
-    } catch {
-      setAssetsError("Failed to load conference assets.");
-    } finally {
-      setAssetsLoading(false);
-    }
-  }, []);
+    return fetchAssets();
+  }, [fetchAssets]);
 
   useEffect(() => {
-    void loadAssets();
-  }, [loadAssets]);
+    void fetchAssets();
+  }, [fetchAssets]);
 
   async function handleGenerate() {
     setGenError(null);

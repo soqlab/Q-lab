@@ -66,21 +66,24 @@ export default function HPCBridgePage() {
   const [sshUser, setSshUser] = useState("");
   const [sshKeyB64, setSshKeyB64] = useState("");
 
-  const fetchJobs = useCallback(async () => {
-    setJobsLoading(true);
-    try {
-      const data = await listHPCJobs();
-      setJobs(data.jobs);
-      setJobsError(null);
-    } catch (e: unknown) {
-      setJobsError(e instanceof Error ? e.message : "Failed to load jobs");
-    } finally {
-      setJobsLoading(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const requestJobs = useCallback(() => {
+    return listHPCJobs()
+      .then((data) => {
+        setJobs(data.jobs);
+        setJobsError(null);
+      })
+      .catch((e: unknown) => setJobsError(e instanceof Error ? e.message : "Failed to load jobs"))
+      .finally(() => setJobsLoading(false));
   }, []);
 
+  const fetchJobs = useCallback(() => {
+    setJobsLoading(true);
+    return requestJobs();
+  }, [requestJobs]);
+
   useEffect(() => {
-    setClustersLoading(true);
+    // clustersLoading starts true
     listHPCClusters()
       .then((data) => setClusters(data.clusters))
       .catch((e: unknown) =>
@@ -88,8 +91,8 @@ export default function HPCBridgePage() {
       )
       .finally(() => setClustersLoading(false));
 
-    fetchJobs();
-  }, [fetchJobs]);
+    requestJobs();
+  }, [requestJobs]);
 
   async function handleSubmit() {
     setSubmitting(true);

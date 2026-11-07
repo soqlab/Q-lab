@@ -8,18 +8,25 @@ export default function XEBPage() {
   const [nCircuits, setNCircuits] = useState(10);
   const [noise, setNoise] = useState(0.002);
   const [result, setResult] = useState<XEBResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return runXEB({ n_qubits: nQubits, circuit_depth: depth, n_circuits: nCircuits, noise_level: noise })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await runXEB({ n_qubits: nQubits, circuit_depth: depth, n_circuits: nCircuits, noise_level: noise })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const W = 560, H = 120;
   function barChart(data: number[]) {

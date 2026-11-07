@@ -88,14 +88,18 @@ export default function DecoherenceAlertsPage() {
     qubit: "",
   });
 
+  const fetchAlerts = () =>
+    listDecoherenceAlerts()
+      .then((a) => setAlerts(a))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
   const load = async () => {
     setLoading(true);
-    try { setAlerts(await listDecoherenceAlerts()); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    await fetchAlerts();
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void fetchAlerts(); }, []);
 
   const handleMetricChange = (metric: string) => {
     const info = METRIC_INFO[metric];

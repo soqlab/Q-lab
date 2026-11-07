@@ -31,7 +31,7 @@ export default function ComplexityPage() {
   const [paramName, setParamName] = useState("n_qubits");
   const [metricName, setMetricName] = useState("circuit_depth");
   const [result, setResult] = useState<ComplexityResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -42,41 +42,48 @@ export default function ComplexityPage() {
     setMetricName(p.metric);
   }
 
-  async function handleAnalyze() {
+  // Throws on an entry that is not a number.
+  function parseInputs(): [number[], number[]] {
+    const parsedSizes = sizesText.split(",").map((s) => {
+      const n = Number(s.trim());
+      if (isNaN(n)) throw new Error(`Invalid size: "${s.trim()}"`);
+      return n;
+    });
+    const parsedValues = valuesText.split(",").map((s) => {
+      const n = Number(s.trim());
+      if (isNaN(n)) throw new Error(`Invalid value: "${s.trim()}"`);
+      return n;
+    });
+    return [parsedSizes, parsedValues];
+  }
+
+  // The API call and the state it sets, only in promise callbacks.
+  function compute(parsedSizes: number[], parsedValues: number[]) {
+    return analyzeComplexity({ sizes: parsedSizes, values: parsedValues, param_name: paramName, metric_name: metricName })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function handleAnalyze() {
     setParseError(null);
     setError(null);
 
-    let parsedSizes: number[];
-    let parsedValues: number[];
+    let parsed: [number[], number[]];
     try {
-      parsedSizes = sizesText.split(",").map((s) => {
-        const n = Number(s.trim());
-        if (isNaN(n)) throw new Error(`Invalid size: "${s.trim()}"`);
-        return n;
-      });
-      parsedValues = valuesText.split(",").map((s) => {
-        const n = Number(s.trim());
-        if (isNaN(n)) throw new Error(`Invalid value: "${s.trim()}"`);
-        return n;
-      });
+      parsed = parseInputs();
     } catch (e: unknown) {
       setParseError(e instanceof Error ? e.message : String(e));
       return;
     }
 
     setLoading(true);
-    try {
-      const res = await analyzeComplexity({ sizes: parsedSizes, values: parsedValues, param_name: paramName, metric_name: metricName });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute(...parsed);
   }
 
+  // On mount the default inputs always parse, and loading starts true.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleAnalyze(); }, []);
+  useEffect(() => { void compute(...parseInputs()); }, []);
 
   const sortedFits: ComplexityFit[] = result
     ? [...result.all_fits].sort((a, b) => b.r_squared - a.r_squared)

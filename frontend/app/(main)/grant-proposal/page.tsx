@@ -186,21 +186,22 @@ export default function GrantProposalPage() {
   const [pastProposals, setPastProposals] = useState<GrantProposal[]>([]);
   const [pastLoading, setPastLoading] = useState(true);
 
-  const loadPast = useCallback(async () => {
-    setPastLoading(true);
-    try {
-      const data = await listGrantProposals();
-      setPastProposals(data.proposals);
-    } catch {
-      // non-blocking
-    } finally {
-      setPastLoading(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchPast = useCallback(() => {
+    return listGrantProposals()
+      .then((data) => setPastProposals(data.proposals))
+      .catch(() => { /* non-blocking */ })
+      .finally(() => setPastLoading(false));
   }, []);
 
+  const loadPast = useCallback(() => {
+    setPastLoading(true);
+    return fetchPast();
+  }, [fetchPast]);
+
   useEffect(() => {
-    loadPast();
-  }, [loadPast]);
+    fetchPast();
+  }, [fetchPast]);
 
   const addKeyResult = () => setKeyResults((prev) => [...prev, ""]);
   const removeKeyResult = (i: number) =>

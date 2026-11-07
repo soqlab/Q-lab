@@ -126,28 +126,24 @@ export default function NetworkPage() {
   const [error, setError] = useState("");
   const [peerError, setPeerError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoadingCfg(true);
-    setError("");
-    try {
-      const [cfg, pl, bl] = await Promise.all([
-        fetchNetworkConfig(),
-        listNetworkPeers(),
-        fetchNetworkBackends(),
-      ]);
-      setConfig(cfg);
-      setNodeLabel(cfg.node_label || "");
-      setPeers(pl.peers);
-      setBackends(bl.backends);
-      if (!selectedBackend && bl.backends.length > 0) {
-        setSelectedBackend(bl.backends[0]);
-      }
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoadingCfg(false);
-    }
-  }, [selectedBackend]);
+  // Loaded on mount (loadingCfg starts true); state is set in the promise callbacks.
+  const load = useCallback(() =>
+    Promise.all([
+      fetchNetworkConfig(),
+      listNetworkPeers(),
+      fetchNetworkBackends(),
+    ])
+      .then(([cfg, pl, bl]) => {
+        setConfig(cfg);
+        setNodeLabel(cfg.node_label || "");
+        setPeers(pl.peers);
+        setBackends(bl.backends);
+        if (!selectedBackend && bl.backends.length > 0) {
+          setSelectedBackend(bl.backends[0]);
+        }
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoadingCfg(false)), [selectedBackend]);
 
   useEffect(() => { load(); }, []);
 

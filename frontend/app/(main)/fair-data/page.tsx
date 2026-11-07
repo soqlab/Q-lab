@@ -222,21 +222,22 @@ export default function FAIRDataPage() {
   const [pastRecords, setPastRecords] = useState<FAIRRecord[]>([]);
   const [pastLoading, setPastLoading] = useState(true);
 
-  const loadPast = useCallback(async () => {
-    setPastLoading(true);
-    try {
-      const data = await listFAIRRecords();
-      setPastRecords(data.records);
-    } catch {
-      // non-blocking
-    } finally {
-      setPastLoading(false);
-    }
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const fetchPast = useCallback(() => {
+    return listFAIRRecords()
+      .then((data) => setPastRecords(data.records))
+      .catch(() => { /* non-blocking */ })
+      .finally(() => setPastLoading(false));
   }, []);
 
+  const loadPast = useCallback(() => {
+    setPastLoading(true);
+    return fetchPast();
+  }, [fetchPast]);
+
   useEffect(() => {
-    loadPast();
-  }, [loadPast]);
+    fetchPast();
+  }, [fetchPast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

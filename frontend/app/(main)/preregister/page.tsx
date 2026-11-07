@@ -978,23 +978,35 @@ export default function PreregisterPage() {
   const [editDraftId, setEditDraftId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const load = useCallback(async () => {
+  // The fetch sets state only in promise callbacks, so the effect can call it directly.
+  const fetchList = useCallback(() =>
+    api.list(statusFilter ? { status: statusFilter } : undefined)
+      .then((items) => {
+        setList(items);
+        // Refresh selected if it's in the new list
+        if (selected) {
+          const refreshed = items.find(p => p.prereg_id === selected.prereg_id);
+          if (refreshed) setSelected(refreshed);
+        }
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false)), [statusFilter, selected]);
+
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const items = await api.list(statusFilter ? { status: statusFilter } : undefined);
-      setList(items);
-      // Refresh selected if it's in the new list
-      if (selected) {
-        const refreshed = items.find(p => p.prereg_id === selected.prereg_id);
-        if (refreshed) setSelected(refreshed);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally { setLoading(false); }
-  }, [statusFilter, selected]);
+    return fetchList();
+  }, [fetchList]);
 
-  useEffect(() => { void load(); }, [statusFilter]);
+  // A new status filter shows the loading state at once (set while rendering; loading starts true).
+  const [prevStatusFilter, setPrevStatusFilter] = useState(statusFilter);
+  if (statusFilter !== prevStatusFilter) {
+    setPrevStatusFilter(statusFilter);
+    setLoading(true);
+    setError(null);
+  }
+
+  useEffect(() => { void fetchList(); }, [statusFilter]);
 
   // Group by status for the list panel
   const grouped: Record<string, Prereg[]> = {};

@@ -10,18 +10,25 @@ export default function ChannelCapacityPage() {
   const [nUses, setNUses] = useState(100);
   const [useEntanglement, setUseEntanglement] = useState(true);
   const [result, setResult] = useState<ChannelCapacityResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return analyzeChannelCapacity({ channel, p_err: pErr, n_uses: nUses, uses_entanglement: useEntanglement })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await analyzeChannelCapacity({ channel, p_err: pErr, n_uses: nUses, uses_entanglement: useEntanglement })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   return (
     <div style={{ display: "flex", gap: 24 }}>

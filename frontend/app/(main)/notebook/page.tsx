@@ -199,14 +199,11 @@ export default function NotebookPage() {
   const [newDescription, setNewDescription] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
-  const loadNotebooks = async () => {
-    try {
-      const data = await listNotebooks();
-      setNotebooks(data.notebooks);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  // State is set in the promise callbacks, so the mount effect can call this directly.
+  const loadNotebooks = () =>
+    listNotebooks()
+      .then((data) => setNotebooks(data.notebooks))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
 
   useEffect(() => {
     loadNotebooks();

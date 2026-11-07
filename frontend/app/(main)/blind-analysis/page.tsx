@@ -209,18 +209,12 @@ export default function BlindAnalysisPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
-  const loadRegistrations = useCallback(async () => {
-    setLoadingList(true);
-    setListError(null);
-    try {
-      const data = await listAnalysisRegistrations();
-      setRegistrations(data);
-    } catch (e) {
-      setListError(e instanceof Error ? e.message : "Failed to load registrations");
-    } finally {
-      setLoadingList(false);
-    }
-  }, []);
+  // Runs on mount, when loadingList already starts true; state is set only in the promise callbacks.
+  const loadRegistrations = useCallback(() =>
+    listAnalysisRegistrations()
+      .then((data) => setRegistrations(data))
+      .catch((e: unknown) => setListError(e instanceof Error ? e.message : "Failed to load registrations"))
+      .finally(() => setLoadingList(false)), []);
 
   useEffect(() => { void loadRegistrations(); }, [loadRegistrations]);
 

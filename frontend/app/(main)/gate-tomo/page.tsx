@@ -82,26 +82,26 @@ export default function GateTomoPage() {
   const [tomoMethod, setTomoMethod] = useState("process_tomo");
   const [nShots, setNShots] = useState(4096);
   const [result, setResult] = useState<GateTomoResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const selectedGate = GATES.find((g) => g.id === gate) ?? GATES[0];
 
-  const handleRun = async () => {
+  // State is set only in promise callbacks: the mount effect calls this directly (loading starts true).
+  const compute = () =>
+    runGateTomography({ gate, backend, tomo_method: tomoMethod, n_shots: nShots })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+
+  const handleRun = () => {
     setLoading(true);
     setError(null);
-    try {
-      const r = await runGateTomography({ gate, backend, tomo_method: tomoMethod, n_shots: nShots });
-      setResult(r);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const fidelityColor = result
     ? result.process_fidelity > 0.99 ? "#10b981" : result.process_fidelity > 0.95 ? "#f59e0b" : "#ef4444"

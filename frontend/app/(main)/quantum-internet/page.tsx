@@ -83,22 +83,23 @@ export default function QuantumInternetPage() {
   const [optError, setOptError] = useState<string | null>(null);
   const [optResult, setOptResult] = useState<RepeaterPlacement | null>(null);
 
-  const loadNetworks = useCallback(async () => {
+  // The fetch sets state only in promise callbacks: the mount effect calls it directly
+  // (loadingNetworks starts true), later reloads go through loadNetworks().
+  const fetchNetworks = useCallback(() =>
+    listQuantumNetworks()
+      .then((data) => setNetworks(data))
+      .catch(() => setNetworksError("Failed to load networks."))
+      .finally(() => setLoadingNetworks(false)), []);
+
+  const loadNetworks = useCallback(() => {
     setLoadingNetworks(true);
     setNetworksError(null);
-    try {
-      const data = await listQuantumNetworks();
-      setNetworks(data);
-    } catch {
-      setNetworksError("Failed to load networks.");
-    } finally {
-      setLoadingNetworks(false);
-    }
-  }, []);
+    return fetchNetworks();
+  }, [fetchNetworks]);
 
   useEffect(() => {
-    loadNetworks();
-  }, [loadNetworks]);
+    fetchNetworks();
+  }, [fetchNetworks]);
 
   const handleSelectNetwork = async (id: string) => {
     setLoadingNetwork(true);

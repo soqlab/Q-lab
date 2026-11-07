@@ -56,18 +56,17 @@ export default function CircuitMarketplacePage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const fetchListings = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await listMarketplace({ category: category || undefined, max_price: maxPrice, sort });
-      setListings(data.listings);
-      setError(null);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load listings");
-    } finally {
-      setLoading(false);
-    }
-  }, [category, maxPrice, sort]);
+  // The request and the state it sets, only in promise callbacks.
+  const fetchListings = useCallback(() =>
+    listMarketplace({ category: category || undefined, max_price: maxPrice, sort })
+      .then((data) => { setListings(data.listings); setError(null); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load listings"))
+      .finally(() => setLoading(false)), [category, maxPrice, sort]);
+
+  // New filters show the loading state at once (adjusted while rendering, not in the effect).
+  const query = `${category}|${maxPrice}|${sort}`;
+  const [listedQuery, setListedQuery] = useState(query);
+  if (query !== listedQuery) { setListedQuery(query); setLoading(true); }
 
   useEffect(() => {
     listMarketplaceCategories().then((data) => setCategories((data.categories ?? []).map((c) => c.name))).catch(() => {});

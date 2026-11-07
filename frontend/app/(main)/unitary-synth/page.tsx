@@ -28,7 +28,7 @@ export default function UnitarySynthPage() {
   const [matrix, setMatrix] = useState<string>(CNOT_MATRIX);
   const [optimize, setOptimize] = useState<boolean>(true);
   const [result, setResult] = useState<UnitarySynthResult | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -36,6 +36,14 @@ export default function UnitarySynthPage() {
     setNQubits(n);
     setMatrix(identityForQubits(n));
     setParseError(null);
+  }
+
+  // The API call, setting state only in promise callbacks.
+  function compute(parsed: number[][]) {
+    return synthesizeUnitary({ matrix: parsed, optimize })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }
 
   async function handleRun() {
@@ -50,18 +58,12 @@ export default function UnitarySynthPage() {
       return;
     }
     setLoading(true);
-    try {
-      const res = await synthesizeUnitary({ matrix: parsed, optimize });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    await compute(parsed);
   }
 
+  // On mount the matrix is the built-in CNOT preset, which always parses (loading starts true).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(JSON.parse(matrix) as number[][]); }, []);
 
   const textareaRows = nQubits === 1 ? 4 : nQubits === 2 ? 8 : 10;
 

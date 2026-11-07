@@ -219,33 +219,42 @@ export default function TemplateMarketplacePage() {
 
   const [useResult, setUseResult] = useState<UseResult | null>(null);
 
+  const fetchTemplates = useCallback(() => {
+    const params = new URLSearchParams();
+    if (activeCategory) params.set("category", activeCategory);
+    if (activeAlgo)     params.set("algorithm", activeAlgo);
+    if (search)         params.set("search", search);
+    params.set("sort", sort);
+
+    return Promise.all([
+      safeFetch(`${API}/api/v1/experiment-templates/?${params}`),
+      safeFetch(`${API}/api/v1/experiment-templates/featured`),
+      safeFetch(`${API}/api/v1/experiment-templates/categories`),
+    ])
+      .then(([t, f, c]) => {
+        setTemplates(Array.isArray(t) ? t : []);
+        setFeatured(Array.isArray(f) ? f : []);
+        setCategories(Array.isArray(c) ? c : []);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Failed to load templates";
+        setError(msg.includes("fetch") ? "Backend is warming up — please retry in a moment." : msg);
+      })
+      .finally(() => setLoading(false));
+  }, [activeCategory, activeAlgo, search, sort]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (activeCategory) params.set("category", activeCategory);
-      if (activeAlgo)     params.set("algorithm", activeAlgo);
-      if (search)         params.set("search", search);
-      params.set("sort", sort);
+    await fetchTemplates();
+  }, [fetchTemplates]);
 
-      const [t, f, c] = await Promise.all([
-        safeFetch(`${API}/api/v1/experiment-templates/?${params}`),
-        safeFetch(`${API}/api/v1/experiment-templates/featured`),
-        safeFetch(`${API}/api/v1/experiment-templates/categories`),
-      ]);
-      setTemplates(Array.isArray(t) ? t : []);
-      setFeatured(Array.isArray(f) ? f : []);
-      setCategories(Array.isArray(c) ? c : []);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load templates";
-      setError(msg.includes("fetch") ? "Backend is warming up — please retry in a moment." : msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeCategory, activeAlgo, search, sort]);
+  // A filter change shows the loading state at once (adjusted while rendering; the effect only fetches).
+  const queryKey = JSON.stringify([activeCategory, activeAlgo, search, sort]);
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (queryKey !== prevQueryKey) { setPrevQueryKey(queryKey); setLoading(true); setError(null); }
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
   const handleStar = async (id: string) => {
     await fetch(`${API}/api/v1/experiment-templates/${id}/star`, { method: "POST" }).catch(() => null);

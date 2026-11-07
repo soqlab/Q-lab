@@ -237,34 +237,34 @@ export default function MetaAnalysisPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedData, setExpandedData] = useState<Record<string, FullMetaAnalysisResult>>({});
 
-  const loadStudies = useCallback(async () => {
-    setLoadingStudies(true);
-    setStudiesError(null);
-    try {
-      const data = await listMetaStudies();
-      setStudies(data);
-    } catch (e) {
-      setStudiesError(e instanceof Error ? e.message : "Failed to load studies");
-    } finally {
-      setLoadingStudies(false);
-    }
-  }, []);
+  // Loaded on mount (loadingStudies starts true); state is set in the promise callbacks.
+  const loadStudies = useCallback(() =>
+    listMetaStudies()
+      .then((data) => setStudies(data))
+      .catch((e) => setStudiesError(e instanceof Error ? e.message : "Failed to load studies"))
+      .finally(() => setLoadingStudies(false)), []);
 
-  const loadAnalyses = useCallback(async () => {
+  const fetchAnalyses = useCallback(() =>
+    listFullMetaAnalyses()
+      .then((data) => setPastAnalyses(data))
+      .catch((e) => setAnalysesError(e instanceof Error ? e.message : "Failed to load analyses"))
+      .finally(() => setLoadingAnalyses(false)), []);
+
+  const loadAnalyses = useCallback(() => {
     setLoadingAnalyses(true);
     setAnalysesError(null);
-    try {
-      const data = await listFullMetaAnalyses();
-      setPastAnalyses(data);
-    } catch (e) {
-      setAnalysesError(e instanceof Error ? e.message : "Failed to load analyses");
-    } finally {
-      setLoadingAnalyses(false);
-    }
-  }, []);
+    return fetchAnalyses();
+  }, [fetchAnalyses]);
+
+  // Opening the results tab starts a fresh load: set its loading state while rendering.
+  const [prevTab, setPrevTab] = useState(tab);
+  if (tab !== prevTab) {
+    setPrevTab(tab);
+    if (tab === "results") { setLoadingAnalyses(true); setAnalysesError(null); }
+  }
 
   useEffect(() => { void loadStudies(); }, [loadStudies]);
-  useEffect(() => { if (tab === "results") void loadAnalyses(); }, [tab, loadAnalyses]);
+  useEffect(() => { if (tab === "results") void fetchAnalyses(); }, [tab, fetchAnalyses]);
 
   async function handleAddStudy(e: React.FormEvent) {
     e.preventDefault();

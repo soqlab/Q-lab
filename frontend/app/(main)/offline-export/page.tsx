@@ -94,7 +94,7 @@ export default function OfflineExportPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setReqLoading(true);
+    // reqLoading starts true
     getExportRequirements()
       .then((data) => setRequirements(data))
       .catch((e: unknown) =>

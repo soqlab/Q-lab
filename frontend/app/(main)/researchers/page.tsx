@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Search, Users, MapPin, ExternalLink, Activity, Award } from "lucide-react";
 
@@ -196,27 +197,35 @@ export default function ResearchersPage() {
   const [activeInterest, setActiveInterest] = useState<string | null>(null);
   const [sort, setSort] = useState<"most_runs" | "best_health" | "newest">("newest");
 
+  // A new filter or sort shows the loading state at once (set while rendering; loading starts true).
+  const query = `${activeInterest ?? ""}|${sort}`;
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setLoading(true);
+    setError(null);
+  }
+
+  // The fetch sets state only in promise callbacks, so the effect can call it directly.
+  function load() {
+    const params = new URLSearchParams({ sort });
+    if (activeInterest) params.set("research_interest", activeInterest);
+    return fetch(apiUrl(`/api/v1/profiles/?${params}`), { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load researchers");
+        return await res.json() as { profiles: ResearcherProfile[]; total: number };
+      })
+      .then((data) => {
+        setProfiles(data.profiles ?? []);
+        setTotal(data.total ?? 0);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false));
+  }
+
   useEffect(() => {
     void load();
   }, [activeInterest, sort]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ sort });
-      if (activeInterest) params.set("research_interest", activeInterest);
-      const res = await fetch(apiUrl(`/api/v1/profiles/?${params}`), { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load researchers");
-      const data = await res.json() as { profiles: ResearcherProfile[]; total: number };
-      setProfiles(data.profiles ?? []);
-      setTotal(data.total ?? 0);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const filtered = profiles.filter((p) => {
     if (!search.trim()) return true;
@@ -242,7 +251,7 @@ export default function ResearchersPage() {
             {total} public researcher{total !== 1 ? "s" : ""} on Q-Lab
           </p>
         </div>
-        <a
+        <Link
           href="/profile/edit"
           style={{
             background: "#1d6f8f",
@@ -255,7 +264,7 @@ export default function ResearchersPage() {
           }}
         >
           Edit My Profile
-        </a>
+        </Link>
       </div>
 
       {/* Search + Sort controls */}

@@ -18,24 +18,25 @@ export default function SpeedupPage() {
   const [nQubits, setNQubits] = useState(20);
   const [circuitDepth, setCircuitDepth] = useState(100);
   const [result, setResult] = useState<SpeedupCertResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleRun() {
+  // The API call, setting state only in promise callbacks: run on mount (loading starts true) and by handleRun.
+  function compute() {
+    return certifySpeedup({ problem_type: problemType, n_qubits: nQubits, circuit_depth: circuitDepth })
+      .then((res) => setResult(res))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function handleRun() {
     setLoading(true);
     setError(null);
-    try {
-      const res = await certifySpeedup({ problem_type: problemType, n_qubits: nQubits, circuit_depth: circuitDepth });
-      setResult(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void handleRun(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   const selectedProblem = PROBLEMS.find((p) => p.id === problemType);
 

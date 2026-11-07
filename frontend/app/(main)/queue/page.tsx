@@ -51,27 +51,40 @@ export default function QueuePage() {
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<QueueRecommendation | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(true);
   const [nQubits, setNQubits] = useState(2);
   const [maxQueue, setMaxQueue] = useState(100);
   const [sortBy, setSortBy] = useState<"queue" | "name" | "wait">("queue");
   const [filterOp, setFilterOp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  // The fetch sets state only in promise callbacks, so the effect can call it directly.
+  const fetchQueue = () =>
+    Promise.all([
+      getQueueStatus(),
+      recommendBackend(nQubits, maxQueue),
+    ])
+      .then(([status, rec]) => {
+        setBackends(status.backends); setSource(status.source);
+        setFetchedAt(status.fetched_at); setRecommendation(rec);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => { setLoading(false); setRefreshing(false); });
+
+  const load = () => {
     setRefreshing(true); setError(null);
-    try {
-      const [status, rec] = await Promise.all([
-        getQueueStatus(),
-        recommendBackend(nQubits, maxQueue),
-      ]);
-      setBackends(status.backends); setSource(status.source);
-      setFetchedAt(status.fetched_at); setRecommendation(rec);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); setRefreshing(false); }
+    return fetchQueue();
   };
 
-  useEffect(() => { load(); }, [nQubits, maxQueue]);
+  // New inputs show the refreshing state at once (set while rendering; refreshing starts true).
+  const query = `${nQubits}|${maxQueue}`;
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setRefreshing(true); setError(null);
+  }
+
+  useEffect(() => { fetchQueue(); }, [nQubits, maxQueue]);
 
   const sorted = [...backends]
     .filter(b => !filterOp || b.operational)

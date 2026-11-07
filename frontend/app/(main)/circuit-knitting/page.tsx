@@ -11,18 +11,25 @@ export default function CircuitKnittingPage() {
   const [noise, setNoise] = useState(0.001);
   const [depth, setDepth] = useState(10);
   const [result, setResult] = useState<CircuitKnittingResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  // The API call and the state it sets, only in promise callbacks: the mount effect runs it directly
+  // (loading starts true), the Run button through run().
+  function compute() {
+    return runCircuitKnitting({ n_qubits: nQubits, n_subcircuits: nSubs, cuts_type: cutsType, reconstruction_method: method, n_shots: nShots, noise_level: noise, circuit_depth: depth })
+      .then((r) => setResult(r))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
+
+  function run() {
     setLoading(true); setError(null);
-    try { setResult(await runCircuitKnitting({ n_qubits: nQubits, n_subcircuits: nSubs, cuts_type: cutsType, reconstruction_method: method, n_shots: nShots, noise_level: noise, circuit_depth: depth })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    void compute();
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void compute(); }, []);
 
   return (
     <div style={{ display: "flex", gap: 24 }}>
