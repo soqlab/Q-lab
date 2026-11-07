@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------------------------
+// ------------------------------------------------------------------
 // AI Insights
 // ------------------------------------------------------------------
 
@@ -239,7 +239,6 @@ const API_PREFIX = "/qlab-api";
 export function apiUrl(path: string): string {
   return `${API_PREFIX}${path}`;
 }
-
 
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -5049,52 +5048,6 @@ export async function analyzeCliffordT(req: { qasm: string }): Promise<CliffordT
 }
 
 // ------------------------------------------------------------------
-// Multi-Backend Ensemble Runner
-// ------------------------------------------------------------------
-
-export type EnsembleProviderResult = {
-  provider_id: string;
-  provider_name: string;
-  color: string;
-  noise_level: number;
-  fidelity_weight: number;
-  distribution: Record<string, number>;
-  top_bitstring: string;
-  top_prob: number;
-  entropy: number;
-  tvd_to_ideal: number;
-  estimated_fidelity: number;
-};
-export type EnsembleResult = {
-  ensemble_id: string;
-  n_providers: number;
-  shots_per_provider: number;
-  individual_results: EnsembleProviderResult[];
-  consensus_distribution: Record<string, number>;
-  consensus_top_bitstring: string;
-  consensus_entropy: number;
-  agreement_score: number;
-  best_provider: string;
-  best_provider_name: string;
-  created_at: string;
-};
-
-export async function runEnsemble(req: { qasm: string; providers?: string[]; shots?: number; seed?: number }): Promise<EnsembleResult> {
-  const res = await fetch(apiUrl("/api/v1/ensemble"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listEnsembleProviders(): Promise<{ id: string; name: string; noise_level: number; weight: number; color: string }[]> {
-  const res = await fetch(apiUrl("/api/v1/ensemble/providers"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Providers failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
 // Circuit Semantic Search
 // ------------------------------------------------------------------
 
@@ -5217,49 +5170,6 @@ export async function compileNL(req: { description: string; n_qubits_hint?: numb
 export async function listNL2QASMExamples(): Promise<{ name: string; pattern_hint: string; n_qubits: number }[]> {
   const res = await fetch(apiUrl("/api/v1/nl2qasm/examples"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Examples failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
-// Quantum Volume Benchmarker
-// ------------------------------------------------------------------
-
-export type QVWidthResult = {
-  n_qubits: number;
-  mean_heavy_output_prob: number;
-  pass_rate: number;
-  pass_count: number;
-  sigma_bound: number;
-  certified: boolean;
-  qv_at_width: number;
-  trials: { trial: number; hop: number; pass: boolean }[];
-};
-export type QVBenchResult = {
-  bench_id: string;
-  backend_name: string;
-  noise_profile: string;
-  noise_level: number;
-  n_trials_per_width: number;
-  quantum_volume: number;
-  qv_log2: number;
-  certification_message: string;
-  per_width_results: QVWidthResult[];
-  pass_threshold: number;
-  created_at: string;
-};
-
-export async function runQVBench(req: { max_qubits?: number; n_trials?: number; noise_profile?: string; backend_name?: string; seed?: number }): Promise<QVBenchResult> {
-  const res = await fetch(apiUrl("/api/v1/qvbench"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listQVNoiseProfiles(): Promise<{ id: string; noise_level: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/qvbench/noise-profiles"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Profiles failed");
   return res.json();
 }
 
@@ -5439,50 +5349,6 @@ export async function runOptimizerHub(req: { hamiltonian?: string; n_qubits?: nu
 export async function listOptimizerHamiltonians(): Promise<{ id: string; display: string; n_qubits: number }[]> {
   const res = await fetch(apiUrl("/api/v1/optimizer-hub/hamiltonians"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Hamiltonians failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
-// 5. Quantum Chemistry Module
-// ------------------------------------------------------------------
-
-export type BondCurvePoint = { bond_length: number; energy: number };
-export type QuantumChemResult = {
-  chem_id: string;
-  molecule: string;
-  formula: string;
-  basis: string;
-  n_electrons: number;
-  n_qubits: number;
-  bond_length_angstrom: number;
-  equilibrium_bond_length: number;
-  fci_energy_hartree: number;
-  vqe_energy_hartree: number;
-  energy_error_hartree: number;
-  chemical_accuracy_achieved: boolean;
-  correlation_energy_hartree: number;
-  correlation_energy_pct: number;
-  n_pauli_terms: number;
-  n_cnot_gates: number;
-  circuit_depth: number;
-  bond_curve: BondCurvePoint[];
-  homo_lumo_gap: number;
-  point_group: string;
-  created_at: string;
-};
-
-export async function runQuantumChem(req: { molecule?: string; bond_length?: number; basis?: string }): Promise<QuantumChemResult> {
-  const res = await fetch(apiUrl("/api/v1/quantum-chem"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listChemMolecules(): Promise<{ id: string; formula: string; n_electrons: number; n_qubits: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/quantum-chem/molecules"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Molecules failed");
   return res.json();
 }
 
@@ -6733,7 +6599,6 @@ export async function listBlochGates(): Promise<{ gates: string[] }> {
   return res.json();
 }
 
-
 // ─────────────────────────────────────────────────────────
 // Multi-Provider Execution
 // ─────────────────────────────────────────────────────────
@@ -7190,37 +7055,6 @@ export async function listAutopilotMissions(): Promise<{ missions: object[] }> {
 }
 
 // ─────────────────────────────────────────────────────────
-// Tomography
-// ─────────────────────────────────────────────────────────
-export interface TomographyJob { job_id: string; method: string; n_qubits: number; n_measurements: number; n_shots: number; status: string; created_at: string; fidelity: number | null; purity: number | null; concurrence: number | null; entanglement_entropy: number | null; density_matrix_real: number[][] | null; density_matrix_imag: number[][] | null; eigenvalues: number[] | null; is_physical: boolean | null; negativity: number | null; measurements_used: number; compression_ratio: number; reconstruction_time_ms: number; pauli_expectations: Record<string, number>; bloch_vector: number[] | null; warnings: string[]; infidelity: number | null; }
-export async function runTomography(req: { method?: string; n_qubits?: number; n_shots?: number; counts?: Record<string, number>; target_state?: string; regularization?: number }): Promise<TomographyJob> {
-  const res = await fetch(apiUrl("/api/v1/tomography/run"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listTomographyJobs(): Promise<{ jobs: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/tomography"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List jobs failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// ZNE / PEC
-// ─────────────────────────────────────────────────────────
-export interface ZNEResult { method: string; noise_factors: number[]; raw_values: number[]; extrapolated_value: number; r_squared: number; noise_rate_estimate: number; mitigation_factor: number; }
-export interface MitigationJob { job_id: string; method: string; created_at: string; circuit_name: string; n_qubits: number; circuit_depth: number; backend: string; noisy_value: number; mitigated_value: number; mitigation_overhead: number; estimated_true_value: number; confidence_interval: number[]; zne: ZNEResult | null; pec: object | null; cdr: object | null; symmetry_verification: object | null; mthree: object | null; recommendations: string[]; cost_usd: number; }
-export async function runMitigation(req: { method?: string; circuit_name?: string; n_qubits?: number; circuit_depth?: number; backend?: string; n_shots?: number; noise_factors?: number[]; noisy_counts?: Record<string, number> }): Promise<MitigationJob> {
-  const res = await fetch(apiUrl("/api/v1/zne-pec/mitigate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listMitigationJobs(): Promise<{ jobs: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/zne-pec"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List jobs failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Error Budget
 // ─────────────────────────────────────────────────────────
 export interface ErrorComponent { name: string; category: string; contribution_pct: number; absolute_error: number; description: string; mitigatable: boolean; mitigation_strategy: string; }
@@ -7322,21 +7156,6 @@ export interface CalForecast { forecast_id: string; backend: string; created_at:
 export async function forecastCalibration(req: { backend?: string; horizon_hours?: number; alert_threshold_t1_us?: number; qubit?: number }): Promise<CalForecast> {
   const res = await fetch(apiUrl("/api/v1/cal-forecast/forecast"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Backend Emulator
-// ─────────────────────────────────────────────────────────
-export interface EmulationJob { job_id: string; source_backend: string; target_backend: string; n_qubits: number; circuit_depth: number; source_fidelity: number; emulated_fidelity: number; fidelity_delta: number; source_counts: Record<string, number>; emulated_counts: Record<string, number>; noise_model_mapping: Record<string, number>; connectivity_penalty: number; swap_overhead: number; cross_backend_agreement: number; confidence: number; warnings: string[]; recommendations: string[]; }
-export async function emulateOnBackend(req: { source_backend: string; target_backend: string; n_qubits?: number; circuit_depth?: number; n_shots?: number; source_counts?: Record<string, number> }): Promise<EmulationJob> {
-  const res = await fetch(apiUrl("/api/v1/backend-emulator/emulate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listEmulatorBackends(): Promise<{ backends: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/backend-emulator/backends"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List backends failed");
   return res.json();
 }
 
@@ -7491,32 +7310,6 @@ export async function optimizeCircuitAI(req: { circuit_qasm: string; backend?: s
 }
 export async function explainCircuitAI(req: { circuit_qasm: string; detail_level?: string }): Promise<CircuitAIExplanation> {
   const res = await fetch(apiUrl("/api/v1/circuit-ai/explain"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Global Calibration Database
-// ─────────────────────────────────────────────────────────
-export interface GlobalCalRecord { record_id: string; backend: string; qubit: number; t1_us: number; t2_us: number; gate_error: number; readout_error: number; timestamp: string; institution?: string; contributor?: string; }
-export interface BackendCommunityCalibration { backend: string; records: GlobalCalRecord[]; community_t1_median: number; community_t2_median: number; community_gate_error_median: number; trend: string; n_contributors: number; last_updated: string; forecast_next_24h: { t1: number; t2: number }; }
-export async function contributeCalibration(req: { backend: string; qubit: number; t1_us: number; t2_us: number; gate_error: number; readout_error: number; timestamp?: string; institution?: string }): Promise<GlobalCalRecord> {
-  const res = await fetch(apiUrl("/api/v1/global-cal/contribute"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getBackendCommunityCalibration(backend: string): Promise<BackendCommunityCalibration> {
-  const res = await fetch(apiUrl(`/api/v1/global-cal/backend/${backend}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getCalLeaderboard(): Promise<{ leaderboard: { rank: number; backend: string; median_t2_us: number; n_contributors: number }[] }> {
-  const res = await fetch(apiUrl("/api/v1/global-cal/leaderboard"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function compareCalibration(req: { backend: string; your_t1: number; your_t2: number }): Promise<{ your_percentile_t1: number; your_percentile_t2: number; community_average: Record<string, number>; assessment: string }> {
-  const res = await fetch(apiUrl("/api/v1/global-cal/compare"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -7724,33 +7517,6 @@ export async function getGrantProposal(proposalId: string): Promise<GrantProposa
 }
 export async function listGrantProposals(): Promise<{ proposals: GrantProposal[] }> {
   const res = await fetch(apiUrl("/api/v1/grant-proposal"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// RB / GST / SPAM Suite
-// ─────────────────────────────────────────────────────────
-export interface RBResult { rb_id: string; backend: string; qubit: number; sequence_lengths: number[]; survival_probabilities: number[]; error_per_clifford: number; error_per_gate: number; t_gate_infidelity: number; fit_r_squared: number; confidence_interval: [number, number]; decay_constant: number; coherence_limit: number; }
-export interface SPAMResult { spam_id: string; state_prep_error: number; measurement_error: number; spam_matrix: number[][]; confusion_matrix: number[][]; f_spam: number; recommendations: string[]; }
-export interface RBGSTXEBResult { xeb_id: string; backend: string; n_qubits: number; circuit_depths: number[]; xeb_fidelities: number[]; linear_xeb_per_cycle: number; fit_r_squared: number; }
-export async function runRandomizedBenchmarking(req: { backend: string; qubit?: number; max_sequence_length?: number; n_sequences?: number }): Promise<RBResult> {
-  const res = await fetch(apiUrl("/api/v1/rb-gst/rb"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function runSPAMCharacterization(req: { backend: string; n_qubits?: number }): Promise<SPAMResult> {
-  const res = await fetch(apiUrl("/api/v1/rb-gst/spam"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function runXEBSuite(req: { backend: string; n_qubits: number; max_depth?: number }): Promise<RBGSTXEBResult> {
-  const res = await fetch(apiUrl("/api/v1/rb-gst/xeb"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getRBGSTReport(backend: string): Promise<{ backend: string; rb: RBResult | null; spam: SPAMResult | null; xeb: RBGSTXEBResult | null; summary: string }> {
-  const res = await fetch(apiUrl(`/api/v1/rb-gst/report/${backend}`), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }
@@ -8076,55 +7842,6 @@ export async function getSyntheticDataset(datasetId: string): Promise<SyntheticD
 }
 export async function getSyntheticDatasetStats(datasetId: string): Promise<SyntheticDatasetStats> {
   const res = await fetch(apiUrl(`/api/v1/synthetic-data/dataset/${datasetId}/stats`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Live Backend Monitor  /api/v1/live-monitor
-// ─────────────────────────────────────────────────────────
-export interface LiveBackendStatus { backend: string; operational: boolean; queue_depth: number; avg_wait_min: number; t1_us: number; t2_us: number; readout_error: number; cx_error: number; last_calibrated: string; alert_level: string; }
-export interface BackendQueueSnapshot { backend: string; snapshot_id: string; queue_depth: number; estimated_wait_min: number; jobs_running: number; jobs_pending: number; peak_today: number; taken_at: string; }
-export interface CalibrationDriftEvent { backend: string; qubit: number; metric: string; value: number; baseline: number; drift_pct: number; timestamp: string; alert: boolean; }
-export interface MonitorAlertSubscription { sub_id: string; backend: string; threshold_t1_us?: number; threshold_cx_error?: number; email?: string; created_at: string; }
-export async function getLiveStatus(): Promise<LiveBackendStatus[]> {
-  const res = await fetch(apiUrl("/api/v1/live-monitor/status"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getQueueSnapshot(backend: string): Promise<BackendQueueSnapshot> {
-  const res = await fetch(apiUrl(`/api/v1/live-monitor/queue/${backend}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getBackendDriftHistory(backend: string): Promise<CalibrationDriftEvent[]> {
-  const res = await fetch(apiUrl(`/api/v1/live-monitor/history/${backend}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function watchBackend(req: { backend: string; threshold_t1_us?: number; threshold_cx_error?: number; email?: string }): Promise<MonitorAlertSubscription> {
-  const res = await fetch(apiUrl("/api/v1/live-monitor/watch"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Quantum Process Tomography  /api/v1/process-tomo
-// ─────────────────────────────────────────────────────────
-export interface QPTResult { result_id: string; backend: string; gate_name: string; n_qubits: number; method: string; process_fidelity: number; average_gate_fidelity: number; unitarity: number; diamond_norm_error: number; chi_matrix_real: number[][]; chi_matrix_imag: number[][]; dominant_error_type: string; error_breakdown: Record<string, number>; n_circuits_used: number; shots_per_circuit: number; created_at: string; }
-export interface QPTSummary { result_id: string; backend: string; gate_name: string; process_fidelity: number; average_gate_fidelity: number; diamond_norm_error: number; created_at: string; }
-export async function runQPT(req: { backend: string; gate_name: string; n_qubits?: number; method?: string; shots_per_circuit?: number }): Promise<QPTResult> {
-  const res = await fetch(apiUrl("/api/v1/process-tomo/run"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listQPTResults(): Promise<QPTSummary[]> {
-  const res = await fetch(apiUrl("/api/v1/process-tomo/results"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function getQPTResult(resultId: string): Promise<QPTResult> {
-  const res = await fetch(apiUrl(`/api/v1/process-tomo/result/${resultId}`), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed");
   return res.json();
 }

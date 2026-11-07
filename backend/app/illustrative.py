@@ -15,18 +15,17 @@ ILLUSTRATIVE_VALUE = "illustrative"
 
 ILLUSTRATIVE_ROUTERS = frozenset({
     # Invented results: nothing is run on the user's input.
-    "advantage", "anomaly_physics", "autopilot", "backend_emulator", "bayes_opt", "circuit_ai",
+    "advantage", "anomaly_physics", "autopilot", "bayes_opt", "circuit_ai",
     "circuit_knitting", "collab_notebook", "copilot", "cross_bench",
     "dd_optimizer", "error_mitigate",
-    "evo_optimizer", "fair_data", "gate_tomo", "global_cal", "grant_proposal", "institute", "job_scheduler",
-    "live_monitor", "methods_gen", "mirror_circuit", "noise_marketplace", "oed", "offline_export",
-    "optimizer_hub", "paper_draft", "paper_replication", "process_tomo", "pulse_control", "qaoa_solver", "qfm",
-    "qml_datasets", "qml_workbench", "quantum_chem", "qv_runner", "rb_gst", "rb_suite", "research_pipeline",
-    "rl_optimizer", "spectral_noise", "synthetic_data", "tensor_network", "tomography", "vqe_landscape",
-    "zne_pec",
-    # Real calculation with a fallback to invented numbers when something is missing.
-    "causal", "clifford_sim", "ensemble_runner", "error_budget", "github_ci", "hamiltonian_studio", "hpc_bridge",
-    "protocol_sim", "providers", "quantum_finance", "quantum_internet", "qvbench", "stats_engine",
+    "evo_optimizer", "fair_data", "gate_tomo", "grant_proposal", "institute", "job_scheduler",
+    "methods_gen", "mirror_circuit", "noise_marketplace", "oed", "offline_export",
+    "optimizer_hub", "paper_draft", "paper_replication", "pulse_control", "qaoa_solver", "qfm",
+    "qml_datasets", "qml_workbench", "qv_runner", "rb_suite", "research_pipeline",
+    "rl_optimizer", "spectral_noise", "synthetic_data", "tensor_network", "vqe_landscape",
+        # Real calculation with a fallback to invented numbers when something is missing.
+    "causal", "clifford_sim", "error_budget", "github_ci", "hamiltonian_studio", "hpc_bridge",
+    "protocol_sim", "providers", "quantum_finance", "quantum_internet", "stats_engine",
     # Real flows, showing invented sample records.
     "benchmark_leaderboard", "challenges", "circuit_ancestry", "collab", "learn", "replication", "research_graph",
     "templates",

@@ -107,7 +107,6 @@ from .routers import cost_tracker as cost_tracker_router
 from .routers import rbac as rbac_router
 from .routers import cicd as cicd_router
 from .routers import circuit_versioning as circuit_versioning_router
-from .routers import zne_pec as zne_pec_router
 from .routers import credentials as credentials_router
 from .routers import ai_settings as ai_settings_router
 from .routers import notifications as notifications_router
@@ -133,16 +132,13 @@ from .routers import qec_synthesizer as qec_synthesizer_router
 from .routers import vqe_landscape as vqe_landscape_router
 from .routers import entanglement_map as entanglement_map_router
 from .routers import clifford_t as clifford_t_router
-from .routers import ensemble_runner as ensemble_runner_router
 from .routers import circuit_embed as circuit_embed_router
 from .routers import noise_router as noise_router_router
 from .routers import nl2qasm as nl2qasm_router
-from .routers import qvbench as qvbench_router
 from .routers import error_mitigate as error_mitigate_router
 from .routers import unitary_synth as unitary_synth_router
 from .routers import rb_suite as rb_suite_router
 from .routers import optimizer_hub as optimizer_hub_router
-from .routers import quantum_chem as quantum_chem_router
 from .routers import clifford_sim as clifford_sim_router
 from .routers import syndrome_decoder as syndrome_decoder_router
 from .routers import tensor_network as tensor_network_router
@@ -190,12 +186,10 @@ from .routers import challenges as challenges_router
 from .routers import copilot as copilot_router
 from .routers import stats_engine as stats_engine_router
 from .routers import autopilot as autopilot_router
-from .routers import tomography as tomography_router
 from .routers import dd_optimizer as dd_optimizer_router
 from .routers import peer_review as peer_review_router
 from .routers import replication as replication_router
 from .routers import collab as collab_router
-from .routers import backend_emulator as backend_emulator_router
 from .routers import job_scheduler as job_scheduler_router
 from .routers import paper_draft as paper_draft_router
 from .routers import arxiv_radar as arxiv_radar_router
@@ -203,7 +197,6 @@ from .routers import qfm as qfm_router
 from .routers import auto_mitigation as auto_mitigation_router
 from .routers import anomaly_physics as anomaly_physics_router
 from .routers import circuit_ai as circuit_ai_router
-from .routers import global_cal as global_cal_router
 from .routers import benchmark_leaderboard as benchmark_leaderboard_router
 from .routers import social as social_router
 from .routers import paper_replication as paper_replication_router
@@ -213,7 +206,6 @@ from .routers import fair_data as fair_data_router
 from .routers import causal as causal_router
 from .routers import research_pipeline as research_pipeline_router
 from .routers import grant_proposal as grant_proposal_router
-from .routers import rb_gst as rb_gst_router
 from .routers import transpiler_hub as transpiler_hub_router
 from .routers import hpc_bridge as hpc_bridge_router
 from .routers import circuit_marketplace as circuit_marketplace_router
@@ -226,8 +218,6 @@ from .routers import meta_analysis as meta_analysis_router
 from .routers import dataset_publish as dataset_publish_router
 from .routers import rl_optimizer as rl_optimizer_router
 from .routers import synthetic_data as synthetic_data_router
-from .routers import live_monitor as live_monitor_router
-from .routers import process_tomo as process_tomo_router
 from .routers import conference as conference_router
 from .routers import learn as learn_router
 from .routers import talent as talent_router
@@ -382,7 +372,6 @@ app.include_router(cost_tracker_router.router)
 app.include_router(rbac_router.router)
 app.include_router(cicd_router.router)
 app.include_router(circuit_versioning_router.router)
-app.include_router(zne_pec_router.router)
 app.include_router(credentials_router.router)
 app.include_router(ai_settings_router.router)
 app.include_router(notifications_router.router)
@@ -408,16 +397,13 @@ app.include_router(qec_synthesizer_router.router)
 app.include_router(vqe_landscape_router.router)
 app.include_router(entanglement_map_router.router)
 app.include_router(clifford_t_router.router)
-app.include_router(ensemble_runner_router.router)
 app.include_router(circuit_embed_router.router)
 app.include_router(noise_router_router.router)
 app.include_router(nl2qasm_router.router)
-app.include_router(qvbench_router.router)
 app.include_router(error_mitigate_router.router)
 app.include_router(unitary_synth_router.router)
 app.include_router(rb_suite_router.router)
 app.include_router(optimizer_hub_router.router)
-app.include_router(quantum_chem_router.router)
 app.include_router(clifford_sim_router.router)
 app.include_router(syndrome_decoder_router.router)
 app.include_router(tensor_network_router.router)
@@ -465,12 +451,10 @@ app.include_router(challenges_router.router)
 app.include_router(copilot_router.router)
 app.include_router(stats_engine_router.router)
 app.include_router(autopilot_router.router)
-app.include_router(tomography_router.router)
 app.include_router(dd_optimizer_router.router)
 app.include_router(peer_review_router.router)
 app.include_router(replication_router.router)
 app.include_router(collab_router.router)
-app.include_router(backend_emulator_router.router)
 app.include_router(job_scheduler_router.router)
 app.include_router(paper_draft_router.router)
 app.include_router(arxiv_radar_router.router)
@@ -478,7 +462,6 @@ app.include_router(qfm_router.router)
 app.include_router(auto_mitigation_router.router)
 app.include_router(anomaly_physics_router.router)
 app.include_router(circuit_ai_router.router)
-app.include_router(global_cal_router.router)
 app.include_router(benchmark_leaderboard_router.router)
 app.include_router(social_router.router)
 app.include_router(paper_replication_router.router)
@@ -488,7 +471,6 @@ app.include_router(fair_data_router.router)
 app.include_router(causal_router.router)
 app.include_router(research_pipeline_router.router)
 app.include_router(grant_proposal_router.router)
-app.include_router(rb_gst_router.router)
 app.include_router(transpiler_hub_router.router)
 app.include_router(hpc_bridge_router.router)
 app.include_router(circuit_marketplace_router.router)
@@ -501,8 +483,6 @@ app.include_router(meta_analysis_router.router)
 app.include_router(dataset_publish_router.router)
 app.include_router(rl_optimizer_router.router)
 app.include_router(synthetic_data_router.router)
-app.include_router(live_monitor_router.router)
-app.include_router(process_tomo_router.router)
 app.include_router(conference_router.router)
 app.include_router(learn_router.router)
 app.include_router(talent_router.router)
