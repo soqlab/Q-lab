@@ -3,12 +3,9 @@
 import { useState } from "react";
 import {
   checkPhysicsConstraints,
-  compareToLiterature,
   PhysicsCheck,
-  LiteratureComparison,
 } from "@/lib/api";
 
-type Tab = "physics" | "literature";
 
 type PhysicsForm = {
   t1_us: string;
@@ -20,13 +17,6 @@ type PhysicsForm = {
   n_qubits: string;
 };
 
-type LitForm = {
-  metric: string;
-  value: string;
-  backend: string;
-  n_qubits: string;
-  algorithm: string;
-};
 
 function parseOptFloat(v: string): number | undefined {
   const n = parseFloat(v);
@@ -77,7 +67,6 @@ function GaugeFill({ value }: { value: number }) {
 }
 
 export default function AnomalyPhysicsPage() {
-  const [tab, setTab] = useState<Tab>("physics");
 
   // Physics check state
   const [physForm, setPhysForm] = useState<PhysicsForm>({
@@ -92,18 +81,6 @@ export default function AnomalyPhysicsPage() {
   const [physResult, setPhysResult] = useState<PhysicsCheck | null>(null);
   const [physLoading, setPhysLoading] = useState(false);
   const [physError, setPhysError] = useState<string | null>(null);
-
-  // Literature compare state
-  const [litForm, setLitForm] = useState<LitForm>({
-    metric: "fidelity",
-    value: "",
-    backend: "ibm_brisbane",
-    n_qubits: "",
-    algorithm: "",
-  });
-  const [litResult, setLitResult] = useState<LiteratureComparison | null>(null);
-  const [litLoading, setLitLoading] = useState(false);
-  const [litError, setLitError] = useState<string | null>(null);
 
   async function handlePhysicsCheck() {
     setPhysError(null);
@@ -127,70 +104,18 @@ export default function AnomalyPhysicsPage() {
     }
   }
 
-  async function handleLitCompare() {
-    setLitError(null);
-    setLitLoading(true);
-    setLitResult(null);
-    try {
-      const res = await compareToLiterature({
-        metric: litForm.metric,
-        value: parseFloat(litForm.value),
-        backend: litForm.backend,
-        n_qubits: parseInt(litForm.n_qubits, 10),
-        algorithm: litForm.algorithm,
-      });
-      setLitResult(res);
-    } catch (e) {
-      setLitError(e instanceof Error ? e.message : "Compare failed");
-    } finally {
-      setLitLoading(false);
-    }
-  }
-
   return (
     <div className="page" style={{ padding: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
         Anomaly Physics Engine
       </h1>
       <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>
-        Validate experimental results against known quantum physics constraints
-        and published literature.
+        Check reported device figures against physical limits (T2 ≤ 2·T1, positivity, fidelities within
+        [0, 1]). Fixed rules; nothing is estimated.
       </p>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          background: "var(--surface)",
-          padding: 4,
-          borderRadius: 8,
-          width: "fit-content",
-          marginBottom: 24,
-        }}
-      >
-        {(["physics", "literature"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "6px 16px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              border: "none",
-              background: tab === t ? "var(--strong)" : "transparent",
-              color: tab === t ? "var(--text)" : "var(--muted)",
-            }}
-          >
-            {t === "physics" ? "Physics Check" : "Literature Compare"}
-          </button>
-        ))}
-      </div>
-
       {/* ── Physics Check Tab ── */}
-      {tab === "physics" && (
+      {(
         <div style={{ display: "flex", gap: 24 }}>
           <div style={{ width: 288, flexShrink: 0 }}>
             <div
@@ -533,385 +458,6 @@ export default function AnomalyPhysicsPage() {
         </div>
       )}
 
-      {/* ── Literature Compare Tab ── */}
-      {tab === "literature" && (
-        <div style={{ display: "flex", gap: 24 }}>
-          <div style={{ width: 288, flexShrink: 0 }}>
-            <div
-              style={{
-                background: "var(--surface)",
-                borderRadius: 12,
-                padding: 16,
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "var(--muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Metric
-                </label>
-                <select
-                  className="input"
-                  style={{ width: "100%" }}
-                  value={litForm.metric}
-                  onChange={(e) =>
-                    setLitForm((f) => ({ ...f, metric: e.target.value }))
-                  }
-                >
-                  <option value="fidelity">fidelity</option>
-                  <option value="energy">energy</option>
-                  <option value="error_rate">error_rate</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "var(--muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Value
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  className="input"
-                  style={{ width: "100%" }}
-                  value={litForm.value}
-                  onChange={(e) =>
-                    setLitForm((f) => ({ ...f, value: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "var(--muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Backend
-                </label>
-                <select
-                  className="input"
-                  style={{ width: "100%" }}
-                  value={litForm.backend}
-                  onChange={(e) =>
-                    setLitForm((f) => ({ ...f, backend: e.target.value }))
-                  }
-                >
-                  <option value="ibm_brisbane">ibm_brisbane</option>
-                  <option value="ibm_kyoto">ibm_kyoto</option>
-                  <option value="ionq_aria_1">ionq_aria_1</option>
-                  <option value="quantinuum_h2">quantinuum_h2</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "var(--muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Qubits
-                </label>
-                <input
-                  type="number"
-                  className="input"
-                  style={{ width: "100%" }}
-                  value={litForm.n_qubits}
-                  onChange={(e) =>
-                    setLitForm((f) => ({ ...f, n_qubits: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "var(--muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Algorithm
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  style={{ width: "100%" }}
-                  placeholder="e.g. VQE, QAOA…"
-                  value={litForm.algorithm}
-                  onChange={(e) =>
-                    setLitForm((f) => ({ ...f, algorithm: e.target.value }))
-                  }
-                />
-              </div>
-
-              <button
-                onClick={handleLitCompare}
-                disabled={
-                  litLoading ||
-                  !litForm.value ||
-                  !litForm.n_qubits ||
-                  !litForm.algorithm
-                }
-                className="button"
-                style={{
-                  width: "100%",
-                  opacity:
-                    litLoading ||
-                    !litForm.value ||
-                    !litForm.n_qubits ||
-                    !litForm.algorithm
-                      ? 0.5
-                      : 1,
-                  cursor:
-                    litLoading ||
-                    !litForm.value ||
-                    !litForm.n_qubits ||
-                    !litForm.algorithm
-                      ? "not-allowed"
-                      : "pointer",
-                }}
-              >
-                {litLoading ? "Comparing…" : "Compare to Literature"}
-              </button>
-              {litError && (
-                <p style={{ color: "var(--danger)", fontSize: 12 }}>{litError}</p>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            {!litResult && !litLoading && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: 256,
-                  color: "var(--muted)",
-                  fontSize: 13,
-                }}
-              >
-                Fill in values and click Compare to Literature.
-              </div>
-            )}
-
-            {litResult && (
-              <>
-                {/* Percentile + record badge */}
-                <div
-                  style={{
-                    background: "var(--surface)",
-                    borderRadius: 12,
-                    padding: 24,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 32,
-                  }}
-                >
-                  <div style={{ textAlign: "center" }}>
-                    <div
-                      style={{
-                        fontSize: 60,
-                        fontWeight: 700,
-                        color: "var(--strong)",
-                      }}
-                    >
-                      {litResult.percentile}
-                      <span
-                        style={{
-                          fontSize: 24,
-                          verticalAlign: "super",
-                          color: "var(--muted)",
-                        }}
-                      >
-                        th
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: "var(--muted)",
-                        marginTop: 4,
-                      }}
-                    >
-                      Percentile Rank
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <p style={{ color: "var(--text)", fontSize: 13 }}>
-                      {litResult.assessment}
-                    </p>
-                    <div
-                      style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-                    >
-                      {litResult.is_record && (
-                        <span
-                          style={{
-                            background: "rgba(245,158,11,0.2)",
-                            color: "#f59e0b",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            padding: "4px 12px",
-                            borderRadius: 999,
-                          }}
-                        >
-                          New Record
-                        </span>
-                      )}
-                      <span
-                        style={{
-                          background: "var(--line)",
-                          color: "var(--text)",
-                          fontSize: 12,
-                          padding: "4px 12px",
-                          borderRadius: 999,
-                        }}
-                      >
-                        Better than {litResult.better_than_pct}% of papers
-                      </span>
-                    </div>
-                    {litResult.record_holder && (
-                      <p style={{ fontSize: 12, color: "var(--muted)" }}>
-                        Current record: {litResult.record_holder}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Similar papers table */}
-                {(litResult.similar_papers ?? []).length > 0 && (
-                  <div
-                    style={{
-                      background: "var(--surface)",
-                      borderRadius: 12,
-                      padding: 16,
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontWeight: 600,
-                        color: "var(--text)",
-                        marginBottom: 12,
-                      }}
-                    >
-                      Similar Papers
-                    </h3>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                        <thead>
-                          <tr
-                            style={{
-                              color: "var(--muted)",
-                              fontSize: 12,
-                              borderBottom: "1px solid var(--line)",
-                            }}
-                          >
-                            <th style={{ textAlign: "left", paddingBottom: 8 }}>
-                              arXiv ID
-                            </th>
-                            <th style={{ textAlign: "left", paddingBottom: 8 }}>
-                              Title
-                            </th>
-                            <th style={{ textAlign: "right", paddingBottom: 8 }}>
-                              Value
-                            </th>
-                            <th style={{ textAlign: "right", paddingBottom: 8 }}>
-                              Year
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(litResult.similar_papers ?? []).map((p, i) => (
-                            <tr
-                              key={i}
-                              style={{
-                                borderBottom:
-                                  i < (litResult.similar_papers ?? []).length - 1
-                                    ? "1px solid var(--line)"
-                                    : "none",
-                              }}
-                            >
-                              <td
-                                style={{
-                                  padding: "8px 0",
-                                  color: "var(--strong)",
-                                  fontFamily: "ui-monospace,monospace",
-                                  fontSize: 12,
-                                }}
-                              >
-                                {p.arxiv_id}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "8px 0",
-                                  color: "var(--text)",
-                                  maxWidth: 320,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {p.title}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "8px 0",
-                                  textAlign: "right",
-                                  color: "var(--text)",
-                                }}
-                              >
-                                {p.value}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "8px 0",
-                                  textAlign: "right",
-                                  color: "var(--muted)",
-                                }}
-                              >
-                                {p.year}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

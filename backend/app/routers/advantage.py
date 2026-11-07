@@ -1,13 +1,14 @@
-"""Quantum Advantage — two feature sets in one router.
+"""Quantum advantage analysis of a stored run.
 
-1. Classic Advantage Detector (existing endpoints, unchanged):
-   POST /api/v1/advantage          — run a problem-based advantage test
-   GET  /api/v1/advantage          — list recent results
-   GET  /api/v1/advantage/sweep/{problem_type}
+   POST /api/v1/advantage/analyze/{run_id}   — analyse a run the caller can see
+   GET  /api/v1/advantage/cached/{run_id}    — the last analysis of that run
 
-2. Quantum Advantage Analyzer (new AI-powered endpoints):
-   POST /api/v1/advantage/analyze/{run_id}   — analyze advantage for a stored run
-   GET  /api/v1/advantage/cached/{run_id}    — fetch cached analysis
+Qubits and depth come from the run's stored circuit (or its fingerprint), shots from the run.
+The classical cost is the memory and operation count of a statevector simulation; the advantage
+score is a fixed, documented rule on those figures (_compute_advantage_score), not a measurement.
+An optional AI commentary is added only when an AI provider is configured. Figures the run does
+not record are reported as null rather than defaulted. (The earlier problem-based "detector"
+generated its results from random numbers and was removed.)
 
 Classical simulation cost scales exponentially with qubit count.  The key
 question: does this experiment demonstrate something a classical computer
@@ -39,200 +40,6 @@ from ..store import store_put, store_get
 
 router = APIRouter(prefix="/api/v1/advantage", tags=["advantage"])
 
-
-# =============================================================================
-# SECTION 1 — CLASSIC PROBLEM-BASED ADVANTAGE TESTS (UNCHANGED)
-# =============================================================================
-
-def _random_graph(n: int, edge_prob: float, rng: random.Random) -> list[tuple[int, int]]:
-    return [(i, j) for i in range(n) for j in range(i + 1, n) if rng.random() < edge_prob]
-
-
-def _cut_value(partition: list[int], edges: list[tuple[int, int]]) -> int:
-    return sum(1 for u, v in edges if partition[u] != partition[v])
-
-
-def _greedy_maxcut(n: int, edges: list[tuple[int, int]], rng: random.Random) -> tuple[int, float]:
-    t0 = time.perf_counter()
-    best_cut, best_part = 0, [0] * n
-    for _ in range(min(20, 2 ** n)):
-        part = [rng.randint(0, 1) for _ in range(n)]
-        cut = _cut_value(part, edges)
-        if cut > best_cut:
-            best_cut, best_part = cut, part
-    return best_cut, (time.perf_counter() - t0) * 1000
-
-
-def _qaoa_maxcut(n: int, edges: list[tuple[int, int]], rng: random.Random) -> tuple[int, float]:
-    t0 = time.perf_counter()
-    best_cut = 0
-    for trial in range(50):
-        gamma = rng.uniform(0.3, 1.2)
-        beta = rng.uniform(0.1, 0.8)
-        part = []
-        for i in range(n):
-            bias = sum(math.sin(gamma) * math.cos(2 * beta) for u, v in edges if u == i or v == i)
-            prob = 0.5 + 0.1 * math.tanh(bias)
-            part.append(1 if rng.random() < prob else 0)
-        cut = _cut_value(part, edges)
-        if cut > best_cut:
-            best_cut = cut
-    ms = (time.perf_counter() - t0) * 1000
-    return best_cut, ms
-
-
-def _linear_search(n: int, target: int, rng: random.Random) -> tuple[int, float]:
-    t0 = time.perf_counter()
-    items = list(range(2 ** n))
-    rng.shuffle(items)
-    queries = items.index(target) + 1
-    return queries, (time.perf_counter() - t0) * 1000
-
-
-def _grover_search(n: int, target: int, rng: random.Random) -> tuple[int, float]:
-    t0 = time.perf_counter()
-    N = 2 ** n
-    expected_queries = int(math.ceil(math.pi / 4 * math.sqrt(N)))
-    success_prob = math.sin((2 * expected_queries + 1) * math.asin(1 / math.sqrt(N))) ** 2
-    queries = expected_queries if rng.random() < success_prob else expected_queries * 2
-    return queries, (time.perf_counter() - t0) * 1000
-
-
-def _total_variation_distance(p: dict, q: dict) -> float:
-    keys = set(p) | set(q)
-    return 0.5 * sum(abs(p.get(k, 0) - q.get(k, 0)) for k in keys)
-
-
-def _quantum_sampling(n: int, shots: int, rng: random.Random) -> tuple[float, float]:
-    t0 = time.perf_counter()
-    try:
-        from .job_executor import _simulate_qasm
-        qasm = f"OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[{n}];\ncreg c[{n}];\nh q[0];\n"
-        qasm += "".join(f"cx q[{i}],q[{i+1}];\n" for i in range(n - 1))
-        qasm += "".join(f"measure q[{i}] -> c[{i}];\n" for i in range(n))
-        counts = _simulate_qasm(qasm, shots, seed=rng.randint(0, 2 ** 30))
-        total = sum(counts.values()) or 1
-        dist = {k: v / total for k, v in counts.items()}
-    except Exception:
-        dist = {format(i, f"0{n}b"): 1 / (2 ** n) for i in range(2 ** n)}
-    uniform = {format(i, f"0{n}b"): 1 / (2 ** n) for i in range(2 ** n)}
-    tvd = _total_variation_distance(dist, uniform)
-    return tvd, (time.perf_counter() - t0) * 1000
-
-
-def _classical_sampling(n: int, shots: int, rng: random.Random) -> tuple[float, float]:
-    t0 = time.perf_counter()
-    N = 2 ** n
-    counts: dict[str, int] = {}
-    for _ in range(shots):
-        key = format(rng.randint(0, N - 1), f"0{n}b")
-        counts[key] = counts.get(key, 0) + 1
-    total = shots
-    dist = {k: v / total for k, v in counts.items()}
-    all_keys = {format(i, f"0{n}b") for i in range(N)}
-    for k in all_keys:
-        dist.setdefault(k, 0)
-    uniform = {k: 1 / N for k in all_keys}
-    tvd = _total_variation_distance(dist, uniform)
-    return tvd, (time.perf_counter() - t0) * 1000
-
-
-def _run_advantage_test(problem_type: str, n_qubits: int, seed: int) -> dict[str, Any]:
-    rng = random.Random(seed)
-
-    if problem_type == "maxcut":
-        edges = _random_graph(n_qubits, 0.5, rng)
-        q_score, q_ms = _qaoa_maxcut(n_qubits, edges, rng)
-        c_score, c_ms = _greedy_maxcut(n_qubits, edges, rng)
-        max_possible = len(edges)
-        q_approx = q_score / max_possible if max_possible else 0
-        c_approx = c_score / max_possible if max_possible else 0
-        advantage_ratio = q_approx / c_approx if c_approx > 0 else 1.0
-        verdict = "quantum_wins" if q_score > c_score else ("tie" if q_score == c_score else "classical_wins")
-        details = {"edges": len(edges), "quantum_cut": q_score, "classical_cut": c_score,
-                   "max_possible_cut": max_possible, "quantum_approx_ratio": round(q_approx, 4),
-                   "classical_approx_ratio": round(c_approx, 4)}
-
-    elif problem_type == "search":
-        target = rng.randint(0, 2 ** n_qubits - 1)
-        q_score, q_ms = _grover_search(n_qubits, target, rng)
-        c_score, c_ms = _linear_search(n_qubits, target, rng)
-        advantage_ratio = c_score / q_score if q_score > 0 else 1.0
-        verdict = "quantum_wins" if q_score < c_score else ("tie" if q_score == c_score else "classical_wins")
-        details = {"N": 2 ** n_qubits, "quantum_queries": q_score, "classical_queries": c_score,
-                   "theoretical_grover": int(math.ceil(math.pi / 4 * math.sqrt(2 ** n_qubits)))}
-
-    elif problem_type == "sampling":
-        shots = 512
-        q_score, q_ms = _quantum_sampling(n_qubits, shots, rng)
-        c_score, c_ms = _classical_sampling(n_qubits, shots, rng)
-        advantage_ratio = q_score / c_score if c_score > 0 else 1.0
-        verdict = "quantum_wins" if q_score > c_score else ("tie" if abs(q_score - c_score) < 0.01 else "classical_wins")
-        details = {"shots": shots, "quantum_tvd_from_uniform": round(q_score, 4),
-                   "classical_tvd_from_uniform": round(c_score, 4),
-                   "interpretation": "higher TVD = more structured distribution = more quantum-like"}
-    else:
-        raise HTTPException(422, f"Unknown problem_type '{problem_type}'")
-
-    return {
-        "problem_type": problem_type, "n_qubits": n_qubits,
-        "quantum_score": round(float(q_score), 4), "classical_score": round(float(c_score), 4),
-        "advantage_ratio": round(advantage_ratio, 4),
-        "quantum_time_ms": round(q_ms, 3), "classical_time_ms": round(c_ms, 3),
-        "verdict": verdict, "details": details,
-    }
-
-
-class AdvantageRequest(BaseModel):
-    problem_type: str = Field(default="maxcut", description="maxcut | search | sampling")
-    n_qubits: int = Field(default=4, ge=2, le=12)
-    seed: int = 42
-
-
-@router.post("")
-def detect_advantage(req: AdvantageRequest, db: Session = Depends(get_db)):
-    data = _run_advantage_test(req.problem_type, req.n_qubits, req.seed)
-    result_id = f"adv-{uuid.uuid4().hex[:12]}"
-    record = AdvantageResult(
-        result_id=result_id, problem_type=data["problem_type"], n_qubits=data["n_qubits"],
-        quantum_score=data["quantum_score"], classical_score=data["classical_score"],
-        advantage_ratio=data["advantage_ratio"], quantum_time_ms=data["quantum_time_ms"],
-        classical_time_ms=data["classical_time_ms"], verdict=data["verdict"], details=data["details"],
-    )
-    db.add(record); db.commit(); db.refresh(record)
-    return {"result_id": result_id, **data, "created_at": record.created_at.isoformat()}
-
-
-@router.get("")
-def list_advantage_results(problem_type: Optional[str] = None, db: Session = Depends(get_db)):
-    q = select(AdvantageResult).order_by(AdvantageResult.created_at.desc()).limit(100)
-    if problem_type:
-        q = q.where(AdvantageResult.problem_type == problem_type)
-    rows = db.scalars(q).all()
-    return [{"result_id": r.result_id, "problem_type": r.problem_type, "n_qubits": r.n_qubits,
-             "advantage_ratio": r.advantage_ratio, "verdict": r.verdict,
-             "quantum_time_ms": r.quantum_time_ms, "classical_time_ms": r.classical_time_ms,
-             "created_at": r.created_at.isoformat()} for r in rows]
-
-
-@router.get("/sweep/{problem_type}")
-def advantage_sweep(problem_type: str, max_qubits: int = 8, seed: int = 42, db: Session = Depends(get_db)):
-    """Run advantage test for n=2..max_qubits and return scaling curve."""
-    results = []
-    for n in range(2, max_qubits + 1):
-        try:
-            data = _run_advantage_test(problem_type, n, seed + n)
-            results.append({"n_qubits": n, "advantage_ratio": data["advantage_ratio"],
-                            "verdict": data["verdict"], "quantum_score": data["quantum_score"],
-                            "classical_score": data["classical_score"]})
-        except Exception:
-            break
-    return {"problem_type": problem_type, "sweep": results}
-
-
-# =============================================================================
-# SECTION 2 — AI-POWERED RUN ADVANTAGE ANALYZER (NEW ENDPOINTS)
-# =============================================================================
 
 def _human_time(seconds: float) -> str:
     if seconds < 1:
@@ -359,6 +166,19 @@ def _is_clifford_only(qasm: Optional[str]) -> bool:
     return not any(non_clifford.match(ln) for ln in gate_lines)
 
 
+def _circuit_size(run: Run, fp: dict) -> tuple[int, int]:
+    """(qubits, depth): from the stored circuit when it parses, else from the SDK fingerprint."""
+    if run.qasm:
+        try:
+            from ..local_sim import _parse
+
+            c = _parse(run.qasm)
+            return c.num_qubits, c.depth(filter_function=lambda i: i.operation.name not in ("measure", "barrier"))
+        except ValueError:
+            pass
+    return int(fp.get("num_qubits") or 0), int(fp.get("depth") or 0)
+
+
 def _count_qubits_from_qasm(qasm: Optional[str]) -> int:
     if not qasm:
         return 0
@@ -446,9 +266,10 @@ def analyze_run_advantage(run_id: str, db: Session = Depends(get_db), identity: 
     res = run.results or {}
     params = run.parameters or {}
 
-    n_qubits = int(fp.get("num_qubits") or _count_qubits_from_qasm(run.qasm) or 1)
-    circuit_depth = int(fp.get("depth") or 1)
-    n_shots = int(res.get("shots") or params.get("shots") or 1024)
+    n_qubits, circuit_depth = _circuit_size(run, fp)
+    if not n_qubits:
+        raise HTTPException(422, "The run records neither a circuit nor its qubit count.")
+    n_shots = run.shots
 
     success_prob: Optional[float] = None
     raw_sp = res.get("success_probability")
@@ -501,6 +322,9 @@ def analyze_run_advantage(run_id: str, db: Session = Depends(get_db), identity: 
 @router.get("/cached/{run_id}")
 def get_cached_advantage_analysis(run_id: str, db: Session = Depends(get_db)):
     """Return a previously cached advantage analysis for a run."""
+    # Only for runs the caller can see (Run queries are scoped to the caller).
+    if db.scalar(select(Run).where(Run.run_id == run_id)) is None:
+        raise HTTPException(404, f"Run {run_id!r} not found")
     cached = store_get(db, "advantage_analyses", run_id)
     if cached is None:
         raise HTTPException(404, "No cached analysis found. Call POST /analyze/{run_id} first.")

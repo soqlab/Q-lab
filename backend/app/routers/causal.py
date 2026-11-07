@@ -77,14 +77,13 @@ def _compute_ate(data: list[dict], treatment: str, outcome: str) -> tuple[float,
     t, y = _extract_arrays(data, treatment, outcome)
 
     if t is None or len(t) < 4:
-        return 0.05, 0.02, 0.15  # not enough data — neutral fallback
+        raise HTTPException(422, "At least 4 rows with numeric treatment and outcome are needed to estimate an effect.")
 
     treated = y[t == 1]
     control = y[t == 0]
 
     if len(treated) < 2 or len(control) < 2:
-        ate = float(np.mean(treated) - np.mean(control)) if len(treated) and len(control) else 0.0
-        return round(ate, 4), 0.05, 0.50
+        raise HTTPException(422, "Each treatment group (0 and 1) needs at least 2 rows to estimate an effect.")
 
     ate = float(np.mean(treated) - np.mean(control))
     _, p_value = scipy_stats.ttest_ind(treated, control, equal_var=False)
@@ -115,7 +114,7 @@ def _permutation_refutation(data: list[dict], treatment: str, outcome: str, n_pe
 
     if t is None or len(t) < 4:
         return {
-            "test": "placebo_treatment", "passed": True, "p_value": 0.42,
+            "test": "placebo_treatment", "passed": None, "p_value": None,
             "description": "Replacing treatment with random noise should remove the effect",
             "note": "Insufficient data rows — using fallback estimate",
         }
@@ -250,7 +249,7 @@ def _bootstrap_refutation(data: list[dict], treatment: str, outcome: str, n_boot
 
     if not boot_ates:
         return {
-            "test": "bootstrap_refutation", "passed": True, "p_value": 0.05,
+            "test": "bootstrap_refutation", "passed": None, "p_value": None,
             "description": "Bootstrap confidence interval excludes zero",
             "note": "Could not form bootstrap samples",
         }
@@ -288,27 +287,27 @@ def _refutation_tests(data: list[dict], treatment: str, outcome: str) -> list[di
 # Graph / interpretation helpers (heuristic — no randomness in hot path)
 # ---------------------------------------------------------------------------
 
-def _detect_confounders(covariates: list[str], treatment: str, outcome: str) -> list[str]:
-    quantum_confounders = {
-        "fidelity": ["T1", "T2", "gate_error_rate", "crosstalk", "readout_error"],
-        "energy": ["hamiltonian_depth", "ansatz_layers", "noise_model", "backend_topology"],
-        "error_rate": ["gate_count", "circuit_depth", "qubit_connectivity", "calibration_age"],
-    }
-    base = quantum_confounders.get(outcome, ["noise_model", "calibration_age"])
-    detected = [c for c in covariates if c in base]
-    if not detected:
-        detected = base[:2]
-    return detected
+def _detect_confounders(covariates: list[str], treatment: str, outcome: str, data: list[dict] | None = None) -> list[str]:
+    """Covariates present in the data whose values correlate (|r| > 0.15) with the outcome."""
+    rows = data or []
+    found = []
+    for c in covariates:
+        pairs = [(r.get(c), r.get(outcome)) for r in rows if r.get(c) is not None and r.get(outcome) is not None]
+        try:
+            zs, ys = np.array([float(a) for a, _ in pairs]), np.array([float(b) for _, b in pairs])
+        except (TypeError, ValueError):
+            continue
+        if len(pairs) >= 3 and np.std(zs) > 0 and np.std(ys) > 0 and abs(scipy_stats.pearsonr(zs, ys)[0]) > 0.15:
+            found.append(c)
+    return found
 
 
 def _causal_graph(treatment: str, outcome: str, confounders: list[str]) -> tuple[list[str], list[dict]]:
-    nodes = list(dict.fromkeys([treatment, outcome] + confounders + ["noise_model", "calibration_date"]))
+    nodes = list(dict.fromkeys([treatment, outcome] + confounders))
     edges = [{"from": treatment, "to": outcome, "type": "direct_cause"}]
     for c in confounders:
         edges.append({"from": c, "to": outcome, "type": "confounder"})
         edges.append({"from": c, "to": treatment, "type": "confounder"})
-    edges.append({"from": "calibration_date", "to": "noise_model", "type": "mediator"})
-    edges.append({"from": "noise_model", "to": outcome, "type": "indirect_cause"})
     return nodes, edges
 
 
@@ -332,7 +331,7 @@ def causal_analyze(req: CausalAnalyzeRequest, db: Session = Depends(get_db)):
     ate, ate_std, p = _compute_ate(req.data, req.treatment, req.outcome)
     z = 1.96
     ci = [round(ate - z * ate_std, 4), round(ate + z * ate_std, 4)]
-    confounders = _detect_confounders(req.covariates, req.treatment, req.outcome)
+    confounders = _detect_confounders(req.covariates, req.treatment, req.outcome, req.data)
     nodes, edges = _causal_graph(req.treatment, req.outcome, confounders)
     refutations = _refutation_tests(req.data, req.treatment, req.outcome)
     result = {
@@ -399,24 +398,6 @@ def identify_confounders(req: ConfounderRequest):
                         "observed_in_log": True,
                         "recommendation": f"Include '{var}' as covariate or stratify by '{var}'",
                     })
-        else:
-            # Heuristic fallback when data is insufficient
-            quantum_confounders = {
-                "fidelity": ["T1", "T2", "gate_error_rate", "crosstalk", "readout_error"],
-                "energy": ["hamiltonian_depth", "ansatz_layers", "noise_model"],
-                "error_rate": ["gate_count", "circuit_depth", "qubit_connectivity"],
-            }
-            candidates = quantum_confounders.get(outcome, ["noise_model", "calibration_age"])
-            if var in candidates:
-                suspected.append({
-                    "variable": var,
-                    "evidence_strength": 0.60,
-                    "correlation_with_outcome": None,
-                    "p_value": None,
-                    "mechanism": f"'{var}' is a known confounder for '{outcome}' in quantum systems",
-                    "observed_in_log": any(var in d for d in data),
-                    "recommendation": f"Include '{var}' as covariate or stratify by '{var}'",
-                })
 
     return {
         "outcome": req.outcome,
@@ -424,7 +405,8 @@ def identify_confounders(req: ConfounderRequest):
         "suspected_confounders": sorted(suspected, key=lambda x: -x["evidence_strength"]),
         "total_found": len(suspected),
         "n_samples": len(data),
-        "method": "pearson_correlation" if y is not None and len(y_vals) >= 3 else "heuristic",
+        # Variables without at least 3 paired numeric values are not judged.
+        "method": "pearson_correlation",
         "advice": "Use do-calculus or instrumental variables to remove confounding before drawing causal conclusions.",
     }
 

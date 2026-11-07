@@ -7,9 +7,6 @@ import { Lock, Play, ShieldCheck, AlertTriangle } from "lucide-react";
 const PROTOCOLS = [
   { id: "bb84", label: "BB84", color: "#3b82f6", desc: "Bennett-Brassard 1984" },
   { id: "e91", label: "E91", color: "#8b5cf6", desc: "Ekert 1991 (Bell inequality)" },
-  { id: "b92", label: "B92", color: "#10b981", desc: "Bennett 1992" },
-  { id: "six_state", label: "Six-State", color: "#f59e0b", desc: "3-basis protocol" },
-  { id: "sarg04", label: "SARG04", color: "#ef4444", desc: "Scarani et al. 2004" },
 ];
 
 export default function ProtocolSimPage() {

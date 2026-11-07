@@ -18,55 +18,62 @@ function getMetricColor(cls: string): string {
   return "var(--text)";
 }
 
+const num = (v: string): number | undefined => (v.trim() === "" ? undefined : Number(v));
+
 export default function ErrorBudgetPage() {
-  const [nQubits, setNQubits] = useState(5);
-  const [depth, setDepth] = useState(50);
-  const [backend, setBackend] = useState("ibm_brisbane");
-  const [fidelity, setFidelity] = useState(0.92);
+  const [runId, setRunId] = useState("");
+  const [p1, setP1] = useState("");
+  const [p2, setP2] = useState("");
+  const [t1, setT1] = useState("");
+  const [t2, setT2] = useState("");
+  const [gateNs, setGateNs] = useState("");
+  const [readout, setReadout] = useState("");
   const [result, setResult] = useState<ErrorBudgetReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function run() {
+    if (!runId.trim()) { setError("Enter a run ID"); return; }
     setLoading(true); setError(""); setResult(null);
     try {
-      const r = await analyzeErrorBudget({ n_qubits: nQubits, circuit_depth: depth, backend, measured_fidelity: fidelity });
-      setResult(r);
+      setResult(await analyzeErrorBudget({
+        run_id: runId.trim(), single_q_error_rate: num(p1), two_q_error_rate: num(p2), t1_us: num(t1),
+        t2_us: num(t2), gate_time_ns: num(gateNs), readout_error: num(readout),
+      }));
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
 
-  const total = result ? result.total_error : 1;
+  const total = result && result.total_error > 0 ? result.total_error : 1;
+  const fields: [string, string, (v: string) => void, string][] = [
+    ["1-qubit gate error", p1, setP1, "e.g. 0.0003"], ["2-qubit gate error", p2, setP2, "e.g. 0.008"],
+    ["T1 (us)", t1, setT1, "from calibration"], ["T2 (us)", t2, setT2, "from calibration"],
+    ["Gate time (ns)", gateNs, setGateNs, "needed for T1/T2 terms"], ["Readout error", readout, setReadout, "e.g. 0.015"],
+  ];
 
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700 }}>Error Budget Analyzer</h1>
-      <p style={{ color: "var(--muted)" }}>Break down total circuit error by source: gate errors, decoherence, readout, crosstalk, leakage. Identify the dominant bottleneck for your algorithm.</p>
+      <p style={{ color: "var(--muted)" }}>
+        First-order error budget of one of your runs: gate counts and depth from its stored circuit, error rates from the
+        calibration recorded with it. Fill in a field to override a recorded value or supply a missing one; anything
+        neither recorded nor stated is left out, not assumed.
+      </p>
 
       <div style={{ background: "var(--surface)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div>
-            <label style={{ fontSize: 13, color: "var(--muted)" }}>Qubits</label>
-            <input type="number" min={1} max={50} value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-              className="input" style={{ width: "100%", marginTop: 4 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 13, color: "var(--muted)" }}>Circuit Depth</label>
-            <input type="number" min={1} value={depth} onChange={e => setDepth(Number(e.target.value))}
-              className="input" style={{ width: "100%", marginTop: 4 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 13, color: "var(--muted)" }}>Backend</label>
-            <select value={backend} onChange={e => setBackend(e.target.value)}
-              className="input" style={{ width: "100%", marginTop: 4 }}>
-              {["ibm_brisbane", "ibm_kyoto", "ionq_aria_1", "rigetti_ankaa_2"].map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 13, color: "var(--muted)" }}>Measured Fidelity</label>
-            <input type="number" step="0.001" min={0} max={1} value={fidelity} onChange={e => setFidelity(Number(e.target.value))}
-              className="input" style={{ width: "100%", marginTop: 4, fontFamily: "ui-monospace,monospace" }} />
-          </div>
+        <div>
+          <label style={{ fontSize: 13, color: "var(--muted)" }}>Run ID</label>
+          <input value={runId} onChange={e => setRunId(e.target.value)} className="input"
+            style={{ width: "100%", marginTop: 4, fontFamily: "ui-monospace,monospace" }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16 }}>
+          {fields.map(([label, value, set, hint]) => (
+            <div key={label}>
+              <label style={{ fontSize: 13, color: "var(--muted)" }}>{label}</label>
+              <input value={value} onChange={e => set(e.target.value)} placeholder={hint} inputMode="decimal"
+                className="input" style={{ width: "100%", marginTop: 4, fontFamily: "ui-monospace,monospace" }} />
+            </div>
+          ))}
         </div>
         <button onClick={run} disabled={loading} className="button"
           style={{ padding: "8px 24px", opacity: loading ? 0.5 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
@@ -121,12 +128,12 @@ export default function ErrorBudgetPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
               <h2 style={{ fontWeight: 600, fontSize: 13 }}>Dominant Error Source</h2>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--danger)" }}>{result.dominant_error.replace(/_/g, " ")}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--danger)" }}>{result.dominant_error ?? "none estimated"}</div>
               <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Gate error</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{(result.gate_error_total * 100).toFixed(3)}%</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Decoherence</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{(result.decoherence_total * 100).toFixed(3)}%</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>SPAM</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{(result.spam_total * 100).toFixed(3)}%</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Leakage</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{(result.leakage_total * 100).toFixed(3)}%</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Decoherence</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{result.decoherence_total === null ? "not estimated" : `${(result.decoherence_total * 100).toFixed(3)}%`}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Readout</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{result.measurement_total === null ? "not estimated" : `${(result.measurement_total * 100).toFixed(3)}%`}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--muted)" }}>Gates counted</span><span style={{ fontFamily: "ui-monospace,monospace" }}>{result.n_1q_gates} 1Q, {result.n_2q_gates} 2Q, depth {result.circuit_depth}</span></div>
               </div>
             </div>
             {result.recommendations && result.recommendations.length > 0 && (

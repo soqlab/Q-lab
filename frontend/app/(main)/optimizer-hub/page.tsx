@@ -5,7 +5,7 @@ import { OptimizerHubResult, OptimizerRunResult, runOptimizerHub } from "../../.
 import { Cpu, Play, Trophy, TrendingDown } from "lucide-react";
 
 const ALL_OPTIMIZERS = ["COBYLA", "SPSA", "ADAM", "L-BFGS-B", "SLSQP"];
-type Hamiltonian = "ising" | "heisenberg" | "maxcut" | "generic";
+type Hamiltonian = "ising" | "heisenberg" | "maxcut";
 
 function Sparkline({ pts }: { pts: number[] }): React.ReactElement {
   if (!pts || pts.length < 2) return <svg width={100} height={30} />;
@@ -72,7 +72,7 @@ export default function OptimizerHubPage() {
             <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "1rem" }}>
               <label style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>Hamiltonian</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
-                {(["ising", "heisenberg", "maxcut", "generic"] as Hamiltonian[]).map((h) => (
+                {(["ising", "heisenberg", "maxcut"] as Hamiltonian[]).map((h) => (
                   <button
                     key={h}
                     onClick={() => setHamiltonian(h)}

@@ -444,3 +444,233 @@ def test_no_sample_researchers_are_created_and_old_ones_are_removed():
     assert "alice_vqe" not in names and "bob_qaoa" not in names
     assert client.get("/api/v1/social/profile/qyang_mit", headers=_user()).status_code == 404
     assert client.get("/api/v1/social/profile/chen_stanford", headers=_user()).status_code == 404
+
+
+# ── FAIR record score and physics checks ─────────────────────────────────────
+
+def test_fair_score_reflects_what_the_record_has():
+    body = {"title": "T", "description": "D", "algorithm": "vqe", "backend": "ibm_x", "n_qubits": 2, "n_shots": 100}
+    bare = client.post("/api/v1/fair-data/generate", json=body)
+    assert bare.status_code == 200, bare.text
+    assert "x-qlab-data" not in bare.headers
+    s = bare.json()["fair_score"]
+    assert (s["findable"], s["accessible"], s["interoperable"], s["reusable"]) == (0.333, 0.0, 1.0, 0.333)
+    assert abs(s["total"] - 0.4165) < 0.001
+    linked = client.post("/api/v1/fair-data/generate", json={**body, "run_id": "r1", "fidelity": 0.9}).json()
+    assert linked["fair_score"]["reusable"] == 1.0
+    assert client.post("/api/v1/fair-data/generate", json=body).json()["fair_score"] == s
+    assert not next(c for c in linked["checklist"] if "DOI" in c["item"])["done"]
+
+
+def test_physics_checks_are_rules_and_literature_ranking_is_gone():
+    r = client.post("/api/v1/anomaly-physics/check", json={"t1_us": 100, "t2_us": 300, "fidelity": 1.2})
+    assert r.status_code == 200 and "x-qlab-data" not in r.headers
+    rules = {v["rule"] for v in r.json()["violations"]}
+    assert rules == {"T2_leq_2T1", "fidelity_leq_1"}
+    assert client.post("/api/v1/anomaly-physics/compare-literature", json={}).status_code in (404, 405)
+
+
+# ── Templates ─────────────────────────────────────────────────────────────────
+
+def test_builtin_templates_carry_no_invented_counts():
+    r = client.get("/api/v1/experiment-templates", headers=_user())
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    body = r.json()
+    items = body if isinstance(body, list) else body.get("templates", body.get("items", []))
+    seeds = [t for t in items if str(t.get("template_id", "")).startswith("tpl_")]
+    assert seeds and all(t["fork_count"] == 0 and t["run_count"] == 0 and t["star_count"] == 0 for t in seeds)
+    bell = next(t for t in seeds if t["template_id"] == "tpl_bell_state")
+    assert bell["is_verified"] is True
+
+
+# ── No sample graph, circuits or replication claims ───────────────────────────
+
+def test_research_graph_ancestry_and_replication_start_empty_of_samples():
+    labels = {n["label"] for n in client.get("/api/v1/research-graph").json()["nodes"]}
+    assert not labels & {"Run #4821 (N=4 GHZ)", "Our Draft (2026)", "GHZ Heisenberg Limit"}
+    claims = client.get("/api/v1/replication").json()
+    titles = {c["title"] for c in (claims if isinstance(claims, list) else claims.get("claims", []))}
+    assert "GHZ Heisenberg Limit at N=8" not in titles
+    circuits = client.get("/api/v1/circuit-ancestry").json()["circuits"]
+    assert not any(c["name"] in {"Bell State", "GHZ State", "QFT-4"} and c["versions"] == 2 for c in circuits)
+
+
+def test_circuit_ancestry_measures_the_committed_circuit():
+    r = client.post("/api/v1/circuit-ancestry/", json={"name": "mine", "qasm": BELL})
+    assert r.status_code == 200, r.text
+    v = r.json()
+    assert (v["n_qubits"], v["depth"], v["gate_count"]) == (2, 2, 2) and v["fidelity_at_commit"] is None
+    assert client.post("/api/v1/circuit-ancestry/", json={"name": "bad", "qasm": "garbage"}).status_code == 422
+
+
+# ── Advantage analysis ────────────────────────────────────────────────────────
+
+def test_advantage_analysis_uses_the_runs_circuit_and_is_private():
+    owner, other = _user(), _user()
+    run_id = _run(owner, {"00": 5, "11": 5}, BELL)
+    r = client.post(f"/api/v1/advantage/analyze/{run_id}", headers=owner)
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert (out["n_qubits"], out["circuit_depth"]) == (2, 2) and out["n_shots"] is None
+    assert out["is_clifford_only"] is True and out["advantage_verdict"] == "no_advantage"
+    assert client.get(f"/api/v1/advantage/cached/{run_id}", headers=other).status_code == 404
+    assert client.get(f"/api/v1/advantage/cached/{run_id}", headers=owner).status_code == 200
+    assert client.post("/api/v1/advantage", json={"problem_type": "maxcut"}).status_code in (404, 405)
+
+
+# ── Causal analysis ───────────────────────────────────────────────────────────
+
+def test_causal_analysis_refuses_thin_data_and_reports_only_real_confounders():
+    thin = {"treatment": "dd", "outcome": "fidelity", "covariates": ["T1"], "data": [{"dd": 1, "fidelity": 0.9}]}
+    r = client.post("/api/v1/causal/analyze", json=thin)
+    assert r.status_code == 422 and "x-qlab-data" not in r.headers
+    rows = [{"dd": i % 2, "fidelity": 0.80 + 0.1 * (i % 2) + 0.001 * i, "T1": 100 + i, "crosstalk": 5} for i in range(12)]
+    out = client.post("/api/v1/causal/analyze", json={**thin, "covariates": ["T1", "crosstalk", "readout_error"], "data": rows}).json()
+    assert abs(out["ate"] - 0.101) < 0.01 and out["p_value"] < 0.001
+    assert out["confounders_detected"] == ["T1"]  # crosstalk is constant, readout_error is absent
+    assert "noise_model" not in out["causal_graph_nodes"]
+    conf = client.post("/api/v1/causal/identify-confounders",
+                       json={"variables": ["readout_error"], "outcome": "fidelity", "experiment_log": rows}).json()
+    assert conf["suspected_confounders"] == []
+
+
+# ── Error budget ──────────────────────────────────────────────────────────────
+
+def test_error_budget_counts_real_gates_and_uses_recorded_calibration():
+    headers = _user()
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+    assert client.post("/api/v1/runs", headers=headers, json={
+        "run_id": run_id, "backend": "ibm_x", "qasm": BELL, "results": {"counts": {"00": 1}}, "status": "completed",
+        "calibration": {"t1_us": {"0": 100.0, "1": 100.0}, "readout_errors": {"0": 0.01, "1": 0.03}},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }).status_code == 200
+    r = client.post("/api/v1/error-budget/analyze", headers=headers, json={
+        "run_id": run_id, "single_q_error_rate": 0.001, "two_q_error_rate": 0.01, "gate_time_ns": 100})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert (out["n_1q_gates"], out["n_2q_gates"], out["circuit_depth"]) == (1, 1, 2)
+    errs = {c["name"]: c["absolute_error"] for c in out["components"]}
+    assert errs["Single-qubit gates"] == 0.001 and errs["Two-qubit gates"] == 0.01
+    assert abs(errs["Readout errors"] - 0.04) < 1e-9
+    assert abs(errs["T1 relaxation"] - 2 * (1 - math.exp(-0.002))) < 1e-7
+    assert out["inputs_used"]["readout_error"] == "run calibration (average)" and out["missing_inputs"] == []
+    bare = client.post("/api/v1/error-budget/analyze", headers=headers, json={"qasm": BELL}).json()
+    assert bare["components"] == [] and "readout_error" in bare["missing_inputs"]
+    assert client.post("/api/v1/error-budget/analyze", headers=headers, json={}).status_code == 422
+
+
+# ── QAOA ──────────────────────────────────────────────────────────────────────
+
+def test_qaoa_is_simulated_and_optimised_for_real():
+    r = client.post("/api/v1/qaoa", json={"n_nodes": 4, "graph_type": "ring", "p_layers": 1, "n_shots": 2000, "seed": 3})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["classical_optimal"] == 4
+    # p=1 QAOA on a ring reaches exactly 3/4 of every edge at the optimal angles.
+    assert abs(out["approximation_ratio"] - 0.75) < 0.01 and abs(out["expected_cut_value"] - 3.0) < 0.04
+    assert out["best_shot_cut"] == 4 and out["n_2q_gates"] == 8
+    again = client.post("/api/v1/qaoa", json={"n_nodes": 4, "graph_type": "ring", "p_layers": 1, "n_shots": 2000, "seed": 3}).json()
+    assert again["expected_cut_value"] == out["expected_cut_value"]
+    assert client.post("/api/v1/qaoa", json={"problem": "tsp_small"}).status_code == 422
+
+
+# ── Landscape explorer ────────────────────────────────────────────────────────
+
+def test_landscape_energies_are_exact_expectation_values():
+    r = client.post("/api/v1/landscape-explorer", json={"hamiltonian": "heisenberg", "n_qubits": 2, "grid_size": 5})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["grid"][2][2]["theta1"] == 0 and out["grid"][2][2]["energy"] == 1.0  # |00>: <ZZ> = 1
+    assert out["exact_ground_energy"] == -3.0 and out["min_energy"] >= -3.0 - 1e-9
+    again = client.post("/api/v1/landscape-explorer", json={"hamiltonian": "heisenberg", "n_qubits": 2, "grid_size": 5}).json()
+    assert again["grid"] == out["grid"]
+    assert client.post("/api/v1/landscape-explorer", json={"hamiltonian": "made_up"}).status_code == 422
+
+
+# ── Optimizer hub ─────────────────────────────────────────────────────────────
+
+def test_optimizer_hub_runs_real_optimizers_on_the_exact_energy():
+    body = {"hamiltonian": "heisenberg", "n_qubits": 2, "max_iterations": 60, "optimizers": ["lbfgsb", "spsa"], "seed": 1}
+    r = client.post("/api/v1/optimizer-hub", json=body)
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert out["true_minimum"] == -3.0  # singlet of XX + YY + ZZ
+    for res in out["results"]:
+        assert res["final_energy"] >= -3.0 - 1e-9 and res["n_function_evals"] > 0
+        assert res["final_energy"] < out["initial_energy"]
+    again = client.post("/api/v1/optimizer-hub", json=body).json()
+    assert [x["final_energy"] for x in again["results"]] == [x["final_energy"] for x in out["results"]]
+    assert client.post("/api/v1/optimizer-hub", json={**body, "hamiltonian": "generic"}).status_code == 422
+
+
+# ── QKD protocol simulator ────────────────────────────────────────────────────
+
+def _qkd(**body):
+    r = client.post("/api/v1/protocol-sim", json={"n_bits": 20000, "seed": 5, **body})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    return r.json()
+
+
+def test_bb84_qber_comes_from_the_simulated_attack():
+    clean = _qkd(protocol="bb84", channel_error_rate=0.0)
+    assert clean["qber"] == 0.0 and clean["n_secret_bits"] > 0 and not clean["eavesdropper_detected"]
+    attacked = _qkd(protocol="bb84", channel_error_rate=0.0, eavesdropper=True, eavesdrop_fraction=1.0)
+    assert 0.18 < attacked["qber"] < 0.32  # intercept-resend on every bit: 25%
+    assert attacked["eavesdropper_detected"] and attacked["n_secret_bits"] == 0
+
+
+def test_e91_chsh_is_estimated_from_the_samples():
+    clean = _qkd(protocol="e91", channel_error_rate=0.0)
+    assert abs(clean["chsh_s_value"] - 2 * math.sqrt(2)) < 0.15 and clean["bell_inequality_violated"]
+    assert clean["qber"] == 0.0
+    attacked = _qkd(protocol="e91", channel_error_rate=0.0, eavesdropper=True, eavesdrop_fraction=1.0)
+    assert attacked["chsh_s_value"] < 2.1 and attacked["eavesdropper_detected"]
+    assert client.post("/api/v1/protocol-sim", json={"protocol": "b92"}).status_code == 422
+
+
+# ── Quantum finance ───────────────────────────────────────────────────────────
+
+def test_finance_uses_only_supplied_market_data():
+    r = client.post("/api/v1/quantum-finance", json={"n_qubits": 3, "n_paths": 2000, "seed": 1})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    assert abs(out["black_scholes_price"] - 8.0214) < 1e-3
+    assert out["optimal_portfolio"] is None and out["asset_returns"] is None and out["portfolio_risk"] is None
+    assert out["n_cnot_gates"] > 0 and out["circuit_depth"] > 0
+    cov = [[0.01, 0, 0], [0, 0.01, 0], [0, 0, 0.01]]
+    port = client.post("/api/v1/quantum-finance", json={
+        "n_qubits": 3, "n_paths": 200, "asset_returns": [0.1, 0.2, 0.15], "budget": 2, "covariance": cov}).json()
+    assert port["optimal_portfolio"] == [0, 1, 1] and abs(port["expected_return"] - 0.35) < 1e-9
+    assert abs(port["portfolio_risk"] - math.sqrt(0.005)) < 1e-6
+
+
+# ── Methods section ───────────────────────────────────────────────────────────
+
+def test_methods_text_states_only_recorded_facts():
+    headers = _user()
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+    assert client.post("/api/v1/runs", headers=headers, json={
+        "run_id": run_id, "backend": "ibm_torino", "qasm": BELL, "results": {"counts": {"00": 1}}, "status": "completed",
+        "execution": {"shots": 4000}, "calibration": {"t1_us": {"0": 150.0, "1": 250.0}},
+        "context": {"library_versions": {"qiskit": "2.1.0"}}, "created_at": datetime.now(timezone.utc).isoformat(),
+    }).status_code == 200
+    bare = _run(headers, {"0": 1})
+    r = client.post("/api/v1/methods-gen/generate", headers=headers, json={"run_ids": [run_id, bare]})
+    assert r.status_code == 200, r.text
+    assert "x-qlab-data" not in r.headers
+    out = r.json()
+    text = out["methods_text"]
+    assert "ibm_torino" in text and "mean T1 200 us" in text and "Qiskit 2.1.0" in text and "4000 shots" in text
+    assert "heavy-hexagonal" not in text and "COBYLA" not in text and "bootstrap" not in text
+    assert "not recorded" in out["calibration_table_md"]
+    checklist = {c["item"]: c["done"] for c in out["reproducibility_checklist"]}
+    assert checklist["Shot count recorded"] is False  # the bare run recorded none
+    assert client.post("/api/v1/methods-gen/generate", headers=_user(), json={"run_ids": [run_id]}).status_code == 404

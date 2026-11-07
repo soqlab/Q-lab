@@ -1,51 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { AdvantageDetectorResult, AdvantageSweepPoint, detectAdvantage, listAdvantageResults, sweepAdvantage } from "../../../lib/api";
-import { Zap, Play, TrendingUp, Clock, Search } from "lucide-react";
-
-// ---------------------------------------------------------------------------
-// Existing problem-based detector types / helpers (unchanged)
-// ---------------------------------------------------------------------------
-
-const PROBLEMS = [
-  { id: "maxcut", label: "MaxCut", description: "QAOA vs greedy graph cut", icon: "🔗" },
-  { id: "search", label: "Grover Search", description: "Grover O(√N) vs linear search", icon: "🔍" },
-  { id: "sampling", label: "Quantum Sampling", description: "Structured distribution vs uniform random", icon: "🎲" },
-];
-
-const VERDICT_STYLE: Record<string, { color: string; label: string; icon: string }> = {
-  quantum_wins:   { color: "#3b82f6", label: "Quantum Faster (Benchmark)", icon: "⚛️" },
-  classical_wins: { color: "#f59e0b", label: "Classical Faster", icon: "💻" },
-  tie:            { color: "#64748b", label: "Comparable", icon: "⚖️" },
-};
-
-function SweepChart({ sweep }: { sweep: AdvantageSweepPoint[] }) {
-  if (!sweep.length) return null;
-  const W = 500; const H = 140; const PAD = 35;
-  const maxRatio = Math.max(...sweep.map(s => s.advantage_ratio), 1.1);
-  const minRatio = Math.min(...sweep.map(s => s.advantage_ratio), 0.5);
-  const px = (i: number) => PAD + (i / (sweep.length - 1)) * (W - PAD * 2);
-  const py = (r: number) => H - PAD - ((r - minRatio) / (maxRatio - minRatio || 1)) * (H - PAD * 2);
-  const pts = sweep.map((s, i) => `${px(i)},${py(s.advantage_ratio)}`).join(" ");
-  const baselineY = py(1.0);
-  return (
-    <svg width={W} height={H} style={{ display: "block", width: "100%" }}>
-      <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#334155" strokeWidth={1} />
-      <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="#334155" strokeWidth={1} />
-      <line x1={PAD} y1={baselineY} x2={W - PAD} y2={baselineY} stroke="#475569" strokeWidth={1} strokeDasharray="4 2" />
-      <text x={W - PAD + 2} y={baselineY + 4} fill="#475569" fontSize={9}>1.0</text>
-      <rect x={PAD} y={PAD} width={W - PAD * 2} height={Math.max(0, baselineY - PAD)} fill="#3b82f6" fillOpacity={0.05} />
-      <polyline points={pts} fill="none" stroke="#3b82f6" strokeWidth={2} />
-      {sweep.map((s, i) => (
-        <circle key={i} cx={px(i)} cy={py(s.advantage_ratio)} r={4}
-          fill={s.verdict === "quantum_wins" ? "#3b82f6" : s.verdict === "tie" ? "#f59e0b" : "#ef4444"} />
-      ))}
-      {sweep.map((s, i) => (
-        <text key={i} x={px(i)} y={H - PAD + 12} textAnchor="middle" fill="#475569" fontSize={9}>{s.n_qubits}q</text>
-      ))}
-    </svg>
-  );
-}
+import { useState } from "react";
+import { analyzeRunAdvantage } from "../../../lib/api";
+import { Zap, Search } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Run Advantage Analyzer types
@@ -155,12 +111,7 @@ function RunAnalyzerPanel() {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch(`/api/v1/advantage/analyze/${encodeURIComponent(id)}`, { method: "POST" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
-      }
-      setResult(await res.json() as AnalyzerResult);
+      setResult(await analyzeRunAdvantage(id) as AnalyzerResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -357,212 +308,23 @@ function RunAnalyzerPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Main page — tabbed between Detector and Analyzer
+// Main page
 // ---------------------------------------------------------------------------
 
 export default function AdvantagePage() {
-  const [tab, setTab] = useState<"detector" | "analyzer">("detector");
-
-  // ---- Detector state ----
-  const [problemType, setProblemType] = useState("maxcut");
-  const [nQubits, setNQubits] = useState(4);
-  const [seed, setSeed] = useState(42);
-  const [result, setResult] = useState<AdvantageDetectorResult | null>(null);
-  const [history, setHistory] = useState<AdvantageDetectorResult[]>([]);
-  const [sweep, setSweep] = useState<AdvantageSweepPoint[]>([]);
-  const [running, setRunning] = useState(false);
-  const [sweeping, setSweeping] = useState(false);
-  const [histLoading, setHistLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listAdvantageResults().then(setHistory).catch(() => {}).finally(() => setHistLoading(false));
-  }, []);
-
-  const handleRun = async () => {
-    setRunning(true); setError(null);
-    try {
-      const r = await detectAdvantage({ problem_type: problemType, n_qubits: nQubits, seed });
-      setResult(r); setHistory(prev => [r, ...prev]);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setRunning(false); }
-  };
-
-  const handleSweep = async () => {
-    setSweeping(true); setError(null);
-    try {
-      const r = await sweepAdvantage(problemType, 8);
-      setSweep(r.sweep);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setSweeping(false); }
-  };
-
-  const verdictInfo = result ? (VERDICT_STYLE[result.verdict] ?? VERDICT_STYLE.tie) : null;
-
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem" }}>
-      {/* Header */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 10 }}>
-          <Zap size={28} color="#3b82f6" /> Quantum-Classical Benchmark
+          <Zap size={28} color="#3b82f6" /> Quantum Advantage Analyzer
         </h1>
         <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-          Compare quantum circuit performance against classical baselines. Results reflect benchmark comparisons on specific problem instances — not a general proof of quantum advantage.
+          How hard one of your runs would be to simulate classically: qubits and depth from its stored circuit, the
+          memory and operations a statevector simulation needs, and a rule-based score on those figures. It does not
+          prove a quantum advantage.
         </p>
       </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, marginBottom: "1.5rem", borderBottom: "1px solid #334155" }}>
-        {([
-          { id: "detector", label: "Problem Detector" },
-          { id: "analyzer", label: "Run Analyzer (AI)" },
-        ] as const).map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "0.6rem 1.2rem",
-            background: "transparent",
-            border: "none",
-            borderBottom: tab === t.id ? "2px solid #3b82f6" : "2px solid transparent",
-            color: tab === t.id ? "#e2e8f0" : "#64748b",
-            fontWeight: tab === t.id ? 600 : 400,
-            cursor: "pointer",
-            fontSize: "0.9rem",
-          }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ---- TAB: Problem Detector ---- */}
-      {tab === "detector" && (
-        <div>
-          {error && <div style={{ background: "#7f1d1d22", border: "1px solid #ef4444", borderRadius: 8, padding: "0.75rem 1rem", color: "#f87171", marginBottom: "1rem" }}>{error}</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "1.5rem" }}>
-            <div>
-              <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", padding: "1.25rem" }}>
-                <h3 style={{ color: "#e2e8f0", fontWeight: 600, marginBottom: "1rem" }}>Problem Configuration</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1rem" }}>
-                  {PROBLEMS.map(p => (
-                    <button key={p.id} onClick={() => setProblemType(p.id)}
-                      style={{ textAlign: "left", background: problemType === p.id ? "#1d3a6b" : "#0f172a", border: `1px solid ${problemType === p.id ? "#3b82f6" : "#334155"}`, borderRadius: 8, padding: "0.75rem", cursor: "pointer" }}>
-                      <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "0.9rem" }}>{p.icon} {p.label}</div>
-                      <div style={{ color: "#64748b", fontSize: "0.75rem" }}>{p.description}</div>
-                    </button>
-                  ))}
-                </div>
-                <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 10 }}>
-                  Qubits: <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{nQubits}</span>
-                  <input type="range" min={2} max={12} step={1} value={nQubits} onChange={e => setNQubits(Number(e.target.value))}
-                    style={{ display: "block", width: "100%", marginTop: 4, accentColor: "#3b82f6" }} />
-                </label>
-                <label style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: 12 }}>
-                  Seed
-                  <input type="number" value={seed} onChange={e => setSeed(Number(e.target.value))}
-                    style={{ display: "block", width: "100%", marginTop: 4, background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#e2e8f0", padding: "0.5rem 0.75rem", boxSizing: "border-box" }} />
-                </label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleRun} disabled={running}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "0.6rem", cursor: "pointer", fontWeight: 600, opacity: running ? 0.6 : 1, fontSize: "0.85rem" }}>
-                    <Play size={14} /> {running ? "Running…" : "Benchmark"}
-                  </button>
-                  <button onClick={handleSweep} disabled={sweeping}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#1e293b", color: "#94a3b8", border: "1px solid #334155", borderRadius: 8, padding: "0.6rem", cursor: "pointer", fontSize: "0.85rem", opacity: sweeping ? 0.6 : 1 }}>
-                    <TrendingUp size={14} /> {sweeping ? "Sweeping…" : "Sweep 2–8q"}
-                  </button>
-                </div>
-              </div>
-              <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", padding: "1rem", marginTop: "1rem" }}>
-                <h3 style={{ color: "#94a3b8", fontSize: "0.85rem", fontWeight: 600, marginBottom: 8 }}>History</h3>
-                {histLoading ? <div style={{ color: "#475569", fontSize: "0.8rem" }}>Loading…</div> :
-                  history.slice(0, 6).map(r => {
-                    const v = VERDICT_STYLE[r.verdict] ?? VERDICT_STYLE.tie;
-                    return (
-                      <div key={r.result_id} onClick={() => setResult(r)} style={{ padding: "0.5rem", borderRadius: 6, marginBottom: 4, cursor: "pointer", background: result?.result_id === r.result_id ? "#0f172a" : "transparent" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "#e2e8f0", fontSize: "0.82rem" }}>{r.problem_type} {r.n_qubits}q</span>
-                          <span style={{ color: v.color, fontSize: "0.78rem" }}>{v.icon} {r.advantage_ratio.toFixed(2)}×</span>
-                        </div>
-                        <div style={{ color: "#475569", fontSize: "0.7rem" }}>{new Date(r.created_at).toLocaleString()}</div>
-                      </div>
-                    );
-                  })
-                }
-              </div>
-            </div>
-
-            <div>
-              {result && verdictInfo && (
-                <div>
-                  <div style={{ background: `linear-gradient(135deg, ${verdictInfo.color}22, #1e293b)`, borderRadius: 12, border: `1px solid ${verdictInfo.color}40`, padding: "1.5rem", marginBottom: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div style={{ fontSize: "3rem" }}>{verdictInfo.icon}</div>
-                      <div>
-                        <div style={{ color: verdictInfo.color, fontWeight: 800, fontSize: "1.5rem" }}>{verdictInfo.label}</div>
-                        <div style={{ color: "#94a3b8", fontSize: "0.9rem" }}>{result.problem_type} · {result.n_qubits} qubits</div>
-                      </div>
-                      <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                        <div style={{ color: "#64748b", fontSize: "0.75rem" }}>Advantage Ratio</div>
-                        <div style={{ color: verdictInfo.color, fontSize: "2rem", fontWeight: 800 }}>{result.advantage_ratio.toFixed(2)}×</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                    {[
-                      { label: "Quantum", score: result.quantum_score, time: result.quantum_time_ms, color: "#3b82f6" },
-                      { label: "Classical", score: result.classical_score, time: result.classical_time_ms, color: "#f59e0b" },
-                    ].map(s => (
-                      <div key={s.label} style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "1rem" }}>
-                        <div style={{ color: s.color, fontWeight: 700, fontSize: "1rem", marginBottom: 6 }}>⚡ {s.label}</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                          <div style={{ background: "#0f172a", borderRadius: 6, padding: "0.4rem", textAlign: "center" }}>
-                            <div style={{ color: "#475569", fontSize: "0.68rem" }}>Score</div>
-                            <div style={{ color: "#e2e8f0", fontWeight: 700 }}>{typeof s.score === "number" ? s.score.toFixed(3) : "—"}</div>
-                          </div>
-                          <div style={{ background: "#0f172a", borderRadius: 6, padding: "0.4rem", textAlign: "center" }}>
-                            <div style={{ color: "#475569", fontSize: "0.68rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}><Clock size={9} /> ms</div>
-                            <div style={{ color: "#e2e8f0", fontWeight: 700 }}>{s.time.toFixed(2)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "1rem" }}>
-                    <h4 style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: 8 }}>Problem Details</h4>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                      {Object.entries(result.details).map(([k, v]) => (
-                        <div key={k} style={{ background: "#0f172a", borderRadius: 6, padding: "0.4rem 0.6rem" }}>
-                          <div style={{ color: "#475569", fontSize: "0.68rem" }}>{k.replace(/_/g, " ")}</div>
-                          <div style={{ color: "#94a3b8", fontSize: "0.82rem", fontWeight: 600 }}>{String(v)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {sweep.length > 0 && (
-                <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", padding: "1.25rem", marginTop: "1rem" }}>
-                  <h3 style={{ color: "#e2e8f0", fontWeight: 600, marginBottom: 8 }}>Advantage Scaling — {problemType}</h3>
-                  <SweepChart sweep={sweep} />
-                  <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: "0.75rem", color: "#64748b" }}>
-                    <span style={{ color: "#3b82f6" }}>● Quantum wins</span>
-                    <span style={{ color: "#f59e0b" }}>● Tie</span>
-                    <span style={{ color: "#ef4444" }}>● Classical wins</span>
-                    <span style={{ marginLeft: "auto" }}>Dashed line = parity (ratio = 1.0)</span>
-                  </div>
-                </div>
-              )}
-              {!result && !sweeping && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 360, color: "#475569" }}>
-                  <Zap size={60} style={{ opacity: 0.12, marginBottom: 16 }} />
-                  <p>Select a problem and click Benchmark to detect quantum advantage.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ---- TAB: Run Analyzer ---- */}
-      {tab === "analyzer" && <RunAnalyzerPanel />}
+      <RunAnalyzerPanel />
     </div>
   );
 }

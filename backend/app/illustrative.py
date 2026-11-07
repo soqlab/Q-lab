@@ -13,16 +13,9 @@ from __future__ import annotations
 ILLUSTRATIVE_HEADER = "X-QLab-Data"
 ILLUSTRATIVE_VALUE = "illustrative"
 
-ILLUSTRATIVE_ROUTERS = frozenset({
-    # Invented results: nothing is run on the user's input.
-    "advantage", "anomaly_physics", "bayes_opt", "dd_optimizer", "error_mitigate", "fair_data",
-    "gate_tomo", "methods_gen", "mirror_circuit", "oed", "optimizer_hub", "qaoa_solver",
-    "qv_runner", "rb_suite", "vqe_landscape",
-    # Real calculation with a fallback to invented numbers when something is missing.
-    "causal", "error_budget", "protocol_sim", "quantum_finance", "stats_engine",
-    # Real flows, showing invented sample records.
-    "circuit_ancestry", "replication", "research_graph", "templates",
-})
+# Empty: every tool now computes from a cited source or was removed. A router added here gets the
+# header on all its responses; keep it empty unless a tool genuinely cannot avoid sample data.
+ILLUSTRATIVE_ROUTERS: frozenset[str] = frozenset()
 
 
 class MarkIllustrativeData:

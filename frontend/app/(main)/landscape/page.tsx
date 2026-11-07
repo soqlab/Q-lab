@@ -7,7 +7,6 @@ const HAMILTONIANS = [
   { id: "ising", label: "1D Ising", desc: "Nearest-neighbour ZZ coupling" },
   { id: "heisenberg", label: "Heisenberg", desc: "XXX Hamiltonian" },
   { id: "maxcut", label: "MaxCut (QAOA)", desc: "Graph partition objective" },
-  { id: "generic", label: "Generic", desc: "Barren plateau showcase" },
 ];
 
 function Heatmap({ result }: { result: VQELandscapeResult }) {

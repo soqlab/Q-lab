@@ -8,145 +8,102 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/optimizer-hub", tags=["optimizer_hub"])
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Hamiltonian true minima (approximate ground state energies)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _true_minimum(hamiltonian: str, n_qubits: int) -> float:
-    """Approximate ground state energy for the Hamiltonian."""
-    base = {
-        "ising":      -float(n_qubits),
-        "heisenberg": -float(n_qubits) * 0.75,
-        "maxcut":     -float(n_qubits) * 0.5,
-        "generic":    -float(n_qubits) * 0.6,
-    }
-    return round(base.get(hamiltonian.lower(), -float(n_qubits)), 4)
+LAYERS = 2          # hardware-efficient ansatz: Ry layer, CX chain, repeated; final Ry layer
+MAX_QUBITS = 8
+_PRESET_OF = {"ising": "ising_1d", "heisenberg": "heisenberg", "maxcut": "maxcut_ring"}
+_OPTIMIZERS = ("cobyla", "spsa", "adam", "lbfgsb", "slsqp")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Energy landscape
-# ─────────────────────────────────────────────────────────────────────────────
+def _problem(ham: str, n: int):
+    """(exact ground energy, energy function of the ansatz parameters)."""
+    import numpy as np
+    from qiskit.quantum_info import SparsePauliOp
 
-def _energy(params: List[float], true_min: float, n_qubits: int, rng: random.Random, noise: float = 0.02) -> float:
-    """Sinusoidal energy landscape around true minimum."""
-    # Contribution from each parameter (landscape roughness depends on n_qubits)
-    landscape = sum(
-        math.cos(p) * math.sin(p * 1.3 + i * 0.5)
-        for i, p in enumerate(params)
-    ) / max(len(params), 1)
-    energy = true_min + (landscape + 1.5) * 0.4 * n_qubits * 0.15
-    energy += rng.gauss(0, noise)
-    return round(energy, 6)
+    from .hamiltonian_studio import PRESETS
+    from .vqe_landscape import _cx_chain_permutation
 
+    terms = PRESETS[_PRESET_OF[ham]]["build"](n)
+    H = SparsePauliOp([t.pauli_string for t in terms], coeffs=[t.coefficient for t in terms]).to_matrix()
+    ground = float(np.linalg.eigvalsh(H)[0])
+    perm = _cx_chain_permutation(n)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Optimizer simulations
-# ─────────────────────────────────────────────────────────────────────────────
+    def state(params):
+        psi = np.zeros(1 << n, dtype=complex)
+        psi[0] = 1.0
+        for layer in range(LAYERS + 1):
+            t = psi.reshape([2] * n)
+            for q in range(n):
+                th = params[layer * n + q]
+                c, s_ = np.cos(th / 2), np.sin(th / 2)
+                axis = n - 1 - q
+                a0, a1 = np.take(t, 0, axis=axis), np.take(t, 1, axis=axis)
+                t = np.stack([c * a0 - s_ * a1, s_ * a0 + c * a1], axis=axis)
+            psi = t.reshape(-1)
+            if layer < LAYERS:
+                nxt = np.empty_like(psi)
+                nxt[perm] = psi
+                psi = nxt
+        return psi
 
-_OPTIMIZER_PROFILES = {
-    "cobyla": {
-        "max_iters":       60,
-        "residual":        0.05,
-        "noise_scale":     0.015,
-        "converge_factor": 0.85,
-        "n_params_factor": 2,
-    },
-    "spsa": {
-        "max_iters":       80,
-        "residual":        0.08,
-        "noise_scale":     0.035,
-        "converge_factor": 0.70,
-        "n_params_factor": 2,
-    },
-    "adam": {
-        "max_iters":       40,
-        "residual":        0.03,
-        "noise_scale":     0.010,
-        "converge_factor": 0.95,
-        "n_params_factor": 3,
-    },
-    "lbfgsb": {
-        "max_iters":       25,
-        "residual":        0.01,
-        "noise_scale":     0.005,
-        "converge_factor": 0.99,
-        "n_params_factor": 2,
-    },
-    "slsqp": {
-        "max_iters":       30,
-        "residual":        0.02,
-        "noise_scale":     0.008,
-        "converge_factor": 0.98,
-        "n_params_factor": 2,
-    },
-}
+    def energy(params) -> float:
+        psi = state(params)
+        return float(np.real(np.vdot(psi, H @ psi)))
+
+    return ground, energy
 
 
-def _simulate_optimizer(
-    name: str,
-    true_min: float,
-    n_qubits: int,
-    max_iterations: int,
-    rng: random.Random,
-) -> Dict[str, Any]:
-    profile = _OPTIMIZER_PROFILES.get(name.lower(), _OPTIMIZER_PROFILES["cobyla"])
-    actual_iters = min(max_iterations, profile["max_iters"])
-    n_params = max(2, n_qubits * profile["n_params_factor"])
-    noise = profile["noise_scale"]
-    residual = profile["residual"]
-    converge_factor = profile["converge_factor"]
+def _run_optimizer(name: str, energy, x0, max_iter: int, seed: int) -> Dict[str, Any]:
+    """Runs one optimizer for real on the exact energy. Counts every energy evaluation."""
+    import numpy as np
+    from scipy.optimize import minimize
 
-    # Initial random parameters
-    params = [rng.uniform(-math.pi, math.pi) for _ in range(n_params)]
-    initial_energy = _energy(params, true_min, n_qubits, rng, noise=noise * 3)
-    target_energy = true_min + residual
+    evals = {"n": 0}
 
-    convergence_curve: List[Dict[str, Any]] = []
-    current_energy = initial_energy
-    n_fn_evals = 0
+    def f(x) -> float:
+        evals["n"] += 1
+        return energy(x)
 
+    def grad(x):  # parameter-shift rule: exact for Ry rotations
+        g = np.zeros_like(x)
+        for i in range(len(x)):
+            e = np.zeros_like(x)
+            e[i] = np.pi / 2
+            g[i] = (f(x + e) - f(x - e)) / 2
+        return g
+
+    curve: List[Dict[str, Any]] = []
     t0 = time.perf_counter()
+    x = np.array(x0, dtype=float)
+    if name in ("cobyla", "lbfgsb", "slsqp"):
+        method = {"cobyla": "COBYLA", "lbfgsb": "L-BFGS-B", "slsqp": "SLSQP"}[name]
+        kwargs = {} if name == "cobyla" else {"jac": grad}
 
-    for it in range(actual_iters):
-        # Progress fraction — sigmoidal convergence model
-        frac = (it + 1) / actual_iters
-        # Exponential decay from initial to target
-        decay = math.exp(-converge_factor * 4 * frac)
-        ideal_energy = target_energy + (initial_energy - target_energy) * decay
-        current_energy = ideal_energy + rng.gauss(0, noise * (1 - frac * 0.8))
-        current_energy = round(current_energy, 6)
+        def cb(xk, *_):
+            curve.append({"iter": len(curve) + 1, "energy": round(energy(xk), 8)})
 
-        # Update params towards optimum (simplified gradient step)
-        for i in range(n_params):
-            params[i] += rng.gauss(0, 0.1 * (1 - frac))
-            params[i] = round(params[i], 5)
-
-        convergence_curve.append({"iter": it + 1, "energy": current_energy})
-
-        # Function evals: COBYLA/SPSA use more evals per iter
-        fn_evals_per_iter = 2 * n_params if name in ("lbfgsb", "slsqp") else (
-            1 if name == "spsa" else n_params
-        )
-        n_fn_evals += fn_evals_per_iter
-
-    elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
-    final_energy = convergence_curve[-1]["energy"] if convergence_curve else initial_energy
-    converged = abs(final_energy - true_min) < residual * 2
-
-    return {
-        "optimizer": name,
-        "final_energy": final_energy,
-        "n_iterations": actual_iters,
-        "n_function_evals": n_fn_evals,
-        "convergence_curve": convergence_curve,
-        "converged": converged,
-        "time_ms": elapsed_ms,
-        "final_params": [round(p, 5) for p in params],
-        "energy_gap_from_true_min": round(abs(final_energy - true_min), 6),
-        "improvement_pct": round(
-            (initial_energy - final_energy) / max(abs(initial_energy - true_min), 1e-9) * 100, 2
-        ),
-    }
+        res = minimize(f, x, method=method, callback=cb, options={"maxiter": max_iter}, **kwargs)
+        x = res.x
+    elif name == "adam":
+        lr, b1, b2, eps = 0.1, 0.9, 0.999, 1e-8
+        m = np.zeros_like(x)
+        v = np.zeros_like(x)
+        for it in range(1, max_iter + 1):
+            g = grad(x)
+            m = b1 * m + (1 - b1) * g
+            v = b2 * v + (1 - b2) * g * g
+            x = x - lr * (m / (1 - b1 ** it)) / (np.sqrt(v / (1 - b2 ** it)) + eps)
+            curve.append({"iter": it, "energy": round(energy(x), 8)})
+    else:  # spsa, standard gain sequences (Spall 1998)
+        rng = np.random.default_rng(seed)
+        a, c, A = 0.2, 0.1, max_iter * 0.1
+        for it in range(1, max_iter + 1):
+            ak, ck = a / (it + A) ** 0.602, c / it ** 0.101
+            delta = rng.choice([-1.0, 1.0], size=len(x))
+            ghat = (f(x + ck * delta) - f(x - ck * delta)) / (2 * ck) * delta
+            x = x - ak * ghat
+            curve.append({"iter": it, "energy": round(energy(x), 8)})
+    return {"x": x, "final": energy(x), "curve": curve, "evals": evals["n"],
+            "ms": round((time.perf_counter() - t0) * 1000, 2)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,9 +111,9 @@ def _simulate_optimizer(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class OptimizerHubRequest(BaseModel):
-    hamiltonian: str = Field(default="ising", description="ising | heisenberg | maxcut | generic")
-    n_qubits: int = Field(default=4, ge=1, le=20)
-    max_iterations: int = Field(default=100, ge=5, le=10_000)
+    hamiltonian: str = Field(default="ising", description="ising | heisenberg | maxcut")
+    n_qubits: int = Field(default=4, ge=2, le=MAX_QUBITS)
+    max_iterations: int = Field(default=100, ge=5, le=500)
     optimizers: List[str] = Field(default=["cobyla", "spsa", "adam", "lbfgsb", "slsqp"])
     seed: Optional[int] = None
 
@@ -167,52 +124,61 @@ class OptimizerHubRequest(BaseModel):
 
 @router.post("")
 def run_optimizer_hub(req: OptimizerHubRequest) -> Dict[str, Any]:
-    """Benchmark multiple VQE optimizers on a quantum Hamiltonian."""
+    """Runs each optimizer for real on the exact VQE energy of a model Hamiltonian.
+
+    Ansatz: LAYERS repetitions of an Ry layer and a CX chain, then a final Ry layer. Energies are
+    exact statevector expectation values; gradients (Adam, L-BFGS-B, SLSQP) use the parameter-shift
+    rule. All optimizers start from the same seeded random point. The true minimum is the exact
+    ground energy. Energies are in the units of the Hamiltonian's coefficients.
+    """
+    import numpy as np
     from fastapi import HTTPException
 
-    allowed_hamiltonians = {"ising", "heisenberg", "maxcut", "generic"}
     ham = req.hamiltonian.lower()
-    if ham not in allowed_hamiltonians:
-        raise HTTPException(422, f"hamiltonian must be one of {sorted(allowed_hamiltonians)}")
-
-    allowed_optimizers = set(_OPTIMIZER_PROFILES.keys())
-    bad = [o for o in req.optimizers if o.lower() not in allowed_optimizers]
+    if ham not in _PRESET_OF:
+        raise HTTPException(422, f"hamiltonian must be one of {sorted(_PRESET_OF)}")
+    bad = [o for o in req.optimizers if o.lower() not in _OPTIMIZERS]
     if bad:
-        raise HTTPException(422, f"Unknown optimizers: {bad}. Allowed: {sorted(allowed_optimizers)}")
-
-    rng = random.Random(req.seed)
-    true_min = _true_minimum(ham, req.n_qubits)
+        raise HTTPException(422, f"Unknown optimizers: {bad}. Allowed: {sorted(_OPTIMIZERS)}")
+    seed = 0 if req.seed is None else req.seed
+    n = req.n_qubits
+    true_min, energy = _problem(ham, n)
+    x0 = np.random.default_rng(seed).uniform(-np.pi, np.pi, size=n * (LAYERS + 1))
+    e0 = energy(x0)
 
     results: List[Dict[str, Any]] = []
-    for opt_name in req.optimizers:
-        result = _simulate_optimizer(
-            name=opt_name.lower(),
-            true_min=true_min,
-            n_qubits=req.n_qubits,
-            max_iterations=req.max_iterations,
-            rng=rng,
-        )
-        results.append(result)
+    for name in (o.lower() for o in req.optimizers):
+        r = _run_optimizer(name, energy, x0, req.max_iterations, seed)
+        gap = r["final"] - true_min
+        results.append({
+            "optimizer": name,
+            "final_energy": round(r["final"], 8),
+            "n_iterations": len(r["curve"]),
+            "n_function_evals": r["evals"],
+            "convergence_curve": r["curve"],
+            "converged": gap < 1e-2,  # within 0.01 of the exact ground energy
+            "time_ms": r["ms"],
+            "final_params": [round(float(v), 6) for v in r["x"]],
+            "energy_gap_from_true_min": round(gap, 8),
+            "improvement_pct": round((e0 - r["final"]) / max(abs(e0 - true_min), 1e-12) * 100, 2),
+        })
 
-    # Determine winner
     best = min(results, key=lambda r: r["final_energy"])
-    best_optimizer = best["optimizer"]
-    best_energy = best["final_energy"]
-    winner_summary = (
-        f"{best_optimizer.upper()} achieved the lowest energy ({best_energy:.4f} Ha) "
-        f"in {best['n_iterations']} iterations with {best['n_function_evals']} function evaluations. "
-        f"Gap from true minimum: {best['energy_gap_from_true_min']:.4f} Ha."
-    )
-
     return {
         "hub_id": f"hub-{uuid.uuid4().hex[:12]}",
         "hamiltonian": ham,
-        "n_qubits": req.n_qubits,
-        "true_minimum": true_min,
+        "n_qubits": n,
+        "true_minimum": round(true_min, 8),
+        "initial_energy": round(e0, 8),
         "results": results,
-        "best_optimizer": best_optimizer,
-        "best_energy": best_energy,
-        "winner_summary": winner_summary,
+        "best_optimizer": best["optimizer"],
+        "best_energy": best["final_energy"],
+        "winner_summary": (
+            f"{best['optimizer'].upper()} reached {best['final_energy']:.4f} in {best['n_iterations']} iterations "
+            f"({best['n_function_evals']} energy evaluations); exact ground energy {true_min:.4f}."
+        ),
+        "method": ("Exact statevector VQE; hardware-efficient Ry/CX ansatz; scipy COBYLA, L-BFGS-B, SLSQP; "
+                   "numpy Adam and SPSA; parameter-shift gradients."),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -225,7 +191,6 @@ def list_optimizers() -> List[Dict[str, Any]]:
             "name": "cobyla",
             "full_name": "Constrained Optimization By Linear Approximation",
             "type": "gradient-free",
-            "typical_iters": 60,
             "noise_robustness": "good",
             "description": "Derivative-free simplex method. Robust to shot noise. Good for NISQ.",
         },
@@ -233,7 +198,6 @@ def list_optimizers() -> List[Dict[str, Any]]:
             "name": "spsa",
             "full_name": "Simultaneous Perturbation Stochastic Approximation",
             "type": "gradient-free (stochastic)",
-            "typical_iters": 80,
             "noise_robustness": "excellent",
             "description": "Uses random finite differences. Best suited for very noisy circuits.",
         },
@@ -241,7 +205,6 @@ def list_optimizers() -> List[Dict[str, Any]]:
             "name": "adam",
             "full_name": "Adaptive Moment Estimation",
             "type": "gradient-based",
-            "typical_iters": 40,
             "noise_robustness": "moderate",
             "description": "Adaptive learning-rate gradient descent. Fast convergence in early iterations.",
         },
@@ -249,7 +212,6 @@ def list_optimizers() -> List[Dict[str, Any]]:
             "name": "lbfgsb",
             "full_name": "Limited-memory Broyden–Fletcher–Goldfarb–Shanno (Bounded)",
             "type": "quasi-Newton",
-            "typical_iters": 25,
             "noise_robustness": "low",
             "description": "Quasi-Newton method. Very fast convergence but sensitive to shot noise.",
         },
@@ -257,7 +219,6 @@ def list_optimizers() -> List[Dict[str, Any]]:
             "name": "slsqp",
             "full_name": "Sequential Least SQuares Programming",
             "type": "gradient-based (constrained)",
-            "typical_iters": 30,
             "noise_robustness": "low",
             "description": "Constrained gradient method. Suitable when parameter bounds are required.",
         },

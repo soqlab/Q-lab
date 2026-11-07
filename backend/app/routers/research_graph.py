@@ -63,56 +63,22 @@ NODE_COLORS = {
     "dataset": "#06b6d4", "method": "#84cc16",
 }
 
+# Earlier versions filled every graph with an invented study ("Run #4821 (N=4 GHZ)", "Our Draft
+# (2026)", ...). Those nodes and their edges are removed once; no sample graph is created any more.
+_OLD_SAMPLE_LABELS = {'Our Draft (2026)', 'Run #4821 (N=4 GHZ)', 'Run #4822 (N=8 GHZ)', 'GHZ Heisenberg Limit', 'Ramsey Interferometry Study', 'Cal Data Q1 2026', 'ghz_sensing_v3', 'HL Advantage at N≥6', 'GHZ State Preparation', 'Giovannetti et al. 2004'}
+_CLEANED = "_samples_removed_v1"
+
+
 def _seed_db(db: Session):
-    import random; rng = random.Random(42)
-    nodes_data = [
-        ("hypothesis", "GHZ Heisenberg Limit", "GHZ states achieve 1/N phase sensitivity"),
-        ("experiment", "Ramsey Interferometry Study", "Phase estimation with N=1..8 qubits"),
-        ("run", "Run #4821 (N=4 GHZ)", "4-qubit GHZ sensing, ibm_brisbane"),
-        ("run", "Run #4822 (N=8 GHZ)", "8-qubit GHZ sensing, ibm_brisbane"),
-        ("finding", "HL Advantage at N≥6", "Heisenberg limit observed for N=6,7,8"),
-        ("paper", "Giovannetti et al. 2004", "Quantum-Enhanced Measurements: Beating the Standard Quantum Limit"),
-        ("method", "GHZ State Preparation", "H + cascade CX gates for N-qubit GHZ"),
-        ("circuit", "ghz_sensing_v3", "Ramsey sequence with GHZ probe and adaptive phase"),
-        ("paper", "Our Draft (2026)", "Heisenberg-limited magnetometry with Q-Lab tracking"),
-        ("dataset", "Cal Data Q1 2026", "ibm_brisbane calibration snapshots Jan-Mar 2026"),
-    ]
-    node_seeds = []
-    nids = []
-    for i, (ntype, label, desc) in enumerate(nodes_data):
-        nid = str(uuid.uuid4())
-        angle = 2 * 3.14159 * i / len(nodes_data)
-        r = rng.uniform(150, 300)
-        node = GraphNode(
-            node_id=nid, node_type=ntype, label=label, description=desc,
-            metadata={}, created_at=datetime.now(timezone.utc).isoformat(),
-            x=round(r * (1 if i % 2 == 0 else -1) * abs(rng.uniform(0.3, 1.0)), 1),
-            y=round(r * (1 if i < 5 else -1) * rng.uniform(0.3, 1.0), 1),
-            color=NODE_COLORS.get(ntype, "#6366f1"),
-            size=1.5 if ntype in ("finding","paper") else 1.0,
-        )
-        node_seeds.append((nid, node.model_dump()))
-        nids.append(nid)
-    store_seed(db, NS_NODES, node_seeds)
-    edges_data = [
-        (0, 1, "tests", "Tests hypothesis"), (1, 2, "produces", "Produced run"),
-        (1, 3, "produces", "Produced run"), (2, 4, "produces", "Supports finding"),
-        (3, 4, "produces", "Supports finding"), (5, 0, "inspired_by", "Inspired hypothesis"),
-        (6, 2, "uses", "Circuit used in run"), (6, 3, "uses", "Circuit used in run"),
-        (4, 8, "produces", "Finding → paper"), (9, 2, "produces", "Cal data → run"),
-        (0, 8, "produces", "Hypothesis → draft paper"),
-    ]
-    edge_seeds = []
-    for si, ti, etype, label in edges_data:
-        if si < len(nids) and ti < len(nids):
-            eid = str(uuid.uuid4())
-            edge = GraphEdge(
-                edge_id=eid, source_id=nids[si], target_id=nids[ti],
-                edge_type=etype, label=label, weight=1.0, metadata={},
-                created_at=datetime.now(timezone.utc).isoformat(),
-            )
-            edge_seeds.append((eid, edge.model_dump()))
-    store_seed(db, NS_EDGES, edge_seeds)
+    if store_get(db, NS_NODES + "_meta", _CLEANED):
+        return
+    old = {n["node_id"] for n in store_list(db, NS_NODES) if n.get("label") in _OLD_SAMPLE_LABELS}
+    for nid in old:
+        store_delete(db, NS_NODES, nid)
+    for e in store_list(db, NS_EDGES):
+        if e.get("source_id") in old or e.get("target_id") in old:
+            store_delete(db, NS_EDGES, e["edge_id"])
+    store_put(db, NS_NODES + "_meta", _CLEANED, {"done": True})
 
 @router.get("")
 def get_graph(db: Session = Depends(get_db)):

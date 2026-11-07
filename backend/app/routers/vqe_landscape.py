@@ -9,27 +9,37 @@ from pydantic import BaseModel, Field
 router = APIRouter(prefix="/api/v1/landscape-explorer", tags=["vqe_landscape"])
 
 
-def _energy_fn(theta1: float, theta2: float, n_qubits: int, hamiltonian: str, rng: random.Random) -> float:
-    noise = rng.gauss(0, 0.015)
-    if hamiltonian == "ising":
-        base = -math.cos(theta1) * math.cos(theta2) - 0.5 * math.sin(theta1 + theta2)
-        return round(base * (1 + 0.1 * max(n_qubits - 2, 0)) + noise, 4)
-    elif hamiltonian == "heisenberg":
-        base = -math.cos(theta1) * math.cos(theta2) * math.cos(theta1 - theta2)
-        return round(base * n_qubits * 0.25 + noise, 4)
-    elif hamiltonian == "maxcut":
-        g = math.cos(2 * theta1) * math.sin(2 * theta2)
-        return round(-g * n_qubits * (n_qubits - 1) / 4 + noise, 4)
-    else:
-        r = math.sqrt(theta1 ** 2 + theta2 ** 2)
-        base = rng.gauss(0, 0.001) if r < 0.5 else -math.cos(2 * theta1) * math.sin(theta2) * math.exp(-r * 0.1)
-        return round(base * n_qubits * 0.3, 4)
+_PRESET_OF = {"ising": "ising_1d", "heisenberg": "heisenberg", "maxcut": "maxcut_ring"}
+
+
+def _ry(state, n: int, theta: float):
+    """Ry(theta) on every qubit of a statevector (bit q of the index is qubit q)."""
+    import numpy as np
+
+    c, s_ = np.cos(theta / 2), np.sin(theta / 2)
+    t = state.reshape([2] * n)
+    for q in range(n):
+        axis = n - 1 - q
+        a0, a1 = np.take(t, 0, axis=axis), np.take(t, 1, axis=axis)
+        t = np.stack([c * a0 - s_ * a1, s_ * a0 + c * a1], axis=axis)
+    return t.reshape(-1)
+
+
+def _cx_chain_permutation(n: int):
+    """Index map of CX(0,1) CX(1,2) ... CX(n-2,n-1) acting on basis states."""
+    import numpy as np
+
+    idx = np.arange(1 << n)
+    out = idx.copy()
+    for c in range(n - 1):
+        out = np.where((out >> c) & 1, out ^ (1 << (c + 1)), out)
+    return out
 
 
 class LandscapeRequest(BaseModel):
-    qasm: str = ""
+    qasm: str = ""  # ignored: the ansatz is fixed (see explore_landscape)
     hamiltonian: str = Field(default="ising")
-    n_qubits: int = Field(default=4, ge=2, le=12)
+    n_qubits: int = Field(default=4, ge=2, le=8)
     param1_range: List[float] = Field(default=[-3.14159, 3.14159])
     param2_range: List[float] = Field(default=[-3.14159, 3.14159])
     grid_size: int = Field(default=20, ge=5, le=50)
@@ -38,57 +48,69 @@ class LandscapeRequest(BaseModel):
 
 @router.post("")
 def explore_landscape(req: LandscapeRequest):
-    rng = random.Random(req.seed)
+    """Exact energy landscape of a fixed two-parameter ansatz on a model Hamiltonian.
+
+    Ansatz: Ry(theta1) on every qubit, a CX chain, Ry(theta2) on every qubit. The Hamiltonian is a
+    Hamiltonian Studio preset (transverse-field Ising, Heisenberg XXX or MaxCut ring). Each grid
+    point is <psi|H|psi> computed exactly from the statevector; the true ground energy (exact
+    diagonalisation) is reported alongside, so the ansatz's best value can be judged against it.
+    """
+    import numpy as np
+    from fastapi import HTTPException
+
+    from .hamiltonian_studio import PRESETS, _spectrum
+
+    key = _PRESET_OF.get(req.hamiltonian)
+    if key is None:
+        raise HTTPException(422, f"hamiltonian must be one of {sorted(_PRESET_OF)}.")
+    nq, n = req.n_qubits, req.grid_size
+    terms = PRESETS[key]["build"](nq)
+    from qiskit.quantum_info import SparsePauliOp
+
+    H = SparsePauliOp([t.pauli_string for t in terms], coeffs=[t.coefficient for t in terms]).to_matrix()
+    perm = _cx_chain_permutation(nq)
+    zero = np.zeros(1 << nq, dtype=complex)
+    zero[0] = 1.0
     p1_min, p1_max = req.param1_range
     p2_min, p2_max = req.param2_range
-    n = req.grid_size
-
-    grid = []
-    min_energy, max_energy = float("inf"), float("-inf")
-    optimal_params = [0.0, 0.0]
-
-    for i in range(n):
+    t1s = [p1_min + (p1_max - p1_min) * i / max(n - 1, 1) for i in range(n)]
+    t2s = [p2_min + (p2_max - p2_min) * j / max(n - 1, 1) for j in range(n)]
+    grid, energies = [], []
+    for t1 in t1s:
+        first = _ry(zero, nq, t1)
+        entangled = np.empty_like(first)
+        entangled[perm] = first
         row = []
-        for j in range(n):
-            t1 = p1_min + (p1_max - p1_min) * i / max(n - 1, 1)
-            t2 = p2_min + (p2_max - p2_min) * j / max(n - 1, 1)
-            e = _energy_fn(t1, t2, req.n_qubits, req.hamiltonian, rng)
-            row.append({"theta1": round(t1, 4), "theta2": round(t2, 4), "energy": e})
-            if e < min_energy:
-                min_energy = e
-                optimal_params = [round(t1, 4), round(t2, 4)]
-            max_energy = max(max_energy, e)
+        for t2 in t2s:
+            psi = _ry(entangled, nq, t2)
+            e = float(np.real(np.vdot(psi, H @ psi)))
+            energies.append(e)
+            row.append({"theta1": round(t1, 4), "theta2": round(t2, 4), "energy": round(e, 6)})
         grid.append(row)
 
-    all_energies = [row[j]["energy"] for row in grid for j in range(n)]
-    mean_e = sum(all_energies) / len(all_energies)
-    roughness = math.sqrt(sum((e - mean_e) ** 2 for e in all_energies) / len(all_energies))
-
-    center = [grid[n // 4 + di][n // 4 + dj]["energy"] for di in range(n // 2) for dj in range(n // 2)]
-    variance = sum((e - sum(center) / len(center)) ** 2 for e in center) / len(center)
-    has_barren_plateau = variance < 0.01
-
-    recs = []
-    if has_barren_plateau:
-        recs.append("Barren plateau detected in center region — use gradient-free optimizer (COBYLA/SPSA)")
-    else:
-        recs.append(f"Well-conditioned landscape — start at θ1={optimal_params[0]:.3f}, θ2={optimal_params[1]:.3f}")
-        recs.append("Gradient descent (ADAM) should converge from the identified minimum")
-
+    e_arr = np.array(energies)
+    k = int(np.argmin(e_arr))
+    best = grid[k // n][k % n]
+    ground = _spectrum(terms, nq)[0]
     return {
         "landscape_id": f"lscape-{uuid.uuid4().hex[:12]}",
         "hamiltonian": req.hamiltonian,
-        "n_qubits": req.n_qubits,
+        "n_qubits": nq,
         "grid_size": n,
         "grid": grid,
-        "min_energy": round(min_energy, 4),
-        "max_energy": round(max_energy, 4),
-        "energy_range": round(max_energy - min_energy, 4),
-        "optimal_theta1": optimal_params[0],
-        "optimal_theta2": optimal_params[1],
-        "has_barren_plateau": has_barren_plateau,
-        "landscape_roughness": round(roughness, 4),
-        "gradient_variance": round(variance, 6),
-        "recommendations": recs,
+        "min_energy": round(float(e_arr.min()), 6),
+        "max_energy": round(float(e_arr.max()), 6),
+        "energy_range": round(float(e_arr.max() - e_arr.min()), 6),
+        "optimal_theta1": best["theta1"],
+        "optimal_theta2": best["theta2"],
+        "exact_ground_energy": round(ground, 6),
+        "ansatz_gap_to_ground": round(float(e_arr.min()) - ground, 6),
+        # Variance of the energy over the grid; whether that is a "barren plateau" depends on scale.
+        "has_barren_plateau": None,
+        "landscape_roughness": round(float(e_arr.std()), 6),
+        "gradient_variance": round(float(e_arr.var()), 8),
+        "recommendations": [f"Best grid point: theta1={best['theta1']:.3f}, theta2={best['theta2']:.3f} "
+                            f"(energy {e_arr.min():.4f}; exact ground {ground:.4f})."],
+        "method": "Exact statevector; ansatz Ry(theta1)^n, CX chain, Ry(theta2)^n; Hamiltonian " + PRESETS[key]["formula"],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }

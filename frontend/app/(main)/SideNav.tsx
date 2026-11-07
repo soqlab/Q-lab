@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useSyncExternalStore } from "react";
-import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Filter, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, ShoppingCart, Building2, Eye, Microscope, BookText, Database, Bot, Beaker, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Activity, BarChart2, Bell, Clock, Cpu, FlaskConical, Folder, GitCompare, Globe, Grid, History, LineChart, MessageSquare, Radio, ScatterChart, Send, Settings, Shield, Users, Zap, FlaskRound, Share2, Play, Download, DollarSign, Lock, ScrollText, GitBranch, GitCommit, Atom, Key, BellRing, Layers, Server, Sliders, BookOpen, AlertTriangle, Dna, HeartPulse, Search, AlertOctagon, Shuffle, RefreshCw, ArrowRightLeft, Lightbulb, Fingerprint, TrendingDown, GitMerge, Navigation, Terminal, Award, Wand2, BarChart3, Trophy, Network, ShieldCheck, Workflow, Rocket, TrendingUp, Brain, Calculator, FileImage, Wifi, BookMarked, Timer, Scan, FileCode, Bug, Target, ShoppingCart, Building2, Eye, BookText, Database, Bot, Beaker, GitPullRequest, BadgeCheck, Wrench, GraduationCap, Briefcase, Globe2, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { isCorePath, useLabs } from "../../lib/labs";
 
@@ -68,7 +68,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/dna", icon: Fingerprint, label: "Circuit DNA" },
       { href: "/circuit-debugger", icon: Bug, label: "Circuit Debugger" },
       { href: "/circuit-ancestry", icon: GitCommit, label: "Circuit Ancestry" },
-      { href: "/mirror-circuit", icon: Shuffle, label: "Mirror Circuit" },
       { href: "/circuit-marketplace", icon: ShoppingCart, label: "Circuit Market" },
       { href: "/bloch-animator", icon: Globe, label: "Bloch Animator" },
       { href: "/figure-gen", icon: FileImage, label: "Figure Generator" },
@@ -103,12 +102,10 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/recommend", icon: Lightbulb, label: "Recommender" },
       { href: "/hypothesis", icon: BarChart3, label: "Hypothesis Engine" },
       { href: "/hypotheses", icon: Lightbulb, label: "Hypotheses" },
-      { href: "/bayes-opt", icon: TrendingDown, label: "Bayes Opt" },
       { href: "/bayes-uncertainty", icon: BarChart3, label: "Bayes Uncertainty" },
       { href: "/causal", icon: Share2, label: "Causal Analysis" },
       { href: "/causal-inference", icon: GitMerge, label: "Causal Inference" },
       { href: "/anomaly-physics", icon: AlertOctagon, label: "Physics Checker" },
-      { href: "/stats-engine", icon: Calculator, label: "Stats Engine" },
       { href: "/multi-comparisons", icon: Calculator, label: "Multi-Comparisons" },
     ],
   },
@@ -118,14 +115,9 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
     items: [
       { href: "/qec", icon: Shield, label: "QEC Synthesizer" },
       { href: "/statetomo", icon: Atom, label: "Ideal State Analysis" },
-      { href: "/gate-tomo", icon: Scan, label: "Gate Tomography" },
-      { href: "/qv", icon: Layers, label: "Quantum Volume" },
-      { href: "/rb-suite", icon: BarChart3, label: "RB Suite" },
       { href: "/xeb", icon: Target, label: "XEB Fidelity" },
-      { href: "/error-mitigate", icon: Filter, label: "Error Mitigation" },
       { href: "/auto-mitigation", icon: Wand2, label: "Auto-Mitigation" },
       { href: "/error-budget", icon: BarChart3, label: "Error Budget" },
-      { href: "/dd-optimizer", icon: Wand2, label: "DD Optimizer" },
       { href: "/syndrome-decoder", icon: ShieldCheck, label: "Syndrome Decoder" },
       { href: "/cliffordt", icon: Layers, label: "Clifford+T Counter" },
       { href: "/clifford-sim", icon: Network, label: "Clifford Sim" },
@@ -179,7 +171,6 @@ const GROUPS: { label: string; defaultOpen: boolean; items: NavItem[] }[] = [
       { href: "/research-graph", icon: Network, label: "Research Graph" },
       { href: "/replication", icon: RefreshCw, label: "Replication Mkt" },
       { href: "/blind-analysis", icon: Eye, label: "Blind Analysis" },
-      { href: "/oed", icon: Microscope, label: "Optimal Exp Design" },
     ],
   },
   {

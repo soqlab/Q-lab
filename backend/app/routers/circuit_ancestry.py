@@ -77,20 +77,24 @@ class DiffResult(BaseModel):
     similarity_score: float
 
 def _parse_qasm(qasm: str) -> tuple[int, int, list[str]]:
-    lines = [l.strip() for l in qasm.strip().split("\n") if l.strip() and not l.strip().startswith("//")]
-    gate_lines = [l for l in lines if not l.startswith("OPENQASM") and not l.startswith("include") and not l.startswith("qreg") and not l.startswith("creg") and not l.startswith("measure") and l.endswith(";")]
-    n_qubits = sum(1 for l in lines if l.startswith("qreg"))
-    if n_qubits == 0:
-        n_qubits = max(1, qasm.count("[") // 2)
-    return n_qubits, len(gate_lines), [l.split("(")[0].split(" ")[0] for l in gate_lines]
+    """(qubits, depth, gate names) of the circuit, parsed with Qiskit. 422 if it does not parse."""
+    from ..local_sim import _parse
+
+    try:
+        circuit = _parse(qasm)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    gates = [i.operation.name for i in circuit.data if i.operation.name not in ("measure", "barrier")]
+    depth = circuit.depth(filter_function=lambda i: i.operation.name not in ("measure", "barrier"))
+    return circuit.num_qubits, depth, gates
 
 def _make_version(circuit_id: str, qasm: str, msg: str, by: str, tags: list, parent_id: str | None, fork_from: str | None, ver_num: int, fidelity: float | None) -> CircuitVersion:
     n_q, depth, gates = _parse_qasm(qasm)
     vid = str(uuid.uuid4())
     return CircuitVersion(
         version_id=vid, circuit_id=circuit_id, version_number=ver_num,
-        commit_message=msg, qasm=qasm, n_qubits=max(1, n_q),
-        depth=max(1, depth), gate_count=max(1, len(gates)),
+        commit_message=msg, qasm=qasm, n_qubits=n_q,
+        depth=depth, gate_count=len(gates),
         created_at=datetime.now(timezone.utc).isoformat(),
         created_by=by, parent_version_id=parent_id,
         forked_from_circuit_id=fork_from, tags=tags, run_ids=[],
@@ -103,23 +107,22 @@ DEMO_CIRCUITS = [
     ("QFT-4", 'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[4];\nh q[0];\ncu1(pi/2) q[1],q[0];\ncu1(pi/4) q[2],q[0];\ncu1(pi/8) q[3],q[0];\nh q[1];\ncu1(pi/2) q[2],q[1];\ncu1(pi/4) q[3],q[1];\nh q[2];\ncu1(pi/2) q[3],q[2];\nh q[3];\n'),
 ]
 
+# Earlier versions created three demo circuits (Bell, GHZ, QFT-4) with invented "fidelity at commit"
+# figures and a fake optimisation pass. They are removed once; nothing is created any more.
+_CLEANED = "_samples_removed_v1"
+
+
 def _seed_db(db: Session):
-    import random
-    rng = random.Random(42)
-    circuit_seeds = []
-    version_seeds = []
-    for name, qasm in DEMO_CIRCUITS:
-        cid = str(uuid.uuid4())
-        v1 = _make_version(cid, qasm, "Initial version", "researcher", ["demo"], None, None, 1, rng.uniform(0.95, 0.999))
-        v2_qasm = qasm + f"// optimized pass 1\n"
-        v2 = _make_version(cid, v2_qasm, "Add optimization pass", "researcher", ["demo","optimized"], v1.version_id, None, 2, rng.uniform(0.96, 0.999))
-        v1_data = v1.model_dump(); v1_data["is_head"] = False
-        circuit_data = {"circuit_id": cid, "name": name, "head": v2.version_id, "created_at": v1.created_at, "fork_ids": [], "version_ids": [v1.version_id, v2.version_id]}
-        circuit_seeds.append((cid, circuit_data))
-        version_seeds.append((v1.version_id, v1_data))
-        version_seeds.append((v2.version_id, v2.model_dump()))
-    store_seed(db, NS_CIRCUITS, circuit_seeds)
-    store_seed(db, NS_VERSIONS, version_seeds)
+    if store_get(db, NS_CIRCUITS + "_meta", _CLEANED):
+        return
+    demo_names = {name for name, _ in DEMO_CIRCUITS}
+    for c in store_list(db, NS_CIRCUITS):
+        versions = [store_get(db, NS_VERSIONS, vid) or {} for vid in c.get("version_ids", [])]
+        if c.get("name") in demo_names and versions and all("demo" in (v.get("tags") or []) for v in versions):
+            for vid in c.get("version_ids", []):
+                store_delete(db, NS_VERSIONS, vid)
+            store_delete(db, NS_CIRCUITS, c["circuit_id"])
+    store_put(db, NS_CIRCUITS + "_meta", _CLEANED, {"done": True})
 
 @router.post("/", response_model=CircuitVersion)
 def create_circuit(req: CreateCircuitRequest, db: Session = Depends(get_db)):

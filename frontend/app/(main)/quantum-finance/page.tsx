@@ -1,6 +1,11 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { runQuantumFinance, QuantumFinanceResult } from "@/lib/api";
+
+function parseReturns(text: string): number[] | undefined {
+  const vals = text.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean).map(Number);
+  return vals.length && vals.every((v) => Number.isFinite(v)) ? vals : undefined;
+}
 
 export default function QuantumFinancePage() {
   const [assetPrice, setAssetPrice] = useState(100);
@@ -9,7 +14,7 @@ export default function QuantumFinancePage() {
   const [riskFreeRate, setRiskFreeRate] = useState(0.05);
   const [timeToExpiry, setTimeToExpiry] = useState(1.0);
   const [nQubits, setNQubits] = useState(5);
-  const [nAssets, setNAssets] = useState(4);
+  const [returnsText, setReturnsText] = useState("");
   const [budget, setBudget] = useState(2);
   const [result, setResult] = useState<QuantumFinanceResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +23,7 @@ export default function QuantumFinancePage() {
   async function run() {
     setLoading(true); setError(null);
     try {
-      setResult(await runQuantumFinance({ asset_price: assetPrice, strike_price: strikePrice, volatility, risk_free_rate: riskFreeRate, time_to_expiry: timeToExpiry, n_qubits: nQubits, n_assets: nAssets, budget }));
+      setResult(await runQuantumFinance({ asset_price: assetPrice, strike_price: strikePrice, volatility, risk_free_rate: riskFreeRate, time_to_expiry: timeToExpiry, n_qubits: nQubits, budget, asset_returns: parseReturns(returnsText) }));
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }
@@ -44,7 +49,12 @@ export default function QuantumFinancePage() {
             </div>
           ))}
           <div style={{ marginTop: 4, marginBottom: 4, borderTop: "1px solid #334155", paddingTop: 12, fontSize: 13, color: "#94a3b8" }}>Portfolio</div>
-          {([["Assets", nAssets, setNAssets, 2, 8, 1], ["Budget", budget, setBudget, 1, 6, 1]] as [string, number, (x: number) => void, number, number, number][]).map(([l, v, s, min, max, step]) => (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Expected returns, one per asset (e.g. 0.08, 0.12, 0.10)</div>
+            <input value={returnsText} onChange={e => setReturnsText(e.target.value)} placeholder="leave empty to skip the portfolio"
+              style={{ width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#e2e8f0", padding: "4px 6px", fontSize: 12 }} />
+          </div>
+          {([["Budget", budget, setBudget, 1, 6, 1]] as [string, number, (x: number) => void, number, number, number][]).map(([l, v, s, min, max, step]) => (
             <div key={String(l)} style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>{l}: {v}</div>
               <input type="range" min={Number(min)} max={Number(max)} step={Number(step)} value={Number(v)}
@@ -79,15 +89,16 @@ export default function QuantumFinancePage() {
               <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Quantum Speedup</div>
                 <div style={{ fontSize: 36, fontWeight: 800, color: result.quantum_advantage_achieved ? "#34d399" : "#f87171" }}>
-                  {result.speedup_factor.toFixed(1)}×
+                  {result.speedup_factor === null ? "n/a" : `${result.speedup_factor.toFixed(1)}×`}
                 </div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Quantum AE paths: {result.quantum_n_paths_needed.toLocaleString()}</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Classical MC paths: {result.classical_n_paths_needed.toLocaleString()}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Classical MC paths: {result.classical_n_paths_needed === null ? "n/a" : result.classical_n_paths_needed.toLocaleString()}</div>
                 <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 6, background: result.quantum_advantage_achieved ? "#14532d" : "#7f1d1d", color: result.quantum_advantage_achieved ? "#34d399" : "#f87171", fontSize: 12, fontWeight: 700 }}>
                   {result.quantum_advantage_achieved ? "✓ Advantage Achieved" : "✗ No Advantage"}
                 </div>
               </div>
 
+              {result.optimal_portfolio && result.asset_returns && (
               <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Portfolio (QAOA)</div>
                 <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -97,24 +108,27 @@ export default function QuantumFinancePage() {
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Return: <span style={{ color: "#34d399", fontWeight: 700 }}>{(result.expected_return * 100).toFixed(1)}%</span></div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Sharpe: <span style={{ color: "#fbbf24", fontWeight: 700 }}>{result.sharpe_ratio.toFixed(2)}</span></div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>QAOA ratio: <span style={{ color: "#a78bfa", fontWeight: 700 }}>{result.qaoa_approximation_ratio.toFixed(3)}</span></div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Return: <span style={{ color: "#34d399", fontWeight: 700 }}>{result.expected_return === null ? "n/a" : `${(result.expected_return * 100).toFixed(1)}%`}</span></div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Sharpe: <span style={{ color: "#fbbf24", fontWeight: 700 }}>{result.sharpe_ratio === null ? "n/a (no covariance)" : result.sharpe_ratio.toFixed(2)}</span></div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>QAOA ratio: <span style={{ color: "#a78bfa", fontWeight: 700 }}>{result.qaoa_approximation_ratio === null ? "n/a" : result.qaoa_approximation_ratio.toFixed(3)}</span></div>
               </div>
+              )}
             </div>
 
+            {result.optimal_portfolio && result.asset_returns && (
             <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Asset Returns</div>
               <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 80 }}>
-                {result.asset_returns.map((r, i) => (
+                {(result.asset_returns ?? []).map((r, i) => (
                   <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                    <div style={{ width: "100%", background: result.optimal_portfolio[i] ? "#6366f1" : "#334155", borderRadius: 2, height: `${r * 300}px` }} />
+                    <div style={{ width: "100%", background: result.optimal_portfolio?.[i] ? "#6366f1" : "#334155", borderRadius: 2, height: `${r * 300}px` }} />
                     <div style={{ fontSize: 10, color: "#64748b" }}>A{i+1}</div>
                     <div style={{ fontSize: 10, color: "#e2e8f0" }}>{(r * 100).toFixed(1)}%</div>
                   </div>
                 ))}
               </div>
             </div>
+            )}
 
             <div style={{ background: "#1e293b", borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 12, color: "#94a3b8" }}>{result.interpretation}</div>

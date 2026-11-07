@@ -12,7 +12,6 @@ Exposed prefixes:
 from __future__ import annotations
 
 import uuid
-import random
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -126,36 +125,35 @@ def _make_zenodo_metadata(req: FAIRGenerateRequest) -> dict:
     }
 
 
-def _fair_score(req: FAIRGenerateRequest) -> dict:
-    findable = round(random.uniform(0.80, 0.97), 3)
-    accessible = round(random.uniform(0.75, 0.95), 3)
-    interoperable = round(random.uniform(0.70, 0.92), 3)
-    reusable = round(0.6 + (0.1 if req.fidelity else 0) + random.uniform(0.05, 0.2), 3)
-    reusable = min(reusable, 1.0)
-    total = round((findable + accessible + interoperable + reusable) / 4, 3)
-    return {
-        "findable": findable,
-        "accessible": accessible,
-        "interoperable": interoperable,
-        "reusable": reusable,
-        "total": total,
-    }
-
-
-def _checklist(score: dict) -> list[dict]:
-    items = [
-        ("Persistent identifier (DOI) assigned", score["findable"] > 0.7, "Assign a DOI via Zenodo"),
-        ("Metadata deposited in searchable registry", score["findable"] > 0.8, "Register on re3data.org"),
-        ("Data accessible via standard protocol (HTTPS)", score["accessible"] > 0.7, "Ensure HTTPS endpoint"),
-        ("Authentication documented", score["accessible"] > 0.85, "Document API token requirements"),
-        ("Metadata uses community vocabulary (schema.org)", score["interoperable"] > 0.75, "Add schema.org types"),
-        ("RO-Crate manifest included", True, "Already included"),
-        ("DataCite XML exported", True, "Already included"),
-        ("License explicitly stated (CC-BY 4.0)", score["reusable"] > 0.7, "Add LICENSE file"),
-        ("Provenance recorded (circuit QASM)", score["reusable"] > 0.8, "Include circuit QASM artifact"),
-        ("README with usage instructions", score["reusable"] > 0.9, "Add README.md to dataset"),
+def _checklist_items(req: FAIRGenerateRequest) -> list[tuple[str, str, bool, str]]:
+    """(FAIR dimension, item, satisfied, recommendation), judged on what this record really has."""
+    linked = bool(req.run_id or req.run_ids)
+    return [
+        ("findable", "Persistent identifier (DOI) assigned", False, "Deposit on Zenodo to get a DOI"),
+        ("findable", "Metadata deposited in a searchable registry", False, "Publish the record on Zenodo or another repository"),
+        ("findable", "Rich metadata (title, description, algorithm, backend)", bool(req.title and req.description), "Fill in title and description"),
+        ("accessible", "Data retrievable over a standard protocol (HTTPS)", False, "Deposit the data so it has a public URL"),
+        ("interoperable", "Metadata uses a community vocabulary (schema.org via RO-Crate)", True, "Already included"),
+        ("interoperable", "DataCite XML exported", True, "Already included"),
+        ("reusable", "License stated (CC-BY 4.0)", True, "Already included"),
+        ("reusable", "Provenance: linked to recorded runs", linked, "Generate the record from a run (run_id)"),
+        ("reusable", "Result figure recorded (fidelity)", req.fidelity is not None, "Add the measured fidelity"),
     ]
-    return [{"item": i[0], "done": i[1], "recommendation": i[2]} for i in items]
+
+
+def _fair_score(req: FAIRGenerateRequest) -> dict:
+    """Each dimension: the fraction of its checklist items this record satisfies."""
+    items = _checklist_items(req)
+    score = {}
+    for dim in ("findable", "accessible", "interoperable", "reusable"):
+        mine = [ok for d, _, ok, _ in items if d == dim]
+        score[dim] = round(sum(mine) / len(mine), 3)
+    score["total"] = round(sum(score[d] for d in ("findable", "accessible", "interoperable", "reusable")) / 4, 3)
+    return score
+
+
+def _checklist(req: FAIRGenerateRequest) -> list[dict]:
+    return [{"item": item, "done": ok, "recommendation": rec} for _, item, ok, rec in _checklist_items(req)]
 
 
 @_fair_data_router.post("/generate")
@@ -170,7 +168,7 @@ def generate_fair_record(req: FAIRGenerateRequest, db: Session = Depends(get_db)
         "datacite_xml": _make_datacite_xml(req, doi),
         "zenodo_metadata": _make_zenodo_metadata(req),
         "fair_score": score,
-        "checklist": _checklist(score),
+        "checklist": _checklist(req),
         "landing_page_url": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "_meta": req.model_dump(),

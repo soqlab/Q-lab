@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 import { useState, useEffect } from "react";
 import { runQAOA, QAOAResult } from "@/lib/api";
 
-const PROBLEMS = ["maxcut", "vertex_cover", "mis"];
+const PROBLEMS = ["maxcut"];
 const GRAPHS = ["random_3reg", "erdos_renyi", "complete", "ring"];
 
 export default function QAOAPage() {

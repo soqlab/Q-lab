@@ -251,6 +251,16 @@ function authHeaders(token?: string | null): Record<string, string> {
   return { Authorization: `Bearer ${t}` };
 }
 
+/** Advantage analysis of one of the caller's runs (POST /api/v1/advantage/analyze/{run_id}). */
+export async function analyzeRunAdvantage(runId: string): Promise<unknown> {
+  const res = await fetch(apiUrl(`/api/v1/advantage/analyze/${encodeURIComponent(runId)}`), { method: "POST", headers: authHeaders() });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // ------------------------------------------------------------------
 // Runs
 // ------------------------------------------------------------------
@@ -4269,50 +4279,6 @@ export async function getNotificationLogs(channelId?: string): Promise<Notificat
 }
 
 // ------------------------------------------------------------------
-// Quantum Volume Runner
-// ------------------------------------------------------------------
-
-export type QVTrialResult = { m: number; qv: number; mean_hop: number; ci_low: number; std: number; passed: boolean };
-
-export type QVResult = {
-  qv_id: string; backend: string; qv_achieved: number; log2_qv: number;
-  n_qubits_tested: number; n_trials: number;
-  heavy_output_prob: number; pass_threshold: number; passed: boolean;
-  trial_results: QVTrialResult[]; created_at: string;
-};
-
-export type QVTrend = {
-  backend: string; current_qv: number | null; peak_qv: number | null;
-  history: { date: string; qv: number; hop: number; qv_id: string }[];
-};
-
-export async function runQV(req: {
-  backend: string; max_qubits?: number; n_trials?: number;
-  shots?: number; noise_level?: number; seed?: number;
-}): Promise<QVResult> {
-  const res = await fetch(apiUrl("/api/v1/qv-runner"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listQVResults(backend?: string): Promise<QVResult[]> {
-  const qs = backend ? `?backend=${encodeURIComponent(backend)}` : "";
-  const res = await fetch(apiUrl(`/api/v1/qv-runner${qs}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("QV results failed");
-  return res.json();
-}
-
-export async function getQVTrend(backend: string): Promise<QVTrend> {
-  const res = await fetch(apiUrl(`/api/v1/qv-runner/trend/${encodeURIComponent(backend)}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("QV trend failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
 // Gate Characterization
 // ------------------------------------------------------------------
 
@@ -4609,46 +4575,6 @@ export async function getHealthForecast(backend: string, metric?: string, days?:
 export async function listHealthForecasts(): Promise<HealthMetricForecast[]> {
   const res = await fetch(apiUrl("/api/v1/health-forecast"), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error("Forecasts failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
-// Quantum Advantage Detector
-// ------------------------------------------------------------------
-
-export type AdvantageDetectorResult = {
-  result_id: string; problem_type: string; n_qubits: number;
-  quantum_score: number; classical_score: number;
-  advantage_ratio: number; quantum_time_ms: number; classical_time_ms: number;
-  verdict: "quantum_wins" | "classical_wins" | "tie";
-  details: Record<string, unknown>; created_at: string;
-};
-
-export type AdvantageSweepPoint = {
-  n_qubits: number; advantage_ratio: number; verdict: string;
-  quantum_score: number; classical_score: number;
-};
-
-export async function detectAdvantage(req: { problem_type?: string; n_qubits?: number; seed?: number }): Promise<AdvantageDetectorResult> {
-  const res = await fetch(apiUrl("/api/v1/advantage"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listAdvantageResults(problemType?: string): Promise<AdvantageDetectorResult[]> {
-  const qs = problemType ? `?problem_type=${problemType}` : "";
-  const res = await fetch(apiUrl(`/api/v1/advantage${qs}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Advantage results failed");
-  return res.json();
-}
-
-export async function sweepAdvantage(problemType: string, maxQubits?: number): Promise<{ problem_type: string; sweep: AdvantageSweepPoint[] }> {
-  const qs = maxQubits ? `?max_qubits=${maxQubits}` : "";
-  const res = await fetch(apiUrl(`/api/v1/advantage/sweep/${problemType}${qs}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Sweep failed");
   return res.json();
 }
 
@@ -5174,65 +5100,6 @@ export async function listNL2QASMExamples(): Promise<{ name: string; pattern_hin
 }
 
 // ------------------------------------------------------------------
-// 1. Error Mitigation Engine
-// ------------------------------------------------------------------
-
-export type ZNEMitigateResult = {
-  noise_scale_factors: number[];
-  noisy_expectations: number[];
-  extrapolated_linear: number;
-  extrapolated_richardson: number;
-  best_extrapolation: string;
-  best_value: number;
-  improvement_pct: number;
-};
-export type PECMitigateResult = {
-  quasi_probability_overhead: number;
-  n_circuits_sampled: number;
-  mitigated_expectation: number;
-  variance_estimate: number;
-  improvement_pct: number;
-};
-export type CDRResult = {
-  n_training_circuits: number;
-  linear_regression_slope: number;
-  linear_regression_intercept: number;
-  corrected_expectation: number;
-  r_squared: number;
-  improvement_pct: number;
-};
-export type ErrorMitigateResult = {
-  mitigation_id: string;
-  qasm_hash: string;
-  n_qubits: number;
-  n_gates: number;
-  method_used: string;
-  raw_expectation: number;
-  zne_result: ZNEMitigateResult;
-  pec_result: PECMitigateResult;
-  cdr_result: CDRResult;
-  best_method: string;
-  best_mitigated_expectation: number;
-  overall_improvement_pct: number;
-  created_at: string;
-};
-
-export async function runErrorMitigate(req: { qasm: string; method?: string; noise_level?: number; n_zne_samples?: number }): Promise<ErrorMitigateResult> {
-  const res = await fetch(apiUrl("/api/v1/error-mitigate"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listMitigationMethods(): Promise<{ id: string; name: string; description: string }[]> {
-  const res = await fetch(apiUrl("/api/v1/error-mitigate/methods"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Methods failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
 // 2. Circuit Synthesis from Unitary
 // ------------------------------------------------------------------
 
@@ -5264,48 +5131,6 @@ export async function synthesizeUnitary(req: { matrix: number[][]; optimize?: bo
     body: JSON.stringify(req),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ------------------------------------------------------------------
-// 3. Randomized Benchmarking Suite
-// ------------------------------------------------------------------
-
-export type RBSuiteResult = {
-  rb_id: string;
-  backend: string;
-  rb_type: string;
-  qubit: number;
-  n_qubits: number;
-  sequence_lengths: number[];
-  survival_probabilities: number[];
-  fit_A: number;
-  fit_B: number;
-  fit_p: number;
-  error_per_clifford: number;
-  average_gate_fidelity: number;
-  gate_fidelity_1q: number;
-  interleaved_gate: string | null;
-  interleaved_epc: number | null;
-  gate_specific_fidelity: number | null;
-  decay_curve: { m: number; survival: number; fit: number }[];
-  quality_grade: string;
-  recommendations: string[];
-  created_at: string;
-};
-
-export async function runRBSuite(req: { rb_type?: string; backend?: string; qubit?: number; n_qubits?: number; sequence_lengths?: number[]; n_seeds?: number; interleaved_gate?: string }): Promise<RBSuiteResult> {
-  const res = await fetch(apiUrl("/api/v1/rb-suite"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listRBBackends(): Promise<{ id: string; n_qubits: number; gate_error: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/rb-suite/backends"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Backends failed");
   return res.json();
 }
 
@@ -5829,55 +5654,6 @@ export async function listAdvantageAlgorithms(): Promise<{ id: string; display_n
 }
 
 // ------------------------------------------------------------------
-// 19. Multi-Qubit Gate Tomography
-// ------------------------------------------------------------------
-
-export type GateTomoResult = {
-  tomo_id: string;
-  gate_name: string;
-  gate_display: string;
-  n_qubits: number;
-  backend: string;
-  tomo_method: string;
-  method_description: string;
-  n_shots: number;
-  ptm: number[][];
-  process_fidelity: number;
-  average_gate_fidelity: number;
-  unitarity: number;
-  diamond_norm_upper_bound: number;
-  pauli_error_rates: { depolarizing: number; dephasing: number; amplitude_damping: number };
-  dominant_error_channel: string;
-  is_unital: boolean;
-  ideal_ptm: number[][];
-  ptm_deviation: number[][];
-  backend_specs: { gate_error: number; t1_us: number; t2_us: number; gate_time_ns: number };
-  recommendations: string[];
-  created_at: string;
-};
-
-export async function runGateTomography(req: { gate?: string; backend?: string; tomo_method?: string; n_shots?: number }): Promise<GateTomoResult> {
-  const res = await fetch(apiUrl("/api/v1/gate-tomo"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function listTomoGates(): Promise<{ id: string; display: string; n_qubits: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/gate-tomo/gates"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Gates failed");
-  return res.json();
-}
-
-export async function listTomoBackends(): Promise<{ id: string; n_qubits: number; gate_error: number }[]> {
-  const res = await fetch(apiUrl("/api/v1/gate-tomo/backends"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Backends failed");
-  return res.json();
-}
-
-// ------------------------------------------------------------------
 // 20. Collaborative Experiment Notebooks
 // ------------------------------------------------------------------
 
@@ -6212,61 +5988,25 @@ export interface QuantumFinanceResult {
   quantum_price_estimate: number;
   classical_mc_price: number;
   pricing_error: number;
-  classical_n_paths_needed: number;
+  classical_n_paths_needed: number | null;
   quantum_n_paths_needed: number;
-  speedup_factor: number;
+  speedup_factor: number | null;
   confidence_interval_lower: number;
   confidence_interval_upper: number;
-  optimal_portfolio: number[];
-  expected_return: number;
-  portfolio_risk: number;
-  sharpe_ratio: number;
-  qaoa_approximation_ratio: number;
-  asset_returns: number[];
+  optimal_portfolio: number[] | null;
+  expected_return: number | null;
+  portfolio_risk: number | null;
+  sharpe_ratio: number | null;
+  qaoa_approximation_ratio: number | null;
+  asset_returns: number[] | null;
   circuit_depth: number;
   n_cnot_gates: number;
   quantum_advantage_achieved: boolean;
   interpretation: string;
   created_at: string;
 }
-export async function runQuantumFinance(req: { problem?: string; asset_price?: number; strike_price?: number; volatility?: number; risk_free_rate?: number; time_to_expiry?: number; n_qubits?: number; n_paths?: number; n_assets?: number; budget?: number; seed?: number }): Promise<QuantumFinanceResult> {
+export async function runQuantumFinance(req: { problem?: string; asset_price?: number; strike_price?: number; volatility?: number; risk_free_rate?: number; time_to_expiry?: number; n_qubits?: number; n_paths?: number; n_assets?: number; budget?: number; seed?: number ; asset_returns?: number[]; covariance?: number[][] }): Promise<QuantumFinanceResult> {
   const res = await fetch(apiUrl("/api/v1/quantum-finance"), {
-    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ────────────────────────────────────────────
-// Mirror Circuit Benchmarker
-// ────────────────────────────────────────────
-export interface MirrorCircuitResult {
-  mirror_id: string;
-  n_qubits: number;
-  circuit_depth: number;
-  n_circuits: number;
-  n_shots: number;
-  noise_level: number;
-  gate_set: string;
-  n_gates_per_circuit: number;
-  n_total_gates: number;
-  per_circuit_success: number[];
-  mean_success_probability: number;
-  std_success_probability: number;
-  polarization_fidelity: number;
-  effective_error_per_layer: number;
-  effective_error_per_gate: number;
-  entanglement_layer_fidelity: number;
-  clops_estimate: number;
-  quality_grade: string;
-  comparison_to_ideal: string;
-  vs_qv_score: number;
-  recommendations: string[];
-  created_at: string;
-}
-export async function runMirrorCircuit(req: { n_qubits?: number; circuit_depth?: number; n_circuits?: number; n_shots?: number; noise_level?: number; gate_set?: string }): Promise<MirrorCircuitResult> {
-  const res = await fetch(apiUrl("/api/v1/mirror"), {
     method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(req),
   });
@@ -6740,42 +6480,6 @@ export async function starRegistryEntry(registryId: string): Promise<{ starred: 
 }
 
 // ─────────────────────────────────────────────────────────
-// Bayesian Optimization
-// ─────────────────────────────────────────────────────────
-export interface BayesParamSpec { name: string; min_val: number; max_val: number; param_type: string; log_scale: boolean; }
-export interface BayesOptSession {
-  opt_id: string; name: string; parameters: BayesParamSpec[];
-  objective: string; minimize: boolean; n_initial: number;
-  max_iterations: number; current_iteration: number; status: string;
-  best_params: Record<string, number>; best_value: number | null;
-  created_at: string; updated_at: string;
-  history: Array<{ iteration: number; params: Record<string, number>; value: number; timestamp: string }>;
-  gp_model_summary: Record<string, unknown>; next_params: Record<string, number>;
-  convergence_detected: boolean; improvement_history: number[];
-  expected_improvement: number;
-}
-export async function startBayesOpt(req: { name?: string; parameters: BayesParamSpec[]; objective?: string; minimize?: boolean; n_initial?: number; max_iterations?: number; acquisition?: string }): Promise<BayesOptSession> {
-  const res = await fetch(apiUrl("/api/v1/bayes-opt/start"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function submitBayesResult(req: { opt_id: string; params: Record<string, number>; value: number; metadata?: Record<string, unknown> }): Promise<BayesOptSession> {
-  const res = await fetch(apiUrl("/api/v1/bayes-opt/submit"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function getBayesSession(optId: string): Promise<BayesOptSession> {
-  const res = await fetch(apiUrl(`/api/v1/bayes-opt/${optId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Get session failed");
-  return res.json();
-}
-export async function listBayesSessions(): Promise<{ sessions: object[] }> {
-  const res = await fetch(apiUrl("/api/v1/bayes-opt"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("List sessions failed");
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Research Graph
 // ─────────────────────────────────────────────────────────
 export interface ResearchGraphNode {
@@ -6809,34 +6513,12 @@ export async function addGraphEdge(req: { source_id: string; target_id: string; 
 }
 
 // ─────────────────────────────────────────────────────────
-// Stats Engine
-// ─────────────────────────────────────────────────────────
-export interface FisherResult { qfi: number; cfi: number; hl_bound: number; sql_bound: number; sensitivity_ratio: number; beating_sql: boolean; beating_hl: boolean; }
-export interface StatAnalysisResult { analysis_id: string; created_at: string; n_samples: number; fidelity_mean: number; fidelity_std: number; fidelity_ci_low: number; fidelity_ci_high: number; chi2_statistic: number; chi2_p_value: number; bayesian_evidence: number; log_bayes_factor: number; bootstrap_mean: number; bootstrap_std: number; bootstrap_ci_low: number; bootstrap_ci_high: number; effect_size: number; is_significant: boolean; power: number; sample_size_needed: number; fisher: FisherResult; systematic_variance: number; shot_variance: number; dominant_noise: string; recommendations: string[]; error_budget: Record<string, number>; }
-export async function runStatAnalysis(req: { samples: { counts: Record<string, number>; n_shots: number; n_qubits: number; label?: string }[]; target_state?: string; confidence_level?: number; n_bootstrap?: number }): Promise<StatAnalysisResult> {
-  const res = await fetch(apiUrl("/api/v1/stats-engine/analyze"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
 // Error Budget
 // ─────────────────────────────────────────────────────────
 export interface ErrorComponent { name: string; category: string; contribution_pct: number; absolute_error: number; description: string; mitigatable: boolean; mitigation_strategy: string; }
-export interface ErrorBudgetReport { report_id: string; created_at: string; circuit_name: string; n_qubits: number; circuit_depth: number; backend: string; total_error: number; infidelity: number; components: ErrorComponent[]; gate_error_total: number; decoherence_total: number; spam_total: number; measurement_total: number; leakage_total: number; dominant_error: string; fault_tolerant_threshold: number; below_ft_threshold: boolean; recommendations: string[]; action_items: object[]; }
-export async function analyzeErrorBudget(req: { circuit_name?: string; n_qubits?: number; circuit_depth?: number; backend?: string; measured_fidelity?: number }): Promise<ErrorBudgetReport> {
+export interface ErrorBudgetReport { report_id: string; created_at: string; circuit_name: string; run_id: string | null; n_qubits: number; circuit_depth: number; n_1q_gates: number; n_2q_gates: number; backend: string | null; total_error: number; infidelity: number; measured_fidelity: number | null; components: ErrorComponent[]; gate_error_total: number; decoherence_total: number | null; measurement_total: number | null; dominant_error: string | null; fault_tolerant_threshold: number; below_ft_threshold: boolean; inputs_used: Record<string, string>; missing_inputs: string[]; recommendations: string[]; }
+export async function analyzeErrorBudget(req: { run_id?: string; qasm?: string; circuit_name?: string; measured_fidelity?: number; single_q_error_rate?: number; two_q_error_rate?: number; t1_us?: number; t2_us?: number; gate_time_ns?: number; readout_error?: number }): Promise<ErrorBudgetReport> {
   const res = await fetch(apiUrl("/api/v1/error-budget/analyze"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// DD Optimizer
-// ─────────────────────────────────────────────────────────
-export interface DDPulseSchedule { sequence_type: string; pulses: string[]; n_repetitions: number; total_pulses: number; gate_overhead: number; time_overhead_pct: number; t1_improvement_factor: number; t2_improvement_factor: number; fidelity_improvement_pct: number; qasm_insertion: string; qiskit_snippet: string; suppresses: string[]; }
-export interface DDReport { report_id: string; created_at: string; backend: string; idle_time_us: number; recommended_sequence: string; reason: string; sequences: DDPulseSchedule[]; estimated_t2_with_dd: number; estimated_t2_without_dd: number; overhead_acceptable: boolean; noise_spectrum: Record<string, unknown>; }
-export async function optimizeDDSequence(req: { circuit_name?: string; n_qubits?: number; circuit_depth?: number; backend?: string; noise_type?: string; t1_us?: number; t2_us?: number; max_overhead_pct?: number }): Promise<DDReport> {
-  const res = await fetch(apiUrl("/api/v1/dd-optimizer/optimize"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -6950,14 +6632,8 @@ export async function applyMitigationStrategy(req: { recommendation_id: string; 
 // ─────────────────────────────────────────────────────────
 export interface PhysicsViolation { rule: string; severity: string; observed: number; limit: number; explanation: string; }
 export interface PhysicsCheck { check_id: string; violations: PhysicsViolation[]; warnings: { rule: string; message: string }[]; passed: string[]; overall_valid: boolean; physics_score: number; }
-export interface LiteratureComparison { comparison_id: string; percentile: number; better_than_pct: number; similar_papers: { arxiv_id: string; title: string; value: number; year: number }[]; assessment: string; is_record: boolean; record_holder?: string; }
 export async function checkPhysicsConstraints(req: { t1_us?: number; t2_us?: number; gate_fidelity?: number; readout_fidelity?: number; energy?: number; fidelity?: number; backend?: string; n_qubits?: number }): Promise<PhysicsCheck> {
   const res = await fetch(apiUrl("/api/v1/anomaly-physics/check"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function compareToLiterature(req: { metric: string; value: number; backend: string; n_qubits: number; algorithm: string }): Promise<LiteratureComparison> {
-  const res = await fetch(apiUrl("/api/v1/anomaly-physics/compare-literature"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -7168,33 +6844,6 @@ export async function getAnalysisRegistration(regId: string): Promise<AnalysisRe
 }
 export async function revealAnalysis(regId: string, req: { effect_size: number; p_value: number; confidence_interval: number[]; result_summary: string }): Promise<RevealResult> {
   const res = await fetch(apiUrl(`/api/v1/blind-analysis/${regId}/reveal`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─────────────────────────────────────────────────────────
-// Optimal Experiment Design  /api/v1/oed
-// ─────────────────────────────────────────────────────────
-export interface ExperimentDesign { design_id: string; name: string; experiment_type: string; n_qubits: number; target_precision: number; optimal_shots: number; fisher_information: number; cramer_rao_bound: number; recommended_circuits: string[]; estimated_runtime_min: number; created_at: string; }
-export interface OEDSimulatedOutcome { outcome_id: string; design_id: string; achieved_precision: number; achieved_fidelity: number; total_shots_used: number; runtime_min: number; converged: boolean; }
-export async function designExperiment(req: { name: string; experiment_type: string; n_qubits: number; target_precision: number; budget_shots: number }): Promise<ExperimentDesign> {
-  const res = await fetch(apiUrl("/api/v1/oed/design"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-export async function listExperimentDesigns(): Promise<ExperimentDesign[]> {
-  const res = await fetch(apiUrl("/api/v1/oed/designs"), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  const data = await res.json();
-  return Array.isArray(data) ? data : (data.designs ?? []);
-}
-export async function getExperimentDesign(designId: string): Promise<ExperimentDesign> {
-  const res = await fetch(apiUrl(`/api/v1/oed/design/${designId}`), { cache: "no-store", headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-export async function simulateOED(req: { design_id: string; noise_level?: number }): Promise<OEDSimulatedOutcome> {
-  const res = await fetch(apiUrl("/api/v1/oed/simulate"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(req) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

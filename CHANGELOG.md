@@ -38,10 +38,24 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   Tomography) compute from the exact statevector of the circuit and say it is the ideal state,
   not a hardware measurement. Each response names its source, and none is marked illustrative.
 - The run page's evolutionary optimizer panel (illustrative) shows only with Labs on.
+- No tool returns invented numbers any more: the illustrative list is empty. Labs tools now compute
+  from a stated source: the user's recorded runs (XEB, advantage analysis, error budget, Methods
+  section, run optimizer), exact simulation of the user's circuit or model (Hamiltonian spectrum,
+  Clifford tableau, tensor network, QAOA, VQE landscape, optimizer comparison, Trotter evolution,
+  unitary synthesis, QKD protocols), or rules on the user's input (physics checks, FAIR score,
+  causal analysis). A figure that is not recorded or supplied is reported as missing, never
+  defaulted. Sample people, circuits, claims and graphs are no longer created, and old ones are
+  removed.
+- The talent board requires sign-in and shows a profile's email only to its owner.
 
 ### Removed
 - Cost Arbitrage: its device error rates, T1, fidelity, queue times and availability were random.
   Cost Oracle quotes the published prices.
+- 48 Labs tools whose results could not be made real with the data Q-Lab has (random draws,
+  canned replies, invented device tables or sample records), among them the RB/GST/SPAM, ZNE/PEC,
+  tomography, QV, mirror-circuit and DD tools, the chat copilots, community leaderboards and
+  marketplaces, the HPC bridge, offline export, paper and grant drafting, and the transpiler hub.
+  Real counterparts are listed in each commit.
 - The old `sdk/` folder: a stale duplicate of the `qlab-sdk` package (0.1.0) that pointed at a
   retired server. The SDK is `qlab_sdk/`.
 

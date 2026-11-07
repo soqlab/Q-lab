@@ -1,101 +1,183 @@
-﻿from __future__ import annotations
-import uuid, math, random
+﻿"""Error budget of a circuit, from its real gate counts and recorded or stated error rates.
+
+Gate counts, depth and qubit count come from parsing the circuit (a stored run's QASM, or QASM
+the caller sends). Error rates come from the run's recorded calibration (averages) or from values
+the caller states; nothing is filled in from a table of typical devices. A component whose inputs
+are missing is left out and listed in `missing_inputs`. Each component is the standard first-order
+estimate: gates x error per gate, n_qubits x (1 - exp(-t/T1)) and (1 - exp(-t/T2))/2 with
+t = depth x gate time, and n_qubits x readout error.
+"""
+from __future__ import annotations
+
+import math
+import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..calibration_history import calibration_metric
 from ..database import get_db
-from ..store import store_put, store_get, store_list, store_delete, store_seed
+from ..models import Run
 
 router = APIRouter(prefix="/api/v1/error-budget", tags=["error-budget"])
 
-NS = "error_budget_reports"
+FT_THRESHOLD = 0.01  # a commonly quoted surface-code threshold, for orientation only
+
 
 class ErrorComponent(BaseModel):
-    name: str; category: str; contribution_pct: float; absolute_error: float
-    description: str; mitigatable: bool; mitigation_strategy: str
+    name: str
+    category: str
+    contribution_pct: float
+    absolute_error: float
+    description: str
+    mitigatable: bool
+    mitigation_strategy: str
+
 
 class ErrorBudgetReport(BaseModel):
-    report_id: str; created_at: str; circuit_name: str
-    n_qubits: int; circuit_depth: int; backend: str
-    total_error: float; infidelity: float
+    report_id: str
+    created_at: str
+    circuit_name: str
+    run_id: Optional[str]
+    n_qubits: int
+    circuit_depth: int
+    n_1q_gates: int
+    n_2q_gates: int
+    backend: Optional[str]
+    total_error: float
+    infidelity: float
+    measured_fidelity: Optional[float]
     components: list[ErrorComponent]
-    gate_error_total: float; decoherence_total: float
-    spam_total: float; measurement_total: float; leakage_total: float
-    dominant_error: str; fault_tolerant_threshold: float
+    gate_error_total: float
+    decoherence_total: Optional[float]
+    measurement_total: Optional[float]
+    dominant_error: Optional[str]
+    fault_tolerant_threshold: float
     below_ft_threshold: bool
-    recommendations: list[str]; action_items: list[dict]
+    inputs_used: dict
+    missing_inputs: list[str]
+    recommendations: list[str]
+
 
 class BudgetRequest(BaseModel):
-    circuit_name: str = "circuit"; n_qubits: int = 5; circuit_depth: int = 20
-    backend: str = "ibm_brisbane"; n_shots: int = 8192
-    measured_fidelity: float | None = None
-    single_q_error_rate: float | None = None; two_q_error_rate: float | None = None
-    t1_us: float | None = None; t2_us: float | None = None
-    gate_time_ns: float = 50.0; readout_error: float | None = None
+    run_id: Optional[str] = None
+    qasm: Optional[str] = None
+    circuit_name: str = "circuit"
+    backend: Optional[str] = None
+    measured_fidelity: Optional[float] = None
+    single_q_error_rate: Optional[float] = None
+    two_q_error_rate: Optional[float] = None
+    t1_us: Optional[float] = None
+    t2_us: Optional[float] = None
+    gate_time_ns: Optional[float] = None
+    readout_error: Optional[float] = None
 
-BACKEND_DEFAULTS = {
-    "ibm_brisbane": {"1q": 0.0003, "2q": 0.003, "t1": 280, "t2": 150, "readout": 0.01, "leakage": 0.0001},
-    "ionq_aria_1": {"1q": 0.00005, "2q": 0.0005, "t1": 10000, "t2": 5000, "readout": 0.003, "leakage": 0.00001},
-    "rigetti_ankaa_2": {"1q": 0.0005, "2q": 0.005, "t1": 180, "t2": 90, "readout": 0.02, "leakage": 0.0002},
-}
+
+def _counts(qasm: str) -> tuple[int, int, int, int]:
+    from ..local_sim import _parse
+
+    try:
+        c = _parse(qasm)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    gates = [i for i in c.data if i.operation.name not in ("measure", "barrier", "reset")]
+    n2 = sum(1 for i in gates if len(i.qubits) >= 2)
+    depth = c.depth(filter_function=lambda i: i.operation.name not in ("measure", "barrier"))
+    return c.num_qubits, depth, len(gates) - n2, n2
+
 
 @router.post("/analyze", response_model=ErrorBudgetReport)
 def analyze(req: BudgetRequest, db: Session = Depends(get_db)):
-    rng = random.Random(hash(req.circuit_name + req.backend) & 0xFFFFFF)
-    bd = BACKEND_DEFAULTS.get(req.backend, BACKEND_DEFAULTS["ibm_brisbane"])
-    p1q = req.single_q_error_rate or bd["1q"]
-    p2q = req.two_q_error_rate or bd["2q"]
-    t1 = (req.t1_us or bd["t1"]) * 1e-6
-    t2 = (req.t2_us or bd["t2"]) * 1e-6
-    gt = req.gate_time_ns * 1e-9
-    readout = req.readout_error or bd["readout"]
-    leakage = bd["leakage"]
-    n1q = req.n_qubits * req.circuit_depth // 2
-    n2q = (req.n_qubits - 1) * req.circuit_depth // 4
-    gate_1q_err = n1q * p1q
-    gate_2q_err = n2q * p2q
-    circuit_time = req.circuit_depth * gt
-    t1_err = req.n_qubits * (1 - math.exp(-circuit_time / t1))
-    t2_err = req.n_qubits * (1 - math.exp(-circuit_time / t2)) * 0.5
-    spam_err = req.n_qubits * 0.005
-    meas_err = req.n_qubits * readout
-    leak_err = (n1q + n2q) * leakage
-    total = gate_1q_err + gate_2q_err + t1_err + t2_err + spam_err + meas_err + leak_err
-    total = max(total, 1e-6)
-    infidelity = min(0.999, 1 - math.exp(-total))
-    def pct(e): return round(e / total * 100, 2)
-    components = [
-        ErrorComponent(name="Single-qubit gates", category="gate", contribution_pct=pct(gate_1q_err), absolute_error=round(gate_1q_err,6), description=f"{n1q} single-qubit gates × {p1q:.2e} error/gate", mitigatable=True, mitigation_strategy="ZNE, PEC, gate compilation optimization"),
-        ErrorComponent(name="Two-qubit gates", category="gate", contribution_pct=pct(gate_2q_err), absolute_error=round(gate_2q_err,6), description=f"{n2q} CX/ECR gates × {p2q:.2e} error/gate", mitigatable=True, mitigation_strategy="ZNE, reduce CX count, use native gates"),
-        ErrorComponent(name="T1 relaxation", category="decoherence", contribution_pct=pct(t1_err), absolute_error=round(t1_err,6), description=f"Circuit time {circuit_time*1e9:.0f}ns vs T1={t1*1e6:.0f}μs", mitigatable=True, mitigation_strategy="Dynamical decoupling, shorter circuits, faster gates"),
-        ErrorComponent(name="T2 dephasing", category="decoherence", contribution_pct=pct(t2_err), absolute_error=round(t2_err,6), description=f"Circuit time {circuit_time*1e9:.0f}ns vs T2={t2*1e6:.0f}μs", mitigatable=True, mitigation_strategy="Echo sequences, refocusing pulses"),
-        ErrorComponent(name="SPAM errors", category="spam", contribution_pct=pct(spam_err), absolute_error=round(spam_err,6), description="State preparation and measurement combined", mitigatable=True, mitigation_strategy="M3 readout mitigation, repeated readout"),
-        ErrorComponent(name="Readout errors", category="measurement", contribution_pct=pct(meas_err), absolute_error=round(meas_err,6), description=f"Per-qubit readout error {readout:.3%}", mitigatable=True, mitigation_strategy="Readout calibration matrix, post-selection"),
-        ErrorComponent(name="Leakage to |2⟩", category="leakage", contribution_pct=pct(leak_err), absolute_error=round(leak_err,6), description="Population escape to non-computational states", mitigatable=False, mitigation_strategy="Leakage reduction units (LRU), leakage-aware transpilation"),
-    ]
-    dominant = max(components, key=lambda c: c.contribution_pct)
-    ft_threshold = 0.01
-    recs = [f"Dominant error: {dominant.name} ({dominant.contribution_pct:.1f}%) — {dominant.mitigation_strategy}"]
-    if gate_2q_err > gate_1q_err * 2: recs.append("2Q gate errors dominant — optimize circuit to reduce CX count")
-    if t1_err + t2_err > gate_1q_err + gate_2q_err: recs.append("Decoherence dominates — use DD sequences or switch to faster backend")
-    if infidelity > ft_threshold: recs.append(f"Infidelity {infidelity:.4f} above FT threshold {ft_threshold} — QEC encoding recommended")
-    actions = [{"priority": i+1, "action": c.mitigation_strategy, "target_error": c.name, "expected_improvement_pct": round(c.contribution_pct*0.6, 1)} for i, c in enumerate(sorted(components, key=lambda x: x.contribution_pct, reverse=True)[:3]) if c.mitigatable]
-    rid = str(uuid.uuid4())
-    report = ErrorBudgetReport(report_id=rid, created_at=datetime.now(timezone.utc).isoformat(), circuit_name=req.circuit_name, n_qubits=req.n_qubits, circuit_depth=req.circuit_depth, backend=req.backend, total_error=round(total,6), infidelity=round(infidelity,6), components=components, gate_error_total=round(gate_1q_err+gate_2q_err,6), decoherence_total=round(t1_err+t2_err,6), spam_total=round(spam_err,6), measurement_total=round(meas_err,6), leakage_total=round(leak_err,6), dominant_error=dominant.name, fault_tolerant_threshold=ft_threshold, below_ft_threshold=infidelity<ft_threshold, recommendations=recs, action_items=actions)
-    store_put(db, NS, rid, report.model_dump())
-    return report
+    qasm, cal, backend, sources = req.qasm, {}, req.backend, {}
+    if req.run_id:
+        run = db.scalar(select(Run).where(Run.run_id == req.run_id))
+        if run is None:
+            raise HTTPException(404, f"Run {req.run_id} not found")
+        qasm = qasm or run.qasm
+        cal = run.calibration or {}
+        backend = backend or run.backend
+    if not qasm:
+        raise HTTPException(422, "Give a run with a stored circuit, or the circuit's QASM.")
+    n_qubits, depth, n1, n2 = _counts(qasm)
 
-@router.get("/{report_id}", response_model=ErrorBudgetReport)
-def get_report(report_id: str, db: Session = Depends(get_db)):
-    data = store_get(db, NS, report_id)
-    if data is None:
-        raise HTTPException(404, "report not found")
-    return ErrorBudgetReport(**data)
+    def pick(stated: Optional[float], metric: Optional[str], name: str) -> Optional[float]:
+        if stated is not None:
+            sources[name] = "stated"
+            return stated
+        value = calibration_metric(cal, metric) if metric else None
+        if value is not None:
+            sources[name] = "run calibration (average)"
+        return value
 
-@router.get("")
-def list_reports(db: Session = Depends(get_db)):
-    reports = store_list(db, NS)
-    return {"reports": [{"report_id": r["report_id"], "circuit_name": r["circuit_name"], "infidelity": r["infidelity"], "dominant_error": r["dominant_error"]} for r in reports]}
+    p1 = pick(req.single_q_error_rate, None, "single_q_error_rate")
+    p2 = pick(req.two_q_error_rate, None, "two_q_error_rate")
+    if p1 is None and p2 is None:
+        avg = pick(None, "avg_gate_error", "gate_error")
+        if avg is not None:
+            p1 = p2 = avg  # one recorded average, applied to every gate
+    t1 = pick(req.t1_us, "avg_t1_us", "t1_us")
+    t2 = pick(req.t2_us, "avg_t2_us", "t2_us")
+    ro = pick(req.readout_error, "avg_readout_error", "readout_error")
+    gt = req.gate_time_ns
 
+    comps: list[tuple[str, str, float, str, bool, str]] = []
+    missing: list[str] = []
+    if p1 is not None:
+        comps.append(("Single-qubit gates", "gate", n1 * p1, f"{n1} gates x {p1:.2e}", True, "Gate fusion, ZNE"))
+    else:
+        missing.append("single_q_error_rate")
+    if p2 is not None:
+        comps.append(("Two-qubit gates", "gate", n2 * p2, f"{n2} gates x {p2:.2e}", True, "Fewer two-qubit gates, ZNE"))
+    else:
+        missing.append("two_q_error_rate")
+    if gt is not None and (t1 or t2):
+        t = depth * gt * 1e-9
+        if t1:
+            comps.append(("T1 relaxation", "decoherence", n_qubits * (1 - math.exp(-t / (t1 * 1e-6))),
+                          f"{t * 1e9:.0f} ns of circuit vs T1 = {t1:.0f} us", True, "Shorter circuits, dynamical decoupling"))
+        if t2:
+            comps.append(("T2 dephasing", "decoherence", n_qubits * (1 - math.exp(-t / (t2 * 1e-6))) * 0.5,
+                          f"{t * 1e9:.0f} ns of circuit vs T2 = {t2:.0f} us", True, "Echo sequences, dynamical decoupling"))
+    else:
+        if gt is None:
+            missing.append("gate_time_ns")
+        if not (t1 or t2):
+            missing.append("t1_us/t2_us")
+    if ro is not None:
+        comps.append(("Readout errors", "measurement", n_qubits * ro, f"{n_qubits} qubits x {ro:.2%}", True,
+                      "Readout calibration matrix"))
+    else:
+        missing.append("readout_error")
+
+    total = sum(c[2] for c in comps)
+    components = [ErrorComponent(name=n, category=cat, absolute_error=round(e, 8),
+                                 contribution_pct=round(e / total * 100, 2) if total else 0.0,
+                                 description=d, mitigatable=m, mitigation_strategy=s)
+                  for n, cat, e, d, m, s in comps]
+    dominant = max(components, key=lambda c: c.absolute_error) if components else None
+    infidelity = 1 - math.exp(-total)
+    recs = []
+    if dominant:
+        recs.append(f"Largest estimated contribution: {dominant.name} ({dominant.contribution_pct:.1f}%).")
+    if missing:
+        recs.append("Not estimated for lack of inputs: " + ", ".join(missing) + ".")
+    if req.measured_fidelity is not None and components:
+        recs.append(f"Estimated fidelity {1 - infidelity:.4f} vs measured {req.measured_fidelity:.4f}.")
+    decoh = [c.absolute_error for c in components if c.category == "decoherence"]
+    meas = [c.absolute_error for c in components if c.category == "measurement"]
+    return ErrorBudgetReport(
+        report_id=str(uuid.uuid4()), created_at=datetime.now(timezone.utc).isoformat(),
+        circuit_name=req.circuit_name, run_id=req.run_id, n_qubits=n_qubits, circuit_depth=depth,
+        n_1q_gates=n1, n_2q_gates=n2, backend=backend, total_error=round(total, 8),
+        infidelity=round(infidelity, 8), measured_fidelity=req.measured_fidelity, components=components,
+        gate_error_total=round(sum(c.absolute_error for c in components if c.category == "gate"), 8),
+        decoherence_total=round(sum(decoh), 8) if decoh else None,
+        measurement_total=round(sum(meas), 8) if meas else None,
+        dominant_error=dominant.name if dominant else None, fault_tolerant_threshold=FT_THRESHOLD,
+        below_ft_threshold=infidelity < FT_THRESHOLD, inputs_used=sources, missing_inputs=missing,
+        recommendations=recs,
+    )

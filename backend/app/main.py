@@ -110,7 +110,6 @@ from .routers import circuit_versioning as circuit_versioning_router
 from .routers import credentials as credentials_router
 from .routers import ai_settings as ai_settings_router
 from .routers import notifications as notifications_router
-from .routers import qv_runner as qv_runner_router
 from .routers import gate_char as gate_char_router
 from .routers import circuit_templates as circuit_templates_router
 from .routers import export_data as export_data_router
@@ -135,9 +134,7 @@ from .routers import clifford_t as clifford_t_router
 from .routers import circuit_embed as circuit_embed_router
 from .routers import noise_router as noise_router_router
 from .routers import nl2qasm as nl2qasm_router
-from .routers import error_mitigate as error_mitigate_router
 from .routers import unitary_synth as unitary_synth_router
-from .routers import rb_suite as rb_suite_router
 from .routers import optimizer_hub as optimizer_hub_router
 from .routers import clifford_sim as clifford_sim_router
 from .routers import syndrome_decoder as syndrome_decoder_router
@@ -152,7 +149,6 @@ from .routers import quantum_network as quantum_network_router
 from .routers import arxiv_search as arxiv_search_router
 from .routers import literature as literature_router
 from .routers import advantage_timeline as advantage_timeline_router
-from .routers import gate_tomo as gate_tomo_router
 from .routers import circuit_debugger as circuit_debugger_router
 from .routers import hardware_jobs as hardware_jobs_router
 from .routers import resource_estimator as resource_estimator_router
@@ -160,7 +156,6 @@ from .routers import trotter_evolution as trotter_evolution_router
 from .routers import code_exporter as code_exporter_router
 from .routers import xeb as xeb_router
 from .routers import quantum_finance as quantum_finance_router
-from .routers import mirror_circuit as mirror_circuit_router
 from .routers import channel_capacity as channel_capacity_router
 from .routers import arxiv_feed as arxiv_feed_router
 from .routers import noise_model_builder as noise_model_builder_router
@@ -174,10 +169,7 @@ from .routers import methods_gen as methods_gen_router
 from .routers import cost_oracle as cost_oracle_router
 from .routers import calibration_oracle as calibration_oracle_router
 from .routers import experiment_registry as experiment_registry_router
-from .routers import bayes_opt as bayes_opt_router
 from .routers import research_graph as research_graph_router
-from .routers import stats_engine as stats_engine_router
-from .routers import dd_optimizer as dd_optimizer_router
 from .routers import peer_review as peer_review_router
 from .routers import replication as replication_router
 from .routers import arxiv_radar as arxiv_radar_router
@@ -191,7 +183,6 @@ from .routers import fair_data as fair_data_router
 from .routers import causal as causal_router
 from .routers import circuit_marketplace as circuit_marketplace_router
 from .routers import blind_analysis as blind_analysis_router
-from .routers import oed as oed_router
 from .routers import meta_analysis as meta_analysis_router
 from .routers import dataset_publish as dataset_publish_router
 from .routers import conference as conference_router
@@ -346,7 +337,6 @@ app.include_router(circuit_versioning_router.router)
 app.include_router(credentials_router.router)
 app.include_router(ai_settings_router.router)
 app.include_router(notifications_router.router)
-app.include_router(qv_runner_router.router)
 app.include_router(gate_char_router.router)
 app.include_router(circuit_templates_router.router)
 app.include_router(export_data_router.router)
@@ -371,9 +361,7 @@ app.include_router(clifford_t_router.router)
 app.include_router(circuit_embed_router.router)
 app.include_router(noise_router_router.router)
 app.include_router(nl2qasm_router.router)
-app.include_router(error_mitigate_router.router)
 app.include_router(unitary_synth_router.router)
-app.include_router(rb_suite_router.router)
 app.include_router(optimizer_hub_router.router)
 app.include_router(clifford_sim_router.router)
 app.include_router(syndrome_decoder_router.router)
@@ -388,7 +376,6 @@ app.include_router(quantum_network_router.router)
 app.include_router(arxiv_search_router.router)
 app.include_router(literature_router.router)
 app.include_router(advantage_timeline_router.router)
-app.include_router(gate_tomo_router.router)
 app.include_router(circuit_debugger_router.router)
 app.include_router(hardware_jobs_router.router)
 app.include_router(resource_estimator_router.router)
@@ -396,7 +383,6 @@ app.include_router(trotter_evolution_router.router)
 app.include_router(code_exporter_router.router)
 app.include_router(xeb_router.router)
 app.include_router(quantum_finance_router.router)
-app.include_router(mirror_circuit_router.router)
 app.include_router(channel_capacity_router.router)
 app.include_router(arxiv_feed_router.router)
 app.include_router(noise_model_builder_router.router)
@@ -410,10 +396,7 @@ app.include_router(methods_gen_router.router)
 app.include_router(cost_oracle_router.router)
 app.include_router(calibration_oracle_router.router)
 app.include_router(experiment_registry_router.router)
-app.include_router(bayes_opt_router.router)
 app.include_router(research_graph_router.router)
-app.include_router(stats_engine_router.router)
-app.include_router(dd_optimizer_router.router)
 app.include_router(peer_review_router.router)
 app.include_router(replication_router.router)
 app.include_router(arxiv_radar_router.router)
@@ -427,7 +410,6 @@ app.include_router(fair_data_router.router)
 app.include_router(causal_router.router)
 app.include_router(circuit_marketplace_router.router)
 app.include_router(blind_analysis_router.router)
-app.include_router(oed_router.router)
 app.include_router(meta_analysis_router.router)
 app.include_router(dataset_publish_router.router)
 app.include_router(conference_router.router)

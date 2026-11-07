@@ -28,11 +28,8 @@ class AttemptRequest(BaseModel):
     run_ids: list[str] = []; notes: str = ""
     circuit_modified: bool = False; methodology_notes: str = ""
 
-SEED_CLAIMS = [
-    {"title": "GHZ Heisenberg Limit at N=8", "original_author": "Martinez et al.", "original_doi": "10.1038/s41567-023-01234-5", "original_value": 0.125, "metric": "phase_sensitivity_1_over_N", "higher_is_better": False, "n_qubits": 8, "backend": "ibm_brisbane", "description": "Phase sensitivity reaching 1/N=0.125 rad with 8-qubit GHZ state on IBM hardware.", "tags": ["ghz","sensing","heisenberg-limit"], "status": "replicated"},
-    {"title": "QAOA MaxCut Approximation Ratio p=3", "original_author": "Farhi et al.", "original_doi": "arXiv:2209.01234", "original_value": 0.887, "metric": "approximation_ratio", "higher_is_better": True, "n_qubits": 50, "backend": "ibm_sherbrooke", "description": "QAOA with p=3 layers achieves 0.887 approximation ratio on 50-node MaxCut.", "tags": ["qaoa","maxcut"], "status": "contested"},
-    {"title": "VQE H2 Chemical Accuracy", "original_author": "Peruzzo et al.", "original_doi": "10.1038/ncomms5213", "original_value": -1.8572, "metric": "ground_state_energy_hartree", "higher_is_better": False, "n_qubits": 2, "backend": "generic", "description": "VQE achieves chemical accuracy for H2 molecule ground state energy.", "tags": ["vqe","chemistry","h2"], "status": "replicated"},
-]
+# Titles and authors of the sample claims earlier versions created, to find and delete them.
+_OLD_SAMPLE_CLAIMS = {('GHZ Heisenberg Limit at N=8', 'Martinez et al.'), ('QAOA MaxCut Approximation Ratio p=3', 'Farhi et al.'), ('VQE H2 Chemical Accuracy', 'Peruzzo et al.')}
 
 def _verdict(original: float, your_val: float, uncertainty: float, higher_is_better: bool) -> str:
     delta = abs(your_val - original)
@@ -46,31 +43,20 @@ def _badge(rate: float, count: int) -> str:
     if rate >= 0.5: return "partially_replicated"
     return "contested"
 
+# Earlier versions created three claims with invented authors, DOIs and replication attempts. They
+# are removed once; claims and attempts now come only from users.
+_CLEANED = "_samples_removed_v1"
+
+
 def _seed_db(db: Session):
-    rng = random.Random(42)
-    seed_claims = []
-    seed_attempts = []
-    for s in SEED_CLAIMS:
-        cid = str(uuid.uuid4())
-        n_atts = rng.randint(3, 8)
-        attempts = []
-        for i in range(n_atts):
-            noise = rng.gauss(0, abs(s["original_value"]) * 0.03)
-            your_val = s["original_value"] + noise
-            unc = abs(s["original_value"]) * 0.02
-            verdict = _verdict(s["original_value"], your_val, unc, s["higher_is_better"])
-            attempts.append({"attempt_id": str(uuid.uuid4()), "claim_id": cid, "your_value": round(your_val, 6), "your_uncertainty": round(unc, 6), "verdict": verdict, "backend": rng.choice(["ibm_brisbane","ionq_aria_1","rigetti_ankaa_2"]), "submitted_at": datetime.now(timezone.utc).isoformat(), "run_ids": [f"run_{rng.randint(1000,9999)}"], "notes": f"Replication attempt {i+1}", "circuit_modified": rng.random() < 0.2, "methodology_notes": ""})
-        success = sum(1 for a in attempts if a["verdict"] == "success")
-        partial = sum(1 for a in attempts if a["verdict"] == "partial")
-        failure = sum(1 for a in attempts if a["verdict"] == "failure")
-        rep_rate = (success + 0.5 * partial) / max(n_atts, 1)
-        vals = [a["your_value"] for a in attempts]
-        claim_data = ReplicationClaim(claim_id=cid, submitted_at=datetime.now(timezone.utc).isoformat(), replication_count=n_atts, success_count=success, failure_count=failure, partial_count=partial, consensus_value=round(sum(vals)/len(vals),6) if vals else None, consensus_uncertainty=round((sum((v-sum(vals)/len(vals))**2 for v in vals)/max(len(vals)-1,1))**0.5, 6) if len(vals)>1 else None, replication_rate=round(rep_rate,3), badge=_badge(rep_rate,n_atts), attempts=attempts, **{k:v for k,v in s.items()}).model_dump()
-        seed_claims.append((cid, claim_data))
-        for att in attempts:
-            seed_attempts.append((att["attempt_id"], att))
-    store_seed(db, NS_CLAIMS, seed_claims)
-    store_seed(db, NS_ATTEMPTS, seed_attempts)
+    if store_get(db, NS_CLAIMS + "_meta", _CLEANED):
+        return
+    for c in store_list(db, NS_CLAIMS):
+        if (c.get("title"), c.get("original_author")) in _OLD_SAMPLE_CLAIMS:
+            for a in c.get("attempts") or []:
+                store_delete(db, NS_ATTEMPTS, a.get("attempt_id", ""))
+            store_delete(db, NS_CLAIMS, c["claim_id"])
+    store_put(db, NS_CLAIMS + "_meta", _CLEANED, {"done": True})
 
 @router.get("")
 def list_claims(status: str | None = None, badge: str | None = None, db: Session = Depends(get_db)):

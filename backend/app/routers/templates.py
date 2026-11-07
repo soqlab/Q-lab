@@ -729,9 +729,45 @@ def _random_suffix(n: int = 6) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=n))
 
 
+# The built-in templates start with zero forks, runs and stars: earlier versions shipped invented
+# counts. "Verified" means the template's QASM parses and runs in the local simulator.
+_COUNTS_RESET_KEY = "_counts_reset_v1"
+
+
+def _verified(qasm: str) -> bool:
+    from ..local_sim import simulate_counts
+
+    try:
+        simulate_counts(qasm, 8, seed=0)
+        return True
+    except Exception:
+        return False
+
+
+def _honest_seed(data: dict) -> dict:
+    return {**data, "fork_count": 0, "run_count": 0, "star_count": 0, "author": "Q-Lab Team",
+            "is_verified": bool(data.get("qasm_circuit")) and _verified(data["qasm_circuit"])}
+
+
+_HONEST_SEEDS: list[tuple[str, dict]] | None = None
+
+
+def _seed(db: Session) -> None:
+    global _HONEST_SEEDS
+    if _HONEST_SEEDS is None:
+        _HONEST_SEEDS = [(rid, _honest_seed(d)) for rid, d in _SEED_TEMPLATES]
+    store_seed(db, _NS, _HONEST_SEEDS)
+    if store_get(db, _NS, _COUNTS_RESET_KEY) is None:
+        # Databases seeded by an earlier version still carry the invented counts.
+        for rid, data in _HONEST_SEEDS:
+            if store_get(db, _NS, rid) is not None:
+                store_put(db, _NS, rid, data)
+        store_put(db, _NS, _COUNTS_RESET_KEY, {"done": True, "template_id": _COUNTS_RESET_KEY})
+
+
 def _get_all(db: Session) -> list[dict]:
-    store_seed(db, _NS, _SEED_TEMPLATES)
-    return store_list(db, _NS)
+    _seed(db)
+    return [t for t in store_list(db, _NS) if t.get("template_id") != _COUNTS_RESET_KEY]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -769,7 +805,7 @@ def get_by_slug(slug: str, db: Session = Depends(get_db)):
 @router.get("/{template_id}")
 def get_template(template_id: str, db: Session = Depends(get_db)):
     """Fetch a template by ID."""
-    store_seed(db, _NS, _SEED_TEMPLATES)
+    _seed(db)
     data = store_get(db, _NS, template_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -779,7 +815,7 @@ def get_template(template_id: str, db: Session = Depends(get_db)):
 @router.post("/{template_id}/fork")
 def fork_template(template_id: str, db: Session = Depends(get_db)):
     """Fork a template — creates a copy with a new slug and increments fork count."""
-    store_seed(db, _NS, _SEED_TEMPLATES)
+    _seed(db)
     original = store_get(db, _NS, template_id)
     if original is None:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -808,7 +844,7 @@ def fork_template(template_id: str, db: Session = Depends(get_db)):
 @router.post("/{template_id}/star")
 def star_template(template_id: str, db: Session = Depends(get_db)):
     """Star a template (increments star_count)."""
-    store_seed(db, _NS, _SEED_TEMPLATES)
+    _seed(db)
     data = store_get(db, _NS, template_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -820,7 +856,7 @@ def star_template(template_id: str, db: Session = Depends(get_db)):
 @router.post("/{template_id}/run")
 def run_template(template_id: str, body: RunTemplateRequest, db: Session = Depends(get_db)):
     """Instantiate a template with parameters and return circuit code."""
-    store_seed(db, _NS, _SEED_TEMPLATES)
+    _seed(db)
     data = store_get(db, _NS, template_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -896,7 +932,7 @@ def list_templates(
 @router.post("/")
 def create_template(payload: TemplateCreate, db: Session = Depends(get_db)):
     """Publish a new experiment template."""
-    store_seed(db, _NS, _SEED_TEMPLATES)
+    _seed(db)
     tid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     slug = payload.slug or f"{_slugify(payload.name)}-{_random_suffix()}"
