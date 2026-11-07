@@ -90,13 +90,19 @@ export default function CertifyPage() {
   const [certsList, setCertsList] = useState<CertSummary[]>([]);
   const [certsLoading, setCertsLoading] = useState(true);
 
-  const loadCertifications = useCallback(async () => {
-    setCertsLoading(true);
-    try { setCertsList(await listCertifications()); } catch { setCertsList([]); }
-    finally { setCertsLoading(false); }
-  }, []);
+  // State is set only in the promise callbacks, so the mount effect below can call it.
+  const fetchCertifications = useCallback(() =>
+    listCertifications()
+      .then(setCertsList)
+      .catch(() => { setCertsList([]); })
+      .finally(() => { setCertsLoading(false); }), []);
 
-  useEffect(() => { void loadCertifications(); }, [loadCertifications]);
+  const loadCertifications = useCallback(() => {
+    setCertsLoading(true);
+    return fetchCertifications();
+  }, [fetchCertifications]);
+
+  useEffect(() => { void fetchCertifications(); }, [fetchCertifications]);
 
   async function handleCertify(e: React.FormEvent) {
     e.preventDefault();

@@ -63,18 +63,20 @@ export default function StateTomographyPage() {
   const [qasm, setQasm] = useState(PRESET);
   const [target, setTarget] = useState("");
   const [result, setResult] = useState<TomoResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const run = async () => {
-    setLoading(true); setError(null);
-    try { setResult(await analyzeStateTomography({ qasm, target_state: target || undefined })); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
-  };
+  // State is set only in the promise callbacks, so the mount effect below can call it.
+  const fetchAnalysis = (source: string, targetState: string) =>
+    analyzeStateTomography({ qasm: source, target_state: targetState || undefined })
+      .then((r) => { setResult(r); setError(null); })
+      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); })
+      .finally(() => { setLoading(false); });
+
+  const run = () => { setLoading(true); setError(null); void fetchAnalysis(qasm, target); };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void run(); }, []);
+  useEffect(() => { void fetchAnalysis(qasm, target); }, []);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem" }}>
