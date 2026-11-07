@@ -5,7 +5,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from sqlalchemy import select
+
 from ..database import get_db
+from ..models import Run
 from ..store import store_put, store_get, store_list, store_delete, store_seed
 
 router = APIRouter(prefix="/api/v1/hypotheses", tags=["hypotheses"])
@@ -163,12 +166,15 @@ def link_run(hyp_id: str, req: LinkRunRequest, db: Session = Depends(get_db)):
     data = store_get(db, NS_HYPOTHESES, hyp_id)
     if not data:
         raise HTTPException(404, "hypothesis not found")
+    if db.scalar(select(Run.id).where(Run.run_id == req.run_id)) is None:
+        raise HTTPException(404, "run not found")
+    label = f"Run {req.run_id[:8]}"
     if req.run_id not in data["linked_run_ids"]:
         data["linked_run_ids"].append(req.run_id)
-    if req.role == "evidence" and req.run_id not in data["evidence_for"]:
-        data["evidence_for"].append(f"Run {req.run_id[:8]}")
-    elif req.role == "refutation" and req.run_id not in data["evidence_against"]:
-        data["evidence_against"].append(f"Run {req.run_id[:8]}")
+    if req.role == "evidence" and label not in data["evidence_for"]:
+        data["evidence_for"].append(label)
+    elif req.role == "refutation" and label not in data["evidence_against"]:
+        data["evidence_against"].append(label)
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
     store_put(db, NS_HYPOTHESES, hyp_id, data)
     return Hypothesis(**data)

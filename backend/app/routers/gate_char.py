@@ -43,11 +43,11 @@ def _linreg(xs: list[float], ys: list[float]) -> tuple[float, float]:
     return b, a
 
 
-def _fit_t1(times_us: list[float], probs: list[float]) -> dict[str, float]:
+def _fit_t1(times_us: list[float], probs: list[float]) -> dict[str, float] | None:
     """Fit P = A·exp(-t/T1) + B via log-linear regression."""
     pairs = [(t, p) for t, p in zip(times_us, probs) if p > 0.01]
     if len(pairs) < 2:
-        return {"T1_us": 100.0, "A": 1.0, "B": 0.0, "r2": 0.0}
+        return None
     log_p = [math.log(p) for _, p in pairs]
     ts = [t for t, _ in pairs]
     slope, intercept = _linreg(ts, log_p)
@@ -61,11 +61,11 @@ def _fit_t1(times_us: list[float], probs: list[float]) -> dict[str, float]:
     return {"T1_us": round(min(t1, 9999.0), 2), "A": round(a, 4), "B": 0.0, "r2": round(max(r2, 0.0), 4)}
 
 
-def _fit_t2(times_us: list[float], probs: list[float]) -> dict[str, float]:
+def _fit_t2(times_us: list[float], probs: list[float]) -> dict[str, float] | None:
     """Fit T2 via envelope: log|P - 0.5| = log(A) - t/T2."""
     pairs = [(t, abs(p - 0.5)) for t, p in zip(times_us, probs) if abs(p - 0.5) > 0.01]
     if len(pairs) < 2:
-        return {"T2_us": 80.0, "A": 0.5, "B": 0.5, "r2": 0.0}
+        return None
     log_amp = [math.log(amp) for _, amp in pairs]
     ts = [t for t, _ in pairs]
     slope, intercept = _linreg(ts, log_amp)
@@ -73,10 +73,10 @@ def _fit_t2(times_us: list[float], probs: list[float]) -> dict[str, float]:
     return {"T2_us": round(min(t2, 9999.0), 2), "A": round(math.exp(intercept), 4), "B": 0.5, "r2": 0.0}
 
 
-def _fit_rb(gate_counts: list[int], fidelities: list[float], n_qubits: int = 1) -> dict[str, float]:
+def _fit_rb(gate_counts: list[int], fidelities: list[float], n_qubits: int = 1) -> dict[str, float] | None:
     """Fit RB decay F = A·p^m + B, return p and EPC."""
     if len(gate_counts) < 2:
-        return {"p": 0.99, "A": 0.5, "B": 0.5, "EPC": 0.005, "gate_fidelity": 0.995}
+        return None
     log_f = [math.log(max(f - 0.5, 0.001)) for f in fidelities]
     xs = [float(m) for m in gate_counts]
     slope, intercept = _linreg(xs, log_f)
@@ -144,17 +144,16 @@ def characterize(req: GateCharRequest, db: Session = Depends(get_db)):
     ys = [p.y for p in req.curve_data]
 
     if req.char_type == "t1":
-        fit = _fit_t1(xs, ys)
-        metric, unit = fit["T1_us"], "us"
+        fit, key, unit = _fit_t1(xs, ys), "T1_us", "us"
     elif req.char_type == "t2":
-        fit = _fit_t2(xs, ys)
-        metric, unit = fit["T2_us"], "us"
+        fit, key, unit = _fit_t2(xs, ys), "T2_us", "us"
     elif req.char_type in ("rb_single", "rb_two"):
-        gate_counts = [int(x) for x in xs]
-        fit = _fit_rb(gate_counts, ys, req.n_qubits)
-        metric, unit = fit["EPC"], "epc"
+        fit, key, unit = _fit_rb([int(x) for x in xs], ys, req.n_qubits), "EPC", "epc"
     else:
         raise HTTPException(422, f"Unknown char_type '{req.char_type}'")
+    if fit is None:
+        raise HTTPException(422, "At least 2 usable curve points are needed to fit a decay")
+    metric = fit[key]
 
     row = GateCharResult(
         char_id=f"gc-{uuid.uuid4().hex[:12]}",

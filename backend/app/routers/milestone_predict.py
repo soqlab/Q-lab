@@ -35,6 +35,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..calibration_history import calibration_metric
 from ..database import get_db
 from ..models import Run
 
@@ -137,7 +138,7 @@ def milestone_predict(
         {
             "key":      "avg_t1_us",
             "label":    "T1 relaxation (µs)",
-            "fn":       lambda r: _safe((r.calibration or {}).get("avg_t1_us")),
+            "fn":       lambda r: calibration_metric(r.calibration, "avg_t1_us"),
             "milestones": [
                 {"value": 500.0, "label": "T1 ≥ 500 µs", "higher_is_better": True},
                 {"value": 100.0, "label": "T1 ≥ 100 µs", "higher_is_better": True},
@@ -146,7 +147,7 @@ def milestone_predict(
         {
             "key":      "avg_t2_us",
             "label":    "T2 dephasing (µs)",
-            "fn":       lambda r: _safe((r.calibration or {}).get("avg_t2_us")),
+            "fn":       lambda r: calibration_metric(r.calibration, "avg_t2_us"),
             "milestones": [
                 {"value": 500.0, "label": "T2 ≥ 500 µs", "higher_is_better": True},
                 {"value": 100.0, "label": "T2 ≥ 100 µs", "higher_is_better": True},
@@ -155,7 +156,7 @@ def milestone_predict(
         {
             "key":      "avg_gate_error",
             "label":    "Gate error rate",
-            "fn":       lambda r: _safe((r.calibration or {}).get("avg_gate_error")),
+            "fn":       lambda r: calibration_metric(r.calibration, "avg_gate_error"),
             "milestones": [
                 {"value": 0.001, "label": "Gate error ≤ 0.1% (FT threshold)", "higher_is_better": False},
                 {"value": 0.01,  "label": "Gate error ≤ 1%", "higher_is_better": False},

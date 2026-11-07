@@ -8,10 +8,16 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import Identity, get_identity, require_auth
-from ..models import RunNote
+from ..models import Run, RunNote
 
 run_notes_router = APIRouter(prefix="/api/v1/runs", tags=["notes"])
 notes_router = APIRouter(prefix="/api/v1/notes", tags=["notes"])
+
+
+def _require_visible_run(db: Session, run_id: str) -> None:
+    # Run queries are limited to the caller's runs (run_scope), so this is also the access check.
+    if db.scalar(select(Run.id).where(Run.run_id == run_id)) is None:
+        raise HTTPException(status_code=404, detail="run not found")
 
 
 class NotePayload(BaseModel):
@@ -37,6 +43,7 @@ def list_notes(
     identity: Optional[Identity] = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    _require_visible_run(db, run_id)
     notes = db.scalars(
         select(RunNote).where(RunNote.run_id == run_id).order_by(RunNote.created_at.asc())
     ).all()
@@ -50,6 +57,7 @@ def create_note(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
+    _require_visible_run(db, run_id)
     if not payload.content.strip():
         raise HTTPException(status_code=422, detail="Note content cannot be empty")
     note = RunNote(

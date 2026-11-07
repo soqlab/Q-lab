@@ -77,7 +77,7 @@ def build_noise_model(req: NoiseModelRequest):
         gate_error_table[cg.gate] = {"error_rate": cg.error_rate, "error_type": cg.error_type}
 
     p_meas = 1 - req.readout_fidelity
-    measurement_errors = [{"qubit": i, "p_meas_error": round(p_meas + i*0.001, 6), "p0_given_1": round(p_meas/2, 6), "p1_given_0": round(p_meas/2, 6)} for i in range(n)]
+    measurement_errors = [{"qubit": i, "p_meas_error": round(p_meas, 6), "p0_given_1": round(p_meas/2, 6), "p1_given_0": round(p_meas/2, 6)} for i in range(n)]
     for cm in req.custom_measurements:
         if cm.qubit < n:
             measurement_errors[cm.qubit] = {"qubit": cm.qubit, "p_meas_error": cm.p_meas_error, "p0_given_1": cm.p0_given_1, "p1_given_0": cm.p1_given_0}
@@ -92,8 +92,9 @@ def build_noise_model(req: NoiseModelRequest):
     n_1q_gates = n * d; n_2q_gates = (n-1) * (d//2)
     avg_fidelity = (1-p_1q)**n_1q_gates * (1-p_2q)**n_2q_gates * req.readout_fidelity**n
     qv_estimate = 1
-    while avg_fidelity > 0.5 and qv_estimate < n:
-        qv_estimate *= 2; avg_fidelity *= (1-p_1q)**3 * (1-p_2q)
+    qv_fidelity = avg_fidelity
+    while qv_fidelity > 0.5 and qv_estimate < n:
+        qv_estimate *= 2; qv_fidelity *= (1-p_1q)**3 * (1-p_2q)
 
     qasm_noise_pragma = f"// Noise model for {req.hardware_type}\n// T1={t1}us, T2={t2}us\n// Apply depolarizing({p_1q:.2e}) after each 1Q gate\n// Apply depolarizing({p_2q:.2e}) after each 2Q gate"
 

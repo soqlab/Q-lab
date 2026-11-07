@@ -9,7 +9,7 @@ from __future__ import annotations
 import secrets
 import string
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -63,15 +63,19 @@ def _run_health(run: Run) -> float | None:
     return round(h, 1) if h is not None else None
 
 
-def _parse_date(s: str) -> datetime | None:
+def _parse_date(s: str, end_of_day: bool = False) -> datetime | None:
+    """An ISO date or datetime as UTC. A bare end date covers that whole day."""
     if not s:
         return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(s[:len(fmt)], fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
+    try:
+        dt = datetime.fromisoformat(s.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if end_of_day and len(s.strip()) == 10:
+        dt = dt + timedelta(days=1) - timedelta(microseconds=1)
+    return dt
 
 
 def _run_in_period(run: Run, start: datetime | None, end: datetime | None) -> bool:
@@ -139,7 +143,7 @@ def delete_grant(grant_id: str, db: Session = Depends(get_db)):
 def _build_report_data(grant: dict, db: Session) -> dict:
     project_slugs: list[str] = grant.get("project_slugs") or []
     start_dt = _parse_date(grant.get("start_date", ""))
-    end_dt = _parse_date(grant.get("end_date", ""))
+    end_dt = _parse_date(grant.get("end_date", ""), end_of_day=True)
 
     # Fetch runs for all grant projects
     if project_slugs:

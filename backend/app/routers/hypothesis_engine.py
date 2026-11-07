@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/hypothesis", tags=["hypothesis_engine"])
@@ -64,6 +64,27 @@ def _lower_inc_gamma_regularized(a: float, x: float, n_terms: int = 100) -> floa
         return 0.0
     if x == 0:
         return 0.0
+    if x >= a + 1:
+        # The series converges too slowly here (100 terms at x=320 gave P≈0, so p≈1 for a huge χ²):
+        # use the continued fraction for Q = 1 - P (Numerical Recipes, gcf).
+        b = x + 1.0 - a
+        c = 1.0 / 1e-300
+        d = 1.0 / b
+        h = d
+        for i in range(1, 300):
+            an = -i * (i - a)
+            b += 2.0
+            d = an * d + b
+            d = 1e-300 if abs(d) < 1e-300 else d
+            c = b + an / c
+            c = 1e-300 if abs(c) < 1e-300 else c
+            d = 1.0 / d
+            delta = d * c
+            h *= delta
+            if abs(delta - 1.0) < 1e-15:
+                break
+        q = math.exp(-x + a * math.log(x) - _log_gamma(a)) * h
+        return min(1.0, max(0.0, 1.0 - q))
     # Series: P(a,x) = e^-x * x^a * Σ x^n / Γ(a+n+1)
     term = 1.0 / a
     total = term
@@ -542,10 +563,12 @@ _TEST_DISPATCH = {
 def run_hypothesis_test(req: HypothesisRequest) -> Dict[str, Any]:
     test_fn = _TEST_DISPATCH.get(req.test)
     if not test_fn:
-        # Default to chi-squared
-        test_fn = _TEST_DISPATCH["chi_squared"]
+        raise HTTPException(422, f"test must be one of {sorted(_TEST_DISPATCH)}")
 
-    result = test_fn(req)
+    try:
+        result = test_fn(req)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
 
     return {
         "test_id": str(uuid.uuid4()),

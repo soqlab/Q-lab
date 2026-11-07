@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..calibration_history import calibration_metric
 from ..database import get_db
 from ..models import Run
 from ..outbound import is_safe_url
@@ -119,7 +120,7 @@ def _thresholds_met(thresholds: dict[str, Any], cal: dict) -> tuple[bool, list[s
         th_val = thresholds.get(th_key)
         if th_val is None:
             continue
-        cal_val = cal.get(cal_key)
+        cal_val = calibration_metric(cal, cal_key)
         if cal_val is None:
             failures.append(f"{cal_key} not present in calibration")
             continue

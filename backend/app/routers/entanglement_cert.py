@@ -129,7 +129,9 @@ def _corr_matrix_rank(C: list[list[float]], threshold=0.01) -> int:
     frob2 = sum(C[i][j] ** 2 for i in range(len(C)) for j in range(len(C)))
     diag2 = sum(C[i][i] ** 2 for i in range(len(C)))
     # Lower bound on rank: ||C||_F² / ||C||_∞² — crude but dependency-free
-    c_max = max((abs(C[i][j]) for i in range(len(C)) for j in range(len(C))), default=1e-9)
+    c_max = max((abs(C[i][j]) for i in range(len(C)) for j in range(len(C))), default=0.0)
+    if c_max == 0:  # no correlations at all (e.g. a product state): this used to divide by zero
+        return 1
     return max(1, round(frob2 / (c_max ** 2)))
 
 

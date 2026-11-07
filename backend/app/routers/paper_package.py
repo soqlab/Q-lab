@@ -36,15 +36,14 @@ router = APIRouter(prefix="/api/v1/runs", tags=["paper_package"])
 
 def _esc(s: str) -> str:
     """Escape special LaTeX characters."""
-    replacements = [
-        ("\\", r"\textbackslash{}"),
-        ("&", r"\&"), ("%", r"\%"), ("$", r"\$"), ("#", r"\#"),
-        ("_", r"\_"), ("{", r"\{"), ("}", r"\}"),
-        ("~", r"\textasciitilde{}"), ("^", r"\textasciicircum{}"),
-    ]
-    for old, new in replacements:
-        s = s.replace(old, new)
-    return s
+    # One pass: replacing "\\" first and then "{" and "}" mangled \textbackslash{}.
+    return s.translate(_LATEX_ESCAPES)
+
+
+_LATEX_ESCAPES = str.maketrans({
+    "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
+    "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
+})
 
 
 def _fmt(v: object, decimals: int = 4) -> str:

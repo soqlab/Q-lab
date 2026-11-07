@@ -605,8 +605,8 @@ def contribute_from_run(
     health_score = float(compute_health_score(run_dict) or 50.0)
 
     # T1/T2 from calibration
-    t1 = cal.get("t1") or cal.get("T1")
-    t2 = cal.get("t2") or cal.get("T2")
+    t1 = cal.get("t1_us") or cal.get("t1") or cal.get("T1")
+    t2 = cal.get("t2_us") or cal.get("t2") or cal.get("T2")
     if isinstance(t1, dict):
         vals = list(t1.values())
         t1 = sum(vals) / len(vals) if vals else None

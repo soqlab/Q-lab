@@ -64,6 +64,33 @@ def _parse_calibration(cal: dict, num_qubits: int) -> dict:
         if ge_2q is not None:
             gate_errors_2q[key] = ge_2q
 
+    # The SDK's shape: per-qubit maps {"0": value} and gate errors keyed "<gate>_<q>[_<q2>]".
+    for cal_key, field in (("t1_us", "t1"), ("t2_us", "t2"), ("readout_errors", "readout_error")):
+        per_q = cal.get(cal_key)
+        if not isinstance(per_q, dict):
+            continue
+        for q, v in per_q.items():
+            if str(q).isdigit() and 0 <= int(q) < num_qubits and _safe_float(v) is not None:
+                entry = qubit_data.setdefault(int(q), {"t1": None, "t2": None, "readout_error": None,
+                                                       "gate_error_1q": None})
+                if entry.get(field) is None:
+                    entry[field] = _safe_float(v)
+    gate_errors = cal.get("gate_errors")
+    if isinstance(gate_errors, dict):
+        one_q: dict[int, list[float]] = {}
+        for key, v in gate_errors.items():
+            parts, err = str(key).split("_"), _safe_float(v)
+            if err is None or not all(p.isdigit() for p in parts[1:]):
+                continue
+            if len(parts) == 3:
+                gate_errors_2q[key] = err
+            elif len(parts) == 2 and int(parts[1]) < num_qubits:
+                one_q.setdefault(int(parts[1]), []).append(err)
+        for q, errs in one_q.items():
+            entry = qubit_data.setdefault(q, {"t1": None, "t2": None, "readout_error": None,
+                                              "gate_error_1q": None})
+            if entry.get("gate_error_1q") is None:
+                entry["gate_error_1q"] = sum(errs) / len(errs)
     return {"qubits": qubit_data, "gate_errors_2q": gate_errors_2q}
 
 

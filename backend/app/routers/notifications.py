@@ -150,7 +150,7 @@ class TestPayload(BaseModel):
 def _ch_to_dict(ch: NotificationChannel) -> dict:
     cfg = dict(ch.config or {})
     # Mask secrets
-    for k in ("webhook_url", "url", "token"):
+    for k in ("webhook_url", "url", "token", "secret"):
         if k in cfg:
             v = str(cfg[k])
             cfg[k] = v[:8] + "..." if len(v) > 8 else "***"

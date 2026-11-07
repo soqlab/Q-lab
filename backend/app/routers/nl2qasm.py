@@ -4,7 +4,7 @@ import re, uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/nl2qasm", tags=["nl2qasm"])
 
@@ -91,7 +91,7 @@ TEMPLATES = [
 
 class NL2QASMRequest(BaseModel):
     description: str
-    n_qubits_hint: Optional[int] = None
+    n_qubits_hint: Optional[int] = Field(None, ge=1, le=64)
 
 
 @router.post("")

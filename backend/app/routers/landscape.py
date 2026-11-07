@@ -107,7 +107,9 @@ def get_landscape(run_id: str, db: Session = Depends(get_db)):
                 "energy_name": e_name,
                 "points": [{"step": s, "param": p, "energy": e} for s, p, e in joined],
                 "min_energy": min(e for _, _, e in joined),
-                "min_param": min(p for _, p, _ in joined if p == min(e for _, _, e in joined)),
+                # The parameter value at the lowest energy. (This compared parameters with the
+                # energy, so min() of an empty sequence raised and the endpoint returned 500.)
+                "min_param": min(joined, key=lambda j: j[2])[1],
             }
 
     return {

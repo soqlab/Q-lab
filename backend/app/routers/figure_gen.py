@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import require_auth
@@ -585,6 +585,8 @@ def _latex_caption(figure_type: str, title: str, style: str) -> str:
 
 @router.post("", dependencies=[Depends(require_auth)])
 def generate_figure(req: FigureRequest) -> Dict[str, Any]:
+    if req.figure_type not in _FIGURE_TYPES:
+        raise HTTPException(422, f"figure_type must be one of {_FIGURE_TYPES}")
     # Dimensions by figure type
     dims = {
         "circuit_diagram":        (700, 300),

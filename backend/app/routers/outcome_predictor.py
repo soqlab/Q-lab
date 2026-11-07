@@ -177,7 +177,7 @@ def predict_health_score(req: PredictRequest, db: Session = Depends(get_db)):
 
     if n < 5:
         return {
-            "predicted_health": 50.0,
+            "predicted_health": None,
             "confidence": "low",
             "n_training_runs": n,
             "message": "Not enough history on this backend",
@@ -332,23 +332,24 @@ def backends_readiness(db: Session = Depends(get_db)):
         avg_depth = 10
 
         vals_used = 0
+        sum_t1 = sum_t2 = sum_gate = sum_ro = 0.0
         for r in recent:
             ex = _extract_run_features(r)
             if ex:
                 f = ex[0]
                 avg_qubits = f[0]
                 avg_depth = f[1]
-                avg_t1 += f[3]
-                avg_t2 += f[4]
-                avg_gate += f[5]
-                avg_ro += f[6]
+                sum_t1 += f[3]
+                sum_t2 += f[4]
+                sum_gate += f[5]
+                sum_ro += f[6]
                 vals_used += 1
 
         if vals_used > 0:
-            avg_t1 /= vals_used
-            avg_t2 /= vals_used
-            avg_gate /= vals_used
-            avg_ro /= vals_used
+            avg_t1 = sum_t1 / vals_used
+            avg_t2 = sum_t2 / vals_used
+            avg_gate = sum_gate / vals_used
+            avg_ro = sum_ro / vals_used
 
         query = _extract_features(
             int(avg_qubits), int(avg_depth), 1024,

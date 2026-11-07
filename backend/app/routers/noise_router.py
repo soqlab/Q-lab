@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid, re
 from datetime import datetime, timezone
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/noise-router", tags=["noise_router"])
@@ -53,7 +53,9 @@ class NoiseRouterRequest(BaseModel):
 
 @router.post("")
 def route_circuit(req: NoiseRouterRequest):
-    profile = BACKENDS.get(req.backend, BACKENDS["ibm_nairobi"])
+    if req.backend not in BACKENDS:
+        raise HTTPException(422, f"backend must be one of {sorted(BACKENDS)}")
+    profile = BACKENDS[req.backend]
     qubits = profile["qubits"]
 
     m = re.search(r"qreg\s+\w+\[(\d+)\]", req.qasm)
@@ -70,7 +72,7 @@ def route_circuit(req: NoiseRouterRequest):
 
     # Remap QASM
     def remap(line: str) -> str:
-        if line.strip().startswith(("OPENQASM", "include", "//", "qreg", "creg", "measure")):
+        if line.strip().startswith(("OPENQASM", "include", "//", "qreg", "creg")):
             return line
         return re.sub(r"q\[(\d+)\]", lambda m2: f"q[{opt.get(int(m2.group(1)), int(m2.group(1)))}]", line)
 

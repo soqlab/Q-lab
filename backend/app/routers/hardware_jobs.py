@@ -26,6 +26,17 @@ BACKENDS: Dict[str, Any] = {
 
 def _now(): return datetime.now(timezone.utc).isoformat()
 
+
+def _caller(identity: Optional[Identity]) -> Optional[int]:
+    return identity.user_id if identity else None
+
+
+def _own_job(db: Session, job_id: str, identity: Optional[Identity]) -> Dict:
+    job = store_get(db, NS, job_id)
+    if job is None or job.get("_user_id") != _caller(identity):
+        raise HTTPException(404, "Job not found")
+    return job
+
 def _parse_n_qubits(qasm: str) -> int:
     import re
     m = re.search(r'qreg\s+\w+\[(\d+)\]', qasm)
@@ -176,8 +187,8 @@ def submit_job(
 
 
 @router.get("")
-def list_jobs(db: Session = Depends(get_db)):
-    jobs = [_advance_job(j, db) for j in store_list(db, NS)]
+def list_jobs(db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
+    jobs = [_advance_job(j, db) for j in store_list(db, NS) if j.get("_user_id") == _caller(identity)]
     for j in jobs:
         store_put(db, NS, j["job_id"], j)
     return {"jobs": [{k: v for k, v in j.items() if not k.startswith('_')} for j in jobs], "total": len(jobs)}
@@ -189,10 +200,8 @@ def list_backends():
 
 
 @router.get("/{job_id}")
-def get_job(job_id: str, db: Session = Depends(get_db)):
-    job = store_get(db, NS, job_id)
-    if job is None:
-        raise HTTPException(404, "Job not found")
+def get_job(job_id: str, db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
+    job = _own_job(db, job_id, identity)
     job = _advance_job(job, db)
     store_put(db, NS, job_id, job)
     return {k: v for k, v in job.items() if not k.startswith('_')}
@@ -204,9 +213,7 @@ def cancel_job(
     db: Session = Depends(get_db),
     identity: Optional[Identity] = Depends(get_identity),
 ):
-    job = store_get(db, NS, job_id)
-    if job is None:
-        raise HTTPException(404, "Job not found")
+    job = _own_job(db, job_id, identity)
     if job["status"] == "completed":
         raise HTTPException(400, "Cannot cancel completed job")
 

@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import Identity, get_identity, require_auth
+from ..deps import Identity, get_identity, require_auth, require_role
 from ..models import Run
 from ..store import store_delete, store_get, store_list, store_put
 
@@ -169,7 +169,7 @@ def _verify_github_signature(body: bytes, signature_header: Optional[str], secre
 async def save_config(
     payload: ConfigSavePayload,
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_role("owner", "admin")),
 ):
     """Save GitHub integration config; validates the token against GitHub API."""
     headers = {
@@ -206,7 +206,7 @@ async def save_config(
 @router.get("/config")
 def get_config(
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_role("owner", "admin")),
 ):
     """Get current GitHub integration config."""
     config = _get_config(db)
@@ -220,7 +220,7 @@ def get_config(
 @router.delete("/config")
 def delete_config(
     db: Session = Depends(get_db),
-    identity: Identity = Depends(require_auth),
+    identity: Identity = Depends(require_role("owner", "admin")),
 ):
     """Remove GitHub integration."""
     deleted = store_delete(db, _NAMESPACE, _CONFIG_ID)
@@ -305,7 +305,7 @@ async def comment_run(
     run_id: str,
     body: CommentRunBody,
     db: Session = Depends(get_db),
-    identity: Optional[Identity] = Depends(get_identity),
+    identity: Identity = Depends(require_auth),
 ):
     """Manually post a comment about a specific run to a PR."""
     run = db.scalar(select(Run).where(Run.run_id == run_id))

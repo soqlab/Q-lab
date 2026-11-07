@@ -64,8 +64,18 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _orcid_checksum_ok(orcid_id: str) -> bool:
+    """ISO 7064 MOD 11-2 check digit, as ORCID defines it."""
+    digits = orcid_id.replace("-", "")
+    total = 0
+    for ch in digits[:-1]:
+        total = (total + int(ch)) * 2
+    check = (12 - total % 11) % 11
+    return digits[-1] == ("X" if check == 10 else str(check))
+
+
 def _validate_orcid(orcid_id: str) -> None:
-    if not _ORCID_RE.match(orcid_id):
+    if not _ORCID_RE.match(orcid_id) or not _orcid_checksum_ok(orcid_id):
         raise HTTPException(
             status_code=422,
             detail=(
@@ -98,8 +108,8 @@ def connect_orcid(body: ConnectRequest, db: Session = Depends(get_db)):
     created_at = existing["created_at"] if existing else _utcnow()
     run_ids: List[str] = existing["run_ids"] if existing else []
 
-    # In a real implementation ORCID_CLIENT_ID would trigger OAuth flow
-    verified = bool(os.environ.get("ORCID_CLIENT_ID"))
+    # Only an ORCID OAuth sign-in could verify the iD; this endpoint has none.
+    verified = False
 
     profile_data: dict = {
         "profile_id": profile_id,
@@ -127,6 +137,8 @@ def claim_run(run_id: str, body: ClaimRequest, db: Session = Depends(get_db)):
             status_code=404,
             detail="ORCID profile not found. Connect your ORCID first via POST /api/v1/orcid/connect.",
         )
+    if db.scalar(select(Run.id).where(Run.run_id == run_id)) is None:
+        raise HTTPException(status_code=404, detail="run not found")
 
     run_ids: List[str] = profile.get("run_ids", [])
     if run_id not in run_ids:

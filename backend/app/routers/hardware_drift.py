@@ -72,6 +72,33 @@ class DriftThresholdCreate(BaseModel):
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+_METRIC_KEYS = {
+    "t1_us": ("t1_us", "t1", "avg_t1_us"),
+    "t2_us": ("t2_us", "t2", "avg_t2_us"),
+    "gate_error_2q": ("gate_error_2q", "cx_error", "ecr_error", "avg_gate_error_2q"),
+    "readout_error": ("readout_error", "meas_error", "avg_readout_error", "readout_errors"),
+}
+
+
+def _mean(values) -> Optional[float]:
+    nums = [float(v) for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    return sum(nums) / len(nums) if nums else None
+
+
+def _metric_value(cal: dict, metric: str) -> Optional[float]:
+    """One number per snapshot. The SDK stores per-qubit maps ({"0": 120.5, ...}), averaged here."""
+    for key in _METRIC_KEYS[metric]:
+        val = cal.get(key)
+        if isinstance(val, dict):
+            val = _mean(val.values())
+        if val:
+            return val
+    if metric == "gate_error_2q" and isinstance(cal.get("gate_errors"), dict):
+        # SDK keys: "<gate>_<q0>_<q1>" for two-qubit gates
+        return _mean(v for k, v in cal["gate_errors"].items() if len(str(k).split("_")) == 3)
+    return None
+
+
 def _extract_calibration_points(db: Session, backend: str, metric: str, limit: int = 100) -> list[dict]:
     """Extract chronological time-series of a calibration metric from run history."""
     rows = db.execute(
@@ -84,17 +111,7 @@ def _extract_calibration_points(db: Session, backend: str, metric: str, limit: i
 
     points = []
     for run in rows:
-        cal = run.calibration or {}
-        val = None
-        if metric == "t1_us":
-            val = cal.get("t1_us") or cal.get("t1") or cal.get("avg_t1_us")
-        elif metric == "t2_us":
-            val = cal.get("t2_us") or cal.get("t2") or cal.get("avg_t2_us")
-        elif metric == "gate_error_2q":
-            val = cal.get("gate_error_2q") or cal.get("cx_error") or cal.get("ecr_error") or cal.get("avg_gate_error_2q")
-        elif metric == "readout_error":
-            val = cal.get("readout_error") or cal.get("meas_error") or cal.get("avg_readout_error")
-
+        val = _metric_value(run.calibration or {}, metric)
         if val is not None:
             try:
                 points.append({"value": float(val), "timestamp": run.created_at.isoformat()})
@@ -132,7 +149,7 @@ def _stats(values: list[float]) -> dict:
     }
 
 
-def _detect_trend(points: list[dict]) -> str:
+def _detect_trend(points: list[dict], higher_is_better: bool = False) -> str:
     if len(points) < 3:
         return "stable"
     slope = _linear_regression_slope(points)
@@ -141,6 +158,8 @@ def _detect_trend(points: list[dict]) -> str:
     if mean == 0:
         return "stable"
     normalized = slope / mean
+    if higher_is_better:
+        normalized = -normalized
     # threshold: 1% change per point = meaningful trend
     if normalized > 0.01:
         return "degrading"
@@ -240,7 +259,7 @@ def get_timeseries(
     points = _extract_calibration_points(db, backend, metric, limit=limit)
     values = [p["value"] for p in points]
     s = _stats(values)
-    trend = _detect_trend(points)
+    trend = _detect_trend(points, _HIGHER_IS_BETTER[metric])
 
     return {
         "backend": backend,

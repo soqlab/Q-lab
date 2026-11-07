@@ -37,6 +37,7 @@ _NAMESPACE = "assistant_conversations"
 
 class Conversation(BaseModel):
     conversation_id: str
+    owner_user_id: Optional[int] = None
     messages: List[dict]  # {"role": "user"|"assistant", "content": str}
     created_at: str
     last_active: str
@@ -106,10 +107,18 @@ def _run_to_context(run) -> str:
     )
 
 
-def _get_or_create_conversation(db: Session, conversation_id: Optional[str]) -> tuple[str, Conversation]:
+def _owned(data: Optional[dict], user_id: Optional[int]) -> bool:
+    return bool(data) and data.get("owner_user_id") == user_id
+
+
+def _get_or_create_conversation(
+    db: Session, conversation_id: Optional[str], user_id: Optional[int] = None,
+) -> tuple[str, Conversation]:
     """Load existing conversation or create a new one. Returns (conversation_id, conversation)."""
     if conversation_id:
         data = store_get(db, _NAMESPACE, conversation_id)
+        if data and not _owned(data, user_id):
+            raise HTTPException(404, "Conversation not found")
         if data:
             conv = Conversation(**data)
             return conversation_id, conv
@@ -119,6 +128,7 @@ def _get_or_create_conversation(db: Session, conversation_id: Optional[str]) -> 
     now = datetime.now(timezone.utc).isoformat()
     conv = Conversation(
         conversation_id=new_id,
+        owner_user_id=user_id,
         messages=[],
         created_at=now,
         last_active=now,
@@ -341,7 +351,7 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), identity: Optional[Id
     provider_name, base_url = _provider_name, _base_url
 
     # Load or create conversation
-    conversation_id, conversation = _get_or_create_conversation(db, body.conversation_id)
+    conversation_id, conversation = _get_or_create_conversation(db, body.conversation_id, identity.user_id)
 
     # Get aggregate stats for context
     stats = _get_aggregate_stats(db)
@@ -409,9 +419,10 @@ User question: {body.message}"""
 
 
 @router.get("/conversations")
-def list_conversations(db: Session = Depends(get_db)):
-    """List recent conversations (newest first)."""
-    all_data = store_list(db, _NAMESPACE)
+def list_conversations(db: Session = Depends(get_db), identity: Optional[Identity] = Depends(get_identity)):
+    """List the caller's recent conversations (newest first)."""
+    user_id = identity.user_id if identity else None
+    all_data = [d for d in store_list(db, _NAMESPACE) if _owned(d, user_id)]
     # Sort by last_active descending
     conversations = []
     for data in all_data:
@@ -438,17 +449,21 @@ def list_conversations(db: Session = Depends(get_db)):
 
 
 @router.get("/conversation/{conversation_id}")
-def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def get_conversation(conversation_id: str, db: Session = Depends(get_db),
+                     identity: Optional[Identity] = Depends(get_identity)):
     """Get full conversation history."""
     data = store_get(db, _NAMESPACE, conversation_id)
-    if not data:
+    if not _owned(data, identity.user_id if identity else None):
         raise HTTPException(404, "Conversation not found")
     return Conversation(**data)
 
 
 @router.delete("/conversation/{conversation_id}")
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db),
+                        identity: Optional[Identity] = Depends(get_identity)):
     """Delete a conversation."""
+    if not _owned(store_get(db, _NAMESPACE, conversation_id), identity.user_id if identity else None):
+        raise HTTPException(404, "Conversation not found")
     deleted = store_delete(db, _NAMESPACE, conversation_id)
     if not deleted:
         raise HTTPException(404, "Conversation not found")

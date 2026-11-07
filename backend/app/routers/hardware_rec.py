@@ -170,7 +170,7 @@ def recommend_hardware(
             continue
         backend_total_runs[backend] = backend_total_runs.get(backend, 0) + 1
         if run.calibration and len(run.calibration) > 1:
-            if backend not in best_cal or run.created_at > best_cal_time.get(backend, datetime.min.replace(tzinfo=timezone.utc)):
+            if backend not in best_cal:  # runs are newest first
                 best_cal[backend] = run.calibration
                 dt = run.created_at
                 if dt.tzinfo is None:

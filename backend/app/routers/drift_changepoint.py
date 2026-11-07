@@ -31,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..calibration_history import calibration_metric
 from ..database import get_db
 from ..models import Run
 
@@ -197,7 +198,7 @@ def drift_changepoints(
     for run in runs:
         cal = run.calibration or {}
         for key in _CAL_KEYS:
-            v = cal.get(key)
+            v = calibration_metric(cal, key)
             try:
                 series[key].append(float(v) if v is not None else None)
             except (TypeError, ValueError):

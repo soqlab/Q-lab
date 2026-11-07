@@ -67,6 +67,8 @@ def google_callback(
                              headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
         info_res.raise_for_status()
         info = info_res.json()
+        if info.get("verified_email") is False:
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
 
         user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
         jwt = create_access_token(user.id, user.org_id, user.role)
