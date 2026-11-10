@@ -99,6 +99,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: push
         uses: docker/build-push-action@v7
+        env:
+          # Keep the build summary but skip the .dockerbuild record artifact: github-release downloads
+          # every artifact of this run into the release assets.
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ${{ matrix.context }}
           push: true
