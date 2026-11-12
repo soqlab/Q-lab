@@ -4,8 +4,12 @@ name: Release
 # CHANGELOG.md entry. Publishes:
 #   - the qlab-sdk package to PyPI (trusted publishing: no stored token; PyPI attaches
 #     signed attestations),
-#   - backend and dashboard images to ghcr.io/soqlab, with signed build provenance,
-#   - a GitHub release with the changelog notes, the SDK files and CycloneDX SBOMs.
+#   - backend and dashboard images to ghcr.io/soqlab, with signed build provenance and a
+#     keyless cosign signature,
+#   - a GitHub release with the changelog notes, the SDK files, CycloneDX SBOMs and SHA256SUMS;
+#     every file carries a keyless Sigstore build-provenance attestation.
+# Signing is keyless throughout: a short-lived Sigstore certificate issued through GitHub's OIDC
+# token, naming this repository, this workflow file and the tag. Nothing to store or leak.
 on:
   push:
     tags: ['v*.*.*']
@@ -37,6 +41,10 @@ jobs:
   sdk:
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write      # Sigstore certificate for the attestation
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -45,6 +53,10 @@ jobs:
       - run: pip install build twine
       - run: python -m build qlab_sdk --outdir dist
       - run: twine check dist/*
+      - name: Attest the SDK files
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*
       - uses: actions/upload-artifact@v7
         with:
           name: sdk-dist
@@ -115,18 +127,33 @@ jobs:
           subject-name: ghcr.io/soqlab/${{ matrix.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+      # A plain keyless signature too, for `cosign verify` and admission controllers that check
+      # signatures rather than attestations. The image digest does not change.
+      - uses: sigstore/cosign-installer@v4.1.2
+      - name: Sign the image (cosign keyless)
+        env:
+          REF: ghcr.io/soqlab/${{ matrix.name }}@${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "$REF"
 
   github-release:
     needs: [verify, sdk, sbom, images]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write      # Sigstore certificate for the attestation
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
+      - name: SHA256SUMS
+        run: cd assets && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      - name: Attest the release files
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-checksums: assets/SHA256SUMS
       - name: Release notes from CHANGELOG.md
         run: |
           awk -v v="${{ needs.verify.outputs.version }}" '
@@ -136,9 +163,20 @@ jobs:
           cat >> notes.md <<EOF
 
           **Docker images:** \`ghcr.io/soqlab/qlab-backend:${{ needs.verify.outputs.version }}\`,
-          \`ghcr.io/soqlab/qlab-frontend:${{ needs.verify.outputs.version }}\` (with signed build provenance).
-          **SDK:** \`pip install qlab-sdk==${{ needs.verify.outputs.version }}\`.
+          \`ghcr.io/soqlab/qlab-frontend:${{ needs.verify.outputs.version }}\` (signed, with build provenance).
+          **SDK:** \`pip install qlab-sdk==${{ needs.verify.outputs.version }}\` (PyPI shows its attestations).
           **SBOMs:** CycloneDX files for the backend, dashboard and SDK are attached.
+
+          **Verify** (GitHub CLI 2.49+; every attached file is attested):
+
+          \`\`\`sh
+          sha256sum -c SHA256SUMS
+          gh attestation verify <file> --repo ${{ github.repository }} --signer-workflow ${{ github.repository }}/.github/workflows/release.yml
+          gh attestation verify oci://ghcr.io/soqlab/qlab-backend:${{ needs.verify.outputs.version }} --repo ${{ github.repository }}
+          cosign verify ghcr.io/soqlab/qlab-backend:${{ needs.verify.outputs.version }} \\
+            --certificate-identity "https://github.com/${{ github.repository }}/.github/workflows/release.yml@$GITHUB_REF" \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          \`\`\`
           EOF
       - env:
           GH_TOKEN: ${{ github.token }}
@@ -157,4 +195,7 @@ jobs:
         with:
           name: sdk-dist
           path: dist
+      # Trusted publishing; PEP 740 attestations are signed keylessly and shown on PyPI.
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true

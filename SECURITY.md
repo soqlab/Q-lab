@@ -27,6 +27,34 @@ keeping or sharing other users' data.
 Security fixes go to the latest release and to the hosted service at qlab.soqlab.com. Self-hosted
 installs should run the latest tagged release.
 
+## Verifying a release
+
+Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml) when a
+`vX.Y.Z` tag is pushed. Nothing is signed with a long-lived key: every image and release file
+carries a keyless Sigstore signature or attestation, issued through GitHub's OIDC token, that names
+this repository, that workflow file and the tag. Replace `1.2.3` with the version; you need the
+[GitHub CLI](https://cli.github.com/) 2.49 or later, and [cosign](https://github.com/sigstore/cosign)
+2.5 or later for the last check.
+
+```sh
+# Release files (SDK wheel and sdist, SBOMs): checksums, then provenance for each file.
+gh release download v1.2.3 --repo soqlab/Q-lab --dir qlab-1.2.3 && cd qlab-1.2.3
+sha256sum -c SHA256SUMS
+for f in *.whl *.tar.gz *.cdx.json; do
+  gh attestation verify "$f" --repo soqlab/Q-lab \
+    --signer-workflow soqlab/Q-lab/.github/workflows/release.yml
+done
+
+# Images: build provenance, and the plain cosign signature.
+gh attestation verify oci://ghcr.io/soqlab/qlab-backend:1.2.3 --repo soqlab/Q-lab
+cosign verify ghcr.io/soqlab/qlab-backend:1.2.3 \
+  --certificate-identity "https://github.com/soqlab/Q-lab/.github/workflows/release.yml@refs/tags/v1.2.3" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Repeat the image checks for `qlab-frontend`. The `qlab-sdk` package on PyPI is published with
+trusted publishing and carries PEP 740 attestations, shown on its PyPI page under "Provenance".
+
 ## In scope
 
 - The Q-Lab backend API, dashboard and the `qlab-sdk` Python package in this repository.
