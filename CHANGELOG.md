@@ -7,6 +7,15 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Passkeys (WebAuthn). The sign-in page is one "Sign in with passkey" button (with passkey
+  autofill); sign-up creates a passkey, never a password; Settings lists, renames, adds and
+  removes passkeys (never the last one). Google and GitHub sign-in stay. With
+  `QLAB_PASSKEYS_ONLY=true` (set on the hosted service) no password is set, reset or accepted:
+  a password user signs in with the password once more and must add a passkey, which deletes the
+  password; "forgot password" emails a single-use 15-minute link that registers a new passkey;
+  creating or revoking API keys needs a session that signed in with a passkey. SDK API keys work
+  as before. Migration `004_passkeys` adds the `passkey_credentials` and `webauthn_challenges`
+  tables.
 - SDK: Amazon Braket and IonQ adapters (`pip install qlab-sdk[braket]`, `qlab-sdk[ionq]`), hooked
   by `qlab.init()` when installed. Braket `device.run`/`run_batch` (LocalSimulator, AwsDevice)
   record the OpenQASM 3 circuit, shots, device ARN/type/noise model, calibration from the device

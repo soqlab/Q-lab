@@ -191,6 +191,11 @@ export type AuthUser = {
   role: string;
   org_id: number | null;
   email_verified?: boolean;
+  /** /auth/me only: how this session signed in, and the account's sign-in methods. */
+  session?: "passkey" | "oauth" | "pwd" | "api_key";
+  passkeys?: number;
+  has_password?: boolean;
+  passkeys_only?: boolean;
 };
 
 export type AuthResponse = {
@@ -515,7 +520,11 @@ export async function createAPIKey(token: string, name: string, expiresDays?: nu
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ name, expires_days: expiresDays }),
   });
-  if (!res.ok) throw new Error("Failed to create key");
+  if (!res.ok) {
+    // "passkey_session_required": the page asks for the passkey, then retries.
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? "Failed to create key");
+  }
   return res.json();
 }
 
@@ -530,7 +539,11 @@ export async function deleteAPIKey(token: string, keyId: number): Promise<void> 
     method: "DELETE",
     headers: authHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to revoke key");
+  if (!res.ok) {
+    // "passkey_session_required": the page asks for the passkey, then retries.
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? "Failed to revoke key");
+  }
 }
 
 // ------------------------------------------------------------------

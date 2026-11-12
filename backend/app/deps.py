@@ -16,7 +16,7 @@ from jwt import PyJWTError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .auth import decode_token, hash_api_key
+from .auth import ENROL_SCOPE, decode_token, hash_api_key, passkeys_only
 from .database import get_db
 
 
@@ -26,8 +26,11 @@ class Identity:
         user: Any = None,
         api_key_row: Any = None,
         legacy: bool = False,
+        amr: str | None = None,
     ):
         self.user = user
+        # How a session token signed in (passkey | oauth | pwd); None for API keys.
+        self.amr = amr
         self.api_key_row = api_key_row
         self.is_legacy = legacy
         self.org_id: int | None = (
@@ -50,6 +53,7 @@ class Identity:
             "role": self.user.role,
             "org_id": self.user.org_id,
             "email_verified": getattr(self.user, "email_verified", True),
+            "session": self.amr if not self.api_key_row else "api_key",
         }
 
 
@@ -70,11 +74,13 @@ def get_identity(
         token = authorization[7:]
         try:
             payload = decode_token(token)
+            if payload.get("scope") == ENROL_SCOPE:
+                raise HTTPException(status_code=401, detail="passkey_enrolment_required")
             user_id = int(payload["sub"])
             user = db.scalar(select(User).where(User.id == user_id, User.is_active.is_(True)))
             if not user:
                 raise HTTPException(status_code=401, detail="User not found or inactive")
-            return Identity(user=user)
+            return Identity(user=user, amr=payload.get("amr") or "pwd")
         except HTTPException:
             raise
         except JWTError:
@@ -110,6 +116,21 @@ def get_identity(
 def require_auth(identity: Optional[Identity] = Depends(get_identity)) -> Identity:
     if identity is None:
         raise HTTPException(status_code=401, detail="Authentication required")
+    return identity
+
+
+def require_user_session(identity: Identity = Depends(require_auth)) -> Identity:
+    """A signed-in person (a session token), not an SDK API key."""
+    if identity.user is None or identity.api_key_row is not None:
+        raise HTTPException(status_code=403, detail="session_required")
+    return identity
+
+
+def require_passkey_session(identity: Identity = Depends(require_user_session)) -> Identity:
+    """With QLAB_PASSKEYS_ONLY, a session that signed in with a passkey (403 otherwise, not 401,
+    so the browser keeps its session and can ask for the passkey)."""
+    if passkeys_only() and identity.amr != "passkey":
+        raise HTTPException(status_code=403, detail="passkey_session_required")
     return identity
 
 

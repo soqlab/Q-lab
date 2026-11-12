@@ -1,11 +1,20 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Atom, Eye, EyeOff } from "lucide-react";
-import { login } from "../../../lib/api";
+import { Atom, KeyRound } from "lucide-react";
+import type { AuthResponse } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import {
+  addPasskey,
+  conditionalUiAvailable,
+  fetchPasskeyConfig,
+  passkeyErrorMessage,
+  passkeysSupported,
+  passwordSignIn,
+  signInWithPasskey,
+} from "../../../lib/passkeys";
 
 function LoginForm() {
   const { setSession } = useAuth();
@@ -14,35 +23,89 @@ function LoginForm() {
   const rawNext = searchParams.get("next") || "/runs";
   // Only allow relative paths to prevent open-redirect attacks
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/runs";
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [unverified, setUnverified] = useState(false);
-  const [isOAuthAccount, setIsOAuthAccount] = useState(false);
+  const [passkeysOnly, setPasskeysOnly] = useState(true);
+  // Existing password accounts: one last password sign-in, then they must add a passkey.
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [enrolment, setEnrolment] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  // Rendered on the server as supported; the browser decides after hydration.
+  const supported = useSyncExternalStore(() => () => {}, passkeysSupported, () => true);
+  const conditional = useRef<AbortController | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function done(resp: AuthResponse) {
+    setSession(resp.access_token, resp.user);
+    router.push(next);
+  }
+
+  function handleError(err: unknown) {
+    const msg = passkeyErrorMessage(err);
+    if (msg === "email_not_verified") setUnverified(true);
+    else setError(msg);
+  }
+
+  useEffect(() => {
+    void fetchPasskeyConfig().then((c) => setPasskeysOnly(c.passkeys_only));
+    if (!passkeysSupported()) return;
+    // Conditional UI: the browser offers saved passkeys in the email field's autofill.
+    let cancelled = false;
+    void conditionalUiAvailable().then((available) => {
+      if (!available || cancelled) return;
+      const ctrl = new AbortController();
+      conditional.current = ctrl;
+      signInWithPasskey({ conditional: true, signal: ctrl.signal })
+        .then(done)
+        .catch((err) => {
+          if (!ctrl.signal.aborted) handleError(err);
+        });
+    });
+    return () => { cancelled = true; conditional.current?.abort(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handlePasskey() {
+    conditional.current?.abort();
     setError(null);
     setUnverified(false);
-    setIsOAuthAccount(false);
     setLoading(true);
     try {
-      const resp = await login(email, password);
-      setSession(resp.access_token, resp.user);
-      router.push(next);
+      done(await signInWithPasskey());
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      if (msg === "email_not_verified") {
-        setUnverified(true);
-      } else if (msg === "oauth_account") {
-        setIsOAuthAccount(true);
-      } else {
-        setError(msg);
-      }
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePassword(e: React.FormEvent) {
+    e.preventDefault();
+    conditional.current?.abort();
+    setError(null);
+    setUnverified(false);
+    setLoading(true);
+    try {
+      const resp = await passwordSignIn(email, password);
+      if (resp.kind === "session") done(resp);
+      else setEnrolment(resp.enrolment_token);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEnrol() {
+    if (!enrolment) return;
+    setError(null);
+    setLoading(true);
+    try {
+      done(await addPasskey(enrolment));
+    } catch (err) {
+      handleError(err);
     } finally {
       setLoading(false);
     }
@@ -85,44 +148,67 @@ function LoginForm() {
               Please verify your email first
             </p>
             <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, marginBottom: 20 }}>
-              Check your inbox for <strong>{email}</strong> and click the verification link before signing in.
+              Check your inbox and click the verification link before signing in.
             </p>
-            {resent ? (
+            {email && (resent ? (
               <p style={{ fontSize: 13, color: "#10b981", fontWeight: 600, marginBottom: 16 }}>Email resent — check your inbox ✓</p>
             ) : (
               <button className="button" onClick={handleResend} disabled={resending} style={{ width: "100%", justifyContent: "center", marginBottom: 12 }}>
                 {resending ? "Sending…" : "Resend verification email"}
               </button>
-            )}
+            ))}
             <button onClick={() => { setUnverified(false); setError(null); }} style={{ background: "none", border: "none", color: "#1d6f8f", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
               Try a different account
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="auth-form">
-            <label className="auth-label">Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
-            <label className="auth-label">Password</label>
-            <div style={{ position: "relative" }}>
-              <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
-              <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            {error && <div className="auth-error">{error}</div>}
-            {isOAuthAccount && (
-              <div style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
-                This account was created with Google or GitHub — it has no password.<br />
-                <span style={{ color: "var(--muted)" }}>Use one of the buttons below to sign in.</span>
-              </div>
-            )}
-            <button className="button" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-            <p style={{ textAlign: "right", margin: "4px 0 0", fontSize: 13 }}>
-              <Link href="/forgot-password" style={{ color: "#1d6f8f" }}>Forgot password?</Link>
+        ) : enrolment ? (
+          <div className="auth-form">
+            <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, margin: 0 }}>
+              <strong>One more step.</strong> Q-Lab now signs in with passkeys instead of passwords.
+              Create a passkey on this device to finish signing in. Your password is then deleted.
             </p>
-          </form>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="button" type="button" onClick={handleEnrol} disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
+              <KeyRound size={16} aria-hidden="true" /> {loading ? "Waiting for your passkey…" : "Create a passkey"}
+            </button>
+          </div>
+        ) : (
+          <div className="auth-form">
+            {/* Lets the browser offer saved passkeys as autofill (conditional UI). */}
+            <input
+              className="input"
+              type="email"
+              name="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username webauthn"
+              placeholder="Email (your passkey can fill this in)"
+              aria-label="Email"
+            />
+            {!showPassword && (
+              <button className="button" type="button" onClick={handlePasskey} disabled={loading || !supported} style={{ width: "100%", justifyContent: "center" }}>
+                <KeyRound size={16} aria-hidden="true" /> {loading ? "Waiting for your passkey…" : "Sign in with passkey"}
+              </button>
+            )}
+            {!supported && (
+              <div className="auth-error">This browser can&apos;t use passkeys here. Passkeys need a current browser and an https address.</div>
+            )}
+            {showPassword && (
+              <form onSubmit={handlePassword} className="auth-form" style={{ margin: 0 }}>
+                <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" placeholder="Password" aria-label="Password" />
+                <button className="button" type="submit" disabled={loading || !email} style={{ width: "100%", justifyContent: "center" }}>
+                  {loading ? "Signing in…" : passkeysOnly ? "Continue to add a passkey" : "Sign in"}
+                </button>
+              </form>
+            )}
+            {error && <div className="auth-error">{error}</div>}
+            <p style={{ display: "flex", justifyContent: "space-between", gap: 12, margin: "4px 0 0", fontSize: 13 }}>
+              <button type="button" onClick={() => { setShowPassword((v) => !v); setError(null); }} style={{ background: "none", border: "none", padding: 0, color: "#1d6f8f", cursor: "pointer", fontSize: 13 }}>
+                {showPassword ? "Use a passkey instead" : passkeysOnly ? "Signed up with a password?" : "Use a password"}
+              </button>
+              <Link href="/forgot-password" style={{ color: "#1d6f8f" }}>{passkeysOnly ? "Lost your passkey?" : "Forgot password?"}</Link>
+            </p>
+          </div>
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0 16px" }}>

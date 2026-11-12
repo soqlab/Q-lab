@@ -387,6 +387,64 @@ def send_password_reset_email(
 
 
 # ---------------------------------------------------------------------------
+# send_account_recovery_email
+# ---------------------------------------------------------------------------
+
+def send_account_recovery_email(
+    to_email: str,
+    recovery_url: str,
+) -> bool:
+    """Send a single-use link that registers a new passkey on the account."""
+    subject = "Get back into your Q-Lab account"
+
+    body = f"""
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
+        Add a new passkey
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        We received a request to recover your Q-Lab account. Q-Lab signs in with passkeys, not
+        passwords: the button below lets you create a new passkey on this device.
+        The link works once and expires in <strong style="color:#c7d2fe;">15 minutes</strong>.
+      </p>
+
+      <!-- CTA button -->
+      <table cellpadding="0" cellspacing="0" style="margin:28px 0;">
+        <tr>
+          <td align="center"
+              style="background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                     border-radius:8px;padding:14px 32px;">
+            <a href="{recovery_url}"
+               style="font-size:15px;font-weight:600;color:#ffffff;
+                      text-decoration:none;letter-spacing:0.3px;">
+              Create a passkey &rarr;
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:0 0 8px;font-size:13px;color:#6b7280;line-height:1.6;">
+        Or copy this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;font-size:12px;word-break:break-all;
+                color:#818cf8;background:#111827;border-radius:6px;
+                padding:10px 14px;font-family:monospace;">
+        {recovery_url}
+      </p>
+
+      <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
+        If you did not ask for this, ignore this email: nothing changes until the link is used.
+        Your existing passkeys keep working either way.
+      </p>
+    """
+
+    return send_email(
+        to=to_email,
+        subject=subject,
+        html=_wrap_email(subject, body),
+    )
+
+
+# ---------------------------------------------------------------------------
 # send_welcome_email
 # ---------------------------------------------------------------------------
 

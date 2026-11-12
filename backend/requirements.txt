@@ -10,6 +10,7 @@ psycopg[binary]==3.3.8
 PyJWT==2.15.1
 cryptography==50.0.2
 bcrypt==5.0.0
+webauthn==3.0.1
 httpx==0.28.1
 anthropic==2.5.0
 openai==3.46.0

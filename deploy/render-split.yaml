@@ -22,6 +22,9 @@ services:
         sync: false
       - key: QLAB_APP_URL
         value: https://qlab.soqlab.com
+      # Sign-in is passkeys only: no password is set, reset or accepted (see SELF_HOSTING.md).
+      - key: QLAB_PASSKEYS_ONLY
+        value: "true"
     healthCheckPath: /health
     disk:
       name: qlab-data

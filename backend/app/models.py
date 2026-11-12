@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -77,6 +77,41 @@ class APIKey(Base):
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
     org: Mapped["Organization | None"] = relationship(back_populates="api_keys")
+
+
+# ---------------------------------------------------------------------------
+# Passkeys (WebAuthn credentials) and their one-time ceremony challenges
+# ---------------------------------------------------------------------------
+
+class PasskeyCredential(Base):
+    __tablename__ = "passkey_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # base64url of the raw credential ID the authenticator returns
+    credential_id: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    sign_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # base64url WebAuthn user handle: the same for every passkey of one user, never their email
+    user_handle: Mapped[str] = mapped_column(String(128), index=True)
+    name: Mapped[str] = mapped_column(String(100), default="Passkey")
+    transports: Mapped[list[str]] = mapped_column(JSON, default=list)
+    aaguid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    backed_up: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WebAuthnChallenge(Base):
+    """A challenge handed out for one registration or sign-in; deleted when it is used."""
+    __tablename__ = "webauthn_challenges"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    challenge: Mapped[str] = mapped_column(String(128))  # base64url
+    purpose: Mapped[str] = mapped_column(String(16))     # signup | register | login | recovery
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[float] = mapped_column(Float, index=True)
 
 
 # ---------------------------------------------------------------------------

@@ -6,10 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import generate_api_key, hash_password, verify_password
+from ..auth import generate_api_key, hash_password, passkeys_only, verify_password
 from ..database import get_db
-from ..deps import Identity, require_auth, require_role
-from ..models import APIKey, User
+from ..deps import Identity, require_auth, require_passkey_session, require_role
+from ..models import APIKey, PasskeyCredential, User
 from ..rate_limit import write_limiter
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
@@ -69,7 +69,9 @@ def change_password(
     u = identity.user
     if not u:
         raise HTTPException(status_code=401)
-    if not u.password_hash:
+    if passkeys_only():
+        raise HTTPException(status_code=403, detail="Passwords are turned off on this server. Use a passkey.")
+    if not u.password_hash or db.scalar(select(PasskeyCredential.id).where(PasskeyCredential.user_id == u.id)):
         raise HTTPException(status_code=400, detail="Account has no password set")
     if not verify_password(payload.current_password, u.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
@@ -83,7 +85,7 @@ def change_password(
 @router.post("/me/api-keys", dependencies=[Depends(write_limiter)])
 def create_api_key(
     payload: CreateKeyPayload,
-    identity: Identity = Depends(require_auth),
+    identity: Identity = Depends(require_passkey_session),
     db: Session = Depends(get_db),
 ):
     u = identity.user
@@ -145,7 +147,7 @@ def list_api_keys(
 @router.delete("/me/api-keys/{key_id}")
 def revoke_api_key(
     key_id: int,
-    identity: Identity = Depends(require_auth),
+    identity: Identity = Depends(require_passkey_session),
     db: Session = Depends(get_db),
 ):
     u = identity.user

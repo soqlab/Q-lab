@@ -2,9 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Brain, Copy, Cpu, KeyRound, Plus, Trash2 } from "lucide-react";
-import { changePassword, checkInsightsAvailable, createAPIKey, deleteAPIKey, listAPIKeys, deleteAccount, type APIKeyInfo } from "../../../lib/api";
+import { Brain, Copy, Cpu, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { changePassword, checkInsightsAvailable, createAPIKey, deleteAPIKey, fetchMe, listAPIKeys, deleteAccount, type APIKeyInfo, type AuthUser } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import {
+  addPasskey,
+  listPasskeys,
+  passkeyErrorMessage,
+  removePasskey,
+  renamePasskey,
+  signInWithPasskey,
+  type PasskeyInfo,
+} from "../../../lib/passkeys";
 
 // ── Provider credential types ─────────────────────────────────────────────────
 
@@ -263,6 +272,149 @@ function KeyRow({ k, onRevoke }: { k: APIKeyInfo; onRevoke: (id: number) => void
   );
 }
 
+// ── Passkeys ─────────────────────────────────────────────────────────────────
+
+/**
+ * Run `action` with a passkey session. With QLAB_PASSKEYS_ONLY the server answers 403
+ * "passkey_session_required" to API-key changes from any other session: the person confirms
+ * with a passkey (or, without one yet, creates their first), and the action runs again.
+ */
+function usePasskeyStepUp(me: AuthUser | null, reloadMe: () => Promise<void>) {
+  const { token, setSession } = useAuth();
+  return async function withPasskey<T>(action: (t: string) => Promise<T>): Promise<T> {
+    try {
+      return await action(token!);
+    } catch (err) {
+      if (!(err instanceof Error) || err.message !== "passkey_session_required") throw err;
+    }
+    const resp = (me?.passkeys ?? 0) > 0 ? await signInWithPasskey() : await addPasskey(token!);
+    const meId = (me as (AuthUser & { user_id?: number }) | null)?.user_id ?? me?.id;
+    if (meId !== undefined && resp.user.id !== meId) {
+      throw new Error("That passkey belongs to a different account.");
+    }
+    setSession(resp.access_token, resp.user);
+    await reloadMe();
+    return action(resp.access_token);
+  };
+}
+
+function PasskeysPanel({ me, reloadMe, withPasskey }: {
+  me: AuthUser | null;
+  reloadMe: () => Promise<void>;
+  withPasskey: <T>(action: (t: string) => Promise<T>) => Promise<T>;
+}) {
+  const { token, setSession } = useAuth();
+  const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
+
+  async function load(t = token) {
+    if (!t) return;
+    setPasskeys(await listPasskeys(t).catch(() => []));
+  }
+
+  useEffect(() => {
+    if (!token) return;
+    let live = true;
+    void listPasskeys(token).then((list) => { if (live) setPasskeys(list); }).catch(() => {});
+    return () => { live = false; };
+  }, [token]);
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(passkeyErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () => run(async () => {
+    // A second passkey needs a passkey session; withPasskey asks for the existing one first.
+    const resp = await withPasskey((t) => addPasskey(t));
+    setSession(resp.access_token, resp.user);
+    await reloadMe();
+    await load(resp.access_token);
+  });
+
+  const rename = (id: number, name: string) => run(async () => {
+    await renamePasskey(token!, id, name);
+    setEditing(null);
+    await load();
+  });
+
+  const remove = (id: number) => run(async () => {
+    await withPasskey((t) => removePasskey(t, id));
+    await reloadMe();
+    await load();
+  });
+
+  return (
+    <section className="panel">
+      <div className="panel-header"><h2>Passkeys</h2></div>
+      <div style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
+          You sign in to Q-Lab with a passkey: Face ID, a fingerprint, a device PIN or a security key.
+          Add one on each device you use. Your last passkey can&apos;t be removed.
+        </p>
+        {me?.has_password && (
+          <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>
+            This account still has a password. Add a passkey and the password is deleted.
+          </div>
+        )}
+        {passkeys.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Added</th><th>Last used</th><th>Synced</th><th></th></tr>
+              </thead>
+              <tbody>
+                {passkeys.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      {editing?.id === p.id ? (
+                        <form onSubmit={(e) => { e.preventDefault(); void rename(p.id, editing.name); }} style={{ display: "flex", gap: 6 }}>
+                          <input className="input" value={editing.name} maxLength={100} onChange={(e) => setEditing({ id: p.id, name: e.target.value })} aria-label="Passkey name" autoFocus />
+                          <button className="button" type="submit" disabled={busy || !editing.name.trim()} style={{ height: 30, fontSize: 12 }}>Save</button>
+                          <button className="button secondary" type="button" onClick={() => setEditing(null)} style={{ height: 30, fontSize: 12 }}>Cancel</button>
+                        </form>
+                      ) : p.name}
+                    </td>
+                    <td style={{ fontSize: 12, color: "#5f6f80" }}>{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
+                    <td style={{ fontSize: 12, color: "#5f6f80" }}>{p.last_used_at ? new Date(p.last_used_at).toLocaleDateString() : "Never"}</td>
+                    <td style={{ fontSize: 12, color: "#5f6f80" }}>{p.backed_up ? "Yes" : "No"}</td>
+                    <td>
+                      <span style={{ display: "flex", gap: 8 }}>
+                        <button className="button secondary" style={{ height: 28, fontSize: 12 }} onClick={() => setEditing({ id: p.id, name: p.name })} disabled={busy}>
+                          <Pencil size={13} aria-hidden="true" /> Rename
+                        </button>
+                        <button className="button secondary" style={{ height: 28, fontSize: 12 }} onClick={() => void remove(p.id)} disabled={busy || passkeys.length <= 1}
+                          title={passkeys.length <= 1 ? "Your only passkey can't be removed" : undefined}>
+                          <Trash2 size={13} aria-hidden="true" /> Remove
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {error && <div className="auth-error">{error}</div>}
+        <div>
+          <button className="button" type="button" onClick={() => void add()} disabled={busy}>
+            <KeyRound size={15} aria-hidden="true" /> {busy ? "Waiting for your passkey…" : "Add a passkey"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ChangePasswordPanel({ token }: { token: string }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -330,11 +482,18 @@ export default function SettingsPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [providerCreds, setProviderCreds] = useState<ProviderCred[]>([]);
+  const [me, setMe] = useState<AuthUser | null>(null);
+  const reloadMe = async () => {
+    const t = localStorage.getItem("qlab_token");
+    if (t) setMe(await fetchMe(t).catch(() => null));
+  };
+  const withPasskey = usePasskeyStepUp(me, reloadMe);
 
   useEffect(() => {
     if (!token) { router.push("/login"); return; }
     void load();
     void loadProviderCreds();
+    void fetchMe(token).then(setMe, () => setMe(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -363,13 +522,13 @@ export default function SettingsPage() {
     setError(null);
     setNewKey(null);
     try {
-      const result = await createAPIKey(token!, keyName, expiresDays ? Number(expiresDays) : undefined);
+      const result = await withPasskey((t) => createAPIKey(t, keyName, expiresDays ? Number(expiresDays) : undefined));
       setNewKey(result.key);
       setKeyName("");
       setExpiresDays("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create key");
+      setError(passkeyErrorMessage(err));
     } finally {
       setCreating(false);
     }
@@ -377,10 +536,10 @@ export default function SettingsPage() {
 
   async function handleRevoke(id: number) {
     try {
-      await deleteAPIKey(token!, id);
+      await withPasskey((t) => deleteAPIKey(t, id));
       await load();
-    } catch {
-      setError("Failed to revoke key");
+    } catch (err) {
+      setError(passkeyErrorMessage(err));
     }
   }
 
@@ -409,8 +568,11 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Change password */}
-      <ChangePasswordPanel token={token!} />
+      {/* Passkeys (sign-in) */}
+      <PasskeysPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
+
+      {/* Password: only for an account that still has one, on a server that allows passwords */}
+      {me?.has_password && !me.passkeys_only && <ChangePasswordPanel token={token!} />}
 
       {/* Create key */}
       <section className="panel">

@@ -33,6 +33,7 @@ from .rate_limit import auth_limiter, read_limiter, write_limiter
 from .routers import auth_routes, users, benchmarks, webhooks, admin, team, activity as activity_router
 from .routers import public_reach as public_reach_router
 from .routers import oauth as oauth_router
+from .routers import passkeys as passkeys_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
 from .routers import sweeps as sweeps_router
@@ -252,6 +253,7 @@ app.add_middleware(MarkIllustrativeData)
 # ------------------------------------------------------------------
 app.include_router(auth_routes.router)
 app.include_router(oauth_router.router)
+app.include_router(passkeys_router.router)
 app.include_router(users.router)
 app.include_router(benchmarks.router)
 app.include_router(webhooks.router)

@@ -40,6 +40,9 @@ The app is now running at `http://localhost:3000`.
 | `SMTP_PASSWORD` | No | SMTP password |
 | `SMTP_FROM` | No | From address for outgoing emails |
 | `ENVIRONMENT` | No | Set to `production` to disable `/docs` and `/redoc` |
+| `QLAB_PASSKEYS_ONLY` | No | `true`: passkeys only. No password is set, reset or accepted; "forgot password" emails a single-use 15-minute link that registers a new passkey; a password user signs in once more with the password and must add a passkey, after which the password is deleted; creating or revoking API keys needs a passkey session. Needs https (or `http://localhost`). Default off. |
+| `QLAB_WEBAUTHN_RP_ID` | No | Passkey domain (default: the host of `QLAB_APP_URL`). Passkeys are bound to it: changing it later strands existing passkeys |
+| `QLAB_WEBAUTHN_ORIGINS` | No | Extra origins allowed to use passkeys, comma-separated (default: only `QLAB_APP_URL`'s origin) |
 
 ## Docker Compose
 

@@ -1,36 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Atom, Eye, EyeOff, Copy, CheckCircle2 } from "lucide-react";
-import { register } from "../../../lib/api";
+import { useRouter } from "next/navigation";
+import { Atom, Copy, CheckCircle2, KeyRound } from "lucide-react";
+import { useAuth } from "../../../lib/auth";
+import { passkeyErrorMessage, passkeysSupported, signUpWithPasskey } from "../../../lib/passkeys";
 
-const pwRules = [
-  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
-  { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
-  { label: "One number", test: (p: string) => /[0-9]/.test(p) },
-];
-
+// New accounts get a passkey, never a password.
 export default function RegisterPage() {
+  const { setSession } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [org, setOrg] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [verified, setVerified] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const [pwFocused, setPwFocused] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const pwValid = pwRules.every(r => r.test(password));
+  const supported = useSyncExternalStore(() => () => {}, passkeysSupported, () => true);
 
   function copyKey(key: string) {
     navigator.clipboard.writeText(key).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
@@ -39,15 +32,19 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!pwValid) { setError("Password does not meet all requirements"); return; }
-    if (password !== confirm) { setError("Passwords do not match"); return; }
     setLoading(true);
     try {
-      const resp = await register(email, name, password, org || undefined);
+      const resp = await signUpWithPasskey(email, name, org || undefined);
       if (resp.api_key) setApiKey(resp.api_key);
+      if (resp.user.email_verified) {
+        // No confirmation email to wait for (a server without mail): straight in.
+        setSession(resp.access_token, resp.user);
+        if (!resp.api_key) { router.push("/runs"); return; }
+        setVerified(true);
+      }
       setRegistered(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(passkeyErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -82,15 +79,21 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div style={{ fontSize: 48, margin: "24px 0 16px" }}>✉️</div>
-          <h1 className="auth-title">Check your inbox</h1>
-          <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, margin: "8px 0 16px" }}>
-            We sent a verification link to<br />
-            <strong style={{ color: "var(--text)" }}>{email}</strong>
-          </p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px" }}>
-            Click the link in the email to verify your account, then sign in.
-          </p>
+          {verified ? (
+            <h1 className="auth-title" style={{ marginTop: 24 }}>Your account is ready</h1>
+          ) : (
+            <>
+              <div style={{ fontSize: 48, margin: "24px 0 16px" }}>✉️</div>
+              <h1 className="auth-title">Check your inbox</h1>
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, margin: "8px 0 16px" }}>
+                We sent a verification link to<br />
+                <strong style={{ color: "var(--text)" }}>{email}</strong>
+              </p>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px" }}>
+                Click the link in the email to verify your account, then sign in with your passkey.
+              </p>
+            </>
+          )}
 
           {apiKey && (
             <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: 16, marginBottom: 20, textAlign: "left" }}>
@@ -113,7 +116,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          {!verified && <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
             <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 10px" }}>
               Didn&apos;t receive it? Check your spam folder or resend.
             </p>
@@ -129,11 +132,11 @@ export default function RegisterPage() {
                 {resending ? "Sending…" : "Resend verification email"}
               </button>
             )}
-          </div>
+          </div>}
 
           <p className="auth-footer" style={{ marginTop: 20 }}>
-            <Link href="/login" style={{ color: "#1d6f8f", fontWeight: 600 }}>
-              Back to sign in
+            <Link href={verified ? "/runs" : "/login"} style={{ color: "#1d6f8f", fontWeight: 600 }}>
+              {verified ? "Go to your runs" : "Back to sign in"}
             </Link>
           </p>
         </div>
@@ -162,36 +165,6 @@ export default function RegisterPage() {
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           <label className="auth-label">Organization name <span style={{ color: "#aaa", fontWeight: 400 }}>(optional)</span></label>
           <input className="input" type="text" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="e.g. MIT Quantum Lab" />
-          <label className="auth-label">Password</label>
-          <div style={{ position: "relative" }}>
-            <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onFocus={() => setPwFocused(true)} required autoComplete="new-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box" }} />
-            <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {(pwFocused || password) && (
-            <ul style={{ margin: "-2px 0 4px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
-              {pwRules.map(r => {
-                const ok = r.test(password);
-                return (
-                  <li key={r.label} style={{ fontSize: 12, color: ok ? "#10b981" : "#94a3b8", display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ fontSize: 10 }}>{ok ? "✓" : "○"}</span>
-                    {r.label}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <label className="auth-label">Confirm password</label>
-          <div style={{ position: "relative" }}>
-            <input className="input" type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" style={{ width: "100%", paddingRight: 40, boxSizing: "border-box", borderColor: confirm && confirm !== password ? "var(--danger)" : undefined }} />
-            <button type="button" onClick={() => setShowConfirm(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, display: "flex" }}>
-              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {confirm && confirm !== password && (
-            <p style={{ fontSize: 12, color: "var(--danger)", margin: "-4px 0 0" }}>Passwords do not match</p>
-          )}
           <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#94a3b8", cursor: "pointer", marginTop: 4 }}>
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2, accentColor: "#7c3aed", flexShrink: 0 }} required />
             <span>
@@ -202,9 +175,15 @@ export default function RegisterPage() {
             </span>
           </label>
           {error && <div className="auth-error">{error}</div>}
-          <button className="button" type="submit" disabled={loading || !agreed || !pwValid} style={{ width: "100%", justifyContent: "center", opacity: agreed && pwValid ? 1 : 0.5 }}>
-            {loading ? "Creating account…" : "Create account"}
+          {!supported && (
+            <div className="auth-error">This browser can&apos;t create passkeys here. Passkeys need a current browser and an https address.</div>
+          )}
+          <button className="button" type="submit" disabled={loading || !agreed || !supported} style={{ width: "100%", justifyContent: "center", opacity: agreed ? 1 : 0.5 }}>
+            <KeyRound size={16} aria-hidden="true" /> {loading ? "Waiting for your passkey…" : "Create account with a passkey"}
           </button>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
+            Q-Lab has no passwords. Your device creates a passkey (Face ID, fingerprint, PIN or a security key) that signs you in.
+          </p>
         </form>
         <p className="auth-footer">
           Already registered?{" "}

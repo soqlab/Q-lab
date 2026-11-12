@@ -5,27 +5,35 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from ..auth import create_access_token, generate_api_key, hash_password, verify_password
+from ..auth import (
+    create_access_token,
+    create_enrolment_token,
+    generate_api_key,
+    hash_link_token,
+    hash_password,
+    passkeys_only,
+    verify_password,
+)
 from ..database import get_db
 from ..deps import Identity, log_audit, require_auth
 from ..email_service import (
+    send_account_recovery_email,
     send_password_reset_email,
-    send_welcome_email,
     is_email_configured,
     send_verification_email,
     send_account_deleted_email,
 )
-
-OAUTH_HINT = "oauth_account"  # returned when an OAuth-only account tries password login
-from ..models import APIKey, Organization, User
+from ..models import APIKey, Organization, PasskeyCredential, User
 from ..rate_limit import auth_limiter
 
 _RESET_TTL_SECONDS = 15 * 60       # 15 minutes
 
 _VERIFY_TTL_SECONDS = 24 * 60 * 60  # 24 hours
+
+PASSWORDS_OFF = "Passwords are turned off on this server. Use a passkey."
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -60,9 +68,6 @@ class ForgotPasswordPayload(BaseModel):
         return v
 
 
-
-
-
 class ResetPasswordPayload(BaseModel):
     token: str
     new_password: str
@@ -83,28 +88,29 @@ def _user_response(user: User, token: str) -> dict:
     }
 
 
-@router.post("/register", dependencies=[Depends(auth_limiter)])
-def register(payload: RegisterPayload, request: Request, db: Session = Depends(get_db)):
-    existing = db.scalar(select(User).where(User.email == payload.email))
-    if existing:
-        raise HTTPException(status_code=409, detail="Email already registered")
+def has_passkey(db: Session, user_id: int) -> bool:
+    return (db.scalar(select(func.count()).select_from(PasskeyCredential)
+                      .where(PasskeyCredential.user_id == user_id)) or 0) > 0
 
+
+def new_account(db: Session, email: str, name: str, org_name: str | None, password_hash: str) -> User:
+    """Create (not yet commit) a user. password_hash is "" for passkey and OAuth accounts."""
     _owner_email = os.getenv("QLAB_OWNER_EMAIL", "").strip().lower()
-    role = "owner" if (_owner_email and payload.email.lower() == _owner_email) else "researcher"
+    role = "owner" if (_owner_email and email.lower() == _owner_email) else "researcher"
 
     org: Organization | None = None
-    if payload.org_name:
-        slug = payload.org_name.lower().replace(" ", "-")[:120]
+    if org_name:
+        slug = org_name.lower().replace(" ", "-")[:120]
         org = db.scalar(select(Organization).where(Organization.slug == slug))
         if not org:
-            org = Organization(slug=slug, name=payload.org_name)
+            org = Organization(slug=slug, name=org_name)
             db.add(org)
             db.flush()
 
     user = User(
-        email=payload.email,
-        name=payload.name,
-        password_hash=hash_password(payload.password),
+        email=email,
+        name=name,
+        password_hash=password_hash,
         role=role,
         org_id=org.id if org else None,
         # A self-hosted install with no mail server (e.g. inside a network with no internet) can
@@ -112,9 +118,12 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
         email_verified=not is_email_configured(),
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    db.flush()
+    return user
 
+
+def finish_signup(db: Session, user: User, request: Request, amr: str) -> dict:
+    """After a new account is committed: default API key, session, audit, confirmation email."""
     # Auto-create a default API key so the user can start immediately
     full_key, key_hash, key_prefix = generate_api_key()
     db.add(APIKey(
@@ -131,7 +140,7 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     user.login_count = 1
     db.commit()
 
-    token = create_access_token(user.id, user.org_id, user.role)
+    token = create_access_token(user.id, user.org_id, user.role, amr=amr)
     log_audit(db, "auth.register", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
 
     # Send verification email — token stored in DB so it survives redeploys
@@ -152,71 +161,125 @@ def register(payload: RegisterPayload, request: Request, db: Session = Depends(g
     return resp
 
 
+@router.post("/register", dependencies=[Depends(auth_limiter)])
+def register(payload: RegisterPayload, request: Request, db: Session = Depends(get_db)):
+    """Password sign-up. Refused with QLAB_PASSKEYS_ONLY: new accounts use /auth/passkeys/signup."""
+    if passkeys_only():
+        raise HTTPException(status_code=403, detail=PASSWORDS_OFF)
+    existing = db.scalar(select(User).where(User.email == payload.email))
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    user = new_account(db, payload.email, payload.name, payload.org_name, hash_password(payload.password))
+    db.commit()
+    db.refresh(user)
+    return finish_signup(db, user, request, amr="pwd")
+
+
 @router.post("/login", dependencies=[Depends(auth_limiter)])
 def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)):
+    """Password sign-in, kept so existing password users can move to a passkey.
+
+    Registering a passkey removes an account's password, so this only signs in accounts that
+    have none. With QLAB_PASSKEYS_ONLY it returns no session, only a 15-minute enrolment token
+    that can do one thing: register the account's first passkey (/auth/passkeys/register).
+    """
     user = db.scalar(select(User).where(User.email == payload.email))
     # Unified error for all invalid-credential cases to prevent account enumeration
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if has_passkey(db, user.id):
+        # The password went when the passkey came; a hash left behind is still not a way in.
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
     if not getattr(user, "email_verified", True) and is_email_configured():
         raise HTTPException(status_code=403, detail="email_not_verified")
 
+    if passkeys_only():
+        log_audit(db, "auth.login_password_enrol", "user", str(user.id), request=request,
+                  user_id=user.id, org_id=user.org_id)
+        return {
+            "passkey_enrolment_required": True,
+            "enrolment_token": create_enrolment_token(user.id),
+            "user": {"email": user.email, "name": user.name},
+        }
+
     from datetime import datetime, timezone
     user.last_login_at = datetime.now(timezone.utc)
     user.login_count = (user.login_count or 0) + 1
     db.commit()
-    token = create_access_token(user.id, user.org_id, user.role)
+    token = create_access_token(user.id, user.org_id, user.role, amr="pwd")
     log_audit(db, "auth.login", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
     return _user_response(user, token)
 
 
 @router.get("/me")
-def me(identity: Identity = Depends(require_auth)):
-    return identity.to_dict()
+def me(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
+    out = identity.to_dict()
+    if identity.user:
+        out["passkeys"] = db.scalar(select(func.count()).select_from(PasskeyCredential)
+                                    .where(PasskeyCredential.user_id == identity.user.id)) or 0
+        out["has_password"] = bool(identity.user.password_hash)
+        out["passkeys_only"] = passkeys_only()
+    return out
 
 
 @router.post("/refresh")
 def refresh_token(identity: Identity = Depends(require_auth)):
-    if not identity.user:
+    if not identity.user or identity.api_key_row is not None:
         raise HTTPException(status_code=401, detail="Cannot refresh a non-user session")
-    token = create_access_token(identity.user.id, identity.org_id, identity.role)
+    token = create_access_token(identity.user.id, identity.org_id, identity.role, amr=identity.amr or "pwd")
     return {"access_token": token, "token_type": "bearer"}
 
 
 # ---------------------------------------------------------------------------
-# Password Reset
+# Password reset / account recovery
 # ---------------------------------------------------------------------------
 
 @router.post("/forgot-password", dependencies=[Depends(auth_limiter)])
 def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db)):
+    """Email a single-use 15-minute link.
+
+    With QLAB_PASSKEYS_ONLY the link is account recovery: it registers a new passkey
+    (/recover → /auth/passkeys/recovery). Otherwise it sets a new password (/reset-password).
+    """
     user = db.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
     if user:
         token = secrets.token_urlsafe(32)
-        user.reset_token = token
+        user.reset_token = hash_link_token(token)
         user.reset_token_expires = time.time() + _RESET_TTL_SECONDS
         db.commit()
         app_url = os.getenv("QLAB_APP_URL", "")
-        reset_url = f"{app_url}/reset-password?token={token}"
         try:
-            send_password_reset_email(to_email=user.email, reset_url=reset_url)
+            if passkeys_only():
+                send_account_recovery_email(to_email=user.email, recovery_url=f"{app_url}/recover?token={token}")
+            else:
+                send_password_reset_email(to_email=user.email, reset_url=f"{app_url}/reset-password?token={token}")
         except Exception:
             pass
-    return {"message": "If that email is registered, a reset link has been sent."}
+    return {"message": "If that email is registered, a link has been sent."}
 
 
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordPayload, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.reset_token == payload.token))
+    if passkeys_only():
+        raise HTTPException(status_code=403, detail=PASSWORDS_OFF)
+    token_hash = hash_link_token(payload.token)
+    user = db.scalar(select(User).where(User.reset_token == token_hash))
     if not user or not user.reset_token_expires or time.time() > user.reset_token_expires:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    if has_passkey(db, user.id):
+        raise HTTPException(status_code=400, detail="This account signs in with a passkey; it has no password.")
     if not payload.new_password or len(payload.new_password) < 8:
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
-    user.password_hash = hash_password(payload.new_password)
-    user.reset_token = None
-    user.reset_token_expires = None
+    # Clear the token only if it is still this one, so the link works once.
+    used = db.execute(update(User).where(User.id == user.id, User.reset_token == token_hash)
+                      .values(reset_token=None, reset_token_expires=None,
+                              password_hash=hash_password(payload.new_password)))
     db.commit()
+    if used.rowcount != 1:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     return {"message": "Password updated successfully. You can now log in."}
 
 
@@ -259,7 +322,7 @@ def resend_verification_by_email(payload: ResendByEmailPayload, db: Session = De
         app_url = os.getenv("QLAB_APP_URL", "")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
     return {"message": "Verification email sent"}
 
@@ -281,7 +344,7 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
         app_url = os.getenv("QLAB_APP_URL", "")
         verify_url = f"{app_url}/verify-email?token={verify_token}"
         send_verification_email(to_email=user.email, verify_url=verify_url)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
 
     return {"message": "Verification email sent"}

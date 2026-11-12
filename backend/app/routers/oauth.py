@@ -127,7 +127,7 @@ def _google_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
             return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
 
         user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
-        jwt = create_access_token(user.id, user.org_id, user.role)
+        jwt = create_access_token(user.id, user.org_id, user.role, amr="oauth")
         dest = "/onboarding" if is_new else "/runs"
         return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
     except Exception as exc:
@@ -191,7 +191,7 @@ def _github_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
 
         name = profile.get("name") or profile.get("login") or email
         user, is_new = _upsert_user(db, email=email, name=name)
-        jwt = create_access_token(user.id, user.org_id, user.role)
+        jwt = create_access_token(user.id, user.org_id, user.role, amr="oauth")
         dest = "/onboarding" if is_new else "/runs"
         return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
     except Exception as exc:

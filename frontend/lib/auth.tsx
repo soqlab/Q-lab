@@ -72,8 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await origFetch(...args);
       if (res.status === 401) {
         const url = typeof args[0] === "string" ? args[0] : (args[0] as Request).url;
-        // Don't intercept the login/register endpoints themselves
-        if (!url.includes("/auth/login") && !url.includes("/auth/register")) {
+        // Don't intercept the sign-in endpoints themselves (a wrong passkey is a 401 too)
+        if (!url.includes("/auth/login") && !url.includes("/auth/register") && !url.includes("/auth/passkeys/")) {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
           setToken(null);
