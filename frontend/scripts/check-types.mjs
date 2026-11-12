@@ -5,12 +5,19 @@ import { readFileSync } from "node:fs";
 
 const baseline = Number(readFileSync(new URL("../.typecheck-baseline", import.meta.url), "utf8").trim());
 let output = "";
+let failed = false;
 try {
   output = execSync("npx tsc --noEmit -p .", { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 } catch (e) {
+  failed = true;
   output = (e.stdout || "") + (e.stderr || "");
 }
 const errors = output.split("\n").filter((l) => l.includes("error TS"));
+if (failed && errors.length === 0) {
+  // tsc exited non-zero without reporting any type errors, so it didn't actually check anything.
+  console.error(`tsc did not run.\n${output.slice(0, 2000)}`);
+  process.exit(2);
+}
 console.log(`TypeScript errors: ${errors.length} (allowed: ${baseline})`);
 if (errors.length > baseline) {
   console.log(errors.join("\n"));
