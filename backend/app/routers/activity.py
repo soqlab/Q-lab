@@ -1,14 +1,16 @@
-"""Frontend activity tracking — receives page-view and feature-click events from the browser."""
+"""Former browser activity endpoint. Q-Lab no longer records what pages people look at.
+
+The dashboard used to post a page-view event here on every navigation, which was stored in the
+audit log with the browser's address and user agent. That was tracking, so it is gone: the
+dashboard sends nothing, and this endpoint stays only so older cached dashboards get a normal
+reply. It records nothing.
+"""
 from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-
-from ..database import get_db
-from ..deps import Identity, get_identity, log_audit
 
 router = APIRouter(prefix="/api/v1/events", tags=["activity"])
 
@@ -20,21 +22,6 @@ class FrontendEvent(BaseModel):
 
 
 @router.post("")
-def track_event(
-    payload: FrontendEvent,
-    request: Request,
-    db: Session = Depends(get_db),
-    identity: Identity = Depends(get_identity),
-):
-    """Receive a browser-side event and record it in the audit log."""
-    if identity and identity.user_id:
-        log_audit(
-            db,
-            payload.event,
-            resource_type="page",
-            resource_id=payload.page,
-            identity=identity,
-            request=request,
-            meta=payload.meta or {},
-        )
-    return {"ok": True}
+def track_event(payload: FrontendEvent):
+    """Accepted and discarded: nothing about the request is stored."""
+    return {"ok": True, "recorded": False}

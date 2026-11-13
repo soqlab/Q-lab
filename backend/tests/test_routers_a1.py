@@ -51,18 +51,15 @@ class _Resp:
 
 # ── activity + admin ─────────────────────────────────────────────────────────
 
-def test_frontend_events_are_audited_for_signed_in_users_only(alice, admin):
+def test_frontend_events_are_accepted_but_never_recorded(alice, admin):
     action = f"page.viewed.{uuid.uuid4().hex[:6]}"
-    assert client.post("/api/v1/events", json={"event": action, "page": "/runs"}).json() == {"ok": True}
+    assert client.post("/api/v1/events", json={"event": action, "page": "/runs"}).json() == {"ok": True, "recorded": False}
     assert client.post("/api/v1/events", headers=alice, json={"event": action, "page": "/runs",
-                                                             "meta": {"tab": "list"}}).json() == {"ok": True}
+                                                             "meta": {"tab": "list"}}).json() == {"ok": True, "recorded": False}
     assert client.post("/api/v1/events", json={"event": "x" * 121}).status_code == 422
 
     logs = client.get(f"/api/v1/admin/audit-logs?action={action}", headers=admin).json()
-    assert logs["total"] == 1  # the anonymous event was not recorded
-    item = logs["items"][0]
-    assert item["user_id"] == _uid(alice)
-    assert item["resource_id"] == "/runs" and item["meta"] == {"tab": "list"}
+    assert logs["total"] == 0  # no tracking: nothing is stored, signed in or not
 
 
 def test_admin_endpoints_need_an_admin(alice):
