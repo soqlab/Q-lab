@@ -215,14 +215,16 @@ def test_sign_up_refuses_a_taken_email_and_a_bad_one():
     assert client.post("/auth/passkeys/signup/begin", json={"email": "nope", "name": "A"}).status_code == 422
 
 
-def test_unverified_email_blocks_passkey_sign_in_when_mail_is_configured(monkeypatch):
+def test_an_unconfirmed_email_does_not_block_passkey_sign_in(monkeypatch):
+    """The passkey is the sign-in; an address that isn't confirmed yet only gets no mail."""
     import app.routers.auth_routes as auth_routes
     monkeypatch.setattr(auth_routes, "send_verification_email", lambda **kw: None)
     monkeypatch.setenv("SMTP_HOST", "mail.invalid")
     auth = SoftAuthenticator()
     sign_up(auth)
     resp = sign_in(auth)
-    assert resp.status_code == 403 and resp.json()["detail"] == "email_not_verified"
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["user"]["email_verified"] is False
 
 
 # ── Password users move to passkeys ──────────────────────────────────────────

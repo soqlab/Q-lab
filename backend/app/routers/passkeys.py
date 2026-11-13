@@ -1,5 +1,10 @@
 """Passkey (WebAuthn) sign-up, sign-in, account recovery and passkey management.
 
+Nothing is typed to sign in: the browser offers the passkeys it has for Q-Lab (on this device,
+or on a phone through its QR code), and the passkey says which account it belongs to. Accounts
+are created with a passkey and a display name; an email address is optional. The way back in
+without email is a one-time recovery code (app/recovery_codes.py), or a second passkey.
+
 Every ceremony is two calls: */begin returns WebAuthn options plus a challenge_id, and
 */finish sends back the authenticator's response with that challenge_id. Challenges live in the
 database for five minutes and are deleted the moment a finish call uses them, so each works once.
@@ -43,15 +48,18 @@ from webauthn.helpers.structs import (
 from ..auth import ENROL_SCOPE, create_access_token, decode_token, hash_link_token, passkeys_only
 from ..database import get_db
 from ..deps import Identity, log_audit, require_passkey_session, require_user_session
-from ..email_service import is_email_configured
+from .. import recovery_codes
 from ..models import PasskeyCredential, User, WebAuthnChallenge
-from ..rate_limit import auth_limiter
+from ..rate_limit import RateLimiter, auth_limiter
 from .auth_routes import _user_response, finish_signup, new_account
 
 router = APIRouter(prefix="/auth/passkeys", tags=["passkeys"])
 
 CHALLENGE_TTL_SECONDS = 5 * 60
 RP_NAME = "Q-Lab"
+
+# Recovery codes are 80 random bits, but every guess still costs: 5 tries per 15 minutes per address.
+recovery_code_limiter = RateLimiter(max_calls=5, period=15 * 60)
 
 
 def rp_config() -> tuple[str, list[str]]:
@@ -110,7 +118,12 @@ def _user_handle(db: Session, user_id: int) -> str:
     return existing or bytes_to_base64url(secrets.token_bytes(32))
 
 
-def _registration_options(db: Session, *, purpose: str, handle: str, email: str, display_name: str,
+def _account_label(email: str | None, display_name: str) -> str:
+    """The name a passkey manager lists the passkey under: the email if there is one."""
+    return (email or "").strip() or (display_name or "").strip() or "Q-Lab account"
+
+
+def _registration_options(db: Session, *, purpose: str, handle: str, email: str | None, display_name: str,
                           user_id: int | None = None, data: dict[str, Any] | None = None) -> dict:
     rp_id, _ = rp_config()
     existing = db.scalars(select(PasskeyCredential.credential_id)
@@ -120,11 +133,13 @@ def _registration_options(db: Session, *, purpose: str, handle: str, email: str,
         rp_id=rp_id,
         rp_name=RP_NAME,
         user_id=base64url_to_bytes(handle),
-        user_name=email,
-        user_display_name=display_name or email,
+        user_name=_account_label(email, display_name),
+        user_display_name=(display_name or "").strip() or _account_label(email, display_name),
         challenge=challenge,
         timeout=CHALLENGE_TTL_SECONDS * 1000,
         attestation=AttestationConveyancePreference.NONE,
+        # Discoverable, so sign-in needs no name typed. No authenticator attachment and no
+        # transports are set: a passkey on this device, a security key, or a phone (QR) all work.
         authenticator_selection=AuthenticatorSelectionCriteria(
             resident_key=ResidentKeyRequirement.REQUIRED,
             user_verification=UserVerificationRequirement.REQUIRED,
@@ -197,8 +212,9 @@ def _session(db: Session, user: User, request: Request, action: str) -> dict:
 # ── Payloads ─────────────────────────────────────────────────────────────────
 
 class SignupBegin(BaseModel):
-    email: str = Field(max_length=254)
     name: str = Field(min_length=1, max_length=200)
+    # Optional, and not asked for by the sign-up page: an address can be added later in settings.
+    email: Optional[str] = Field(default=None, max_length=254)
     org_name: Optional[str] = Field(default=None, max_length=200)
 
 
@@ -214,6 +230,14 @@ class RecoveryBegin(BaseModel):
 
 class RecoveryFinish(Finish):
     token: str = Field(max_length=128)
+
+
+class RecoveryCodeBegin(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+
+
+class RecoveryCodeFinish(Finish):
+    code: str = Field(min_length=1, max_length=64)
 
 
 class Rename(BaseModel):
@@ -233,28 +257,35 @@ def passkey_config():
 
 @router.post("/signup/begin", dependencies=[Depends(auth_limiter)])
 def signup_begin(payload: SignupBegin, db: Session = Depends(get_db)):
-    email = payload.email.strip()
-    if "@" not in email:
-        raise HTTPException(status_code=422, detail="Enter a valid email address")
-    if db.scalar(select(User.id).where(User.email == email)):
-        raise HTTPException(status_code=409, detail="Email already registered")
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Enter a name")
+    email = (payload.email or "").strip() or None
+    if email is not None:
+        if "@" not in email:
+            raise HTTPException(status_code=422, detail="Enter a valid email address")
+        if db.scalar(select(User.id).where(User.email == email)):
+            raise HTTPException(status_code=409, detail="Email already registered")
     handle = bytes_to_base64url(secrets.token_bytes(32))
-    return _registration_options(db, purpose="signup", handle=handle, email=email, display_name=payload.name,
-                                 data={"email": email, "name": payload.name, "org_name": payload.org_name})
+    return _registration_options(db, purpose="signup", handle=handle, email=email, display_name=name,
+                                 data={"email": email, "name": name, "org_name": payload.org_name})
 
 
 @router.post("/signup/finish", dependencies=[Depends(auth_limiter)])
 def signup_finish(payload: Finish, request: Request, db: Session = Depends(get_db)):
     ch = _take_challenge(db, payload.challenge_id, "signup")
     verified = _verify_registration(ch, payload.credential)
-    email = ch.data["email"]
-    if db.scalar(select(User.id).where(User.email == email)):
+    email = ch.data.get("email") or None
+    if email and db.scalar(select(User.id).where(User.email == email)):
         raise HTTPException(status_code=409, detail="Email already registered")
     user = new_account(db, email, ch.data["name"], ch.data.get("org_name"), password_hash="")
     _store_passkey(db, user, verified, ch.data["user_handle"], payload.credential, payload.passkey_name)
+    codes = recovery_codes.new_set(db, user.id)
     db.commit()
     db.refresh(user)
-    return finish_signup(db, user, request, amr="passkey")
+    resp = finish_signup(db, user, request, amr="passkey")
+    resp["recovery_codes"] = codes  # shown once; only their hashes are kept
+    return resp
 
 
 # ── Sign-in ──────────────────────────────────────────────────────────────────
@@ -308,8 +339,8 @@ def login_finish(payload: Finish, request: Request, db: Session = Depends(get_db
     user = db.get(User, row.user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
-    if not getattr(user, "email_verified", True) and is_email_configured():
-        raise HTTPException(status_code=403, detail="email_not_verified")
+    # No email check: the passkey is the sign-in. An unconfirmed address only means Q-Lab
+    # sends it nothing until it is confirmed.
     row.sign_count = verified.new_sign_count
     row.last_used_at = datetime.now(timezone.utc)
     if getattr(verified, "credential_backed_up", None) is not None:
@@ -412,6 +443,64 @@ def recovery_finish(payload: RecoveryFinish, request: Request, db: Session = Dep
     resp = _session(db, user, request, "auth.login_passkey_recovery")
     resp["passkey"] = _passkey_dict(row)
     return resp
+
+
+# ── Account recovery with a one-time code (no email needed) ──────────────────
+
+@router.post("/recovery-code/begin", dependencies=[Depends(recovery_code_limiter)])
+def recovery_code_begin(payload: RecoveryCodeBegin, db: Session = Depends(get_db)):
+    """A recovery code in, options to register a new passkey on that account out. The code is
+    only checked here; it is used up by /recovery-code/finish, once the new passkey verifies."""
+    row = recovery_codes.find_unused(db, payload.code)
+    user = db.get(User, row.user_id) if row else None
+    if row is None or user is None or not user.is_active:
+        raise HTTPException(status_code=400, detail="That recovery code is wrong or already used.")
+    return _registration_options(db, purpose="recovery_code", handle=_user_handle(db, user.id), email=user.email,
+                                 display_name=user.name, user_id=user.id, data={"code_id": row.id})
+
+
+@router.post("/recovery-code/finish", dependencies=[Depends(auth_limiter)])
+def recovery_code_finish(payload: RecoveryCodeFinish, request: Request, db: Session = Depends(get_db)):
+    ch = _take_challenge(db, payload.challenge_id, "recovery_code")
+    row = recovery_codes.find_unused(db, payload.code)
+    if row is None or row.id != ch.data.get("code_id") or row.user_id != ch.user_id:
+        raise HTTPException(status_code=400, detail="That recovery code is wrong or already used.")
+    user = db.get(User, row.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=400, detail="That recovery code is wrong or already used.")
+    verified = _verify_registration(ch, payload.credential)
+    if not recovery_codes.use(db, row.id, payload.code):  # someone used it in the meantime
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That recovery code is wrong or already used.")
+    passkey = _store_passkey(db, user, verified, ch.data["user_handle"], payload.credential, payload.passkey_name)
+    db.commit()
+    log_audit(db, "auth.passkey_recovered_code", "passkey", str(passkey.id), request=request, user_id=user.id,
+              org_id=user.org_id)
+    resp = _session(db, user, request, "auth.login_passkey_recovery_code")
+    resp["passkey"] = _passkey_dict(passkey)
+    resp["recovery_codes_remaining"] = recovery_codes.remaining(db, user.id)
+    return resp
+
+
+# ── Recovery codes: how many are left, and a new set ─────────────────────────
+
+@router.get("/recovery-codes")
+def recovery_codes_status(identity: Identity = Depends(require_user_session), db: Session = Depends(get_db)):
+    return recovery_codes.status(db, identity.user_id)
+
+
+@router.post("/recovery-codes", dependencies=[Depends(auth_limiter)])
+def recovery_codes_new(request: Request, identity: Identity = Depends(require_user_session),
+                       db: Session = Depends(get_db)):
+    """A new set of 10 codes, shown once; the old ones stop working. Needs a passkey session when
+    the account has a passkey, so a stolen OAuth session can't mint a way back in."""
+    has_passkey = db.scalar(select(PasskeyCredential.id).where(PasskeyCredential.user_id == identity.user_id))
+    if has_passkey is not None and identity.amr != "passkey":
+        raise HTTPException(status_code=403, detail="passkey_session_required")
+    codes = recovery_codes.new_set(db, identity.user_id)
+    db.commit()
+    log_audit(db, "auth.recovery_codes_new", "user", str(identity.user_id), identity=identity, request=request)
+    return {"codes": codes, **recovery_codes.status(db, identity.user_id)}
 
 
 # ── Manage ───────────────────────────────────────────────────────────────────

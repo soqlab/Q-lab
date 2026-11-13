@@ -39,7 +39,9 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    # Optional: accounts sign in with a passkey, and an address is only for notifications (and
+    # emailed recovery, if the user adds one). Unique when set; SQL allows any number of NULLs.
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True, nullable=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(256))
     role: Mapped[str] = mapped_column(String(64), default="researcher")  # owner|admin|researcher|viewer
@@ -112,6 +114,18 @@ class WebAuthnChallenge(Base):
     user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     expires_at: Mapped[float] = mapped_column(Float, index=True)
+
+
+class RecoveryCode(Base):
+    """One single-use account recovery code. Only a SHA-256 of the code is kept: the codes are
+    80 random bits each, so the hash can't be reversed, and a database read can't use them."""
+    __tablename__ = "recovery_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 # ---------------------------------------------------------------------------

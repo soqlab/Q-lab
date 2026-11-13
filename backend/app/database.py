@@ -52,7 +52,18 @@ def init_db() -> None:
 def _create_schema() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_compat_columns()
+    _relax_users_email()
     _ensure_fts()
+
+
+def _relax_users_email() -> None:
+    """users.email became optional (sign-in without email); see app/auth_schema.py."""
+    from .auth_schema import relax_users_email
+    try:
+        relax_users_email(engine)
+    except Exception as exc:  # never keep the server from starting; email stays required
+        import logging
+        logging.getLogger("qlab").error("Could not make users.email optional: %s", exc)
 
 
 def _col(name: str, col_type: str, nullable: bool = True) -> str:
