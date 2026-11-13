@@ -1,0 +1,101 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+.wrap {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+  display: grid;
+  gap: 18px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.brand {
+  font-family: "Cascadia Code", Consolas, monospace;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: var(--text);
+}
+.back { font-size: 13px; color: var(--muted); text-decoration: underline; }
+.h1 { margin: 6px 0 0; font-size: 26px; letter-spacing: 0; }
+.lead { margin: 0; color: var(--muted); line-height: 1.6; max-width: 68ch; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.panel h2 { margin: 0; font-size: 16px; }
+.panel p { margin: 0; line-height: 1.6; font-size: 14px; }
+.eyebrow {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+.muted { color: var(--muted); }
+.mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.link { color: var(--strong); text-decoration: underline; }
+.readings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.reading {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  min-width: 0;
+}
+.reading dt {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.reading dd { margin: 6px 0 0; font-family: "Cascadia Code", Consolas, monospace; font-size: 15px; overflow-wrap: anywhere; }
+.reading small { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; color: var(--muted); }
+.verdict { font-weight: 600; }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--danger); }
+.list { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.55; }
+.tableWrap { overflow-x: auto; max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--table-border);
+  font-size: 12px;
+  white-space: nowrap;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+.table td.url { white-space: normal; overflow-wrap: anywhere; min-width: 220px; }
+.third td { color: var(--danger); font-weight: 600; }
+.csp { display: grid; gap: 6px; margin: 0; }
+.csp div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--table-border); }
+.csp dt { font-family: "Cascadia Code", Consolas, monospace; color: var(--text); overflow-wrap: anywhere; }
+.csp dd { margin: 0; color: var(--muted); line-height: 1.5; }
+.csp code { color: var(--text); }
+
+@media (max-width: 640px) {
+  .wrap { padding: 20px 14px 48px; }
+  .h1 { font-size: 22px; }
+  .readings { grid-template-columns: 1fr; }
+  .csp div { grid-template-columns: 1fr; gap: 2px; }
+}

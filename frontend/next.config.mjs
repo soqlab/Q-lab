@@ -20,7 +20,10 @@ function git(...args) {
 const rawCommit = (process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || git("rev-parse", "HEAD")).toLowerCase();
 const commit = /^[0-9a-f]{40}$/.test(rawCommit) ? rawCommit : "";
 const commitEpoch = commit ? git("show", "-s", "--format=%ct", commit) : "";
-const commitTime = commitEpoch ? new Date(Number(commitEpoch) * 1000).toISOString().replace(".000Z", "Z") : "";
+// QLAB_COMMIT_TIME: for builds without the .git directory (a Docker build context, for example).
+const commitTime = commitEpoch
+  ? new Date(Number(commitEpoch) * 1000).toISOString().replace(".000Z", "Z")
+  : process.env.QLAB_COMMIT_TIME || "";
 
 const isDev = process.env.NODE_ENV !== "production";
 
