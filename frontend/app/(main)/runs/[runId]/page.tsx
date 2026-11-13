@@ -843,8 +843,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
           <div className="metric-label">Non-Clifford</div>
           <div className="metric-value">{(((run.fingerprint.non_clifford_ratio ?? 0) * 100)).toFixed(1)}%</div>
         </div>
-        <div className="metric" style={{ borderColor: hc }}>
-          <div className="metric-label">Execution Quality</div>
+        <div className="metric d-expert" style={{ borderColor: hc }} title="Q-Lab health score, 0–100: a weighted heuristic of the top outcome share and calibrated fidelities">
+          <div className="metric-label">Health score (heuristic)</div>
           <div className="metric-value" style={{ color: hc }}>{run.health_score ?? "—"}</div>
         </div>
       </section>
@@ -884,8 +884,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       <div className="d-expert"><LandscapePanel runId={run.run_id} /></div>
       <div className="d-expert"><AssertionsPanel runId={run.run_id} /></div>
 
-      <section className="panel d-standard">
-        <div className="panel-header"><h2>Execution Quality Score</h2></div>
+      <section className="panel d-expert">
+        <div className="panel-header"><h2>Health score (heuristic)</h2></div>
         <div style={{ padding: "12px 16px" }}>
           <ScoreGauge score={run.health_score} />
           <div style={{ margin: "10px 0 12px", padding: "8px 12px", background: "var(--panel-2)", borderRadius: 6, fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>

@@ -212,7 +212,8 @@ def answer(db: Session, run: Run, level: Level = "standard", allowed: Optional[C
     else:
         pts = abs(delta)
         word = "better" if delta > 0 else "worse"
-        tail = (f", {pts:.0f} point{'s' if round(pts) != 1 else ''} {word} than {when}{other}" if pts >= 0.5
+        shown = f"{pts:.0f}" if pts >= 10 else f"{pts:.1f}".rstrip("0").rstrip(".")
+        tail = (f", {shown} point{'' if shown == '1' else 's'} {word} than {when}{other}" if pts >= 0.05
                 else f", a real but tiny change from {when}{other}")
         if level == "expert" and noise.get("p_value") is not None:
             tail += f" (TVD {diff['observed']['tvd']:.3f}, p = {noise['p_value']:.3g})"

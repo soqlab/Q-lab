@@ -175,3 +175,13 @@ def test_gallery_reports_share_on_expected_outcomes():
     items = client.get("/api/v1/public/gallery?limit=100").json()["items"]
     mine = next(i for i in items if i["share_token"] == token)
     assert mine["on_expected"] == 0.94
+
+
+def test_points_in_the_sentence_match_the_readings():
+    me = make_user(prefix="ans")
+    name = f"bell-{uuid.uuid4().hex[:6]}"
+    _post(me, circuit_name=name, created_at=_at(8), results={"counts": {"00": 1930, "11": 1928, "01": 75, "10": 67}})
+    rid = _post(me, circuit_name=name, created_at=_at(1), results={"counts": {"00": 1868, "11": 1890, "01": 130, "10": 112}})
+    a = _answer(me, rid)
+    assert a["change"]["points"] == -2.5
+    assert "2.5 points worse than last week's run" in a["sentence"]
