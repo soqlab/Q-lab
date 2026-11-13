@@ -74,7 +74,7 @@ def test_qasm_and_rerun_script(users):
     assert r.status_code == 200 and r.text == GHZ3
     assert client.get(f"/api/v1/runs/{run_id}/qasm", headers=bob).status_code == 404
     rerun = client.get(f"/api/v1/runs/{run_id}/rerun.py", headers=alice)
-    assert f"/api/v1/runs/{run_id}/qasm" in rerun.text
+    assert f'RUN_ID = "{run_id}"' in rerun.text and "qlab.reproducing(RUN_ID)" in rerun.text
     assert client.get("/api/v1/runs/nope/rerun.py", headers=alice).status_code == 404
 
     no_qasm = push_run(alice, qasm=None)

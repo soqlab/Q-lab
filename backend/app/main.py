@@ -63,6 +63,7 @@ from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
 from .routers import answer as answer_router
 from .routers import machine_pick as machine_pick_router
+from .routers import reproduce as reproduce_router
 from .routers import verify_run as verify_run_router
 from .routers import pub_report as pub_report_router
 from .routers import paper_package as paper_package_router
@@ -296,6 +297,7 @@ app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
 app.include_router(answer_router.router)
 app.include_router(machine_pick_router.router)
+app.include_router(reproduce_router.router)
 app.include_router(verify_run_router.router)
 app.include_router(pub_report_router.router)
 app.include_router(paper_package_router.router)
@@ -575,6 +577,7 @@ def _run_to_dict(run: Run, include_health: bool = False) -> Dict[str, Any]:
         "status": run.status,
         "share_url": run.share_url,
         "benchmark_id": run.benchmark_id,
+        "reproduction_of": run.reproduction_of,
         "org_id": run.org_id,
         "created_by_user_id": run.created_by_user_id,
         "created_at": run.created_at.isoformat(),
@@ -607,6 +610,15 @@ def _find_run(db: Session, run_id: str) -> Run:
     return run
 
 
+def _reproduction_of(payload: RunPayload) -> Optional[str]:
+    """The run this upload re-ran, as the SDK tags it (qlab.init(reproduces=...)); never itself."""
+    value = (payload.context or {}).get("reproduction_of")
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value if value and len(value) <= 64 and value != payload.run_id else None
+
+
 def _upsert_run(db: Session, payload: RunPayload, identity: Optional[Identity] = None) -> Run:
     project = _get_or_create_project(db, payload.project, identity.user_id if identity else None)
     run = db.scalar(select(Run).where(Run.run_id == payload.run_id))
@@ -632,6 +644,7 @@ def _upsert_run(db: Session, payload: RunPayload, identity: Optional[Identity] =
     run.status = payload.status
     run.share_url = payload.share_url
     run.benchmark_id = payload.benchmark_id
+    run.reproduction_of = _reproduction_of(payload)
     run.created_at = payload.created_at
     if identity:
         run.created_by_user_id = identity.user_id
@@ -1189,17 +1202,17 @@ def circuit_text(run_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/runs/{run_id}/rerun.py", response_class=PlainTextResponse)
 def rerun_helper(run_id: str, db: Session = Depends(get_db)):
-    _find_run(db, run_id)
-    return _rerun_script(run_id)
+    return _rerun_script(_find_run(db, run_id))
 
 
 @app.get("/api/v1/runs/{run_id}/bundle.zip")
 def reproducibility_bundle(run_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
-    run = _run_to_dict(_find_run(db, run_id))
+    run_row = _find_run(db, run_id)
+    run = _run_to_dict(run_row)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("metadata.json", json.dumps(run, indent=2))
-        archive.writestr("rerun.py", _rerun_script(run_id))
+        archive.writestr("rerun.py", _rerun_script(run_row))
         if run.get("qasm"):
             archive.writestr("circuit.qasm", run["qasm"])
         pip_freeze = (run.get("context") or {}).get("pip_freeze")
@@ -1222,13 +1235,14 @@ def reproducibility_bundle(run_id: str, identity: Identity = Depends(require_aut
 @app.get("/api/v1/runs/{run_id}/capsule.zip")
 def reproducibility_capsule(run_id: str, identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
     """Reproducibility Time Capsule — hermetic zip with SHA256 manifest."""
-    run = _run_to_dict(_find_run(db, run_id))
+    run_row = _find_run(db, run_id)
+    run = _run_to_dict(run_row)
     files: dict[str, bytes] = {}
 
     # Core artifacts
     metadata = {k: v for k, v in run.items() if k not in ("qasm",)}
     files["metadata.json"] = json.dumps(metadata, indent=2).encode()
-    files["rerun.py"] = _rerun_script(run_id).encode()
+    files["rerun.py"] = _rerun_script(run_row).encode()
 
     if run.get("qasm"):
         files["circuit.qasm"] = run["qasm"].encode()
@@ -1599,11 +1613,11 @@ def export_runs_report(
 # HTML dashboard (built-in, always available)
 # ------------------------------------------------------------------
 
-def _rerun_script(run_id: str) -> str:
-    return f"""from qiskit import qasm3
-QASM_URL = "{API_URL}/api/v1/runs/{run_id}/qasm"
-# Download QASM from Q-Lab then re-submit to your chosen backend.
-"""
+def _rerun_script(run: Run) -> str:
+    """The run's reproduce script (app/reproduce.py): recorded circuit, versions, settings, seeds, shots."""
+    from . import reproduce
+    from .routers.build_info import backend_commit
+    return reproduce.script(run, reproduce.recipe(run, sdk_ref=backend_commit()), api_url=API_URL, app_url=APP_URL)
 
 
 def _run_report_markdown(filters: Dict, metrics: Dict, runs: List[Dict]) -> str:

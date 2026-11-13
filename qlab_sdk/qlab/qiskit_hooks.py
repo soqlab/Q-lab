@@ -1,4 +1,5 @@
 import atexit
+import contextlib
 import hashlib
 import os
 import sys
@@ -75,6 +76,9 @@ _CONFIG = {
     "tags": [],
     "zk_qco": False,
     "zk_qco_salt": "",
+    # Set while re-running an earlier run (init(reproduces=...), qlab.reproducing(), QLAB_REPRODUCES):
+    # every run uploaded is tagged as a reproduction of that run, and Q-Lab compares the two.
+    "reproduces": None,
 }
 
 def _pop_transpiler_context() -> dict:
@@ -549,6 +553,47 @@ def _extract_parameters(args: tuple, kwargs: dict) -> dict[str, Any]:
 
     return parameters
 
+def _int_seed(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    try:
+        import numbers
+        if isinstance(value, numbers.Integral):
+            return int(value)
+    except Exception:
+        pass
+    return None
+
+
+def _object_seeds(obj: Any, kind: str, backend_obj: Any) -> dict[str, int]:
+    """Seeds set on the primitive or backend itself rather than passed to run().
+
+    StatevectorSampler(seed=...), Aer's SamplerV2(seed=...), runtime's options.simulator.seed_simulator
+    and AerSimulator(seed_simulator=...): without them a simulator run can't be re-run exactly.
+    """
+    out: dict[str, int] = {}
+    if kind != "backend":
+        for path in (("_seed",), ("seed",)):
+            seed = _int_seed(_option(obj, *path))
+            if seed is not None:
+                out["seed"] = seed
+                break
+        sim = _int_seed(_option(obj, "options", "simulator", "seed_simulator"))
+        if sim is not None:
+            out["seed_simulator"] = sim
+    sim = _int_seed(_option(backend_obj, "options", "seed_simulator"))
+    if sim is not None:
+        out.setdefault("seed_simulator", sim)
+    return out
+
+
+def _primitive_info(obj: Any, kind: str) -> dict[str, str]:
+    """How the circuit was run: backend.run(), a Sampler or an Estimator, and which class."""
+    cls = type(obj)
+    role = "backend" if kind == "backend" else ("estimator" if _is_estimator(obj) else "sampler")
+    return {"kind": role, "class": f"{cls.__module__}.{cls.__qualname__}"}
+
+
 def _extract_job_metadata(job: Any) -> dict[str, Any]:
     metadata = {}
 
@@ -728,6 +773,11 @@ def _send_capture(
     }
     if privacy:
         payload["context"]["zk_qco"] = privacy
+    reproduces = _CONFIG.get("reproduces")
+    if reproduces:
+        payload["context"]["reproduction_of"] = str(reproduces)[:64]
+        if "reproduction" not in payload["tags"]:
+            payload["tags"].append("reproduction")
 
     # Policy gate — check before sending
     _enforce_policy(payload)
@@ -1297,9 +1347,13 @@ def _wrap_run(cls, kind: str) -> None:
         calibration: dict = {}
         transpiler_ctx: dict = {}
         submit_time = datetime.now(timezone.utc).isoformat()
+        primitive: dict = {}
         try:
             circuits = _extract_circuits_from_args(args, kwargs)
             parameters = _extract_parameters(args, kwargs)
+            for key, value in _object_seeds(self, kind, backend_obj).items():
+                parameters.setdefault(key, value)
+            primitive = _primitive_info(self, kind)
             calibration = _capture_calibration(backend_obj)
             transpiler_ctx = _pop_transpiler_context()
         except Exception:
@@ -1325,7 +1379,7 @@ def _wrap_run(cls, kind: str) -> None:
                         circuit,
                         backend_name=backend_name,
                         parameters=parameters,
-                        execution={**_error_metadata(error), **shot_info},
+                        execution={**_error_metadata(error), **shot_info, **({"primitive": primitive} if primitive else {})},
                         status="failed",
                         calibration=calibration,
                         transpiler=transpiler_ctx,
@@ -1345,7 +1399,7 @@ def _wrap_run(cls, kind: str) -> None:
                     circuit,
                     backend_name=backend_name,
                     parameters=parameters,
-                    execution={**execution, **shot_info},
+                    execution={**execution, **shot_info, **({"primitive": primitive} if primitive else {})},
                     status="submitted",
                     calibration=calibration,
                     transpiler=transpiler_ctx,
@@ -1585,6 +1639,67 @@ def _circuit_stats(circuit) -> dict:
         return {}
 
 
+_TRANSPILE_SETTING_KEYS = (
+    "optimization_level", "basis_gates", "routing_method", "layout_method", "translation_method",
+    "seed_transpiler", "approximation_degree", "scheduling_method",
+)
+
+
+def _first_circuit(value: Any) -> Any:
+    if _looks_like_circuit(value):
+        return value
+    if isinstance(value, (list, tuple)) and value and _looks_like_circuit(value[0]):
+        return value[0]
+    return None
+
+
+def _record_transpile(call, circuit: Any, settings: dict) -> Any:
+    """Run one compilation (transpile() or a preset pass manager's run()) and remember what it did
+    for the next run() on this thread: settings, circuit stats and source before and after."""
+    before: dict = {}
+    qpy_before: dict = {}
+    qasm_before: dict = {}
+    try:
+        first = _first_circuit(circuit)
+        if first is not None:
+            before = _circuit_stats(first)
+            if not _CONFIG.get("zk_qco"):
+                qpy_before = _circuit_to_qpy(first)
+                qasm_before = _circuit_source(first)
+    except Exception:
+        pass
+
+    start_time = datetime.now(timezone.utc).isoformat()
+    t0 = time.monotonic()
+    result = call()
+    duration_ms = round((time.monotonic() - t0) * 1000, 2)
+
+    after: dict = {}
+    qpy_after: dict = {}
+    qasm_after: dict = {}
+    try:
+        tc = _first_circuit(result)
+        if tc is not None:
+            after = _circuit_stats(tc)
+            if not _CONFIG.get("zk_qco"):
+                qpy_after = _circuit_to_qpy(tc)
+                qasm_after = _circuit_source(tc)
+    except Exception:
+        pass
+
+    _transpiler_context.last = {
+        "settings": settings,
+        "before": before,
+        "after": after,
+        "qpy": {"before": qpy_before, "after": qpy_after},
+        "qasm": {"before": qasm_before, "after": qasm_after},
+        "start_time": start_time,
+        "end_time": datetime.now(timezone.utc).isoformat(),
+        "duration_ms": duration_ms,
+    }
+    return result
+
+
 def _patch_transpile() -> None:
     try:
         import qiskit.compiler
@@ -1594,67 +1709,17 @@ def _patch_transpile() -> None:
         original = qiskit.compiler.transpile
 
         def patched(*args, **kwargs):
-            settings = {
-                k: kwargs[k]
-                for k in [
-                    "optimization_level", "basis_gates", "routing_method",
-                    "layout_method", "translation_method", "seed_transpiler",
-                    "approximation_degree", "scheduling_method",
-                ]
-                if k in kwargs and kwargs[k] is not None
-            }
+            settings = {k: kwargs[k] for k in _TRANSPILE_SETTING_KEYS if k in kwargs and kwargs[k] is not None}
+            circuit = args[0] if args else kwargs.get("circuits")
 
-            # Capture pre-transpile circuit stats and source (QPY + OpenQASM)
-            before: dict = {}
-            qpy_before: dict = {}
-            qasm_before: dict = {}
-            try:
-                circuit = args[0] if args else kwargs.get("circuits")
-                first = None
-                if _looks_like_circuit(circuit):
-                    first = circuit
-                elif isinstance(circuit, (list, tuple)) and circuit and _looks_like_circuit(circuit[0]):
-                    first = circuit[0]
-                if first is not None:
-                    before = _circuit_stats(first)
-                    if not _CONFIG.get("zk_qco"):
-                        qpy_before = _circuit_to_qpy(first)
-                        qasm_before = _circuit_source(first)
-            except Exception:
-                pass
+            def call():
+                _LOCAL.in_transpile = getattr(_LOCAL, "in_transpile", 0) + 1
+                try:
+                    return original(*args, **kwargs)
+                finally:
+                    _LOCAL.in_transpile -= 1
 
-            start_time = datetime.now(timezone.utc).isoformat()
-            t0 = time.monotonic()
-            result = original(*args, **kwargs)
-            duration_ms = round((time.monotonic() - t0) * 1000, 2)
-
-            # Capture post-transpile circuit stats
-            after: dict = {}
-            qpy_after: dict = {}
-            qasm_after: dict = {}
-            try:
-                tc = result if _looks_like_circuit(result) else (
-                    result[0] if isinstance(result, (list, tuple)) and result and _looks_like_circuit(result[0]) else None
-                )
-                if tc is not None:
-                    after = _circuit_stats(tc)
-                    if not _CONFIG.get("zk_qco"):
-                        qpy_after = _circuit_to_qpy(tc)
-                        qasm_after = _circuit_source(tc)
-            except Exception:
-                pass
-
-            _transpiler_context.last = {
-                "settings": settings,
-                "before": before,
-                "after": after,
-                "qpy": {"before": qpy_before, "after": qpy_after},
-                "qasm": {"before": qasm_before, "after": qasm_after},
-                "start_time": start_time,
-                "end_time": datetime.now(timezone.utc).isoformat(),
-                "duration_ms": duration_ms,
-            }
-            return result
+            return _record_transpile(call, circuit, settings)
 
         patched._qlab_patched = True
         qiskit.compiler.transpile = patched
@@ -1667,6 +1732,45 @@ def _patch_transpile() -> None:
             pass
     except Exception:
         pass
+    _patch_preset_pass_manager()
+
+
+def _patch_preset_pass_manager() -> None:
+    """generate_preset_pass_manager(...).run(circuit), the compile step in Qiskit's docs, is recorded
+    like transpile(): its settings (optimization level, transpiler seed, methods) and the circuit
+    before and after."""
+    try:
+        import qiskit.transpiler as qt
+        import qiskit.transpiler.preset_passmanagers as pp
+    except Exception:
+        return
+    original = getattr(pp, "generate_preset_pass_manager", None)
+    if not callable(original) or getattr(original, "_qlab_patched", False):
+        return
+
+    def patched(*args, **kwargs):
+        pm = original(*args, **kwargs)
+        if getattr(_LOCAL, "in_transpile", 0):
+            return pm  # transpile() builds one inside and records itself
+        try:
+            settings = {k: kwargs[k] for k in _TRANSPILE_SETTING_KEYS if kwargs.get(k) is not None}
+            if args and "optimization_level" not in settings and _int_seed(args[0]) is not None:
+                settings["optimization_level"] = int(args[0])
+            settings["via"] = "generate_preset_pass_manager"
+            inner_run = pm.run
+
+            def run(circuits, *a, **kw):
+                return _record_transpile(lambda: inner_run(circuits, *a, **kw), circuits, dict(settings))
+
+            pm.run = run
+        except Exception:
+            pass
+        return pm
+
+    patched._qlab_patched = True
+    pp.generate_preset_pass_manager = patched
+    if getattr(qt, "generate_preset_pass_manager", None) is original:
+        qt.generate_preset_pass_manager = patched
 
 
 def init(
@@ -1681,9 +1785,15 @@ def init(
     config_path: Optional[str] = None,
     zk_qco: Optional[bool] = None,
     zk_qco_salt: Optional[str] = None,
+    reproduces: Optional[str] = None,
 ) -> None:
+    """Start capturing. reproduces=<run id> (or QLAB_REPRODUCES) tags every run uploaded from here on
+    as a reproduction of that run; Q-Lab then compares the two and says whether it reproduced."""
     global _CLIENT, _INITIALIZED
 
+    resolved_reproduces = reproduces or os.getenv("QLAB_REPRODUCES") or None
+    if resolved_reproduces:
+        _CONFIG["reproduces"] = str(resolved_reproduces).strip() or None
     if _INITIALIZED:
         return
 
@@ -1740,6 +1850,21 @@ def init(
     _INITIALIZED = True
 
     _fire_telemetry_ping()
+
+
+@contextlib.contextmanager
+def reproducing(run_id: str):
+    """Tag the runs uploaded inside this block as reproductions of run_id (for notebooks)::
+
+        with qlab.reproducing("3f2a..."):
+            sampler.run([isa], shots=4000).result()
+    """
+    previous = _CONFIG.get("reproduces")
+    _CONFIG["reproduces"] = str(run_id).strip() or None
+    try:
+        yield
+    finally:
+        _CONFIG["reproduces"] = previous
 
 
 def auto_track(api_key: Optional[str] = None, project: Optional[str] = None) -> None:

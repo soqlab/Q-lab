@@ -7,6 +7,7 @@ import { useDetail, withDetail } from "../../../../../lib/dial";
 import { setCommandContext } from "../../../../../components/CommandPalette";
 import { useAnswer } from "../../../../../components/RunAnswer";
 import { DriftLine } from "../../../../../components/DriftAlarm";
+import { ReproductionLine } from "../../../../../components/ReproduceRun";
 
 /*
  * A project as time. The strip is every run of the project in order; dragging along it (or the
@@ -21,6 +22,8 @@ type TRun = {
   measure: { kind: "ideal_share" | "top_share"; value: number } | null;
   // Same circuit, same backend as an earlier run in this list: did the result move beyond shot noise?
   drift?: { previous_run_id: string; tvd: number; p_value: number; drifted: boolean } | null;
+  // Tagged as a reproduction of an earlier run (in this list when the state is known): did it agree?
+  reproduction?: { reproduction_of: string; state: string; tvd?: number | null } | null;
 };
 type Timeline = { slug: string; name: string; total: number; shown: number; truncated: boolean; runs: TRun[] };
 
@@ -104,6 +107,14 @@ function Strip({ runs, index, onPick }: { runs: TRun[]; index: number; onPick: (
             <title>{`Drift: TVD ${r.drift.tvd.toFixed(3)} from run ${r.drift.previous_run_id.slice(0, 8)} (p = ${r.drift.p_value.toPrecision(2)})`}</title>
           </g>
         ) : null))}
+        {/* Reproductions: a square around the run, green when it agreed with its original, amber when it didn't. */}
+        {runs.map((r, i) => (r.reproduction && r.measure && (r.reproduction.state === "reproduced" || r.reproduction.state === "not_reproduced") ? (
+          <g key={`r-${r.run_id}`}>
+            <rect x={x(i) - 6} y={y(r.measure.value) - 6} width={12} height={12} fill="none" strokeWidth={1.3}
+              stroke={r.reproduction.state === "reproduced" ? "var(--ok)" : "var(--warn)"} />
+            <title>{`${r.reproduction.state === "reproduced" ? "Reproduced" : "Didn't reproduce"} run ${r.reproduction.reproduction_of.slice(0, 8)}${r.reproduction.tvd != null ? ` (TVD ${r.reproduction.tvd.toFixed(3)})` : ""}`}</title>
+          </g>
+        ) : null))}
         <line x1={x(index)} x2={x(index)} y1={4} y2={H - 4} stroke="var(--accent)" strokeWidth={1} />
       </svg>
       <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--muted)", padding: "2px 10px 0" }}>
@@ -152,6 +163,7 @@ function Moment({ run, prev, slug }: { run: TRun; prev?: TRun; slug: string }) {
           {a.state === "loading" ? "Working out what this run shows…" : a.state === "error" ? "This run's answer couldn't be worked out." : a.data!.sentence}
         </p>
         {run.drift && <DriftLine runId={run.run_id} />}
+        {run.reproduction && <ReproductionLine runId={run.run_id} />}
         {prev ? (
           diff.length ? (
             <div className="table-wrap">
@@ -240,9 +252,14 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
 
   const measured = runs.filter((r) => r.measure);
   const drifted = runs.filter((r) => r.drift?.drifted).length;
+  const reproAgreed = runs.filter((r) => r.reproduction?.state === "reproduced").length;
+  const reproFailed = runs.filter((r) => r.reproduction?.state === "not_reproduced").length;
+  const reproText = reproAgreed + reproFailed
+    ? ` ${reproAgreed + reproFailed} ${reproAgreed + reproFailed === 1 ? "is a reproduction" : "are reproductions"} of an earlier run: ${reproAgreed} agreed${reproFailed ? `, ${reproFailed} didn't` : ""} (boxed).`
+    : "";
   const circuits = new Set(runs.map((r) => r.circuit_hash ?? r.circuit_name)).size;
   const summary = `${d.name}: ${d.total} run${d.total === 1 ? "" : "s"} of ${circuits} circuit${circuits === 1 ? "" : "s"} from ${day(runs[0].created_at)} to ${day(runs[runs.length - 1].created_at)}`
-    + `${d.truncated ? ` (the latest ${d.shown} are shown)` : ""}. ${measured.length === runs.length ? "Every run has a result." : `${measured.length} have a result to score.`} ${drifted ? ` ${drifted} moved beyond shot noise from the run before it of the same circuit on the same machine (ringed in amber).` : ""} Drag along the strip to move through them.`;
+    + `${d.truncated ? ` (the latest ${d.shown} are shown)` : ""}. ${measured.length === runs.length ? "Every run has a result." : `${measured.length} have a result to score.`} ${drifted ? ` ${drifted} moved beyond shot noise from the run before it of the same circuit on the same machine (ringed in amber).` : ""}${reproText} Drag along the strip to move through them.`;
 
   return (
     <main className="page">

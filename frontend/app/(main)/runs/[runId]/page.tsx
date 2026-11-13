@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import RunAnswer, { useAnswer } from "../../../../components/RunAnswer";
 import { setCommandContext } from "../../../../components/CommandPalette";
+import ReproduceRun, { downloadFromApi } from "../../../../components/ReproduceRun";
 import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
@@ -771,6 +772,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
   useEffect(() => {
     if (!run) return;
     const items = [
+      { id: "here:reproduce", kind: "here" as const, title: "Reproduce this run", hint: "Script with the recorded circuit, versions, seeds, settings and shots (.py)", run: () => { void downloadFromApi(`/api/v1/runs/${run.run_id}/reproduce.py`, `reproduce_${run.run_id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12)}.py`); document.getElementById("reproduce")?.scrollIntoView({ behavior: "smooth" }); } },
       { id: "here:pick", kind: "here" as const, title: "Where should I run this next?", hint: "Rank the machines for this circuit from their calibration", href: `/hardware/pick?run=${run.run_id}` },
       { id: "here:verify", kind: "here" as const, title: "Verify this run", hint: "Check its record independently", href: `/verify/${run.run_id}` },
       { id: "here:bundle", kind: "here" as const, title: "Download this run's reproduction bundle", hint: "Circuit, results, calibration, script (.zip)", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)) },
@@ -805,7 +807,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <div className="actions-group">Get the run</div>
             <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)}><Package size={15} aria-hidden="true" /> Reproduction bundle (.zip)</a>
             <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)}><Download size={15} aria-hidden="true" /> Circuit (QASM)</a>
-            <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/rerun.py`)}><FileCode size={15} aria-hidden="true" /> Script to run it again</a>
+            <a href="#reproduce"><FileCode size={15} aria-hidden="true" /> Reproduce this run</a>
             <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/capsule.zip`)}><Package size={15} aria-hidden="true" /> Time capsule (.zip with SHA-256 manifest)</a>
             <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/health`)}><Activity size={15} aria-hidden="true" /> Health score (JSON)</a>
             <div className="actions-group">Compare and share</div>
@@ -824,6 +826,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
           </div>
         </details>
       </div>
+
+      <ReproduceRun runId={run.run_id} />
 
       <dl className="readouts d-standard d-not-expert" aria-label="Circuit">
         <div className="readout"><dt>Qubits</dt><dd>{run.fingerprint.num_qubits ?? "—"}</dd></div>

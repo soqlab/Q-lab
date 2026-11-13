@@ -7,6 +7,26 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Reproduce this run (every run page, Ctrl+K, `GET /api/v1/runs/{id}/reproduce`, `.../reproduce.py`,
+  `.../reproduce.ipynb`): one command, `uv run reproduce_<id>.py`, re-runs the run with the recorded
+  circuit (QPY of the circuit given to `transpile()` when recorded), the recorded qiskit,
+  qiskit-ibm-runtime and qiskit-aer versions and Python minor version (pinned in the script's PEP 723
+  header; a `pip install` line and a notebook cell too), the transpiler settings, seeds, backend and
+  shots. `--as-compiled` runs the exact compiled circuit instead. The page says plainly what can't
+  be pinned (hardware noise, queue time, layout on recalibrated hardware, anything unseeded) and
+  what wasn't recorded. The re-run is uploaded tagged as a reproduction (`qlab.init(reproduces=...)`,
+  `qlab.reproducing()` or `QLAB_REPRODUCES`), and both runs' pages and the project timeline say
+  whether it agreed: "Reproduced: results agree within shot noise (TVD 0.01)" or "Didn't reproduce:
+  … — the machine's calibration changed: …", with drift.py's shot-noise test and attribution
+  (`app/reproduce.py`). `rerun.py` and the bundles now carry this script. Migration
+  `007_reproductions` adds `runs.reproduction_of`.
+- SDK: records seeds set on the primitive or backend object (`StatevectorSampler(seed=)`, Aer's
+  `SamplerV2(seed=)`, runtime `options.simulator.seed_simulator`, `AerSimulator(seed_simulator=)`),
+  which primitive ran the circuit (`execution.primitive`), and the settings and circuits of
+  `generate_preset_pass_manager(...).run()` like `transpile()`.
+- Sign-in: when the browser returns no passkey (NotAllowedError: none found or the prompt closed,
+  which the browser doesn't distinguish), the page says so and offers email and password, creating
+  an account, a phone passkey and a recovery code, instead of a generic error.
 - Pick the machine before you run (`/hardware/pick`, Ctrl+K, and "Where should I run this next?"
   on a run page): paste or drop an OpenQASM 2/3 circuit, or take one of your runs', and the page
   answers which IBM machine to use, e.g. "On ibm_a expect ≈0.84; on ibm_b ≈0.71: qubit 3's

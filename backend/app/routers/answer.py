@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..drift import timeline_marks as drift_marks
+from ..reproduce import timeline_marks as reproduction_marks
 from ..deps import Identity, get_identity
 from ..models import Project, Run
 from ..run_answer import LEVELS, Level, answer, ideal_distribution, measure
@@ -73,6 +74,8 @@ def project_timeline(slug: str, db: Session = Depends(get_db), identity: Optiona
     items = []
     # Same circuit, same backend, result moved beyond shot noise (app/drift.py): marked on the strip.
     marks = drift_marks(list(reversed(runs)))
+    # Re-runs tagged as a reproduction of an earlier run in this list, and whether they agreed (app/reproduce.py).
+    repro_marks = reproduction_marks(list(reversed(runs)))
     for r in reversed(runs):
         key = (r.fingerprint or {}).get("qasm_sha256") or r.qasm or ""
         known = None
@@ -92,6 +95,7 @@ def project_timeline(slug: str, db: Session = Depends(get_db), identity: Optiona
             "depth": (r.fingerprint or {}).get("depth"),
             "measure": None if m is None else {"kind": m["kind"], "value": round(m["value"], 6)},
             "drift": marks.get(r.run_id),
+            "reproduction": repro_marks.get(r.run_id),
         })
     return {
         "slug": slug,

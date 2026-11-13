@@ -231,6 +231,8 @@ class Run(Base):
     org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     benchmark_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # The run this one re-ran (the SDK's context.reproduction_of; see app/reproduce.py).
+    reproduction_of: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

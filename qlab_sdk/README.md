@@ -127,6 +127,26 @@ and a shareable dashboard URL. In detail:
   `qpy_version`, `qiskit_version`, `sha256`), and `transpiler.qasm.before/after`
   the OpenQASM 3 (or 2) text. Each is capped at 512 KB (`QLAB_SOURCE_MAX_BYTES`);
   over the cap only the size and hash are kept. Nothing is captured in ZK-QCO mode.
+  `generate_preset_pass_manager(...).run(circuit)` is recorded the same way
+  (`transpiler.settings.via` says which was used).
+- **Seeds and primitive**: seeds set on the primitive or backend itself
+  (`StatevectorSampler(seed=)`, Aer's `SamplerV2(seed=)`, runtime
+  `options.simulator.seed_simulator`, `AerSimulator(seed_simulator=)`) go into
+  `parameters`, and `execution.primitive` says whether `backend.run()`, a Sampler
+  or an Estimator ran the circuit, and which class.
+
+## Reproducing a run
+
+Every run page in Q-Lab has "Reproduce this run": a script that re-runs it with
+the recorded circuit, versions, settings, seeds, backend and shots. The script
+uploads its result tagged as a reproduction, and Q-Lab says whether it agreed.
+To tag runs yourself:
+
+```python
+qlab.init(reproduces="<run id>")          # every run from here on, or QLAB_REPRODUCES=<run id>
+with qlab.reproducing("<run id>"):        # only the runs inside the block (notebooks)
+    sampler.run([isa], shots=4000).result()
+```
 
 ## Amazon Braket and IonQ
 

@@ -189,6 +189,7 @@ def _ensure_compat_columns() -> None:
         ("org_id", "INTEGER"),
         ("created_by_user_id", "INTEGER"),
         ("benchmark_id", "VARCHAR(64)"),
+        ("reproduction_of", "VARCHAR(64)"),
     ]
 
     with engine.begin() as conn:
@@ -202,6 +203,8 @@ def _ensure_compat_columns() -> None:
         for col, col_type in nullable_cols:
             if col not in columns:
                 conn.execute(text(f"ALTER TABLE runs ADD COLUMN {col} {col_type}"))
+        if "reproduction_of" not in columns:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_runs_reproduction_of ON runs (reproduction_of)"))
 
 
 def _ensure_fts() -> None:
