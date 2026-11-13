@@ -60,6 +60,7 @@ from .routers import hardware_intel as hardware_intel_router
 from .routers import institute_admin as institute_admin_router
 from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
+from .routers import answer as answer_router
 from .routers import pub_report as pub_report_router
 from .routers import paper_package as paper_package_router
 from .routers import campaigns as campaigns_router
@@ -289,6 +290,7 @@ app.include_router(hardware_intel_router.router)
 app.include_router(institute_admin_router.router)
 app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
+app.include_router(answer_router.router)
 app.include_router(pub_report_router.router)
 app.include_router(paper_package_router.router)
 app.include_router(campaigns_router.router)
@@ -808,6 +810,7 @@ def search_runs(
     has_calibration: Optional[bool] = None,
     benchmark_id: Optional[str] = None,
     tags: Optional[str] = Query(default=None, description="Comma-separated tags"),
+    circuit: Optional[str] = Query(default=None, max_length=64, description="Circuit hash (fingerprint.qasm_sha256) or its start"),
     created_after: Optional[datetime] = None,
     created_before: Optional[datetime] = None,
     sort_by: Literal["created_at", "depth", "num_qubits"] = Query(default="created_at"),
@@ -864,6 +867,9 @@ def search_runs(
         serialized = [r for r in serialized if r.get("calibration")]
     elif has_calibration is False:
         serialized = [r for r in serialized if not r.get("calibration")]
+    if circuit:
+        prefix = circuit.strip().lower()
+        serialized = [r for r in serialized if str((r.get("fingerprint") or {}).get("qasm_sha256") or "").startswith(prefix)]
     if tags:
         tag_set = {t.strip() for t in tags.split(",") if t.strip()}
         serialized = [r for r in serialized if tag_set & set(r.get("tags") or [])]
