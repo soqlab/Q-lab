@@ -11,7 +11,7 @@ import { useCallback, useSyncExternalStore } from "react";
 const CORE_EXACT = [
   "/",
   "/runs", "/projects", "/timeline", "/analytics", "/compare", "/benchmarks", "/reproducibility",
-  "/backends", "/calibration", "/intel", "/cost-oracle",
+  "/backends", "/calibration", "/intel", "/cost-oracle", "/hardware",
   "/assistant", "/onboarding",
   "/integrations", "/webhooks",
   "/team",
@@ -20,7 +20,7 @@ const CORE_EXACT = [
   "/profile", "/billing", "/admin",
 ];
 // Paths whose sub-pages are core too (a run's detail page, a project's page, ...).
-const CORE_PREFIX = ["/runs/", "/projects/", "/benchmarks/", "/backends/", "/profile/", "/admin/"];
+const CORE_PREFIX = ["/runs/", "/hardware/", "/projects/", "/benchmarks/", "/backends/", "/profile/", "/admin/"];
 
 export function isCorePath(pathname: string): boolean {
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;

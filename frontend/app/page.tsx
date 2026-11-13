@@ -7,6 +7,7 @@ import { useAuth } from "../lib/auth";
 import { qlabApiPath } from "../lib/api";
 import { FRONTEND_COMMIT, commitUrl, shortSha } from "../lib/build";
 import s from "./landing.module.css";
+import BoardReadout from "../components/board/BoardReadout";
 
 // The signed-out front door is the instrument itself: what this Q-Lab server is doing right now,
 // read live from its public API. Nothing on this page is a picture or a made-up number; a reading
@@ -179,6 +180,14 @@ export default function Landing() {
               </table>
             </div>
           )}
+        </section>
+
+        <section className="frame" aria-labelledby="hw-h">
+          <div className="frame-head">
+            <h2 id="hw-h" className="inst-label">Quantum hardware right now</h2>
+            <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>IBM Quantum, read by this server</span>
+          </div>
+          <div className="frame-body"><BoardReadout href="/hardware" /></div>
         </section>
 
         <section className="frame" aria-labelledby="rec-h">

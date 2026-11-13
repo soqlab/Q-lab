@@ -822,3 +822,43 @@ class GenericRecord(Base):
     record_id: Mapped[str] = mapped_column(String(64), index=True)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Hardware board (app/hardware_board.py): a fixed benchmark set run on real IBM machines
+# ---------------------------------------------------------------------------
+
+class HardwareBoardJob(Base):
+    """One benchmark job on one machine. Written only by the server, so the board reads its
+    results from here rather than from run rows, which the run API can also write."""
+    __tablename__ = "hardware_board_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    backend: Mapped[str] = mapped_column(String(120), index=True)
+    backend_qubits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    set_version: Mapped[str] = mapped_column(String(40))
+    shots: Mapped[int] = mapped_column(Integer)
+    simulated: Mapped[bool] = mapped_column(Boolean, default=False)
+    # pending | done | error | cancelled | abandoned
+    status: Mapped[str] = mapped_column(String(20), index=True, default="pending")
+    provider_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Per circuit, at submission: id, qasm, physical qubits, transpiler facts, calibration.
+    circuits: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    # Per circuit, once done: id, counts, hellinger, success, run_id, share_token.
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    versions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class HardwareBoardState(Base):
+    """A single row (id 1): when the next benchmark is due. Claimed with a conditional UPDATE,
+    so several workers or instances never submit the same benchmark twice."""
+    __tablename__ = "hardware_board_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    next_due: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_submitted: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_message: Mapped[str | None] = mapped_column(Text, nullable=True)

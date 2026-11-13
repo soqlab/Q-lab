@@ -1,0 +1,26 @@
+# Wakes the hosted backend once a day so the hardware board's scheduler gets to run.
+#
+# The benchmark is scheduled inside the backend (backend/app/hardware_board.py): it submits when one
+# is due and collects finished jobs whenever the server is awake. Render's free plan stops an idle
+# server, so this asks it for /health once a day. No secrets: /health is public.
+name: Hardware board wake-up
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the backend for /health
+        run: |
+          for attempt in 1 2 3 4; do
+            if curl -fsS --max-time 60 https://qlab-backend.onrender.com/health; then echo; exit 0; fi
+            sleep 20
+          done
+          echo "::warning::The backend did not answer /health; the board will catch up on its next wake."
