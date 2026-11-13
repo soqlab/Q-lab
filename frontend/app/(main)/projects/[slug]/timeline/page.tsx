@@ -49,7 +49,10 @@ function Strip({ runs, index, onPick }: { runs: TRun[]; index: number; onPick: (
   const H = 96, pad = 10;
   const n = runs.length;
   const x = (i: number) => pad + (n <= 1 ? (w - 2 * pad) / 2 : (i * (w - 2 * pad)) / (n - 1));
-  const y = (v: number) => H - 14 - v * (H - 28);
+  // The vertical scale runs from just below the lowest result to 100%, so small changes show.
+  const vals = runs.flatMap((r) => (r.measure ? [r.measure.value] : []));
+  const lo = vals.length ? Math.max(0, Math.floor((Math.min(...vals) - 0.02) * 20) / 20) : 0;
+  const y = (v: number) => H - 14 - ((v - lo) / Math.max(0.01, 1 - lo)) * (H - 28);
   const pick = (clientX: number) => {
     const r = box.current?.getBoundingClientRect();
     if (!r || n === 0) return;
@@ -79,7 +82,8 @@ function Strip({ runs, index, onPick }: { runs: TRun[]; index: number; onPick: (
       onPointerUp={() => { dragging.current = false; }}
       onPointerCancel={() => { dragging.current = false; }}>
       <svg width={w} height={H} role="img" aria-label={`${n} runs in time order; the selected one is number ${index + 1}`} style={{ display: "block" }}>
-        <line x1={pad} x2={w - pad} y1={y(0)} y2={y(0)} stroke="var(--line)" />
+        <line x1={pad} x2={w - pad} y1={y(lo)} y2={y(lo)} stroke="var(--line)" />
+        <text x={w - pad} y={y(lo) - 3} textAnchor="end" fontSize="9" fill="var(--muted)" fontFamily="var(--mono)">{Math.round(lo * 100)}%</text>
         <line x1={pad} x2={w - pad} y1={y(1)} y2={y(1)} stroke="var(--line)" strokeDasharray="2 4" />
         <text x={w - pad} y={y(1) - 3} textAnchor="end" fontSize="9" fill="var(--muted)" fontFamily="var(--mono)">100%</text>
         {segs.map((d, i) => <path key={i} d={d} fill="none" stroke="var(--c-runs)" strokeWidth={1.2} opacity={0.6} />)}
@@ -87,7 +91,7 @@ function Strip({ runs, index, onPick }: { runs: TRun[]; index: number; onPick: (
           r.measure
             ? <circle key={r.run_id} cx={x(i)} cy={y(r.measure.value)} r={i === index ? 4.5 : 2.4}
                 fill={r.status === "failed" ? "var(--danger)" : i === index ? "var(--text)" : "var(--c-runs)"} />
-            : <line key={r.run_id} x1={x(i)} x2={x(i)} y1={y(0) - 5} y2={y(0) + 2} stroke={r.status === "failed" ? "var(--danger)" : "var(--muted)"} />
+            : <line key={r.run_id} x1={x(i)} x2={x(i)} y1={y(lo) - 5} y2={y(lo) + 2} stroke={r.status === "failed" ? "var(--danger)" : "var(--muted)"} />
         ))}
         <line x1={x(index)} x2={x(index)} y1={4} y2={H - 4} stroke="var(--accent)" strokeWidth={1} />
       </svg>
