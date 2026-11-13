@@ -166,3 +166,12 @@ def test_public_answer_compares_only_with_the_owners_shared_runs():
     b = client.get(f"/api/v1/runs/public/{token}/answer").json()
     assert b["previous"]["run_id"] == hidden and b["previous"]["share_token"]
     assert client.get("/api/v1/runs/public/nope/answer").status_code == 404
+
+
+def test_gallery_reports_share_on_expected_outcomes():
+    me = make_user(prefix="ans")
+    rid = _post(me, results={"counts": {"00": 470, "11": 470, "01": 60}})
+    token = client.post(f"/api/v1/runs/{rid}/share", headers=me).json()["share_token"]
+    items = client.get("/api/v1/public/gallery?limit=100").json()["items"]
+    mine = next(i for i in items if i["share_token"] == token)
+    assert mine["on_expected"] == 0.94

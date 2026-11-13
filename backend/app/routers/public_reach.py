@@ -133,7 +133,23 @@ def public_gallery(
         .order_by(Run.created_at.desc()).offset(offset).limit(limit)
     ).all()
     from sqlalchemy import func
+    from ..run_answer import ideal_distribution, measure
     total = db.scalar(select(func.count()).select_from(Run).where(Run.share_token.isnot(None))) or 0
+
+    # The headline number of each run, as on its page: the share of shots on the outcomes the
+    # noise-free circuit can produce (None when there is no ideal to compare with).
+    ideals: dict[str, object] = {}
+
+    def on_expected(r: Run):
+        key = (r.fingerprint or {}).get("qasm_sha256") or r.qasm or ""
+        known = None
+        if r.qasm and not (r.results or {}).get("ideal"):
+            if key not in ideals:
+                ideals[key] = ideal_distribution(r)
+            known = ideals[key]
+        m = measure(r, known)  # type: ignore[arg-type]
+        return round(m["value"], 4) if m and m["kind"] == "ideal_share" else None
+
     return {
         "total": total,
         "offset": offset,
@@ -145,6 +161,7 @@ def public_gallery(
                 "backend": r.backend,
                 "status": r.status,
                 "health_score": r.health_score,
+                "on_expected": on_expected(r),
                 "qubits": (r.fingerprint or {}).get("num_qubits"),
                 "depth": (r.fingerprint or {}).get("depth"),
                 "project": r.project_slug,

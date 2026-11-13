@@ -242,7 +242,7 @@ function RunsInner() {
                   <th className="d-standard" style={{ textAlign: "right" }}>Qubits</th>
                   <th className="d-expert" style={{ textAlign: "right" }}>Depth</th>
                   <th className="d-expert">Circuit hash</th>
-                  <th className="d-standard" style={{ textAlign: "right" }}>Quality</th>
+                  <th className="d-expert" style={{ textAlign: "right" }} title="Q-Lab health score, 0–100: a weighted mix of the top outcome share and calibrated gate and readout fidelity">Health score</th>
                   <th style={{ textAlign: "right" }}>When</th>
                 </tr>
               </thead>
@@ -267,7 +267,7 @@ function RunsInner() {
                     <td className="mono d-expert" style={{ fontSize: 11 }}>
                       {run.fingerprint?.qasm_sha256 ? <Link href={withDetail(`/runs?circuit=${run.fingerprint.qasm_sha256}`, detail)}>{run.fingerprint.qasm_sha256.slice(0, 12)}</Link> : "—"}
                     </td>
-                    <td className="d-standard" style={{ textAlign: "right" }}><HealthBadge score={run.health_score} /></td>
+                    <td className="d-expert" style={{ textAlign: "right" }}><HealthBadge score={run.health_score} /></td>
                     <td style={{ textAlign: "right", color: "var(--muted)", whiteSpace: "nowrap" }}>{ago(run.created_at)}</td>
                   </tr>
                 ))}

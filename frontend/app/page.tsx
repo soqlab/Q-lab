@@ -15,7 +15,7 @@ import BoardReadout from "../components/board/BoardReadout";
 
 type GalleryItem = {
   share_token: string; circuit_name: string; backend: string | null; status: string;
-  health_score: number | null; qubits: number | null; depth: number | null; project: string | null; created_at: string | null;
+  health_score: number | null; on_expected: number | null; qubits: number | null; depth: number | null; project: string | null; created_at: string | null;
 };
 type Gallery = { total: number; items: GalleryItem[] };
 type Load<T> = { state: "loading" } | { state: "error" } | { state: "ok"; data: T; ms?: number };
@@ -163,7 +163,7 @@ export default function Landing() {
             <div className="table-wrap">
               <table className={s.table}>
                 <thead>
-                  <tr><th>Circuit</th><th>Backend</th><th className={s.r}>Qubits</th><th className={s.r}>Depth</th><th className={s.r}>Quality</th><th className={s.r}>When</th></tr>
+                  <tr><th>Circuit</th><th>Backend</th><th className={s.r}>Qubits</th><th className={s.r}>Depth</th><th className={s.r} title="Share of shots that landed on outcomes the noise-free circuit can produce">On expected outcomes</th><th className={s.r}>When</th></tr>
                 </thead>
                 <tbody>
                   {shown.map((r) => (
@@ -172,7 +172,7 @@ export default function Landing() {
                       <td className="mono">{r.backend ?? "—"}</td>
                       <td className={`num ${s.r}`}>{r.qubits ?? "—"}</td>
                       <td className={`num ${s.r}`}>{r.depth ?? "—"}</td>
-                      <td className={`num ${s.r}`}>{r.health_score ?? "—"}</td>
+                      <td className={`num ${s.r}`}>{r.on_expected != null ? `${(r.on_expected * 100).toFixed(1)}%` : "—"}</td>
                       <td className={s.r}>{ago(r.created_at)}</td>
                     </tr>
                   ))}
