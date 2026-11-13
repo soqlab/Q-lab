@@ -186,10 +186,13 @@ export default function ProjectPage({ params: paramsPromise }: { params: Promise
         </a>
         <Link
           className="button"
-          href={`/?project=${encodeURIComponent(params.slug)}`}
+          href={`/projects/${encodeURIComponent(params.slug)}/timeline`}
           style={{ fontSize: 13 }}
         >
-          <Layers size={15} /> View Runs
+          <Layers size={15} /> Timeline
+        </Link>
+        <Link className="button secondary" href={`/runs?project=${encodeURIComponent(params.slug)}`} style={{ fontSize: 13 }}>
+          View runs
         </Link>
       </div>
 

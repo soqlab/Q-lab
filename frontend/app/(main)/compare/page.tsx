@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GitCompare, Search } from "lucide-react";
 import { compareRuns, CompareResult, explainRunDiff, ExplainDiffResult, fetchRuns, fetchRunMetricsData, QLabRun, MetricPoint, RunMetricsResponse } from "../../../lib/api";
 import ExplainDiffPanel from "../../../components/ExplainDiffPanel";
@@ -276,7 +277,11 @@ function MetricsComparePanel({
 // ------------------------------------------------------------------
 // Main compare page
 // ------------------------------------------------------------------
-export default function ComparePage() {
+function CompareInner() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const urlA = params.get("a") ?? "";
+  const urlB = params.get("b") ?? "";
   const [runs, setRuns] = useState<QLabRun[]>([]);
   const [leftRunId, setLeftRunId] = useState("");
   const [rightRunId, setRightRunId] = useState("");
@@ -291,16 +296,30 @@ export default function ComparePage() {
       try {
         const loaded = await fetchRuns();
         setRuns(loaded);
-        setLeftRunId(loaded[0]?.run_id || "");
-        setRightRunId(loaded[1]?.run_id || loaded[0]?.run_id || "");
+        // A link names the pair (?a=…&b=…); otherwise start from the two newest runs.
+        if (!urlA) setLeftRunId(loaded[1]?.run_id || loaded[0]?.run_id || "");
+        if (!urlB) setRightRunId(loaded[0]?.run_id || "");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load runs");
       }
     }
     void loadRuns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runCompare() {
+  // The pair in the address is compared as soon as the page opens, so a comparison is a link.
+  const [shown, setShown] = useState("");
+  if (urlA && urlB && `${urlA}|${urlB}` !== shown) {
+    setShown(`${urlA}|${urlB}`);
+    setLeftRunId(urlA);
+    setRightRunId(urlB);
+  }
+  useEffect(() => {
+    if (urlA && urlB) void runCompare(urlA, urlB);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlA, urlB]);
+
+  async function runCompare(leftRunId: string, rightRunId: string) {
     if (!leftRunId || !rightRunId) return;
     setError(null);
     setExplainError(null);
@@ -320,20 +339,27 @@ export default function ComparePage() {
     await explaining;
   }
 
-  const runOptions = useMemo(
-    () =>
-      runs.map((run) => ({
-        value: run.run_id,
-        label: `${run.circuit_name || run.run_id.slice(0, 8)} (${run.project || "no project"})`,
-      })),
-    [runs],
-  );
+  const runOptions = useMemo(() => {
+    const opts = runs.map((run) => ({
+      value: run.run_id,
+      label: `${run.circuit_name || run.run_id.slice(0, 8)} (${run.project || "no project"}, ${run.created_at.slice(0, 10)})`,
+    }));
+    for (const id of [urlA, urlB]) if (id && !opts.some((o) => o.value === id)) opts.unshift({ value: id, label: id });
+    return opts;
+  }, [runs, urlA, urlB]);
 
   const leftLabel = useMemo(() => runOptions.find(r => r.value === leftRunId)?.label ?? leftRunId.slice(0, 10), [runOptions, leftRunId]);
   const rightLabel = useMemo(() => runOptions.find(r => r.value === rightRunId)?.label ?? rightRunId.slice(0, 10), [runOptions, rightRunId]);
 
   return (
     <main className="page">
+      <p className="summary-line">
+        {result && compared
+          ? (explanation?.attribution?.summary
+              ? `Comparing ${leftLabel} with ${rightLabel}. ${explanation.attribution.summary}`
+              : `Comparing ${leftLabel} with ${rightLabel}.`)
+          : "Pick two runs to see what differs between them and whether shot noise, the compiler or calibration explains it. The pair goes in the address, so the comparison is a link."}
+      </p>
       <div className="toolbar">
         <select
           className="input"
@@ -359,7 +385,11 @@ export default function ComparePage() {
             </option>
           ))}
         </select>
-        <button className="button" type="button" onClick={() => void runCompare()}>
+        <button className="button" type="button" onClick={() => {
+          const sp = new URLSearchParams(window.location.search);
+          sp.set("a", leftRunId); sp.set("b", rightRunId);
+          router.replace(`/compare?${sp}`, { scroll: false });
+        }}>
           <GitCompare size={17} aria-hidden="true" />
           Compare
         </button>
@@ -416,4 +446,8 @@ export default function ComparePage() {
       ) : null}
     </main>
   );
+}
+
+export default function ComparePage() {
+  return <Suspense fallback={<main className="page"><p className="summary-line">Loading…</p></main>}><CompareInner /></Suspense>;
 }

@@ -20,7 +20,7 @@ function ProjectCard({ project }: { project: Project }) {
           <Folder size={18} color="var(--strong)" aria-hidden="true" />
         </div>
         <div style={{ minWidth: 0 }}>
-          <Link href={`/projects/${project.slug}`} style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", textDecoration: "none" }}>
+          <Link href={`/projects/${project.slug}/timeline`} style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", textDecoration: "none" }}>
             {project.name}
           </Link>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
@@ -37,8 +37,11 @@ function ProjectCard({ project }: { project: Project }) {
         <Link className="button secondary" href={`/projects/${project.slug}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
           <Folder size={14} aria-hidden="true" /> Dashboard
         </Link>
-        <Link className="button secondary" href={`/?project=${project.slug}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
+        <Link className="button secondary" href={`/runs?project=${encodeURIComponent(project.slug)}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
           <History size={14} aria-hidden="true" /> Runs
+        </Link>
+        <Link className="button" href={`/projects/${encodeURIComponent(project.slug)}/timeline`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
+          Timeline
         </Link>
       </div>
     </div>
@@ -95,28 +98,14 @@ export default function ProjectsPage() {
 
   return (
     <main className="page">
-      <section className="summary-grid" aria-label="Project overview">
-        <div className="metric">
-          <div className="metric-label">Total Projects</div>
-          <div className="metric-value">{projects.length}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Total Runs</div>
-          <div className="metric-value">{projects.reduce((s, p) => s + p.run_count, 0)}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Avg Runs / Project</div>
-          <div className="metric-value">
-            {projects.length ? (projects.reduce((s, p) => s + p.run_count, 0) / projects.length).toFixed(1) : "—"}
-          </div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Most Active</div>
-          <div className="metric-value" style={{ fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {projects.length ? (projects.reduce((a, b) => a.run_count >= b.run_count ? a : b)).name : "—"}
-          </div>
-        </div>
-      </section>
+      <p className="summary-line">
+        {loading ? "Loading projects…" : error ? "Projects couldn't be loaded." : projects.length === 0 ? "No projects yet."
+          : (() => {
+              const total = projects.reduce((s, p) => s + p.run_count, 0);
+              const top = projects.reduce((x, y) => (x.run_count >= y.run_count ? x : y));
+              return `${projects.length} project${projects.length === 1 ? "" : "s"} holding ${total} run${total === 1 ? "" : "s"}; the busiest is ${top.name} with ${top.run_count}. Open one to drag through its history.`;
+            })()}
+      </p>
 
       <section className="panel">
         <div className="panel-header">

@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, RefreshCw, Wifi, Download } from "lucide-react";
 import { createRunStream, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { useToast } from "../../../lib/toast";
+import { useDetail, withDetail } from "../../../lib/dial";
 
 
 // Empty state: what is missing and how to get it. No pictures, no sample data.
@@ -19,7 +20,7 @@ function QuickStart() {
 
 import qlab
 qlab.auto_track(api_key="YOUR_KEY")`}</pre>
-        <p style={{ margin: "10px 0 0" }}>Your API key and a step-by-step guide are in <a href="/onboarding" style={{ textDecoration: "underline" }}>Quick start</a>.</p>
+        <p style={{ margin: "10px 0 0" }}>Your API key and a step-by-step guide are in <Link href="/onboarding" style={{ textDecoration: "underline" }}>Quick start</Link>.</p>
       </div>
     </section>
   );
@@ -35,13 +36,13 @@ function statusClass(s: string) {
 
 function HealthBadge({ score }: { score: number | null | undefined }) {
   if (score === null || score === undefined) return <span style={{ color: "var(--muted)", fontSize: 13 }}>—</span>;
-  return <span style={{ fontWeight: 700, color: healthColor(score), fontSize: 13 }}>{score}</span>;
+  return <span className="num" style={{ fontWeight: 600, color: healthColor(score), fontSize: 13 }}>{score}</span>;
 }
 
 
 // ------------------------------------------------------------------
 // Smart query parser
-// Supports: backend:X  status:Y  project:Z  depth>N  depth<N  qubits>N  tag:X
+// Supports: backend:X  status:Y  project:Z  depth<N  qubits>N  tag:X
 // ------------------------------------------------------------------
 type ParsedQuery = {
   text: string;
@@ -76,243 +77,198 @@ function parseSmartQuery(raw: string): ParsedQuery {
 }
 
 // ------------------------------------------------------------------
-// Main
+// The list. Every filter lives in the address, so a filtered view is a link.
 // ------------------------------------------------------------------
+const FILTERS = ["q", "backend", "status", "project", "min_qubits", "max_depth", "circuit"] as const;
+type Filters = Record<(typeof FILTERS)[number], string>;
+
+function filtersFrom(sp: { get(k: string): string | null }): Filters {
+  const f = {} as Filters;
+  for (const k of FILTERS) f[k] = sp.get(k) ?? "";
+  return f;
+}
+
+function ago(iso: string): string {
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (!Number.isFinite(m)) return "—";
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+/** One plain sentence about what is on screen, from the runs actually loaded. */
+function summarise(runs: QLabRun[], f: Filters): string {
+  const scope = [
+    f.project && `in project ${f.project}`, f.backend && `on ${f.backend}`, f.status && `with status ${f.status}`,
+    f.circuit && `of circuit ${f.circuit.slice(0, 12)}`, f.q && `matching “${f.q}”`,
+  ].filter(Boolean).join(", ");
+  if (!runs.length) return scope ? `No runs ${scope}.` : "No runs recorded yet.";
+  const failed = runs.filter((r) => r.status === "failed").length;
+  const backends = new Set(runs.map((r) => r.backend).filter(Boolean)).size;
+  const latest = runs[0];
+  return `${runs.length} run${runs.length === 1 ? "" : "s"}${scope ? ` ${scope}` : ""} on ${backends} backend${backends === 1 ? "" : "s"}`
+    + `${failed ? `, ${failed} failed` : ""}. The latest, ${latest.circuit_name || latest.run_id.slice(0, 8)}${latest.backend ? ` on ${latest.backend}` : ""}, arrived ${ago(latest.created_at)}.`;
+}
+
 function RunsInner() {
   const { token } = useAuth();
-  const { toast } = useToast();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [detail] = useDetail();
+  const applied = useMemo(() => filtersFrom(searchParams), [searchParams]);
+  const key = FILTERS.map((k) => applied[k]).join("|");
+  const [draft, setDraft] = useState<Filters>(applied);
+  const [lastKey, setLastKey] = useState(key);
+  if (key !== lastKey) { setLastKey(key); setDraft(applied); }
+
   const [runs, setRuns] = useState<QLabRun[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
-
-  // Filters
-  const [q, setQ] = useState(searchParams.get("q") ?? "");
-  const [backend, setBackend] = useState(searchParams.get("backend") ?? "");
-  const [status, setStatus] = useState(searchParams.get("status") ?? "");
-  const [project, setProject] = useState(searchParams.get("project") ?? "");
-  const [minQubits, setMinQubits] = useState(searchParams.get("min_qubits") ?? "");
-  const [maxDepth, setMaxDepth] = useState(searchParams.get("max_depth") ?? "");
-
-  const esCleanup = useRef<(() => void) | null>(null);
-
-  // The search and the state it sets, only in promise callbacks: the mount effect runs it directly
-  // (loading starts true), everything else through loadRuns().
-  function fetchRuns() {
-    const params: Record<string, string | number> = { page_size: 500 };
-    if (q) params.q = q;
-    if (backend) params.backend = backend;
-    if (status) params.status = status;
-    if (project) params.project = project;
-    if (minQubits) params.min_qubits = Number(minQubits);
-    if (maxDepth) params.max_depth = Number(maxDepth);
-    return searchRuns(params)
-      .then((result) => setRuns(result.items))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load runs"))
-      .finally(() => setLoading(false));
-  }
-
-  function loadRuns() {
-    setLoading(true);
-    setError(null);
-    return fetchRuns();
-  }
-
-  function connectSSE() {
-    if (esCleanup.current) esCleanup.current();
-    const cleanup = createRunStream((type, data) => {
-      if (type === "run.created") setRuns(prev => [data, ...prev.slice(0, 999)]);
-      else if (type === "run.updated") setRuns(prev => prev.map(r => r.run_id === data.run_id ? data : r));
-      else if (type === "run.deleted") setRuns(prev => prev.filter(r => r.run_id !== (data as unknown as { run_id: string }).run_id));
-    });
-    esCleanup.current = cleanup;
-    setLive(true);
-  }
+  // Runs that arrived over the live stream while this page was open: they flash once.
+  const [arrived, setArrived] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    void fetchRuns().then(connectSSE);
-    return () => { if (esCleanup.current) esCleanup.current(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let on = true;
+    const params: Record<string, string | number> = { page_size: 500 };
+    for (const k of FILTERS) if (applied[k]) params[k] = applied[k];
+    searchRuns(params)
+      .then((res) => { if (on) { setRuns(res.items); setError(null); setLoaded(key); } })
+      .catch((err: unknown) => { if (on) { setError(err instanceof Error ? err.message : "Failed to load runs"); setLoaded(key); } });
+    return () => { on = false; };
+  }, [key, applied]);
 
-  // KPI metrics
-  const total = runs.length;
-  const completed = runs.filter(r => r.status === "completed").length;
-  const failed = runs.filter(r => r.status === "failed").length;
-  const maxQubits = Math.max(0, ...runs.map(r => r.fingerprint?.num_qubits ?? 0));
-  const withCal = runs.filter(r => r.calibration && Object.keys(r.calibration).length > 0).length;
-  const avgHealth = (() => {
-    const scored = runs.filter(r => r.health_score !== null && r.health_score !== undefined);
-    if (!scored.length) return null;
-    return Math.round(scored.reduce((s, r) => s + (r.health_score ?? 0), 0) / scored.length);
-  })();
+  useEffect(() => {
+    const close = createRunStream((type, data) => {
+      if (type === "run.created") {
+        setRuns((prev) => (prev.some((r) => r.run_id === data.run_id) ? prev : [data, ...prev.slice(0, 999)]));
+        setArrived((prev) => new Set(prev).add(data.run_id));
+      } else if (type === "run.updated") setRuns((prev) => prev.map((r) => (r.run_id === data.run_id ? data : r)));
+      else if (type === "run.deleted") setRuns((prev) => prev.filter((r) => r.run_id !== (data as unknown as { run_id: string }).run_id));
+    }, applied.project || undefined);
+    setLive(true);
+    return close;
+  }, [applied.project]);
 
+  function apply(next: Filters) {
+    const sp = new URLSearchParams(window.location.search);
+    for (const k of FILTERS) { if (next[k]) sp.set(k, next[k]); else sp.delete(k); }
+    const qs = sp.toString();
+    router.replace(qs ? `/runs?${qs}` : "/runs", { scroll: false });
+  }
 
+  function submitSearch() {
+    const parsed = parseSmartQuery(draft.q);
+    apply({
+      ...draft,
+      q: parsed.text,
+      backend: parsed.backend || draft.backend,
+      status: parsed.status || draft.status,
+      project: parsed.project || draft.project,
+      min_qubits: parsed.minQubits || draft.min_qubits,
+      max_depth: parsed.maxDepth || draft.max_depth,
+    });
+  }
+
+  const loading = loaded !== key;
+  const filtered = FILTERS.some((k) => applied[k]);
   const exportUrl = qlabApiPath(`/api/v1/exports/runs.csv`);
+  const set = (k: keyof Filters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setDraft({ ...draft, [k]: e.target.value });
 
   return (
     <main className="page">
-      {/* Toolbar */}
-      <div className="toolbar">
-        <input
-          className="input"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === "Enter") {
-              const parsed = parseSmartQuery(q);
-              if (parsed.backend) setBackend(parsed.backend);
-              if (parsed.status) setStatus(parsed.status);
-              if (parsed.project) setProject(parsed.project);
-              if (parsed.minQubits) setMinQubits(parsed.minQubits);
-              if (parsed.maxDepth) setMaxDepth(parsed.maxDepth);
-              if (parsed.text !== q) setQ(parsed.text);
-              void loadRuns();
-            }
-          }}
-          placeholder='Search · try "backend:ibm_osaka depth<20 status:completed"'
-          style={{ minWidth: 300 }}
-        />
-        <input className="input" value={backend} onChange={e => setBackend(e.target.value)} placeholder="Backend" />
-        <select className="input" value={status} onChange={e => setStatus(e.target.value)} style={{ minWidth: 130 }}>
+      <p className="summary-line" aria-live="polite">{loading ? "Loading runs…" : error ? `Runs couldn't be loaded: ${error}` : summarise(runs, applied)}</p>
+
+      <form className="toolbar" role="search" onSubmit={(e) => { e.preventDefault(); submitSearch(); }}>
+        <input className="input" value={draft.q} onChange={set("q")} style={{ minWidth: 220, flex: 1 }}
+          placeholder='Circuit or tag · try "backend:ibm_torino depth<20 status:completed"' aria-label="Search runs" />
+        <input className="input d-standard" value={draft.backend} onChange={set("backend")} placeholder="Backend" aria-label="Backend" />
+        <select className="input d-standard" value={draft.status} onChange={set("status")} style={{ minWidth: 130 }} aria-label="Status">
           <option value="">All statuses</option>
           <option>completed</option>
           <option>failed</option>
           <option>submitted</option>
         </select>
-        <input className="input" value={project} onChange={e => setProject(e.target.value)} placeholder="Project" />
-        <input className="input" value={minQubits} onChange={e => setMinQubits(e.target.value)} placeholder="Min qubits" type="number" style={{ width: 100 }} />
-        <input className="input" value={maxDepth} onChange={e => setMaxDepth(e.target.value)} placeholder="Max depth" type="number" style={{ width: 100 }} />
-        <button className="button" onClick={() => void loadRuns()} type="button">
-          <Filter size={16} aria-hidden="true" /> Search
-        </button>
-        <button className="button secondary" onClick={() => {
-          setQ(""); setBackend(""); setStatus(""); setProject(""); setMinQubits(""); setMaxDepth("");
-          void loadRuns();
-        }} type="button">
-          <RefreshCw size={16} aria-hidden="true" /> Reset
-        </button>
-        <button
-          className="button secondary"
-          style={{ height: 38, fontSize: 14 }}
-          title="Export all runs as CSV"
-          type="button"
+        <input className="input d-standard" value={draft.project} onChange={set("project")} placeholder="Project" aria-label="Project" />
+        <input className="input d-expert" value={draft.min_qubits} onChange={set("min_qubits")} placeholder="Min qubits" type="number" style={{ width: 110, minWidth: 0 }} aria-label="Minimum qubits" />
+        <input className="input d-expert" value={draft.max_depth} onChange={set("max_depth")} placeholder="Max depth" type="number" style={{ width: 110, minWidth: 0 }} aria-label="Maximum depth" />
+        <input className="input d-expert" value={draft.circuit} onChange={set("circuit")} placeholder="Circuit hash" style={{ width: 150, minWidth: 0 }} aria-label="Circuit hash" />
+        <button className="button" type="submit"><Filter size={16} aria-hidden="true" /> Search</button>
+        {filtered && (
+          <button className="button secondary" type="button" onClick={() => apply(filtersFrom(new URLSearchParams()))}>
+            <RefreshCw size={16} aria-hidden="true" /> Clear filters
+          </button>
+        )}
+        <button className="button secondary d-standard" type="button" title="Download every run you can see as CSV"
           onClick={async () => {
-            const res = await fetch(exportUrl, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
+            const res = await fetch(exportUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
             if (!res.ok) return;
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
+            const url = URL.createObjectURL(await res.blob());
             const a = document.createElement("a");
-            a.href = url;
-            a.download = "runs.csv";
-            a.click();
+            a.href = url; a.download = "runs.csv"; a.click();
             URL.revokeObjectURL(url);
-          }}
-        >
+          }}>
           <Download size={16} aria-hidden="true" /> CSV
         </button>
         {live && (
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ok)", marginLeft: 4 }}>
-            <Wifi size={14} /> Live
+          <span className="mono" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }} title="New runs appear here as they arrive">
+            <Wifi size={14} aria-hidden="true" /> listening for new runs
           </span>
         )}
-      </div>
+      </form>
 
-      {/* KPI strip */}
-      <section className="summary-grid" aria-label="Platform summary">
-        {([
-          ["Runs", total],
-          ["Completed", completed],
-          ["Failed", failed],
-          ["Max Qubits", maxQubits],
-          ["With Calibration", withCal],
-          ["Avg Health", avgHealth ?? "—"],
-        ] as [string, string | number][]).map(([label, value]) => (
-          <div className="metric" key={label}>
-            <div className="metric-label">{label}</div>
-            <div className="metric-value">{value}</div>
-          </div>
-        ))}
-      </section>
+      {!loading && !error && !runs.length && !filtered && <QuickStart />}
 
-      {/* Loading indicator */}
-      {loading && (
-        <div className="empty" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5"
-            style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="var(--strong)"/>
-          </svg>
-          <span style={{ color: "var(--muted)", fontSize: 14 }}>Loading runs…</span>
-        </div>
-      )}
-
-      {/* Error state */}
-      {!loading && error && (
-        <div className="empty" style={{ color: "var(--danger)" }}>{error}</div>
-      )}
-
-      {/* Empty state */}
-      {!loading && !error && !runs.length && <QuickStart />}
-
-      {/* Runs table */}
       {!loading && runs.length > 0 && (
-        <section className="panel" style={{ marginTop: 0 }}>
-          <div className="panel-header">
-            <h2>Runs <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 14 }}>({runs.length})</span></h2>
+        <section className="frame">
+          <div className="frame-head">
+            <h2 className="inst-label">Runs ({runs.length}{runs.length >= 500 ? ", newest 500" : ""})</h2>
+            {applied.project && (
+              <Link href={withDetail(`/projects/${encodeURIComponent(applied.project)}/timeline`, detail)} style={{ fontSize: 12, textDecoration: "underline" }}>
+                Scrub through {applied.project} as a timeline →
+              </Link>
+            )}
           </div>
           <div className="table-wrap">
-            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+            <table>
               <thead>
-                <tr style={{ color: "var(--muted)", fontSize: 12, borderBottom: "1px solid var(--line)" }}>
-                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Status</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Circuit</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Backend</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Project</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Qubits</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Depth</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Health</th>
-                  <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600 }}>Created</th>
+                <tr>
+                  <th>Circuit</th>
+                  <th>Backend</th>
+                  <th className="d-standard">Project</th>
+                  <th>Status</th>
+                  <th className="d-standard" style={{ textAlign: "right" }}>Qubits</th>
+                  <th className="d-expert" style={{ textAlign: "right" }}>Depth</th>
+                  <th className="d-expert">Circuit hash</th>
+                  <th className="d-standard" style={{ textAlign: "right" }}>Quality</th>
+                  <th style={{ textAlign: "right" }}>When</th>
                 </tr>
               </thead>
               <tbody>
-                {runs.map((run, i) => (
-                  <tr
-                    key={run.run_id}
-                    style={{ borderBottom: i < runs.length - 1 ? "1px solid var(--line)" : "none", cursor: "pointer" }}
-                    onClick={() => window.location.href = `/runs/${run.run_id}`}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
-                  >
-                    <td style={{ padding: "10px 12px" }}>
-                      <span className={statusClass(run.status)}>{run.status}</span>
+                {runs.map((run) => (
+                  <tr key={run.run_id} className={arrived.has(run.run_id) ? "arrived" : undefined}>
+                    <td style={{ maxWidth: 260 }}>
+                      <Link href={withDetail(`/runs/${run.run_id}`, detail)} style={{ color: "var(--text)", fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {run.circuit_name || run.run_id.slice(0, 12)}
+                      </Link>
+                      <span className="mono d-standard" style={{ color: "var(--muted)", fontSize: 11 }}>{run.run_id.slice(0, 12)}</span>
                     </td>
-                    <td style={{ padding: "10px 12px", maxWidth: 220 }}>
-                      <span style={{ color: "var(--text)", fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {run.circuit_name || "—"}
-                      </span>
-                      <span style={{ color: "var(--muted)", fontSize: 11, fontFamily: "ui-monospace,monospace" }}>
-                        {run.run_id.slice(0, 8)}…
-                      </span>
+                    <td className="mono" style={{ fontSize: 12 }}>
+                      {run.backend ? <Link href={withDetail(`/runs?backend=${encodeURIComponent(run.backend)}`, detail)}>{run.backend}</Link> : "—"}
                     </td>
-                    <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{run.backend || "—"}</td>
-                    <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{run.project || "—"}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                      {run.fingerprint?.num_qubits ?? "—"}
+                    <td className="d-standard" style={{ color: "var(--muted)" }}>
+                      {run.project ? <Link href={withDetail(`/runs?project=${encodeURIComponent(run.project)}`, detail)}>{run.project}</Link> : "—"}
                     </td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                      {run.fingerprint?.depth ?? "—"}
+                    <td><span className={statusClass(run.status)}>{run.status}</span></td>
+                    <td className="num d-standard" style={{ textAlign: "right" }}>{run.fingerprint?.num_qubits ?? "—"}</td>
+                    <td className="num d-expert" style={{ textAlign: "right" }}>{run.fingerprint?.depth ?? "—"}</td>
+                    <td className="mono d-expert" style={{ fontSize: 11 }}>
+                      {run.fingerprint?.qasm_sha256 ? <Link href={withDetail(`/runs?circuit=${run.fingerprint.qasm_sha256}`, detail)}>{run.fingerprint.qasm_sha256.slice(0, 12)}</Link> : "—"}
                     </td>
-                    <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                      <HealthBadge score={run.health_score} />
-                    </td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                      {new Date(run.created_at).toLocaleDateString()}
-                    </td>
+                    <td className="d-standard" style={{ textAlign: "right" }}><HealthBadge score={run.health_score} /></td>
+                    <td style={{ textAlign: "right", color: "var(--muted)", whiteSpace: "nowrap" }}>{ago(run.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -320,7 +276,6 @@ function RunsInner() {
           </div>
         </section>
       )}
-
     </main>
   );
 }

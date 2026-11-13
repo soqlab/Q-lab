@@ -5,6 +5,31 @@ import { use, useEffect, useState } from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { fetchPublicRun, healthColor, qlabApiPath, type QLabRun } from "../../../lib/api";
 
+/** The shared run's one-sentence answer, compared only with the owner's other shared runs. */
+function SharedAnswer({ token }: { token: string }) {
+  const [a, setA] = useState<{ token: string; sentence: string | null; prev: string | null } | null>(null);
+  useEffect(() => {
+    let on = true;
+    fetch(qlabApiPath(`/api/v1/runs/public/${encodeURIComponent(token)}/answer`), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { sentence: string; previous: { share_token?: string | null } | null }) => {
+        if (on) setA({ token, sentence: d.sentence, prev: d.previous?.share_token ?? null });
+      })
+      .catch(() => { if (on) setA({ token, sentence: null, prev: null }); });
+    return () => { on = false; };
+  }, [token]);
+  if (!a || a.token !== token || !a.sentence) return null;
+  return (
+    <section className="frame" style={{ borderLeft: "3px solid var(--c-runs)", marginBottom: 20 }}>
+      <div className="frame-head"><h2 className="inst-label">The answer</h2></div>
+      <div className="frame-body">
+        <p className="summary-line" style={{ fontSize: 16 }}>{a.sentence}</p>
+        {a.prev && <p style={{ margin: "10px 0 0", fontSize: 13 }}><Link href={`/share/${encodeURIComponent(a.prev)}`} style={{ textDecoration: "underline" }}>Open the run it is compared with</Link></p>}
+      </div>
+    </section>
+  );
+}
+
 function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--line)", fontSize: 14 }}>
@@ -58,6 +83,8 @@ export default function PublicSharePage({ params: paramsPromise }: { params: Pro
             <Link href="/" style={{ display: "inline-block", marginTop: 20, color: "#1d6f8f" }}>Go to Q-Lab →</Link>
           </div>
         )}
+
+        {run && <SharedAnswer token={params.token} />}
 
         {run && (
           <>

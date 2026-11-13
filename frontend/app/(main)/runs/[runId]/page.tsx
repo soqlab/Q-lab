@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
+import RunAnswer from "../../../../components/RunAnswer";
+import { setCommandContext } from "../../../../components/CommandPalette";
 import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
@@ -764,6 +766,18 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
     void load();
   }, [params.runId]);
 
+  useEffect(() => {
+    if (!run) return;
+    const items = [
+      { id: "here:verify", kind: "here" as const, title: "Verify this run", hint: "Check its record independently", href: `/verify/${run.run_id}` },
+      { id: "here:list-circuit", kind: "here" as const, title: "Every run of this circuit", hint: "Same circuit hash", href: run.fingerprint.qasm_sha256 ? `/runs?circuit=${run.fingerprint.qasm_sha256}` : `/runs?q=${encodeURIComponent(run.circuit_name ?? "")}` },
+      ...(run.project ? [{ id: "here:timeline", kind: "here" as const, title: `${run.project} timeline at this run`, hint: "Scrub through the project", href: `/projects/${encodeURIComponent(run.project)}/timeline?run=${run.run_id}` }] : []),
+      ...(run.backend && /^ibm/.test(run.backend) ? [{ id: "here:hw", kind: "here" as const, title: `${run.backend} on the hardware board`, hint: "Live status and benchmark history", href: `/hardware/${run.backend}` }] : []),
+    ];
+    setCommandContext(items);
+    return () => setCommandContext([]);
+  }, [run]);
+
   if (error) return <main className="page"><div className="empty">{error}</div></main>;
   if (!run) return <main className="page"><div className="empty">Loading run…</div></main>;
 
@@ -774,43 +788,45 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
 
   return (
     <main className="page">
+      <RunAnswer runId={run.run_id} project={run.project} backend={run.backend} />
+
       <div className="toolbar">
-        <Link className="button secondary" href="/"><ArrowLeft size={17} aria-hidden="true" /> Back</Link>
-        <a className="button" href={qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)}>
+        <Link className="button secondary" href={run.project ? `/runs?project=${encodeURIComponent(run.project)}` : "/runs"}><ArrowLeft size={17} aria-hidden="true" /> Runs</Link>
+        <a className="button d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)}>
           <Package size={17} aria-hidden="true" /> Bundle
         </a>
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)}>
+        <a className="button secondary d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)}>
           <Download size={17} aria-hidden="true" /> QASM
         </a>
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/rerun.py`)}>
+        <a className="button secondary d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/rerun.py`)}>
           <FileCode size={17} aria-hidden="true" /> Rerun
         </a>
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/health`)}>
+        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/health`)}>
           <Activity size={17} aria-hidden="true" /> Health JSON
         </a>
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/capsule.zip`)} title="Reproducibility Time Capsule — hermetic zip with SHA256 manifest">
+        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/capsule.zip`)} title="Reproducibility Time Capsule — hermetic zip with SHA256 manifest">
           <Package size={17} aria-hidden="true" /> Capsule
         </a>
-        <Link className="button secondary" href={`/search/circuits?anchor=${run.run_id}`} title="Find structurally similar circuits">
+        <Link className="button secondary d-expert" href={`/search/circuits?anchor=${run.run_id}`} title="Find structurally similar circuits">
           <Search size={17} aria-hidden="true" /> Similar
         </Link>
-        <DiffButton runId={run.run_id} />
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download title="Download Markdown report for paper appendix">
+        <span className="d-standard"><DiffButton runId={run.run_id} /></span>
+        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download title="Download Markdown report for paper appendix">
           <Download size={17} aria-hidden="true" /> Report.md
         </a>
-        <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.tex`)} download title="Download LaTeX tables for paper appendix">
+        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.tex`)} download title="Download LaTeX tables for paper appendix">
           <FileCode size={17} aria-hidden="true" /> Report.tex
         </a>
-        <a className="button secondary" href={getPaperPackageUrl(run.run_id)} download title="Download complete LaTeX paper package (methods, results, calibration, bibliography, main.tex)">
+        <a className="button secondary d-expert" href={getPaperPackageUrl(run.run_id)} download title="Download complete LaTeX paper package (methods, results, calibration, bibliography, main.tex)">
           <Package size={17} aria-hidden="true" /> Paper ZIP
         </a>
-        <OverleafButton runId={run.run_id} />
+        <span className="d-expert"><OverleafButton runId={run.run_id} /></span>
         <ShareButton runId={run.run_id} />
-        <BadgeButton runId={run.run_id} />
+        <span className="d-standard"><BadgeButton runId={run.run_id} /></span>
         <DeleteRunButton runId={run.run_id} />
       </div>
 
-      <section className="summary-grid" aria-label="Circuit metrics">
+      <section className="summary-grid d-standard" aria-label="Circuit metrics">
         <div className="metric">
           <div className="metric-label">Qubits</div>
           <div className="metric-value">{run.fingerprint.num_qubits ?? 0}</div>
@@ -854,21 +870,21 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
         </div>
       </section>
 
-      <InsightsPanel runId={run.run_id} />
-      <LiteratureSection runId={run.run_id} />
-      <AnomalyPanel runId={run.run_id} />
-      <RootCausePanel runId={run.run_id} />
-      <ErrorBudgetPanel runId={run.run_id} />
-      <RobustnessPanel runId={run.run_id} />
-      <QuantumVolumePanel runId={run.run_id} />
-      <MitigationPanel runId={run.run_id} />
-      <GateFlameChart run={run} />
-      <MetricsPanel runId={run.run_id} />
-      <ConvergencePanel runId={run.run_id} />
-      <LandscapePanel runId={run.run_id} />
-      <AssertionsPanel runId={run.run_id} />
+      <div className="d-expert"><InsightsPanel runId={run.run_id} /></div>
+      <div className="d-expert"><LiteratureSection runId={run.run_id} /></div>
+      <div className="d-expert"><AnomalyPanel runId={run.run_id} /></div>
+      <div className="d-expert"><RootCausePanel runId={run.run_id} /></div>
+      <div className="d-expert"><ErrorBudgetPanel runId={run.run_id} /></div>
+      <div className="d-expert"><RobustnessPanel runId={run.run_id} /></div>
+      <div className="d-expert"><QuantumVolumePanel runId={run.run_id} /></div>
+      <div className="d-expert"><MitigationPanel runId={run.run_id} /></div>
+      <div className="d-standard"><GateFlameChart run={run} /></div>
+      <div className="d-expert"><MetricsPanel runId={run.run_id} /></div>
+      <div className="d-expert"><ConvergencePanel runId={run.run_id} /></div>
+      <div className="d-expert"><LandscapePanel runId={run.run_id} /></div>
+      <div className="d-expert"><AssertionsPanel runId={run.run_id} /></div>
 
-      <section className="panel">
+      <section className="panel d-standard">
         <div className="panel-header"><h2>Execution Quality Score</h2></div>
         <div style={{ padding: "12px 16px" }}>
           <ScoreGauge score={run.health_score} />
@@ -887,16 +903,16 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
         <MeasurementHistogram results={run.results} />
       )}
 
-      <ShadowSimPanel runId={run.run_id} />
+      <div className="d-expert"><ShadowSimPanel runId={run.run_id} /></div>
 
-      <QubitMapPanel runId={run.run_id} />
+      <div className="d-expert"><QubitMapPanel runId={run.run_id} /></div>
 
       {hasCalibration && (
-        <TopologyPanel calibration={run.calibration as Record<string, unknown>} />
+        <div className="d-standard"><TopologyPanel calibration={run.calibration as Record<string, unknown>} /></div>
       )}
 
       {hasCalibration && (
-        <section className="panel">
+        <section className="panel d-expert">
           <div className="panel-header"><h2>Hardware Calibration</h2></div>
           <div style={{ padding: "0 16px 12px" }}>
             {!!run.calibration.snapshot_time && (
@@ -908,7 +924,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       )}
 
       {hasTiming && (
-        <section className="panel">
+        <section className="panel d-standard">
           <div className="panel-header"><h2>Phase Timing</h2></div>
           <div style={{ padding: "0 16px 12px" }}>
             {Object.entries(run.timing).map(([k, v]) => (
@@ -918,13 +934,13 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
         </section>
       )}
 
-      {hasTranspiler && <TranspilerPanel transpiler={run.transpiler} />}
+      {hasTranspiler && <div className="d-expert"><TranspilerPanel transpiler={run.transpiler} /></div>}
 
-      <ResourceEstimatePanel runId={run.run_id} />
+      <div className="d-expert"><ResourceEstimatePanel runId={run.run_id} /></div>
 
-      {run.qasm && <CircuitDiagram runId={run.run_id} />}
+      {run.qasm && <div className="d-standard"><CircuitDiagram runId={run.run_id} /></div>}
 
-      <div className="detail-grid">
+      <div className="detail-grid d-expert">
         <section className="panel">
           <div className="panel-header"><h2>QASM</h2></div>
           <pre className="code">{run.qasm || "QASM not available."}</pre>
@@ -949,7 +965,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
         </div>
       </div>
 
-      {run.context && Object.keys(run.context).length > 0
+      <div className="d-expert">{run.context && Object.keys(run.context).length > 0
         ? <ContextPanel context={run.context as Record<string, unknown>} />
         : (
           <section className="panel">
@@ -957,26 +973,26 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <p style={{ padding: "12px 18px", fontSize: 13, color: "var(--muted)", margin: 0 }}>No context captured.</p>
           </section>
         )
-      }
+      }</div>
 
-      <PauliNoisePanel runId={run.run_id} />
-      <AdvantageOraclePanel runId={run.run_id} />
-      <AnsatzDiscoveryPanel runId={run.run_id} />
-      <TransferPredictionPanel runId={run.run_id} />
-      <EvoOptimizerPanel runId={run.run_id} />
-      <BugDatabasePanel runId={run.run_id} />
-      <ReproScorePanel runId={run.run_id} />
-      <EntanglementPanel runId={run.run_id} />
-      <TomographyPanel runId={run.run_id} />
-      <MagicPanel runId={run.run_id} />
-      <CircuitTopologyPanel runId={run.run_id} />
-      <UAFCPTPanel runId={run.run_id} />
-      <AEMDPanel runId={run.run_id} />
-      <ZXSimplifyPanel runId={run.run_id} hasQasm={!!run.qasm} />
-      <QOETelemetryPanel runId={run.run_id} />
-      <ShadowTomoPanel runId={run.run_id} />
-      <NoiseModelPanel runId={run.run_id} />
-      <CitationsPanel runId={run.run_id} />
+      <div className="d-expert"><PauliNoisePanel runId={run.run_id} /></div>
+      <div className="d-expert"><AdvantageOraclePanel runId={run.run_id} /></div>
+      <div className="d-expert"><AnsatzDiscoveryPanel runId={run.run_id} /></div>
+      <div className="d-expert"><TransferPredictionPanel runId={run.run_id} /></div>
+      <div className="d-expert"><EvoOptimizerPanel runId={run.run_id} /></div>
+      <div className="d-expert"><BugDatabasePanel runId={run.run_id} /></div>
+      <div className="d-expert"><ReproScorePanel runId={run.run_id} /></div>
+      <div className="d-expert"><EntanglementPanel runId={run.run_id} /></div>
+      <div className="d-expert"><TomographyPanel runId={run.run_id} /></div>
+      <div className="d-expert"><MagicPanel runId={run.run_id} /></div>
+      <div className="d-expert"><CircuitTopologyPanel runId={run.run_id} /></div>
+      <div className="d-expert"><UAFCPTPanel runId={run.run_id} /></div>
+      <div className="d-expert"><AEMDPanel runId={run.run_id} /></div>
+      <div className="d-expert"><ZXSimplifyPanel runId={run.run_id} hasQasm={!!run.qasm} /></div>
+      <div className="d-expert"><QOETelemetryPanel runId={run.run_id} /></div>
+      <div className="d-expert"><ShadowTomoPanel runId={run.run_id} /></div>
+      <div className="d-expert"><NoiseModelPanel runId={run.run_id} /></div>
+      <div className="d-expert"><CitationsPanel runId={run.run_id} /></div>
       <NotesPanel runId={run.run_id} />
     </main>
   );

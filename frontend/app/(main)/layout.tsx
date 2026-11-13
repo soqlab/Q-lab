@@ -1,16 +1,16 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { Atom } from "lucide-react";
-import SideNav from "./SideNav";
 import UserMenu from "./UserMenu";
-import NPSWidget from "../../components/NPSWidget";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { isCorePath, useLabs } from "../../lib/labs";
 import IllustrativeNotice from "./IllustrativeNotice";
 import RecoveryPrompt from "../../components/RecoveryPrompt";
+import CommandPalette, { openCommand } from "../../components/CommandPalette";
+import { DETAILS, DETAIL_LABEL, useDetail, useDetailSync, withDetail } from "../../lib/dial";
+import { FRONTEND_COMMIT, commitUrl, shortSha } from "../../lib/build";
 
 function SWUpdater() {
   useEffect(() => {
@@ -162,7 +162,7 @@ function LabsGate({ children }: { children: React.ReactNode }) {
         <h1 style={{ margin: 0, fontSize: 24 }}>This is an experimental tool</h1>
         <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
           It is part of Q-Lab Labs: early tools that are less tested than the core tracker. Turn on Labs to
-          use it. You can switch Labs off again at the bottom of the menu.
+          use it. You can switch Labs off again from the command bar (Ctrl K, then “Labs”).
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
           <button className="button" onClick={() => setLabs(true)}>Turn on Labs</button>
@@ -200,70 +200,75 @@ function ApiReading() {
   );
 }
 
+// The parts of the tool, each with its own colour. Everything else is in the command bar.
+const CHANNELS = [
+  { href: "/runs", label: "Runs", c: "var(--c-runs)", match: (p: string) => p === "/runs" || p.startsWith("/runs/") },
+  { href: "/projects", label: "Projects", c: "var(--c-map)", match: (p: string) => p.startsWith("/projects") },
+  { href: "/hardware", label: "Hardware", c: "var(--c-board)", match: (p: string) => p === "/hardware" || p.startsWith("/hardware/") },
+  { href: "/compare", label: "Compare", c: "var(--c-compare)", match: (p: string) => p === "/compare" },
+];
+
+function Dial() {
+  const [d, setD] = useDetail();
+  return (
+    <div className="dial" role="group" aria-label="How technical">
+      {DETAILS.map((x) => (
+        <button key={x} type="button" aria-pressed={d === x} onClick={() => setD(x)}
+          title={x === "plain" ? "Plain words: the answer and little else" : x === "expert" ? "Everything, including raw records" : "The usual view"}>
+          {DETAIL_LABEL[x]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() || "/";
+  const [d] = useDetail();
+  useDetailSync(pathname);
+  const [mac, setMac] = useState(false);
+  useEffect(() => { setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)); }, []);
+  return (
+    <div className="shell">
+      <header className="shell-bar">
+        <Link href={withDetail("/runs", d)} className="shell-word" aria-label="Q-Lab, your runs">Q-LAB</Link>
+        <nav className="channels" aria-label="Parts of Q-Lab">
+          {CHANNELS.map((c) => (
+            <Link key={c.href} href={withDetail(c.href, d)} aria-current={c.match(pathname) ? "page" : undefined}
+              style={{ ["--ch" as string]: c.c }}>
+              <i aria-hidden="true" />{c.label}
+            </Link>
+          ))}
+        </nav>
+        <button type="button" className="cmd-trigger" onClick={() => openCommand()} aria-keyshortcuts="Control+K Meta+K /">
+          <span>Find a run, project, backend, circuit hash, or any page…</span>
+          <kbd aria-hidden="true">{mac ? "⌘K" : "Ctrl K"}</kbd>
+        </button>
+        <div className="shell-tools">
+          <Dial />
+          <UserMenu />
+        </div>
+      </header>
+      <IllustrativeNotice />
+      <RecoveryPrompt />
+      <div className="shell-main"><LabsGate>{children}</LabsGate></div>
+      <footer className="shell-foot">
+        <ApiReading />
+        <span>Dashboard {FRONTEND_COMMIT ? <a href={commitUrl(FRONTEND_COMMIT)} rel="noreferrer">{shortSha(FRONTEND_COMMIT)}</a> : "commit unknown"}</span>
+        <Link href="/trust">What this Q-Lab runs and loads</Link>
+        <span>Press {mac ? "⌘K" : "Ctrl K"} or / for everything else</span>
+      </footer>
+      <CommandPalette />
+    </div>
+  );
+}
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-    <div className="app-shell">
       <SWUpdater />
       <WarmupBanner />
-
-      {/* ── Sidebar ── */}
-      <aside className="sidebar">
-        {/* Brand */}
-        <div className="brand" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6, marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="brand-mark" style={{ position: "relative" }}>
-              <Atom size={18} aria-hidden="true" />
-            </div>
-            <span style={{ fontFamily: "'Cascadia Code', Consolas, monospace", letterSpacing: 1 }}>Q-LAB</span>
-          </div>
-        </div>
-
-        <SideNav />
-      </aside>
-
-      {/* ── Main content ── */}
-      <div className="content">
-        {/* Topbar */}
-        <header className="topbar" style={{ gap: 16 }}>
-          {/* Left: mode label */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{
-              fontFamily: "'Cascadia Code', Consolas, monospace",
-              fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
-              color: "var(--accent)", fontWeight: 700,
-            }}>
-              QUANTUM RUN TRACKER
-            </div>
-          </div>
-
-          <div style={{ flex: 1, display: "flex", justifyContent: "center" }}><ApiReading /></div>
-
-          <UserMenu />
-        </header>
-
-        <IllustrativeNotice />
-        <RecoveryPrompt />
-        <div style={{ flex: 1 }}><LabsGate>{children}</LabsGate></div>
-
-        {/* Footer */}
-        <footer style={{
-          padding: "10px 24px", borderTop: "1px solid var(--line)",
-          fontSize: 11, color: "var(--muted)",
-          display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap",
-          fontFamily: "'Cascadia Code', Consolas, monospace", letterSpacing: 0.3,
-        }}>
-          <span style={{ color: "var(--accent)", opacity: 0.6 }}>Q-LAB</span>
-          <span>©{new Date().getFullYear()} MIT LICENSE</span>
-          <a href="https://github.com/soqlab/Q-lab" target="_blank" rel="noreferrer"
-            style={{ color: "var(--accent)", opacity: 0.7 }}>
-            ↗ SOURCE
-          </a>
-        </footer>
-      </div>
-
-      <NPSWidget />
-    </div>
+      <Shell>{children}</Shell>
     </AuthGuard>
   );
 }
