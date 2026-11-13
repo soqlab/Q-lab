@@ -103,7 +103,7 @@ function LoginForm() {
           <div className={s.linkRow}>
             <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
             <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); }}>
-              {showPassword ? "Hide" : "Sign in with email and password"}
+              {showPassword ? "Hide" : "Use email and password"}
             </button>
           </div>
         </>
