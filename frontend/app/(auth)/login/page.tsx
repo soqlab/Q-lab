@@ -25,11 +25,13 @@ function LoginForm() {
   const rawNext = searchParams.get("next") || "/runs";
   // Only relative paths, so the page can't be used to send someone elsewhere.
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/runs";
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => oauthError(searchParams.get("error")));
   const [loading, setLoading] = useState(false);
   const [passkeysOnly, setPasskeysOnly] = useState(true);
   // Accounts made with a password before passkeys: one last password sign-in, then a passkey.
   const [showPassword, setShowPassword] = useState(false);
+  // Accounts made with Google or GitHub before passkeys: one last sign-in with them, then a passkey.
+  const [showOAuth, setShowOAuth] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [enrolment, setEnrolment] = useState<string | null>(null);
@@ -120,6 +122,14 @@ function LoginForm() {
               {showPassword ? "Hide" : "Use email and password"}
             </button>
           </div>
+          {passkeysOnly && (
+            <div className={s.linkRow}>
+              <span>Made your account with Google or GitHub?</span>
+              <button type="button" className={s.link} onClick={() => { setShowOAuth((v) => !v); setError(null); setNoPasskey(false); }}>
+                {showOAuth ? "Hide" : "Use Google or GitHub once"}
+              </button>
+            </div>
+          )}
         </>
       }
     >
@@ -175,15 +185,46 @@ function LoginForm() {
         </form>
       )}
 
-      <div style={{ display: "grid", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-        <span className={s.label}>Or with an account you already have</span>
-        <div className={s.row}>
-          <a className={s.secondary} href="/qlab-api/auth/github">GitHub</a>
-          <a className={s.secondary} href="/qlab-api/auth/google">Google</a>
+      {passkeysOnly ? showOAuth && (
+        <div style={{ display: "grid", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          <p className={s.note}>
+            For accounts made with Google or GitHub before passkeys. After this sign-in you create a
+            passkey, and Google and GitHub stop signing in to this account. New accounts can&apos;t be
+            made this way.
+          </p>
+          <div className={s.row}>
+            <a className={s.secondary} href="/qlab-api/auth/github">Continue with GitHub</a>
+            <a className={s.secondary} href="/qlab-api/auth/google">Continue with Google</a>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ display: "grid", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          <span className={s.label}>Or with an account you already have</span>
+          <div className={s.row}>
+            <a className={s.secondary} href="/qlab-api/auth/github">GitHub</a>
+            <a className={s.secondary} href="/qlab-api/auth/google">Google</a>
+          </div>
+        </div>
+      )}
     </AuthFrame>
   );
+}
+
+/** The message for a Google or GitHub sign-in the server sent back to this page. */
+function oauthError(code: string | null): string | null {
+  switch (code) {
+    case null: return null;
+    case "oauth_no_account":
+      return "There is no Q-Lab account with that email address. New accounts are made with a passkey: choose Create one below.";
+    case "oauth_has_passkey":
+      return "This account has a passkey, so Google and GitHub no longer sign in to it. Sign in with the passkey, or use a recovery code if you lost it.";
+    case "no_email":
+      return "Google or GitHub didn't give Q-Lab a verified email address, so the account couldn't be found.";
+    case "oauth_state":
+      return "That sign-in didn't start in this browser, or took longer than 10 minutes. Try again.";
+    default:
+      return "Signing in with Google or GitHub didn't work. Try again.";
+  }
 }
 
 export default function LoginPage() {

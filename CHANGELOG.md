@@ -7,6 +7,9 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Privacy notice at `/privacy` (linked from the sign-in pages, the app footer, the home page and
+  Ctrl+K): what the hosted Q-Lab keeps, what the SDK sends, what is stored in the browser, who else
+  receives data, retention and deletion, contact.
 - Reproduce this run (every run page, Ctrl+K, `GET /api/v1/runs/{id}/reproduce`, `.../reproduce.py`,
   `.../reproduce.ipynb`): one command, `uv run reproduce_<id>.py`, re-runs the run with the recorded
   circuit (QPY of the circuit given to `transpile()` when recorded), the recorded qiskit,
@@ -43,7 +46,7 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   tell without calibration snapshots (`app/drift.py`). No migration.
 - Passkeys (WebAuthn). The sign-in page is one "Sign in with passkey" button (with passkey
   autofill); sign-up creates a passkey, never a password; Settings lists, renames, adds and
-  removes passkeys (never the last one). Google and GitHub sign-in stay. With
+  removes passkeys (never the last one). Google and GitHub sign-in stay unless passkeys only is on. With
   `QLAB_PASSKEYS_ONLY=true` (set on the hosted service) no password is set, reset or accepted:
   a password user signs in with the password once more and must add a passkey, which deletes the
   password; "forgot password" emails a single-use 15-minute link that registers a new passkey;
@@ -73,6 +76,12 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   one user cannot read, change or delete another's runs.
 
 ### Changed
+- With `QLAB_PASSKEYS_ONLY`, Google and GitHub no longer sign anyone in or create accounts. An account
+  made with them before passkeys uses them once ("Made your account with Google or GitHub?" on the
+  sign-in page) to reach a 15-minute token that only registers its first passkey, as a password
+  sign-in does; once it has a passkey they are refused for it. A new email address is refused with
+  a pointer to passkey sign-up. With the setting off they work as before. No migration.
+- Deleting an account now also stops its SDK API keys (they kept uploading runs).
 - Six Labs tools no longer return invented numbers. The XEB Certifier (was Advantage Certifier)
   scores each run's recorded counts with linear XEB against the exact ideal distribution of its
   stored circuit. Environment Snapshots show what the SDK recorded with each run. Backend Compare

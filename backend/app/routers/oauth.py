@@ -1,4 +1,11 @@
-"""Google and GitHub OAuth2 login."""
+"""Google and GitHub OAuth2 login.
+
+With QLAB_PASSKEYS_ONLY (the hosted service) Google and GitHub no longer sign anyone in. They are
+kept only so an account made with them before passkeys can reach its first passkey: the callback
+then gives no session, only the 15-minute enrolment token a password sign-in gives
+(create_enrolment_token), good for registering one passkey. Once the account has a passkey,
+Google and GitHub are refused for it, and no account is ever created through them.
+"""
 from __future__ import annotations
 
 import base64
@@ -14,10 +21,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import SECRET_KEY, create_access_token
+from ..auth import SECRET_KEY, create_access_token, create_enrolment_token, passkeys_only
 from ..database import get_db
+from ..deps import log_audit
 from ..email_service import send_welcome_email
-from ..models import User
+from ..models import PasskeyCredential, User
 
 router = APIRouter(prefix="/auth", tags=["oauth"])
 log = logging.getLogger("qlab.oauth")
@@ -126,10 +134,7 @@ def _google_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
         if info.get("verified_email") is False:
             return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
 
-        user, is_new = _upsert_user(db, email=info["email"], name=info.get("name") or info["email"])
-        jwt = create_access_token(user.id, user.org_id, user.role, amr="oauth")
-        dest = "/onboarding" if is_new else "/runs"
-        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
+        return _signed_in(db, "google", email=info["email"], name=info.get("name") or info["email"])
     except Exception as exc:
         _log_failure("google", exc)
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
@@ -190,10 +195,7 @@ def _github_sign_in(db: Session, code: str, verifier: str) -> RedirectResponse:
             return RedirectResponse(f"{FRONTEND_URL}/login?error=no_email")
 
         name = profile.get("name") or profile.get("login") or email
-        user, is_new = _upsert_user(db, email=email, name=name)
-        jwt = create_access_token(user.id, user.org_id, user.role, amr="oauth")
-        dest = "/onboarding" if is_new else "/runs"
-        return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
+        return _signed_in(db, "github", email=email, name=name)
     except Exception as exc:
         _log_failure("github", exc)
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
@@ -208,6 +210,30 @@ def _log_failure(provider: str, exc: Exception) -> None:
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
+
+def _signed_in(db: Session, provider: str, email: str, name: str) -> RedirectResponse:
+    """Where the browser goes once the provider has vouched for this email address."""
+    if passkeys_only():
+        return _passkey_migration(db, provider, email)
+    user, is_new = _upsert_user(db, email=email, name=name)
+    jwt = create_access_token(user.id, user.org_id, user.role, amr="oauth")
+    dest = "/onboarding" if is_new else "/runs"
+    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={jwt}&next={dest}")
+
+
+def _passkey_migration(db: Session, provider: str, email: str) -> RedirectResponse:
+    """QLAB_PASSKEYS_ONLY: no new account, no session. An existing account without a passkey gets
+    the enrolment token (one passkey registration, 15 minutes); one with a passkey is refused."""
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_no_account")
+    if not user.is_active:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
+    if db.scalar(select(PasskeyCredential.id).where(PasskeyCredential.user_id == user.id)) is not None:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_has_passkey")
+    log_audit(db, "auth.login_oauth_enrol", "user", str(user.id), meta={"provider": provider},
+              user_id=user.id, org_id=user.org_id)
+    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?enrol={create_enrolment_token(user.id)}")
 
 def _upsert_user(db: Session, email: str, name: str) -> tuple[User, bool]:
     """Returns (user, is_new)."""
