@@ -83,16 +83,33 @@ def _send_email(to: str, event: str, payload: dict) -> None:
         smtp.sendmail(SMTP_FROM, to, msg.as_string())
 
 
-def dispatch_event(event: str, payload: dict, db: Session | None = None) -> None:
-    """Called from other routers to fire notifications for an event."""
+def dispatch_event(
+    event: str,
+    payload: dict,
+    db: Session | None = None,
+    *,
+    owner_user_id: int | None,
+    owner_org_id: int | None,
+) -> None:
+    """Called from other routers to fire notifications for an event.
+
+    The event goes only to the channels of people who may see what it is about: the owner
+    (owner_user_id) and, when it belongs to an organisation, that organisation's channels.
+    Pass the owner of the run (or other object) the event describes; both None means an
+    event about something uploaded without an account, which reaches only channels made
+    without an account.
+    """
+    from ..tasks import receives
+
+    subject = {"created_by_user_id": owner_user_id, "org_id": owner_org_id}
     close_db = db is None
     if db is None:
         db = SessionLocal()
     try:
-        channels = db.scalars(
+        channels = [ch for ch in db.scalars(
             select(NotificationChannel)
             .where(NotificationChannel.is_active == True)
-        ).all()
+        ).all() if receives(ch, subject)]
         for ch in channels:
             if event not in (ch.events or []):
                 continue
