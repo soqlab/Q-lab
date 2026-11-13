@@ -65,8 +65,10 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>What you add:</strong> run notes, a researcher profile, feedback you send (with your browser&apos;s
-              user agent), keys for quantum and AI providers you save (encrypted on the server), and the settings of
-              integrations you connect (Slack, Teams, GitHub, webhooks).
+              user agent), keys for quantum and AI providers you save, and the settings of integrations you connect
+              (Slack, Teams, GitHub, webhooks, notification channels). Provider keys, integration tokens, webhook
+              signing secrets and Slack or Teams webhook addresses are stored encrypted, with a key kept apart from the
+              database.
             </li>
             <li>
               <strong>An install ping from the SDK:</strong> when the SDK is pointed at the hosted Q-Lab it sends its
@@ -143,16 +145,34 @@ export default function PrivacyPage() {
             <li>Your runs and account data are kept until you delete them or ask us to.</li>
             <li>Deleting a run removes it straight away. Revoking an API key stops it working.</li>
             <li>
-              <strong>Deleting your account</strong> in Settings switches the account off. It does not erase your runs
-              or the records above. To have your account and data erased, email us (below).
+              <strong>Deleting your account</strong> (in Settings, or on the Data privacy page) locks it at once: it
+              can&apos;t be used, its API keys stop working and its public share links are turned off. Seven days later
+              Q-Lab erases it: your runs and everything attached to them, projects nobody else has runs in, API keys,
+              passkeys, recovery codes, saved provider keys, webhooks, notification channels, integration settings,
+              your profile and the other records listed above. If you were the last member of an organisation, the
+              organisation and its data go too. Signing in with your passkey within the seven days cancels the
+              deletion (share links stay off). We email you when the deletion is scheduled and when it is done, if
+              you gave an address.
             </li>
-            <li>The security log is not deleted on a schedule.</li>
-            <li>You can download your runs as CSV or JSON Lines from the Runs and Analytics pages.</li>
-            <li>A run you have shared can&apos;t be unshared from the dashboard yet; email us and we will do it.</li>
+            <li>
+              The security log keeps its entries about an erased account, so that abuse and break-ins can still be
+              investigated. In them the account is replaced by a code that does not lead back to you without the
+              server&apos;s key, and browser details and other request details are removed; the action, the time and
+              the IP address stay. The security log is not deleted on a schedule.
+            </li>
+            <li>
+              You can download everything Q-Lab holds about your account as one JSON file on the Data privacy page
+              (<Link className={s.link} href="/gdpr">/gdpr</Link>), and your runs as CSV or JSON Lines from the Runs
+              and Analytics pages.
+            </li>
+            <li>
+              To stop sharing a run, open it and choose Actions, then Stop sharing. The link stops working at once and
+              the run leaves the public gallery.
+            </li>
           </ul>
           <p>
             Depending on where you live, you may have the right to see, correct, export or delete your data, and to
-            object to how it is used. Email us to use any of them.
+            object to how it is used. Exporting and deleting are self-service, as above; email us for anything else.
           </p>
         </Section>
 
