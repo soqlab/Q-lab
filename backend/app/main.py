@@ -62,6 +62,7 @@ from .routers import institute_admin as institute_admin_router
 from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
 from .routers import answer as answer_router
+from .routers import verify_run as verify_run_router
 from .routers import pub_report as pub_report_router
 from .routers import paper_package as paper_package_router
 from .routers import campaigns as campaigns_router
@@ -293,6 +294,7 @@ app.include_router(institute_admin_router.router)
 app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
 app.include_router(answer_router.router)
+app.include_router(verify_run_router.router)
 app.include_router(pub_report_router.router)
 app.include_router(paper_package_router.router)
 app.include_router(campaigns_router.router)
