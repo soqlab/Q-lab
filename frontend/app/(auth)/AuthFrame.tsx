@@ -49,6 +49,7 @@ export default function AuthFrame({ caption, aside, children, links }: {
           <span className={s.readoutLinks}>
             <Link href="/gallery">Open the gallery</Link>
             <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
           </span>
         </p>
       </div>

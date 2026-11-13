@@ -213,6 +213,7 @@ qlab.auto_track(api_key="YOUR_KEY")   # your key is in Settings once you sign in
         <a href="https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md">Run it yourself</a>
         <Link href="/trust">What this page loads</Link>
         <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
         <a href="mailto:contact@soqlab.com">contact@soqlab.com</a>
       </footer>
     </div>

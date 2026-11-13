@@ -258,6 +258,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <span>Dashboard {FRONTEND_COMMIT ? <a href={commitUrl(FRONTEND_COMMIT)} rel="noreferrer">{shortSha(FRONTEND_COMMIT)}</a> : "commit unknown"}</span>
         <Link href="/trust">What this Q-Lab runs and loads</Link>
         <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
         <span>Press {mac ? "⌘K" : "Ctrl K"} or / for everything else</span>
       </footer>
       <CommandPalette />

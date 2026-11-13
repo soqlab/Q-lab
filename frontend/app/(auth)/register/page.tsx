@@ -111,8 +111,8 @@ function RegisterForm() {
         <label className={s.check}>
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} required />
           <span>
-            I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and the{" "}
-            <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
+            I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and the{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a>.
           </span>
         </label>
         {error && <div className={s.error} role="alert">{error}</div>}
