@@ -10,6 +10,7 @@ import { useAuth } from "../../lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { isCorePath, useLabs } from "../../lib/labs";
 import IllustrativeNotice from "./IllustrativeNotice";
+import RecoveryPrompt from "../../components/RecoveryPrompt";
 
 function SWUpdater() {
   useEffect(() => {
@@ -242,6 +243,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         <IllustrativeNotice />
+        <RecoveryPrompt />
         <div style={{ flex: 1 }}><LabsGate>{children}</LabsGate></div>
 
         {/* Footer */}
