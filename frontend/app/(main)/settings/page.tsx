@@ -14,6 +14,7 @@ import {
   signInWithPasskey,
   type PasskeyInfo,
 } from "../../../lib/passkeys";
+import { EmailPanel, RecoveryCodesPanel } from "./AccountRecovery";
 
 // ── Provider credential types ─────────────────────────────────────────────────
 
@@ -359,7 +360,9 @@ function PasskeysPanel({ me, reloadMe, withPasskey }: {
       <div style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
         <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
           You sign in to Q-Lab with a passkey: Face ID, a fingerprint, a device PIN or a security key.
-          Add one on each device you use. Your last passkey can&apos;t be removed.
+          A second passkey is a way back in if you lose a device. Press Add a passkey here, then pick
+          where to keep it in your browser&apos;s prompt (this device, a security key, or a phone by
+          scanning its code). Your last passkey can&apos;t be removed.
         </p>
         {me?.has_password && (
           <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>
@@ -555,7 +558,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ display: "flex", gap: 14, fontSize: 14 }}>
             <span style={{ color: "#5f6f80", width: 100 }}>Email</span>
-            <span>{user?.email ?? "—"}</span>
+            <span>{user?.email ?? <span style={{ color: "#5f6f80" }}>None (optional, see Email address below)</span>}</span>
           </div>
           <div style={{ display: "flex", gap: 14, fontSize: 14 }}>
             <span style={{ color: "#5f6f80", width: 100 }}>Role</span>
@@ -570,6 +573,8 @@ export default function SettingsPage() {
 
       {/* Passkeys (sign-in) */}
       <PasskeysPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
+      <RecoveryCodesPanel withPasskey={withPasskey} reloadMe={reloadMe} />
+      <EmailPanel me={me} withPasskey={withPasskey} reloadMe={reloadMe} />
 
       {/* Password: only for an account that still has one, on a server that allows passwords */}
       {me?.has_password && !me.passkeys_only && <ChangePasswordPanel token={token!} />}

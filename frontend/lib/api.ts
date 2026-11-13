@@ -186,7 +186,8 @@ export type Benchmark = {
 
 export type AuthUser = {
   id: number;
-  email: string;
+  /** Optional: accounts sign in with a passkey; an address is only for notifications. */
+  email: string | null;
   name: string;
   role: string;
   org_id: number | null;
@@ -196,6 +197,7 @@ export type AuthUser = {
   passkeys?: number;
   has_password?: boolean;
   passkeys_only?: boolean;
+  recovery_codes_remaining?: number;
 };
 
 export type AuthResponse = {
@@ -203,6 +205,7 @@ export type AuthResponse = {
   token_type: string;
   user: AuthUser;
   api_key?: string;  // returned once on registration
+  recovery_codes?: string[];  // returned once on passkey sign-up
 };
 
 export type APIKeyInfo = {
