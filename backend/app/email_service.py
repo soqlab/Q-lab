@@ -986,20 +986,51 @@ def send_verification_email(to_email: str, verify_url: str) -> bool:
     return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))
 
 
-def send_account_deleted_email(to_email: str, user_name: str) -> bool:
-    """Notify a user that their account has been deleted."""
-    subject = "Your Q-Lab account has been deleted"
+def send_account_deletion_scheduled_email(to_email: str, user_name: str, erase_on: str) -> bool:
+    """Tell a user their account is locked and will be erased on erase_on (a date) unless they sign in."""
+    from html import escape
+    subject = "Your Q-Lab account will be erased on " + erase_on
     body = f"""
       <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
-        Account deleted
+        Account deletion scheduled
       </h2>
-      <p style="margin:0 0 20px;font-size:15px;color:#9ca3c4;line-height:1.6;">
-        Hi {user_name}, your Q-Lab account and associated data have been permanently deleted
-        as requested. You will no longer be able to log in with this email address.
+      <p style="margin:0 0 14px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        Hi {escape(user_name or "")}, you asked to delete your Q-Lab account. It is now locked: it can't be
+        used, its API keys don't work, and any runs you had shared publicly are no longer shared.
+      </p>
+      <p style="margin:0 0 14px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        On {escape(erase_on)} Q-Lab erases the account and everything in it: your runs, projects only you
+        used, API keys, passkeys, recovery codes, saved provider keys, integrations, notification channels
+        and your profile. The security log keeps its entries about the account, with your account
+        replaced by a code that no longer leads to you.
+      </p>
+      <p style="margin:0 0 14px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        Changed your mind? Sign in with your passkey before then and the deletion is cancelled.
+        Sharing links do not come back; share those runs again if you want to.
       </p>
       <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
-        If you did not request this, please contact us immediately at
+        If you did not ask for this, sign in now and email
         <a href="mailto:contact@soqlab.com">contact@soqlab.com</a>.
+      </p>
+    """
+    return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))
+
+
+def send_account_erased_email(to_email: str, user_name: str) -> bool:
+    """Tell a user their account has now been erased (sent just before the address itself is erased)."""
+    from html import escape
+    subject = "Your Q-Lab account has been erased"
+    body = f"""
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#e0e7ff;">
+        Account erased
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#9ca3c4;line-height:1.6;">
+        Hi {escape(user_name or "")}, your Q-Lab account and the data in it have been erased, as you asked.
+        This email address is no longer stored with Q-Lab. The security log keeps its entries about the
+        account without your name or address.
+      </p>
+      <p style="margin:0;font-size:13px;color:#4b4870;line-height:1.6;">
+        Questions: <a href="mailto:contact@soqlab.com">contact@soqlab.com</a>.
       </p>
     """
     return send_email(to=to_email, subject=subject, html=_wrap_email(subject, body))

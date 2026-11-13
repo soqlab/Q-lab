@@ -474,12 +474,18 @@ export async function resendVerification(token: string): Promise<void> {
   if (!res.ok) throw new Error("Failed to resend verification email");
 }
 
-export async function deleteAccount(token: string): Promise<void> {
+/** Schedules the account's erasure (locked now, erased after 7 days; signing in cancels). */
+export async function deleteAccount(token: string): Promise<{ erase_at: string; message: string }> {
   const res = await fetch(apiUrl("/auth/me"), {
     method: "DELETE",
     headers: authHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to delete account");
+  if (!res.ok) {
+    // "passkey_session_required": the page asks for the passkey, then retries.
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? "Failed to delete account");
+  }
+  return res.json();
 }
 
 export async function fetchMe(token?: string): Promise<AuthUser> {

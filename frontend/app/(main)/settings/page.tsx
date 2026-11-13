@@ -722,12 +722,12 @@ tracker = QLabTracker(
       </section>
 
       {/* Danger zone */}
-      <DangerZone />
+      <DangerZone withPasskey={withPasskey} />
     </main>
   );
 }
 
-function DangerZone() {
+function DangerZone({ withPasskey }: { withPasskey: <T>(action: (t: string) => Promise<T>) => Promise<T> }) {
   const { token, clearSession } = useAuth();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -738,9 +738,9 @@ function DangerZone() {
     if (!token) return;
     setDeleting(true);
     try {
-      await deleteAccount(token);
+      await withPasskey((t) => deleteAccount(t));
       clearSession();
-      router.push("/login");
+      router.push("/login?deleted=1");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to delete account");
       setDeleting(false);
@@ -758,7 +758,11 @@ function DangerZone() {
           <div>
             <div style={{ fontWeight: 600, marginBottom: 2 }}>Delete Account</div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>
-              Permanently deactivate your account. Your runs and data will be preserved for the organisation.
+              Your account is locked straight away and erased 7 days later: your runs, projects only you
+              use, API keys, passkeys, saved keys, integrations, notification channels and profile. Public
+              share links stop at once. Sign in with your passkey within the 7 days to cancel. The security
+              log keeps its entries about the account, without your name, email or browser details.
+              Want a copy first? <a href="/gdpr" style={{ color: "inherit" }}>Export your data</a>.
             </div>
           </div>
           {!confirming ? (
@@ -768,7 +772,7 @@ function DangerZone() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
               <div style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600 }}>
-                Are you sure? This cannot be undone.
+                Delete this account? After 7 days this can&apos;t be undone.
               </div>
               {err && <div style={{ fontSize: 12, color: "var(--danger)" }}>{err}</div>}
               <div style={{ display: "flex", gap: 8 }}>

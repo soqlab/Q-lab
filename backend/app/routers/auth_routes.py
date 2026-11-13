@@ -18,13 +18,13 @@ from ..auth import (
     verify_password,
 )
 from ..database import get_db
-from ..deps import Identity, log_audit, require_auth
+from ..deps import Identity, log_audit, require_auth, require_passkey_session
 from ..email_service import (
     send_account_recovery_email,
     send_password_reset_email,
     is_email_configured,
     send_verification_email,
-    send_account_deleted_email,
+    send_account_deletion_scheduled_email,
 )
 from ..models import APIKey, Organization, PasskeyCredential, User
 from ..rate_limit import auth_limiter
@@ -196,6 +196,8 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
     if has_passkey(db, user.id):
         # The password went when the passkey came; a hash left behind is still not a way in.
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    from .. import erasure
+    erasure.cancel_if_pending(db, user)  # signing in cancels a scheduled account deletion
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
     if not getattr(user, "email_verified", True) and is_email_configured():
@@ -430,23 +432,28 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
 # ---------------------------------------------------------------------------
 
 @router.delete("/me")
-def delete_account(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)):
-    """Permanently deactivate the logged-in user's account."""
+def delete_account(identity: Identity = Depends(require_passkey_session), db: Session = Depends(get_db)):
+    """Delete the signed-in account: it is locked now and erased after a grace period
+    (app/erasure.py). Signing in again before then cancels the deletion.
+
+    A browser session only (and, with QLAB_PASSKEYS_ONLY, a passkey one): an SDK API key
+    can't delete the account it belongs to."""
+    from .. import erasure
+
     user = db.scalar(select(User).where(User.id == identity.user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    user_email = user.email
-    user_name = user.name
-
-    # Deactivate rather than hard-delete to preserve run history integrity
-    user.is_active = False
-    db.commit()
-
-    if user_email:
+    due = erasure.schedule(db, user, via="settings")
+    erase_on = f"{due.day} {due:%B %Y}"
+    if user.email:
         try:
-            send_account_deleted_email(to_email=user_email, user_name=user_name)
+            send_account_deletion_scheduled_email(to_email=user.email, user_name=user.name, erase_on=erase_on)
         except Exception:
             pass
-
-    return {"message": "Account deleted successfully"}
+    return {
+        "scheduled": True,
+        "erase_at": due.isoformat(),
+        "grace_days": erasure.GRACE_DAYS,
+        "message": (f"Your account is locked and will be erased on {erase_on}. "
+                    "Sign in with your passkey before then to cancel."),
+    }

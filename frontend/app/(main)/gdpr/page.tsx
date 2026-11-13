@@ -29,8 +29,8 @@ interface RetentionPolicy {
   policy_id: string;
   name: string;
   retain_runs_days: number;
-  retain_logs_days: number;
   anonymize_after_days: number;
+  retain_logs_days: number;
   applies_to_projects: string[];
   enabled: boolean;
   created_at: string;
@@ -193,7 +193,12 @@ export default function GDPRPage() {
         headers: { ...authHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: true, reason: deleteReason }),
       });
-      if (!res.ok) throw new Error("Deletion request failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail === "passkey_session_required"
+          ? "Sign in again with your passkey, then delete the account from Settings."
+          : "Deletion request failed");
+      }
       const data = await res.json() as { request_id: string; message: string };
       setDeleteResult(data);
     } catch (e: unknown) {
@@ -269,7 +274,8 @@ export default function GDPRPage() {
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Data Privacy &amp; GDPR</h2>
         </div>
         <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>
-          Manage your data, exercise GDPR rights, and configure compliance policies.
+          Download everything Q-Lab holds about you, or delete your account. What is kept and why is in the{" "}
+          <a href="/privacy" style={{ color: "#38bdf8" }}>privacy notice</a>.
         </p>
       </div>
 
@@ -341,7 +347,7 @@ export default function GDPRPage() {
               <div style={{ background: "#f59e0b22", border: "1px solid #f59e0b55", borderRadius: 8, padding: "16px 18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <Clock size={16} style={{ color: "#f59e0b" }} />
-                  <strong style={{ color: "#f59e0b" }}>Deletion Request Submitted</strong>
+                  <strong style={{ color: "#f59e0b" }}>Account deletion scheduled</strong>
                 </div>
                 <p style={{ margin: "0 0 12px", fontSize: 13, color: "#fcd34d", lineHeight: 1.6 }}>
                   {deleteResult.message}
@@ -355,9 +361,11 @@ export default function GDPRPage() {
                 <div style={{ background: "#ef444411", border: "1px solid #ef444433", borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10 }}>
                   <AlertTriangle size={16} style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
                   <div style={{ fontSize: 13, color: "#fca5a5", lineHeight: 1.6 }}>
-                    <strong>Warning:</strong> Under GDPR Article 17, you may request deletion of your personal data.
-                    This action is <strong>irreversible</strong>. Your request will be reviewed by an administrator
-                    within 30 days. Some data (anonymized statistics, audit logs) is retained for legal compliance.
+                    Your account is locked straight away and <strong>erased 7 days later</strong>: your runs, projects
+                    nobody else uses, API keys, passkeys, recovery codes, saved provider keys, webhooks, notification
+                    channels, integrations and profile. Public share links stop at once. Sign in with your passkey
+                    within the 7 days to cancel. The security log keeps its entries about the account, with the
+                    account replaced by a code and without browser details.
                   </div>
                 </div>
 
@@ -387,8 +395,8 @@ export default function GDPRPage() {
                       style={{ marginTop: 2 }}
                     />
                     <span style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-                      I understand that requesting deletion will permanently remove my account,
-                      all run data, API keys, and organisation membership. This action is irreversible.
+                      I understand my account is locked now and erased with all its data in 7 days, unless I
+                      sign in before then.
                     </span>
                   </label>
 
@@ -409,7 +417,7 @@ export default function GDPRPage() {
                       }}
                     >
                       <Trash2 size={15} />
-                      {deleteLoading ? "Submitting request…" : "Request account deletion"}
+                      {deleteLoading ? "Deleting…" : "Delete my account"}
                     </button>
                   </div>
                 </div>

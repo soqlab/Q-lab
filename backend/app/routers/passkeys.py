@@ -337,6 +337,8 @@ def login_finish(payload: Finish, request: Request, db: Session = Depends(get_db
         raise HTTPException(status_code=401, detail="The passkey could not be verified.")
 
     user = db.get(User, row.user_id)
+    from .. import erasure
+    erasure.cancel_if_pending(db, user)  # signing in cancels a scheduled account deletion
     if user is None or not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
     # No email check: the passkey is the sign-in. An unconfirmed address only means Q-Lab

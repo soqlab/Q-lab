@@ -497,6 +497,31 @@ async def _wire_event_loop() -> None:
     set_event_loop(asyncio.get_event_loop())
     with SessionLocal() as _db:
         _migrate_legacy_runs(_db)
+    asyncio.get_event_loop().create_task(_erase_due_accounts())
+
+
+async def _erase_due_accounts() -> None:
+    """Every hour, erase the accounts whose deletion grace period is over (app/erasure.py).
+    QLAB_ERASURE_INTERVAL_SECONDS changes the interval; 0 turns it off (then an admin runs
+    POST /api/v1/gdpr/delete/process)."""
+    import asyncio
+    import logging
+    from .erasure import process_due
+
+    interval = int(os.getenv("QLAB_ERASURE_INTERVAL_SECONDS", "3600"))
+    if interval <= 0:
+        return
+    while True:
+        try:
+            def _run() -> list[str]:
+                with SessionLocal() as db:
+                    return process_due(db)
+            erased = await asyncio.to_thread(_run)
+            if erased:
+                logging.getLogger("qlab").info("Erased %d account(s) after their grace period", len(erased))
+        except Exception:
+            logging.getLogger("qlab").exception("Scheduled account erasure failed")
+        await asyncio.sleep(interval)
 
 
 # ------------------------------------------------------------------

@@ -3,8 +3,9 @@
 Endpoints:
   POST /api/v1/gdpr/export/request                  — request full data export
   GET  /api/v1/gdpr/export/{request_id}             — download exported data
-  POST /api/v1/gdpr/delete/request                  — request account deletion
-  GET  /api/v1/gdpr/delete/requests                 — list pending deletions (admin)
+  POST /api/v1/gdpr/delete/request                  — delete your account (locked now, erased after 7 days)
+  GET  /api/v1/gdpr/delete/requests                 — deletion requests and scheduled erasures (admin)
+  POST /api/v1/gdpr/delete/process                  — erase accounts whose grace period is over (admin)
   POST /api/v1/gdpr/anonymize/{run_id}              — anonymize a specific run
   POST /api/v1/gdpr/retention-policy                — create retention policy
   GET  /api/v1/gdpr/retention-policies              — list retention policies
@@ -26,9 +27,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import get_identity, log_audit, require_auth, require_role, Identity
-from ..models import AuditLog, Run, User
-from ..store import store_delete, store_get, store_list, store_put, store_seed
+from ..deps import Identity, log_audit, require_auth, require_passkey_session, require_role
+from ..models import Run, User
+from ..store import store_get, store_list, store_put
 
 router = APIRouter(prefix="/api/v1/gdpr", tags=["gdpr"])
 
@@ -221,55 +222,57 @@ def download_export(
 @router.post("/delete/request")
 def request_deletion(
     body: DeleteRequestBody,
-    identity: Identity = Depends(require_auth),
+    identity: Identity = Depends(require_passkey_session),
     db: Session = Depends(get_db),
 ):
-    """GDPR Article 17 — Right to Erasure. Creates a pending deletion request."""
-    user = _require_user(identity)
+    """GDPR Article 17: delete your account. The same as deleting it in Settings: the account is
+    locked now and erased after the grace period (app/erasure.py); signing in before then cancels."""
+    from .. import erasure
+    from ..email_service import send_account_deletion_scheduled_email
 
+    user = _require_user(identity)
     if not body.confirm:
         raise HTTPException(400, "confirm must be true to proceed with deletion request")
 
     request_id = f"gdpr_del_{uuid.uuid4().hex[:12]}"
     now = _utcnow_str()
-
-    req_record = {
+    due = erasure.schedule(db, user, via="gdpr_request")
+    erase_on = f"{due.day} {due:%B %Y}"
+    store_put(db, NS_REQUESTS, request_id, {
         "request_id": request_id,
         "user_id": user.id,
         "request_type": "delete",
-        "status": "pending_confirmation",
+        "status": "scheduled",
         "reason": body.reason,
         "requested_at": now,
+        "erase_at": due.isoformat(),
         "completed_at": None,
         "download_url": None,
-    }
-    store_put(db, NS_REQUESTS, request_id, req_record)
-
-    log_audit(
-        db,
-        action="gdpr.delete.requested",
-        resource_type="gdpr_delete",
-        resource_id=request_id,
-        identity=identity,
-        meta={"reason": body.reason},
-    )
-
+    })
+    if user.email:
+        try:
+            send_account_deletion_scheduled_email(to_email=user.email, user_name=user.name, erase_on=erase_on)
+        except Exception:
+            pass
     return {
         "request_id": request_id,
-        "status": "pending_confirmation",
+        "status": "scheduled",
+        "erase_at": due.isoformat(),
         "message": (
-            "Your deletion request has been received. An administrator will process it within "
-            "30 days. Your data will be permanently deleted. This action is irreversible."
+            f"Your account is locked and will be erased on {erase_on}. Sign in with your passkey before "
+            "then to cancel. Public share links have been turned off."
         ),
         "what_will_be_deleted": [
-            "All run data",
-            "API keys",
-            "Organization membership",
-            "Personal settings",
+            "Your runs and everything attached to them (notes, metrics, results)",
+            "Projects nobody else has runs in",
+            "API keys, passkeys and recovery codes",
+            "Saved provider keys, webhooks, notification channels and integration settings you made",
+            "Your profile, preferences and other records you made",
+            "Your organisation and its data, if you are its last member",
         ],
         "what_will_be_retained": [
-            "Anonymized aggregate statistics",
-            "Audit logs (required by law for 7 years)",
+            "Security log entries about the account, with the account replaced by an opaque code and "
+            "without browser details",
         ],
         "contact": "contact@soqlab.com",
     }
@@ -280,10 +283,23 @@ def list_deletion_requests(
     identity: Identity = Depends(require_role("admin", "owner")),
     db: Session = Depends(get_db),
 ):
-    """List all pending deletion requests (admin use)."""
-    all_requests = store_list(db, NS_REQUESTS)
-    deletions = [r for r in all_requests if r.get("request_type") == "delete"]
-    return {"requests": deletions, "total": len(deletions)}
+    """Deletion requests and the erasures scheduled from them (admin use)."""
+    from ..erasure import NS_PENDING
+
+    deletions = [r for r in store_list(db, NS_REQUESTS) if r.get("request_type") == "delete"]
+    return {"requests": deletions, "total": len(deletions), "scheduled": store_list(db, NS_PENDING)}
+
+
+@router.post("/delete/process")
+def process_deletions(
+    identity: Identity = Depends(require_role("admin", "owner")),
+    db: Session = Depends(get_db),
+):
+    """Erase now every account whose grace period is over (the server also does this hourly)."""
+    from ..erasure import process_due
+
+    erased = process_due(db)
+    return {"erased": len(erased), "security_log_subjects": erased}
 
 
 @router.post("/anonymize/{run_id}")

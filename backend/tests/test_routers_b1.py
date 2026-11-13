@@ -383,10 +383,11 @@ def test_gdpr_anonymize_and_deletion_request(alice, bob):
     assert run["parameters"] == {"author": "[ANONYMIZED]", "contact": "[ANONYMIZED]", "theta": 0.5}
     assert "anonymized" in run["tags"]
 
-    assert client.post("/api/v1/gdpr/delete/request", headers=alice, json={"confirm": False}).status_code == 400
-    assert client.post("/api/v1/gdpr/delete/request", headers=alice,
-                       json={"confirm": True}).json()["status"] == "pending_confirmation"
-    assert client.get("/api/v1/gdpr/delete/requests", headers=alice).status_code == 403
+    leaving = make_user(prefix="b1del")  # deleting locks the account, so not the shared alice
+    assert client.post("/api/v1/gdpr/delete/request", headers=leaving, json={"confirm": False}).status_code == 400
+    assert client.get("/api/v1/gdpr/delete/requests", headers=leaving).status_code == 403
+    assert client.post("/api/v1/gdpr/delete/request", headers=leaving,
+                       json={"confirm": True}).json()["status"] == "scheduled"
 
 
 def test_gdpr_retention_policy_deletes_only_old_runs():

@@ -666,21 +666,12 @@ def purge_user(
     identity: Identity = Depends(require_role("owner")),
     db: Session = Depends(get_db),
 ):
-    """Permanently delete a user and all their data. Owner only."""
+    """Erase a user and their data now, without the grace period (app/erasure.py). Owner only."""
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == identity.user_id:
         raise HTTPException(status_code=400, detail="You cannot delete your own account")
-    email = user.email
-    # Unlink runs (preserve history but remove attribution)
-    db.execute(
-        Run.__table__.update()
-        .where(Run.created_by_user_id == user_id)
-        .values(created_by_user_id=None)
-    )
-    # Delete API keys
-    db.execute(APIKey.__table__.delete().where(APIKey.user_id == user_id))
-    db.delete(user)
-    db.commit()
-    return {"message": f"User {email} has been permanently deleted"}
+    from ..erasure import erase
+    code = erase(db, user_id)
+    return {"message": "User erased", "security_log_subject": code}

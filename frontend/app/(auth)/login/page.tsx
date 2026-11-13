@@ -144,6 +144,11 @@ function LoginForm() {
       {!supported && (
         <div className={s.error}>This browser can&apos;t use passkeys on this address. Passkeys need a current browser and https.</div>
       )}
+      {searchParams.get("deleted") === "1" && !error && (
+        <div className={s.ok} role="status">
+          Your account is locked and will be erased in 7 days. To cancel, sign in with your passkey before then.
+        </div>
+      )}
       {error && <div className={s.error} role="alert">{error}</div>}
       {noPasskey && (
         <div className={s.notice} role="alert">
