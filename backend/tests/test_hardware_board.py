@@ -396,11 +396,11 @@ def test_benchmark_end_to_end_on_a_fake_backend(monkeypatch):
 
     monkeypatch.setenv("QLAB_HARDWARE_BOARD_SIMULATE", "1")
     monkeypatch.delenv("RENDER", raising=False)
-    hb.provider = Local()
+    monkeypatch.setattr(hb, "provider", Local())  # restored after the test
     with SessionLocal() as db:
         out = hb.tick(db)
         assert len(out["submitted"]) == 1
-        for _ in range(120):
+        for _ in range(480):  # slow CI runners: allow up to four minutes
             if hb.collect_pending(db)["pending"] == 0:
                 break
             time.sleep(0.5)

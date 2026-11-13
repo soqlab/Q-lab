@@ -632,7 +632,9 @@ def submit_to(db: Session, backend, is_sim: bool):
             },
             "calibration": _calibration_for(backend, isa, physical),
         })
-    job = SamplerV2(mode=backend).run(isas, shots=SHOTS)
+    # A simulated preview is seeded, so it gives the same counts every time (and tests are stable).
+    sampler = SamplerV2(mode=backend, options={"simulator": {"seed_simulator": 20261113}}) if is_sim else SamplerV2(mode=backend)
+    job = sampler.run(isas, shots=SHOTS)
     p = _provider()
     if isinstance(p, _Simulated):
         p.remember(job)
