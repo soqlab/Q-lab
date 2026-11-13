@@ -1290,7 +1290,7 @@ def _is_simulator(backend_name: Optional[str]) -> bool:
 # worker thread, and Q-Lab's own shadow simulation runs Aer: those inner calls are not tracked.
 
 _LOCAL = threading.local()
-_NESTED_CALLERS = ("qiskit.primitives", "qiskit_ibm_runtime")
+_NESTED_CALLERS = ("qiskit.primitives", "qiskit_ibm_runtime", "qiskit_aer.primitives")
 
 
 def _is_nested_call() -> bool:

@@ -140,12 +140,15 @@ def test_sign_up_creates_a_passkey_account_without_a_password(passkeys_only):
 
 
 def test_registration_options_are_discoverable_with_user_verification_and_rp_from_app_url():
-    begin = client.post("/auth/passkeys/signup/begin", json={"email": f"o_{uuid.uuid4().hex[:8]}@x.org", "name": "O"})
+    email = f"o_{uuid.uuid4().hex[:8]}@x.org"
+    begin = client.post("/auth/passkeys/signup/begin", json={"email": email, "name": "O"})
     options = begin.json()["options"]
     assert options["rp"]["id"] == RP_ID
     assert options["authenticatorSelection"]["residentKey"] == "required"
     assert options["authenticatorSelection"]["userVerification"] == "required"
-    assert "@" not in base64.urlsafe_b64decode(options["user"]["id"] + "==").decode("latin-1")
+    # The user handle is random bytes (a 0x40 "@" byte turns up by chance); it must not carry the email.
+    handle = base64.urlsafe_b64decode(options["user"]["id"] + "==")
+    assert email.encode() not in handle and email.split("@")[0].encode() not in handle
     config = client.get("/auth/passkeys/config").json()
     assert config == {"passkeys_only": False, "rp_id": RP_ID}
 

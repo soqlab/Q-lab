@@ -135,3 +135,12 @@ def test_reproduces_from_environment(captured, monkeypatch):
     monkeypatch.setenv("QLAB_REPRODUCES", "orig-env-789")
     qlab.init()
     assert qiskit_hooks._CONFIG["reproduces"] == "orig-env-789"
+
+
+def test_aer_sampler_is_one_run_with_its_seed(captured):
+    """Aer's SamplerV2 calls backend.run in a worker thread: that inner call is not a second run."""
+    aer_primitives = pytest.importorskip("qiskit_aer.primitives")
+    aer_primitives.SamplerV2(seed=21).run([_bell()], shots=32).result()
+    assert len(captured) == 1
+    assert captured[0]["parameters"]["seed"] == 21
+    assert captured[0]["execution"]["primitive"]["class"].startswith("qiskit_aer.primitives")
