@@ -315,29 +315,22 @@ function CompareInner() {
     setRightRunId(urlB);
   }
   useEffect(() => {
-    if (urlA && urlB) void runCompare(urlA, urlB);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlA, urlB]);
-
-  async function runCompare(leftRunId: string, rightRunId: string) {
-    if (!leftRunId || !rightRunId) return;
-    setError(null);
-    setExplainError(null);
-    const explaining = explainRunDiff(leftRunId, rightRunId).then(
-      (r) => { setExplanation(r); },
+    if (!urlA || !urlB) return;
+    let on = true;
+    explainRunDiff(urlA, urlB).then(
+      (r) => { if (on) { setExplanation(r); setExplainError(null); } },
       (err: unknown) => {
+        if (!on) return;
         setExplanation(null);
         setExplainError(err instanceof Error ? err.message : "Could not explain the difference");
       },
     );
-    try {
-      setResult(await compareRuns(leftRunId, rightRunId));
-      setCompared({ left: leftRunId, right: rightRunId });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Comparison failed");
-    }
-    await explaining;
-  }
+    compareRuns(urlA, urlB).then(
+      (r) => { if (on) { setResult(r); setCompared({ left: urlA, right: urlB }); setError(null); } },
+      (err: unknown) => { if (on) setError(err instanceof Error ? err.message : "Comparison failed"); },
+    );
+    return () => { on = false; };
+  }, [urlA, urlB]);
 
   const runOptions = useMemo(() => {
     const opts = runs.map((run) => ({

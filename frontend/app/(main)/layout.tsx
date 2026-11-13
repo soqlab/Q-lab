@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import UserMenu from "./UserMenu";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+const noSubscription = () => () => {};
 import { useAuth } from "../../lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { isCorePath, useLabs } from "../../lib/labs";
@@ -226,8 +228,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const [d] = useDetail();
   useDetailSync(pathname);
-  const [mac, setMac] = useState(false);
-  useEffect(() => { setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)); }, []);
+  const mac = useSyncExternalStore(noSubscription, () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent), () => false);
   return (
     <div className="shell">
       <header className="shell-bar">

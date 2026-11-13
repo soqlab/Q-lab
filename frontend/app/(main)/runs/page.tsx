@@ -126,7 +126,6 @@ function RunsInner() {
   const [runs, setRuns] = useState<QLabRun[]>([]);
   const [loaded, setLoaded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
   // Runs that arrived over the live stream while this page was open: they flash once.
   const [arrived, setArrived] = useState<Set<string>>(new Set());
 
@@ -148,7 +147,6 @@ function RunsInner() {
       } else if (type === "run.updated") setRuns((prev) => prev.map((r) => (r.run_id === data.run_id ? data : r)));
       else if (type === "run.deleted") setRuns((prev) => prev.filter((r) => r.run_id !== (data as unknown as { run_id: string }).run_id));
     }, applied.project || undefined);
-    setLive(true);
     return close;
   }, [applied.project]);
 
@@ -212,7 +210,7 @@ function RunsInner() {
           }}>
           <Download size={16} aria-hidden="true" /> CSV
         </button>
-        {live && (
+        {(
           <span className="mono" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }} title="New runs appear here as they arrive">
             <Wifi size={14} aria-hidden="true" /> listening for new runs
           </span>

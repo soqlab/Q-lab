@@ -140,7 +140,6 @@ function Box({ initial, onDone }: { initial: string; onDone: () => void }) {
     return out.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true))).slice(0, 24);
   }, [q, context, remote, labs, detail, setDetail, setLabs]);
 
-  useEffect(() => { setActive(0); }, [q]);
   useEffect(() => { input.current?.focus(); }, []);
   useEffect(() => {
     list.current?.querySelector<HTMLElement>(`#${uid}-o${active}`)?.scrollIntoView({ block: "nearest" });
@@ -167,7 +166,7 @@ function Box({ initial, onDone }: { initial: string; onDone: () => void }) {
       <div className="palette-field">
         <span aria-hidden="true">›</span>
         <input
-          ref={input} value={q} onChange={(e) => setQ(e.target.value)} spellCheck={false} autoCapitalize="off" autoComplete="off"
+          ref={input} value={q} onChange={(e) => { setQ(e.target.value); setActive(0); }} spellCheck={false} autoCapitalize="off" autoComplete="off"
           role="combobox" aria-expanded="true" aria-controls={`${uid}-list`} aria-autocomplete="list"
           aria-activedescendant={matches[active] ? `${uid}-o${active}` : undefined}
           aria-label="Run id, project, backend, circuit hash, page or command"
