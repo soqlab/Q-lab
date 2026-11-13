@@ -22,6 +22,7 @@ from ..database import get_db
 from ..deps import Identity, require_auth, require_role
 from ..models import Run
 from ..outbound import UnsafeURL, is_safe_url, require_safe_url
+from ..secret_box import SLACK_SECRET_KEYS, seal_fields, unseal_fields
 from ..store import store_delete, store_get, store_list, store_put
 
 APP_URL = os.getenv("QLAB_APP_URL", "")
@@ -73,7 +74,8 @@ class TeamsNotifyBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _get_config(db: Session) -> Optional[dict]:
-    return store_get(db, _NAMESPACE, _CONFIG_ID)
+    """The saved settings, with the bot token, signing secret and Teams URL decrypted."""
+    return unseal_fields(store_get(db, _NAMESPACE, _CONFIG_ID), SLACK_SECRET_KEYS)
 
 
 def _make_blocks(title: str, text: str, color: str = "#6366f1") -> dict:
@@ -235,7 +237,7 @@ async def save_slack_config(
         "teams_webhook_url": payload.teams_webhook_url,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    store_put(db, _NAMESPACE, _CONFIG_ID, config)
+    store_put(db, _NAMESPACE, _CONFIG_ID, seal_fields(config, SLACK_SECRET_KEYS))
 
     return {
         **config,

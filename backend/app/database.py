@@ -54,6 +54,20 @@ def _create_schema() -> None:
     _ensure_compat_columns()
     _relax_users_email()
     _ensure_fts()
+    _encrypt_existing_secrets()
+
+
+def _encrypt_existing_secrets() -> None:
+    """Integration secrets saved before they were encrypted are encrypted now (app/secret_box.py)."""
+    if not os.environ.get("QLAB_SECRET_KEY"):
+        return  # nothing can be encrypted without the key; the app itself refuses to start
+    try:
+        from .secret_box import encrypt_existing
+        with engine.begin() as conn:
+            encrypt_existing(conn)
+    except Exception as exc:  # never keep the server from starting
+        import logging
+        logging.getLogger("qlab").error("Could not encrypt stored integration secrets: %s", exc)
 
 
 def _relax_users_email() -> None:

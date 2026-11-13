@@ -24,6 +24,7 @@ from ..deps import Identity, get_identity, require_auth
 from ..models import Run
 from ..health_score import compute_health_score
 from ..outbound import is_safe_url
+from ..secret_box import ALERT_SECRET_KEYS, seal_fields, unseal_fields
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
@@ -61,7 +62,7 @@ _RULES_FILE = pathlib.Path(os.getenv("QLAB_DATA_DIR", "data")) / "alert_rules.js
 def _load_rules() -> list[dict]:
     try:
         if _RULES_FILE.exists():
-            return json.loads(_RULES_FILE.read_text())
+            return [unseal_fields(r, ALERT_SECRET_KEYS) for r in json.loads(_RULES_FILE.read_text())]
         return []
     except Exception:
         return []
@@ -70,7 +71,8 @@ def _load_rules() -> list[dict]:
 def _save_rules(rules: list[dict]) -> None:
     try:
         _RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _RULES_FILE.write_text(json.dumps(rules, indent=2))
+        # Webhook URLs (a Slack one is a credential) are stored encrypted.
+        _RULES_FILE.write_text(json.dumps([seal_fields(r, ALERT_SECRET_KEYS) for r in rules], indent=2))
     except Exception:
         pass
 

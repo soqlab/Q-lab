@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from .database import Base
+from .secret_box import CHANNEL_SECRET_KEYS, SealedJSON, SealedString
 
 
 def utcnow() -> datetime:
@@ -181,7 +182,7 @@ class Webhook(Base):
     name: Mapped[str] = mapped_column(String(200))
     url: Mapped[str] = mapped_column(String(2000))
     events: Mapped[list[str]] = mapped_column(JSON, default=list)
-    secret: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    secret: Mapped[str | None] = mapped_column(SealedString(256), nullable=True)  # stored encrypted
     project_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -475,7 +476,7 @@ class CICDIntegration(Base):
     name: Mapped[str] = mapped_column(String(200))
     provider: Mapped[str] = mapped_column(String(32), default="github")  # github | gitlab | bitbucket
     repo_url: Mapped[str] = mapped_column(String(500))
-    webhook_secret: Mapped[str] = mapped_column(String(256))
+    webhook_secret: Mapped[str] = mapped_column(SealedString(256))  # stored encrypted
     project_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
     baseline_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     auto_fail_threshold: Mapped[float] = mapped_column(Float, default=10.0)  # health score drop %
@@ -559,7 +560,8 @@ class NotificationChannel(Base):
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200))
     channel_type: Mapped[str] = mapped_column(String(32))
-    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Its webhook_url, secret and token are stored encrypted (app/secret_box.py).
+    config: Mapped[dict[str, Any]] = mapped_column(SealedJSON(CHANNEL_SECRET_KEYS), default=dict)
     events: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

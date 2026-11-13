@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import Identity, get_identity, require_auth, require_role
 from ..models import Run
+from ..secret_box import GITHUB_SECRET_KEYS, seal_fields, unseal_fields
 from ..store import store_delete, store_get, store_list, store_put
 
 APP_URL = os.getenv("QLAB_APP_URL", "")
@@ -71,7 +72,8 @@ class LinkCommitBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _get_config(db: Session) -> Optional[dict]:
-    return store_get(db, _NAMESPACE, _CONFIG_ID)
+    """The saved settings, with the GitHub token decrypted."""
+    return unseal_fields(store_get(db, _NAMESPACE, _CONFIG_ID), GITHUB_SECRET_KEYS)
 
 
 def _build_pr_comment(runs: list) -> str:
@@ -199,7 +201,7 @@ async def save_config(
         "comment_template": payload.comment_template,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    store_put(db, _NAMESPACE, _CONFIG_ID, config)
+    store_put(db, _NAMESPACE, _CONFIG_ID, seal_fields(config, GITHUB_SECRET_KEYS))
     return {**config, "verified": True, "github_user": github_user}
 
 

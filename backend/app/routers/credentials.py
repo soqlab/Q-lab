@@ -7,14 +7,12 @@ AI providers:      defined in app/ai_provider.py (add new AI providers there)
 """
 from __future__ import annotations
 
-import base64
-import hashlib
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -25,16 +23,16 @@ from ..ai_provider import AI_PROVIDER_NAMES
 from ..database import get_db
 from ..deps import Identity, require_auth
 from ..models import ApiCredential
+from ..secret_box import fernet
 
 _ALLOWED_PROVIDERS = QUANTUM_BACKEND_IDS | AI_PROVIDER_NAMES | {"other"}
 
 router = APIRouter(prefix="/api/v1/credentials", tags=["credentials"])
 
-# Derive a 32-byte URL-safe base64 Fernet key from QLAB_SECRET_KEY
-_raw_secret = os.environ.get("QLAB_SECRET_KEY", "")
-if not _raw_secret:
+# The Fernet key derived from QLAB_SECRET_KEY, shared with app/secret_box.py.
+if not os.environ.get("QLAB_SECRET_KEY", ""):
     raise RuntimeError("QLAB_SECRET_KEY must be set to encrypt credentials")
-_fernet = Fernet(base64.urlsafe_b64encode(hashlib.sha256(_raw_secret.encode()).digest()))
+_fernet = fernet()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
