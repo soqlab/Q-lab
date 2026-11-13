@@ -36,8 +36,26 @@ export function useAnswer(runId: string | null): { state: "loading" | "ok" | "er
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 /** The sentence a run opens with, then the evidence behind it. */
-export default function RunAnswer({ runId, project, backend }: { runId: string; project?: string | null; backend?: string | null }) {
-  const a = useAnswer(runId);
+/** What to do next, in plain words, from the facts behind the answer. */
+function nextStep(d: Answer): string {
+  if (!d.measure) return "Results show up here once the job finishes; open this page again then.";
+  if (!d.previous) return "Run the same circuit again later to see whether this result holds.";
+  if (!d.change) return "Open the previous run to compare the two by hand: they can't be scored the same way.";
+  if (!d.change.significant) return "Nothing to fix: this matches the previous run within the normal run-to-run spread.";
+  if (d.change.points < 0) {
+    return d.cause && /calibration/i.test(d.cause)
+      ? "The machine itself changed. Try again after its next calibration, or on another machine."
+      : "Compare with the previous run to see what changed.";
+  }
+  return "Better than before. Compare with the previous run to see what changed, and keep those settings.";
+}
+
+export default function RunAnswer({ runId, project, backend, answer }: {
+  runId: string; project?: string | null; backend?: string | null;
+  answer?: { state: "loading" | "ok" | "error"; data?: Answer };
+}) {
+  const own = useAnswer(answer ? null : runId);
+  const a = answer ?? own;
   const [detail] = useDetail();
   const d = a.data;
   return (
@@ -54,6 +72,7 @@ export default function RunAnswer({ runId, project, backend }: { runId: string; 
         <p className="summary-line" style={{ fontSize: 17 }} aria-live="polite">
           {a.state === "loading" ? "Working out what this run shows…" : a.state === "error" ? "The answer for this run couldn't be worked out right now." : d!.sentence}
         </p>
+        {d && <p className="d-plain-only" style={{ margin: 0, fontSize: 15 }}><b>Next:</b> {nextStep(d)}</p>}
         {d?.measure && (
           <dl className="readouts d-standard">
             <div className="readout">

@@ -841,3 +841,37 @@ html:not([data-detail="plain"]) .d-plain-only { display: none !important; }
   .channels { order: 4; flex-basis: 100%; }
   .page { padding: 16px 12px 24px; }
 }
+
+/* Older panels and cards, brought into the instrument look: hairline frames, mono captions,
+   quiet buttons. (Placed last so it applies to every page that still uses these classes.) */
+.panel, .metric { border-radius: 4px; box-shadow: none; }
+.panel-header { padding: 9px 14px; }
+.panel-header h2 { font-size: 13px; font-weight: 600; }
+.metric { padding: 10px 14px; }
+.metric-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.metric-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; margin-top: 4px; }
+.button { border-radius: 4px; background: var(--text); border-color: var(--text); color: var(--bg); }
+.button.secondary { background: transparent; color: var(--text); border-color: var(--line); }
+.button.secondary:hover { border-color: var(--accent); opacity: 1; }
+
+/* The Actions menu on a run: one quiet control instead of a row of buttons. */
+.actions-menu { position: relative; }
+.actions-menu > summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 4px; font-size: 13px; color: var(--text); background: transparent;
+}
+.actions-menu > summary::-webkit-details-marker { display: none; }
+.actions-menu[open] > summary { border-color: var(--accent); }
+.actions-panel {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 280px; max-width: min(92vw, 420px);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  padding: 6px 0; display: grid;
+}
+.actions-panel .actions-group { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 8px 14px 4px; }
+.actions-panel a, .actions-panel > button, .actions-panel .actions-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 13px; color: var(--text);
+  background: transparent; border: 0; text-align: left; cursor: pointer; width: 100%;
+}
+.actions-panel a:hover, .actions-panel > button:hover { background: var(--panel-2); }
+.actions-panel .actions-item .button { height: 30px; font-size: 12.5px; }
+.actions-panel hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }

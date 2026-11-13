@@ -34,13 +34,14 @@ function parseResults(results: Record<string, unknown>): CountsDict | null {
   return null;
 }
 
-const COLORS = [
-  "var(--strong)", "var(--ok)", "var(--warn)", "var(--danger)",
-  "#8b5cf6", "#06b6d4", "#f59e0b", "#10b981",
-  "#3b82f6", "#ef4444", "#14b8a6", "#f97316",
-];
+const bits = (k: string) => k.replace(/ /g, "");
 
-export default function MeasurementHistogram({ results }: { results: Record<string, unknown> }) {
+/**
+ * The measured distribution in one ink. When the run's answer knows which outcomes the noise-free
+ * circuit can produce (`expected`), those bars are filled and the rest are outlines, so the chart
+ * shows exactly what the answer's percentage counts.
+ */
+export default function MeasurementHistogram({ results, expected }: { results: Record<string, unknown>; expected?: string[] | null }) {
   const analysis = useMemo(() => {
     const counts = parseResults(results);
     if (!counts) return null;
@@ -53,81 +54,71 @@ export default function MeasurementHistogram({ results }: { results: Record<stri
 
     const total = entries.reduce((s, e) => s + e.count, 0);
     const top = entries.slice(0, 16);
-    const topTotal = top.reduce((s, e) => s + e.count, 0);
     const probs = entries.map(e => e.count / total);
     const entropy = shannon_entropy(probs);
     const mostProbable = entries[0];
     const successProb = mostProbable.count / total;
     const isQuasiDist = Array.isArray(results.quasi_dists);
 
-    return { top, total, topTotal, entropy, mostProbable, successProb, isQuasiDist, numStates: entries.length };
+    return { top, total, entropy, mostProbable, successProb, isQuasiDist, numStates: entries.length };
   }, [results]);
 
   if (!analysis) return null;
 
   const { top, total, entropy, mostProbable, successProb, isQuasiDist, numStates } = analysis;
   const maxCount = top[0].count;
+  const width = expected && expected.length ? Math.max(...expected.map((e) => e.length)) : 0;
+  const isExpected = (state: string) => !!expected && expected.includes(bits(state).padStart(width, "0"));
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Measurement Results</h2>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>
-          {isQuasiDist ? "Quasi-probability distribution" : `${total.toLocaleString()} shots · ${numStates} unique states`}
+    <section className="frame" aria-labelledby="hist-h">
+      <div className="frame-head">
+        <h2 id="hist-h" className="inst-label">What was measured</h2>
+        <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
+          {isQuasiDist ? "quasi-probabilities" : `${total.toLocaleString()} shots · ${numStates} different outcomes`}
         </span>
       </div>
 
-      {/* Summary KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, padding: "14px 18px" }}>
-        {[
-          { label: "Most probable state", value: <code style={{ fontSize: 14, fontFamily: "monospace" }}>{mostProbable.state}</code> },
-          { label: "Probability", value: `${(successProb * 100).toFixed(2)}%` },
-          { label: "Shannon entropy", value: `${entropy.toFixed(3)} bits` },
-          { label: "Unique states", value: numStates.toLocaleString() },
-        ].map(kpi => (
-          <div key={kpi.label} style={{ background: "var(--panel-2)", borderRadius: 8, padding: "10px 12px" }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-              {kpi.label}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{kpi.value}</div>
-          </div>
-        ))}
-      </div>
+      <dl className="readouts d-expert" style={{ margin: "12px 14px 0" }}>
+        <div className="readout"><dt>Most probable outcome</dt><dd>{mostProbable.state}<small>{(successProb * 100).toFixed(2)}% of shots</small></dd></div>
+        <div className="readout"><dt>Shannon entropy</dt><dd>{entropy.toFixed(3)}<small>bits</small></dd></div>
+        <div className="readout"><dt>Different outcomes</dt><dd>{numStates.toLocaleString()}</dd></div>
+      </dl>
 
-      {/* Bar chart */}
-      <div style={{ padding: "0 18px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
-        {top.map((entry, i) => {
+      <div style={{ padding: "12px 14px 14px", display: "flex", flexDirection: "column", gap: 5 }}>
+        {top.map((entry) => {
           const pct = (entry.count / maxCount) * 100;
           const prob = (entry.count / total * 100).toFixed(1);
-          const color = COLORS[i % COLORS.length];
-
+          const exp = isExpected(entry.state);
           return (
             <div key={entry.state} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <code style={{
-                width: 90, flexShrink: 0, fontSize: 12, textAlign: "right",
-                color: "var(--text)", fontFamily: "monospace", letterSpacing: "0.05em",
-              }}>
+              <code className="mono" style={{ width: 90, flexShrink: 0, fontSize: 12, textAlign: "right", color: exp || !expected ? "var(--text)" : "var(--muted)" }}>
                 {entry.state}
               </code>
-              <div style={{ flex: 1, height: 22, background: "var(--panel-2)", borderRadius: 4, overflow: "hidden", position: "relative" }}>
-                <div style={{
-                  position: "absolute", left: 0, top: 0, bottom: 0,
-                  width: `${pct}%`, background: color, borderRadius: 4,
-                  opacity: 0.85, transition: "width 0.4s ease",
-                }} />
+              <div style={{ flex: 1, height: 18, position: "relative" }}>
+                <div
+                  title={expected ? (exp ? "An outcome the noise-free circuit can produce" : "An outcome the noise-free circuit never produces: noise") : undefined}
+                  style={{
+                    position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(pct, 0.6)}%`,
+                    background: exp || !expected ? "var(--text)" : "transparent",
+                    border: exp || !expected ? "none" : "1px solid var(--muted)",
+                    opacity: exp || !expected ? 0.85 : 1,
+                  }} />
               </div>
-              <div style={{ width: 90, flexShrink: 0, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <div className="num" style={{ width: 110, flexShrink: 0, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                 <span style={{ color: "var(--muted)" }}>{prob}%</span>
-                <span style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                  {isQuasiDist ? entry.count.toFixed(3) : entry.count.toLocaleString()}
-                </span>
+                <span style={{ color: "var(--text)" }}>{isQuasiDist ? entry.count.toFixed(3) : entry.count.toLocaleString()}</span>
               </div>
             </div>
           );
         })}
         {numStates > 16 && (
-          <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
-            Showing top 16 of {numStates} states
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>Showing the 16 most frequent of {numStates} outcomes.</div>
+        )}
+        {expected && expected.length > 0 && (
+          <div className="mono" style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 14, height: 8, background: "var(--text)", opacity: 0.85, display: "inline-block" }} /> expected outcome</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 14, height: 8, border: "1px solid var(--muted)", display: "inline-block" }} /> not produced by the noise-free circuit (noise)</span>
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
-import RunAnswer from "../../../../components/RunAnswer";
+import RunAnswer, { useAnswer } from "../../../../components/RunAnswer";
 import { setCommandContext } from "../../../../components/CommandPalette";
 import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -424,7 +424,7 @@ function DeleteRunButton({ runId }: { runId: string }) {
         style={{ height: 34, fontSize: 13, color: "var(--danger)", borderColor: "var(--danger)" }}
         type="button"
       >
-        <Trash2 size={15} aria-hidden="true" /> Delete
+        <Trash2 size={15} aria-hidden="true" /> Delete this run…
       </button>
     );
   }
@@ -748,6 +748,8 @@ function OverleafButton({ runId }: { runId: string }) {
 export default function RunDetailPage({ params: paramsPromise }: { params: Promise<{ runId: string }> }) {
   const params = use(paramsPromise);
   const [run, setRun] = useState<QLabRun | null>(null);
+  // Asked once here: the answer box and the measurement chart both use it.
+  const answer = useAnswer(run?.run_id ?? null);
   const [health, setHealth] = useState<Record<string, number | null>>({});
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -770,6 +772,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
     if (!run) return;
     const items = [
       { id: "here:verify", kind: "here" as const, title: "Verify this run", hint: "Check its record independently", href: `/verify/${run.run_id}` },
+      { id: "here:bundle", kind: "here" as const, title: "Download this run's reproduction bundle", hint: "Circuit, results, calibration, script (.zip)", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)) },
+      { id: "here:qasm", kind: "here" as const, title: "Download this run's circuit (QASM)", hint: "OpenQASM text", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)) },
       { id: "here:list-circuit", kind: "here" as const, title: "Every run of this circuit", hint: "Same circuit hash", href: run.fingerprint.qasm_sha256 ? `/runs?circuit=${run.fingerprint.qasm_sha256}` : `/runs?q=${encodeURIComponent(run.circuit_name ?? "")}` },
       ...(run.project ? [{ id: "here:timeline", kind: "here" as const, title: `${run.project} timeline at this run`, hint: "Scrub through the project", href: `/projects/${encodeURIComponent(run.project)}/timeline?run=${run.run_id}` }] : []),
       ...(run.backend && /^ibm/.test(run.backend) ? [{ id: "here:hw", kind: "here" as const, title: `${run.backend} on the hardware board`, hint: "Live status and benchmark history", href: `/hardware/${run.backend}` }] : []),
@@ -788,45 +792,45 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
 
   return (
     <main className="page">
-      <RunAnswer runId={run.run_id} project={run.project} backend={run.backend} />
+      <RunAnswer runId={run.run_id} project={run.project} backend={run.backend} answer={answer} />
 
-      <div className="toolbar">
-        <Link className="button secondary" href={run.project ? `/runs?project=${encodeURIComponent(run.project)}` : "/runs"}><ArrowLeft size={17} aria-hidden="true" /> Runs</Link>
-        <a className="button d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)}>
-          <Package size={17} aria-hidden="true" /> Bundle
-        </a>
-        <a className="button secondary d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)}>
-          <Download size={17} aria-hidden="true" /> QASM
-        </a>
-        <a className="button secondary d-standard" href={qlabApiPath(`/api/v1/runs/${run.run_id}/rerun.py`)}>
-          <FileCode size={17} aria-hidden="true" /> Rerun
-        </a>
-        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/health`)}>
-          <Activity size={17} aria-hidden="true" /> Health JSON
-        </a>
-        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/capsule.zip`)} title="Reproducibility Time Capsule — hermetic zip with SHA256 manifest">
-          <Package size={17} aria-hidden="true" /> Capsule
-        </a>
-        <Link className="button secondary d-expert" href={`/search/circuits?anchor=${run.run_id}`} title="Find structurally similar circuits">
-          <Search size={17} aria-hidden="true" /> Similar
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <Link className="button secondary" href={run.project ? `/runs?project=${encodeURIComponent(run.project)}` : "/runs"} style={{ height: 34 }}>
+          <ArrowLeft size={15} aria-hidden="true" /> Runs
         </Link>
-        <span className="d-standard"><DiffButton runId={run.run_id} /></span>
-        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download title="Download Markdown report for paper appendix">
-          <Download size={17} aria-hidden="true" /> Report.md
-        </a>
-        <a className="button secondary d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.tex`)} download title="Download LaTeX tables for paper appendix">
-          <FileCode size={17} aria-hidden="true" /> Report.tex
-        </a>
-        <a className="button secondary d-expert" href={getPaperPackageUrl(run.run_id)} download title="Download complete LaTeX paper package (methods, results, calibration, bibliography, main.tex)">
-          <Package size={17} aria-hidden="true" /> Paper ZIP
-        </a>
-        <span className="d-expert"><OverleafButton runId={run.run_id} /></span>
-        <ShareButton runId={run.run_id} />
-        <span className="d-standard"><BadgeButton runId={run.run_id} /></span>
-        <DeleteRunButton runId={run.run_id} />
+        <details className="actions-menu d-standard">
+          <summary>Actions ▾</summary>
+          <div className="actions-panel" role="menu">
+            <div className="actions-group">Get the run</div>
+            <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)}><Package size={15} aria-hidden="true" /> Reproduction bundle (.zip)</a>
+            <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)}><Download size={15} aria-hidden="true" /> Circuit (QASM)</a>
+            <a href={qlabApiPath(`/api/v1/runs/${run.run_id}/rerun.py`)}><FileCode size={15} aria-hidden="true" /> Script to run it again</a>
+            <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/capsule.zip`)}><Package size={15} aria-hidden="true" /> Time capsule (.zip with SHA-256 manifest)</a>
+            <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/health`)}><Activity size={15} aria-hidden="true" /> Health score (JSON)</a>
+            <div className="actions-group">Compare and share</div>
+            <div className="actions-item"><DiffButton runId={run.run_id} /></div>
+            <Link href={`/search/circuits?anchor=${run.run_id}`}><Search size={15} aria-hidden="true" /> Similar circuits</Link>
+            <div className="actions-item"><ShareButton runId={run.run_id} /></div>
+            <div className="actions-item"><BadgeButton runId={run.run_id} /></div>
+            <div className="actions-group d-expert">Write it up</div>
+            <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download><Download size={15} aria-hidden="true" /> Report (Markdown)</a>
+            <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.tex`)} download><FileCode size={15} aria-hidden="true" /> Report (LaTeX tables)</a>
+            <a className="d-expert" href={getPaperPackageUrl(run.run_id)} download><Package size={15} aria-hidden="true" /> Paper package (.zip)</a>
+            <div className="actions-item d-expert"><OverleafButton runId={run.run_id} /></div>
+            <hr />
+            <div className="actions-item"><DeleteRunButton runId={run.run_id} /></div>
+          </div>
+        </details>
       </div>
 
-      <section className="summary-grid d-standard" aria-label="Circuit metrics">
+      <dl className="readouts d-standard d-not-expert" aria-label="Circuit">
+        <div className="readout"><dt>Qubits</dt><dd>{run.fingerprint.num_qubits ?? "—"}</dd></div>
+        <div className="readout"><dt>Depth</dt><dd>{run.fingerprint.depth ?? "—"}</dd></div>
+        <div className="readout"><dt>Gates</dt><dd>{run.fingerprint.size ?? "—"}</dd></div>
+        <div className="readout"><dt>Non-Clifford gates</dt><dd>{(((run.fingerprint.non_clifford_ratio ?? 0) * 100)).toFixed(1)}%</dd></div>
+      </dl>
+
+      <section className="summary-grid d-expert" aria-label="Circuit metrics">
         <div className="metric">
           <div className="metric-label">Qubits</div>
           <div className="metric-value">{run.fingerprint.num_qubits ?? 0}</div>
@@ -843,13 +847,13 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
           <div className="metric-label">Non-Clifford</div>
           <div className="metric-value">{(((run.fingerprint.non_clifford_ratio ?? 0) * 100)).toFixed(1)}%</div>
         </div>
-        <div className="metric d-expert" style={{ borderColor: hc }} title="Q-Lab health score, 0–100: a weighted heuristic of the top outcome share and calibrated fidelities">
+        <div className="metric" style={{ borderColor: hc }} title="Q-Lab health score, 0–100: a weighted heuristic of the top outcome share and calibrated fidelities">
           <div className="metric-label">Health score (heuristic)</div>
           <div className="metric-value" style={{ color: hc }}>{run.health_score ?? "—"}</div>
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel d-standard">
         <div className="panel-header"><h2>{run.circuit_name || run.run_id}</h2></div>
         <div style={{ padding: "0 16px 12px" }}>
           <KeyValue label="Run ID" value={<code style={{ fontSize: 12 }}>{run.run_id}</code>} />
@@ -900,7 +904,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       </section>
 
       {run.results && Object.keys(run.results).length > 0 && (
-        <MeasurementHistogram results={run.results} />
+        <div className="d-standard"><MeasurementHistogram results={run.results} expected={answer.data?.measure?.kind === "ideal_share" ? answer.data.measure.ideal_outcomes : null} /></div>
       )}
 
       <div className="d-expert"><ShadowSimPanel runId={run.run_id} /></div>
@@ -938,7 +942,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
 
       <div className="d-expert"><ResourceEstimatePanel runId={run.run_id} /></div>
 
-      {run.qasm && <div className="d-standard"><CircuitDiagram runId={run.run_id} /></div>}
+      {run.qasm && <CircuitDiagram runId={run.run_id} />}
 
       <div className="detail-grid d-expert">
         <section className="panel">
@@ -993,7 +997,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       <div className="d-expert"><ShadowTomoPanel runId={run.run_id} /></div>
       <div className="d-expert"><NoiseModelPanel runId={run.run_id} /></div>
       <div className="d-expert"><CitationsPanel runId={run.run_id} /></div>
-      <NotesPanel runId={run.run_id} />
+      <div className="d-standard"><NotesPanel runId={run.run_id} /></div>
     </main>
   );
 }
