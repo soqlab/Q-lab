@@ -1090,7 +1090,7 @@ function ActivityFeedTab({ token }: { token: string }) {
       <div className="panel-header" style={{ gap: 12 }}>
         <h2>Live Activity Feed</h2>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#22c55e" }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block", animationName: "pulse-dot", animationDuration: "2s", animationIterationCount: "infinite" }} />
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
           live · {filtered.length} events
         </span>
         {lastUpdated && (

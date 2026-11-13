@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Filter, RefreshCw, Wifi, Download } from "lucide-react";
 import { createRunStream, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
@@ -8,268 +8,19 @@ import { useAuth } from "../../../lib/auth";
 import { useToast } from "../../../lib/toast";
 
 
-// ------------------------------------------------------------------
-// ─── Dashboard routing fabric ─────────────────────────────────────────────────
-function DashFabric({ runs: initialRuns }: { runs: QLabRun[] }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const { token } = useAuth();
-  const [liveRuns, setLiveRuns] = useState<QLabRun[]>(initialRuns);
-
-  // New runs from the parent replace the polled ones (adjusted while rendering, not in an effect)
-  const [prevInitialRuns, setPrevInitialRuns] = useState(initialRuns);
-  if (initialRuns !== prevInitialRuns) {
-    setPrevInitialRuns(initialRuns);
-    setLiveRuns(initialRuns);
-  }
-
-  // Poll for fresh backend stats every 30 seconds
-  useEffect(() => {
-    if (!token) return;
-    const poll = async () => {
-      try {
-        const res = await fetch("/qlab-api/api/v1/runs?limit=50", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setLiveRuns(Array.isArray(data) ? data : data.items ?? []);
-        }
-      } catch {}
-    };
-    const id = setInterval(poll, 30_000);
-    return () => clearInterval(id);
-  }, [token]);
-
-  // Derive active backends from real runs
-  const activeBackends = useMemo(() => {
-    const recent = liveRuns.slice(0, 20);
-    const counts: Record<string, number> = {};
-    recent.forEach(r => {
-      const b = (r.backend || "").toLowerCase();
-      if (b.includes("ibm"))     counts.ibm     = (counts.ibm || 0) + 1;
-      if (b.includes("ionq"))    counts.ionq    = (counts.ionq || 0) + 1;
-      if (b.includes("rigetti")) counts.rigetti = (counts.rigetti || 0) + 1;
-      if (b.includes("aer") || b.includes("sim") || b === "") counts.aer = (counts.aer || 0) + 1;
-    });
-    return counts;
-  }, [liveRuns]);
-
-  const latestCircuit = liveRuns[0]?.circuit_name || liveRuns[0]?.run_id?.slice(0, 8) || "experiment";
-
-  // Ref keeps animation loop reading fresh data without restarting the rAF loop
-  const dataRef = useRef({ activeBackends, latestCircuit });
-  useEffect(() => { dataRef.current = { activeBackends, latestCircuit }; }, [activeBackends, latestCircuit]);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
-    let W = 0, H = 0, raf = 0, t0 = 0;
-    const reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
-
-    function resize() {
-      const r = canvas!.getBoundingClientRect();
-      W = r.width; H = r.height;
-      canvas!.width = W * dpr; canvas!.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-
-    const N = {
-      exp:     { x:.09, y:.50, r:6   },
-      qlab:    { x:.40, y:.50, r:12  },
-      ibm:     { x:.76, y:.17, r:8   },
-      ionq:    { x:.80, y:.40, r:6   },
-      rigetti: { x:.80, y:.60, r:6   },
-      aer:     { x:.76, y:.83, r:6   },
-    };
-
-    const P = (n:{x:number,y:number}) => ({ x: n.x*W, y: n.y*H });
-
-    function bez(a:{x:number,y:number}, b:{x:number,y:number}) {
-      const A=P(a),B=P(b),mx=(A.x+B.x)/2;
-      ctx.beginPath(); ctx.moveTo(A.x,A.y);
-      ctx.bezierCurveTo(mx,A.y,mx,B.y,B.x,B.y);
-    }
-
-    function ptBez(a:{x:number,y:number}, b:{x:number,y:number}, t:number) {
-      const A=P(a),B=P(b),mx=(A.x+B.x)/2,u=1-t;
-      return { x:u*u*u*A.x+3*u*u*t*mx+3*u*t*t*mx+t*t*t*B.x, y:u*u*u*A.y+3*u*u*t*A.y+3*u*t*t*B.y+t*t*t*B.y };
-    }
-
-    function edge(a:{x:number,y:number},b:{x:number,y:number},col:string,lw:number,alpha:number) {
-      bez(a,b); ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.globalAlpha=alpha; ctx.stroke(); ctx.globalAlpha=1;
-    }
-
-    function circle(c:{x:number,y:number},r:number,fill:string,stroke:string,lw:number) {
-      ctx.beginPath(); ctx.arc(c.x,c.y,r,0,Math.PI*2);
-      ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
-    }
-
-    function lbl(n:{x:number,y:number},text:string,side:"left"|"right"|"above"|"below") {
-      ctx.fillStyle="rgba(148,163,184,0.7)";
-      ctx.font="9px ui-monospace,monospace";
-      ctx.textAlign=(side==="left"?"right":side==="right"?"left":"center") as CanvasTextAlign;
-      const ox=side==="left"?-10:side==="right"?10:0, oy=side==="above"?-12:side==="below"?14:3;
-      ctx.fillText(text.toUpperCase(),P(n).x+ox,P(n).y+oy);
-    }
-
-    function frame(ts:number) {
-      if (!t0) t0=ts;
-      const time=(ts-t0)/1000;
-      ctx.clearRect(0,0,W,H);
-
-      // Read fresh data every frame via ref — no stale closure
-      const { activeBackends: ab, latestCircuit: circuit } = dataRef.current;
-      const hasIbm     = (ab.ibm     || 0) > 0;
-      const hasIonq    = (ab.ionq    || 0) > 0;
-      const hasRigetti = (ab.rigetti || 0) > 0;
-      const hasAer     = (ab.aer     || 0) > 0;
-      const hasAny = hasIbm || hasIonq || hasRigetti || hasAer;
-      const chosen = Object.entries(ab).sort((a,b)=>b[1]-a[1])[0]?.[0] || "ibm";
-
-      // passive edges — always shown as faint infrastructure
-      edge(N.qlab,N.ionq,"#1e2d45",1,hasIonq?0.3:0.5);
-      edge(N.qlab,N.rigetti,"#1e2d45",1,hasRigetti?0.3:0.5);
-      edge(N.qlab,N.aer,"#1e2d45",1,hasAer?0.3:0.5);
-      edge(N.qlab,N.ibm,"#1e2d45",1,hasIbm?0.3:0.5);
-
-      // active edges — only for backends with real run data
-      if (hasIbm)     edge(N.qlab,N.ibm,"#6366f1",1.8,0.6);
-      if (hasIonq)    edge(N.qlab,N.ionq,"#a78bfa",1.5,0.5);
-      if (hasRigetti) edge(N.qlab,N.rigetti,"#a78bfa",1.5,0.5);
-      if (hasAer)     edge(N.qlab,N.aer,"#33e0c6",1.5,0.5);
-      if (hasAny)     edge(N.exp,N.qlab,"#6366f1",1.6,0.55);
-
-      if (!reduce && hasAny) {
-        // particles only to backends that have real runs
-        const activePaths: [typeof N.exp, typeof N.ibm, number][] = [[N.exp,N.qlab,2.2]];
-        if (chosen==="ibm")     activePaths.push([N.qlab,N.ibm,2.8]);
-        if (chosen==="ionq")    activePaths.push([N.qlab,N.ionq,3.0]);
-        if (chosen==="rigetti") activePaths.push([N.qlab,N.rigetti,3.0]);
-        if (chosen==="aer")     activePaths.push([N.qlab,N.aer,2.6]);
-
-        (activePaths as any[]).forEach(([a,b,cyc])=>{
-          for(let k=0;k<3;k++){
-            const ph=((time/cyc)+k/3)%1;
-            const pt=ptBez(a,b,ph);
-            ctx.globalAlpha=0.25+0.75*Math.sin(ph*Math.PI);
-            ctx.fillStyle="#33e0c6";
-            ctx.beginPath(); ctx.arc(pt.x,pt.y,2.6,0,Math.PI*2); ctx.fill();
-          }
-        });
-        ctx.globalAlpha=1;
-        const C=P(N.qlab), pulse=0.4-0.4*Math.abs(Math.sin(time*1.8));
-        ctx.globalAlpha=pulse;
-        ctx.beginPath(); ctx.arc(C.x,C.y,N.qlab.r+6+4*Math.abs(Math.sin(time*1.8)),0,Math.PI*2);
-        ctx.strokeStyle="#6366f1"; ctx.lineWidth=1.2; ctx.stroke();
-        ctx.globalAlpha=1;
-      }
-
-      const ibmActive=chosen==="ibm" && hasAny;
-      circle(P(N.ionq),N.ionq.r,"var(--surface)",hasIonq?"#a78bfa":"#1e2d45",hasIonq?1.6:1.2);
-      circle(P(N.rigetti),N.rigetti.r,"var(--surface)",hasRigetti?"#a78bfa":"#1e2d45",hasRigetti?1.6:1.2);
-      circle(P(N.aer),N.aer.r,"var(--surface)",hasAer?"#33e0c6":"#1e2d45",hasAer?1.6:1.2);
-      circle(P(N.ibm),N.ibm.r,ibmActive?"rgba(51,224,198,0.12)":"var(--surface)",ibmActive?"#33e0c6":"#1e2d45",ibmActive?1.8:1.2);
-      circle(P(N.exp),N.exp.r,"rgba(99,102,241,0.1)","#6366f1",1.6);
-      circle(P(N.qlab),N.qlab.r,"rgba(99,102,241,0.12)","#6366f1",2);
-
-      lbl(N.exp, circuit.length>12 ? circuit.slice(0,12)+"…" : circuit, "left");
-      lbl(N.qlab,"Q-LAB","above");
-      lbl(N.ibm, hasIbm ? `ibm (${ab.ibm})` : "ibm", "right");
-      lbl(N.ionq, hasIonq ? `ionq (${ab.ionq})` : "ionq", "right");
-      lbl(N.rigetti, hasRigetti ? `rigetti (${ab.rigetti})` : "rigetti", "right");
-      lbl(N.aer, hasAer ? `sim (${ab.aer})` : "aer_sim", "right");
-
-      raf=requestAnimationFrame(frame);
-    }
-
-    const ro=new ResizeObserver(resize);
-    ro.observe(canvas); resize();
-    raf=requestAnimationFrame(frame);
-    return ()=>{ cancelAnimationFrame(raf); ro.disconnect(); };
-  }, []);
-
-  return (
-    <div style={{
-      margin:"0 0 20px",
-      background:"rgba(99,102,241,0.04)",
-      border:"1px solid var(--line)",
-      borderRadius:12, overflow:"hidden", position:"relative",
-    }}>
-      <div style={{ position:"relative", width:"100%", aspectRatio:"21/6", maxHeight:160 }}>
-        <canvas ref={ref} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
-      </div>
-      <span style={{
-        position:"absolute", bottom:8, left:14,
-        fontFamily:"ui-monospace,monospace", fontSize:9.5,
-        letterSpacing:"0.15em", textTransform:"uppercase", color:"var(--muted)", opacity:0.5,
-      }}>live routing fabric · {liveRuns.length} runs · refreshes every 30s</span>
-    </div>
-  );
-}
-
-const QUICK_ACTIONS = [
-  {
-    emoji: "⚗️",
-    title: "Track my experiments",
-    desc: "Install the SDK, connect your API key, and every Qiskit circuit you run is captured automatically.",
-    cta: "Set up the SDK",
-    href: "/onboarding",
-    accent: "#6366f1",
-  },
-  {
-    emoji: "💰",
-    title: "Find the cheapest QPU",
-    desc: "Enter your circuit parameters and get an instant cost comparison across IBM, IonQ, Rigetti, and more.",
-    cta: "Open Cost Oracle",
-    href: "/cost-oracle",
-    accent: "#10b981",
-  },
-  {
-    emoji: "🤖",
-    title: "Ask the Lab Assistant",
-    desc: "Ask questions in plain English. The AI reads your experiment history and can execute cost estimates and searches for you.",
-    cta: "Open Lab Assistant",
-    href: "/assistant",
-    accent: "#f59e0b",
-  },
-];
-
-function QuickActions() {
-  return (
-    <div style={{ padding: "4px 20px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-      {QUICK_ACTIONS.map((w) => (
-        <a key={w.href} href={w.href} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, background: "var(--surface)", border: `1px solid ${w.accent}30`, borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s, transform 0.15s" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = w.accent; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = `${w.accent}30`; (e.currentTarget as HTMLElement).style.transform = ""; }}>
-          <div style={{ fontSize: 32 }}>{w.emoji}</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 6 }}>{w.title}</div>
-            <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{w.desc}</div>
-          </div>
-          <div style={{ marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: w.accent }}>
-            {w.cta} →
-          </div>
-        </a>
-      ))}
-    </div>
-  );
-}
-
-// Empty state — no runs yet
+// Empty state: what is missing and how to get it. No pictures, no sample data.
 function QuickStart() {
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Welcome to Q-Lab — what would you like to do?</h2>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>Your experiments will appear here once submitted</span>
+    <section className="frame">
+      <div className="frame-head"><h2 className="inst-label">No runs yet</h2></div>
+      <div className="empty-state">
+        <p style={{ margin: "0 0 10px" }}>Runs appear here the moment a script that uses the Q-Lab SDK runs a circuit. Add two lines to any Qiskit script:</p>
+        <pre className="code">{`pip install qlab-sdk
+
+import qlab
+qlab.auto_track(api_key="YOUR_KEY")`}</pre>
+        <p style={{ margin: "10px 0 0" }}>Your API key and a step-by-step guide are in <a href="/onboarding" style={{ textDecoration: "underline" }}>Quick start</a>.</p>
       </div>
-      <div style={{ padding: "20px 20px 0" }}>
-        <DashFabric runs={[]} />
-      </div>
-      <QuickActions />
     </section>
   );
 }
@@ -507,14 +258,6 @@ function RunsInner() {
 
       {/* Empty state */}
       {!loading && !error && !runs.length && <QuickStart />}
-
-      {/* Live routing fabric + quick action cards */}
-      {!loading && runs.length > 0 && (
-        <section className="panel">
-          <DashFabric runs={runs} />
-          <QuickActions />
-        </section>
-      )}
 
       {/* Runs table */}
       {!loading && runs.length > 0 && (

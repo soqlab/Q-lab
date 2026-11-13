@@ -172,18 +172,31 @@ function LabsGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-function LiveClock() {
-  const [time, setTime] = useState("");
+/** The API's state, measured: a real request every minute, its answer and how long it took. */
+function ApiReading() {
+  const [r, setR] = useState<{ ok: boolean; ms: number } | null>(null);
   useEffect(() => {
-    function tick() {
-      const now = new Date();
-      setTime(now.toISOString().replace("T", " ").slice(0, 19) + " UTC");
+    let on = true;
+    async function ping() {
+      const t0 = performance.now();
+      try {
+        const res = await fetch("/qlab-api/health", { cache: "no-store", signal: AbortSignal.timeout(15000) });
+        if (on) setR({ ok: res.ok, ms: Math.round(performance.now() - t0) });
+      } catch {
+        if (on) setR({ ok: false, ms: Math.round(performance.now() - t0) });
+      }
     }
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    void ping();
+    const id = setInterval(() => void ping(), 60_000);
+    return () => { on = false; clearInterval(id); };
   }, []);
-  return <span style={{ fontFamily: "'Cascadia Code', Consolas, monospace", fontSize: 11, color: "var(--accent)", letterSpacing: 0.5 }}>{time}</span>;
+  return (
+    <span className="mono" style={{ fontSize: 11, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 6 }}
+      title="Measured from this browser once a minute">
+      <span className={`dot ${r === null ? "" : r.ok ? "ok" : "bad"}`} aria-hidden="true" />
+      {r === null ? "API: checking" : r.ok ? `API answered in ${r.ms} ms` : "API not answering"}
+    </span>
+  );
 }
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -203,16 +216,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             </div>
             <span style={{ fontFamily: "'Cascadia Code', Consolas, monospace", letterSpacing: 1 }}>Q-LAB</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 2 }}>
-            <span style={{
-              display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-              background: "var(--ok)", boxShadow: "0 0 6px var(--ok)",
-              animation: "pulse-dot 2s ease-in-out infinite",
-            }} />
-            <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Cascadia Code', Consolas, monospace" }}>
-              QUANTUM INTEL PLATFORM
-            </span>
-          </div>
         </div>
 
         <SideNav />
@@ -229,31 +232,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
               color: "var(--accent)", fontWeight: 700,
             }}>
-              QUANTUM EXPERIMENT TRACKER
-            </div>
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>
-              Capture · Analyze · Reproduce
+              QUANTUM RUN TRACKER
             </div>
           </div>
 
-          {/* Center: live stats strip */}
-          <div style={{
-            flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 20,
-          }}>
-            <LiveClock />
-            <span style={{
-              fontFamily: "'Cascadia Code', Consolas, monospace", fontSize: 10,
-              color: "var(--ok)", letterSpacing: 1,
-              display: "flex", alignItems: "center", gap: 5,
-            }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%", background: "var(--ok)",
-                boxShadow: "0 0 5px var(--ok)", display: "inline-block",
-                animation: "pulse-dot 2s ease-in-out infinite",
-              }} />
-              SYS ONLINE
-            </span>
-          </div>
+          <div style={{ flex: 1, display: "flex", justifyContent: "center" }}><ApiReading /></div>
 
           <UserMenu />
         </header>

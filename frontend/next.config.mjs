@@ -119,12 +119,6 @@ const nextConfig = {
           { key: "Content-Security-Policy", value: contentSecurityPolicy() },
         ],
       },
-      {
-        source: "/videos/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=604800" },
-        ],
-      },
     ];
   },
 };

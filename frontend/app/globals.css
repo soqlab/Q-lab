@@ -159,9 +159,6 @@ button, input, select, textarea { font: inherit; }
   border-radius: 4px;
 }
 
-[data-theme="dark"] .brand-mark {
-  box-shadow: 0 0 10px rgba(0, 212, 255, 0.25), inset 0 0 8px rgba(0, 212, 255, 0.06);
-}
 
 .nav { display: grid; gap: 6px; }
 
@@ -612,17 +609,6 @@ tbody tr:hover { background: var(--panel-2); }
   background: #060c14;
 }
 
-/* Subtle scanline on main content in dark mode */
-[data-theme="dark"] .content {
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(0, 212, 255, 0.012) 3px,
-    rgba(0, 212, 255, 0.012) 4px
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* OSINT / Terminal utilities                                            */
 /* ------------------------------------------------------------------ */
@@ -651,8 +637,6 @@ tbody tr:hover { background: var(--panel-2); }
   height: 7px;
   border-radius: 50%;
   background: var(--ok);
-  box-shadow: 0 0 6px var(--ok);
-  animation: pulse-dot 1.8s ease-in-out infinite;
 }
 
 /* OSINT card — terminal border style */

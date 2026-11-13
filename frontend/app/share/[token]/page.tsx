@@ -153,23 +153,9 @@ export default function PublicSharePage({ params: paramsPromise }: { params: Pro
               </div>
             )}
 
-            {/* Footer CTA */}
-            <div style={{
-              marginTop: 24, background: "linear-gradient(135deg, #0d1b2a 0%, #1d4e6f 100%)",
-              borderRadius: 12, padding: "24px 28px",
-              display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16,
-            }}>
-              <div>
-                <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>Track your own quantum experiments</div>
-                <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>Q-Lab automatically captures every Qiskit run — circuit, calibration, results, and more.</div>
-              </div>
-              <a
-                href="/register"
-                style={{ background: "#27ae60", color: "#fff", padding: "10px 22px", borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: "none" }}
-              >
-                Get started free →
-              </a>
-            </div>
+            <p style={{ marginTop: 24, fontSize: 13, color: "var(--muted)" }}>
+              Recorded by Q-Lab, which captures Qiskit runs as they happen. <Link href="/" style={{ textDecoration: "underline" }}>See what this server records</Link>.
+            </p>
 
             {/* Share meta */}
             <div style={{ marginTop: 16, textAlign: "center", fontSize: 12, color: "#9aa8b6" }}>

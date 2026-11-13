@@ -1,150 +1,97 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { qlabApiPath } from "../../lib/api";
+import s from "../landing.module.css";
 
 interface GalleryRun {
   share_token: string; circuit_name: string; backend: string | null;
   status: string; health_score: number | null; qubits: number | null;
-  depth: number | null; project: string | null; created_at: string | null; url: string;
+  depth: number | null; project: string | null; created_at: string | null;
 }
 
-function HealthDot({ score }: { score: number | null }) {
-  if (score === null) return null;
-  const color = score >= 80 ? "#10b981" : score >= 55 ? "#f59e0b" : "#ef4444";
+const PAGE = 50;
+
+function Gallery() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
+  const [data, setData] = useState<{ page: number; total: number; items: GalleryRun[] } | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    fetch(qlabApiPath(`/api/v1/public/gallery?limit=${PAGE}&offset=${(page - 1) * PAGE}`), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d) => { if (on) { setData({ page, total: d.total ?? 0, items: d.items ?? [] }); setFailed(false); } })
+      .catch(() => { if (on) setFailed(true); });
+    return () => { on = false; };
+  }, [page]);
+
+  const ready = !!data && data.page === page;
+  const pages = data ? Math.max(1, Math.ceil(data.total / PAGE)) : 1;
+  const go = (p: number) => router.push(p > 1 ? `/gallery?page=${p}` : "/gallery");
+
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color }}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, display: "inline-block" }} />
-      {score}
-    </span>
+    <div className={s.root}>
+      <header className={s.bar}>
+        <Link href="/" className={s.word}>Q-LAB</Link>
+        <span className={s.host}>public runs</span>
+        <nav className={s.links} aria-label="Q-Lab">
+          <Link href="/trust">Trust</Link>
+          <Link href="/login" className={s.primary}>Sign in</Link>
+        </nav>
+      </header>
+      <main className={s.main}>
+        <p className="summary-line">
+          {failed ? "The list of public runs couldn't be loaded. The server may be starting up; try again in 30 seconds."
+            : !ready || !data ? "Loading public runs…"
+            : data.total === 0 ? "Nobody has shared a run yet. A run appears here when its owner presses Share on it."
+            : `${data.total.toLocaleString("en-US")} run${data.total === 1 ? " is" : "s are"} shared publicly on this server, newest first. Each opens with its circuit, results and calibration.`}
+        </p>
+        {ready && data && data.items.length > 0 && (
+          <section className="frame">
+            <div className="frame-head">
+              <span className="inst-label">Page {page} of {pages}</span>
+              <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{(page - 1) * PAGE + 1}–{Math.min(page * PAGE, data.total)} of {data.total}</span>
+            </div>
+            <div className="table-wrap">
+              <table className={s.table}>
+                <thead><tr><th>Circuit</th><th>Backend</th><th>Status</th><th className={s.r}>Qubits</th><th className={s.r}>Depth</th><th className={s.r}>Quality</th><th className={s.r}>Date</th></tr></thead>
+                <tbody>
+                  {data.items.map((r) => (
+                    <tr key={r.share_token}>
+                      <td><Link href={`/share/${encodeURIComponent(r.share_token)}`} className={s.run}>{r.circuit_name}</Link>{r.project && <span className={s.proj}>{r.project}</span>}</td>
+                      <td className="mono">{r.backend ?? "—"}</td>
+                      <td>{r.status}</td>
+                      <td className={`num ${s.r}`}>{r.qubits ?? "—"}</td>
+                      <td className={`num ${s.r}`}>{r.depth ?? "—"}</td>
+                      <td className={`num ${s.r}`}>{r.health_score ?? "—"}</td>
+                      <td className={`num ${s.r}`}>{r.created_at ? r.created_at.slice(0, 10) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+        {ready && pages > 1 && (
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button className="button secondary" disabled={page <= 1} onClick={() => go(page - 1)}>Newer</button>
+            <button className="button secondary" disabled={page >= pages} onClick={() => go(page + 1)}>Older</button>
+          </div>
+        )}
+      </main>
+      <footer className={s.foot}>
+        <span>Quality is Q-Lab&apos;s execution score, 0–100, from results and calibration</span>
+        <Link href="/">Q-Lab home</Link>
+      </footer>
+    </div>
   );
 }
 
 export default function GalleryPage() {
-  const [runs, setRuns] = useState<GalleryRun[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [offset, setOffset] = useState(0);
-  const PAGE = 24;
-
-  // Loading starts true; the page buttons set it again when they change the offset.
-  useEffect(() => {
-    fetch(qlabApiPath(`/api/v1/public/gallery?limit=${PAGE}&offset=${offset}`))
-      .then(r => r.json())
-      .then(d => { setRuns(d.items ?? []); setTotal(d.total ?? 0); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [offset]);
-
-  return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", fontFamily: "Inter, Segoe UI, Arial, sans-serif" }}>
-      {/* Header */}
-      <header style={{ background: "#0d1b2a", borderBottom: "1px solid #1e2d3d", padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <Link href="/" style={{ color: "#fff", textDecoration: "none", fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px" }}>Q-Lab</Link>
-          <span style={{ marginLeft: 14, color: "#64748b", fontSize: 13 }}>Public Experiment Gallery</span>
-        </div>
-        <a href="/register" style={{ background: "#6366f1", color: "#fff", padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-          Track yours free →
-        </a>
-      </header>
-
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, color: "var(--text)" }}>
-            Quantum Experiments — Open Gallery
-          </h1>
-          <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
-            {total.toLocaleString()} shared experiments from the Q-Lab community. Circuit results, health scores, and calibration data — publicly accessible.
-          </p>
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>Loading experiments…</div>
-        ) : runs.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚛️</div>
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No public experiments yet</div>
-            <div style={{ marginBottom: 20 }}>Be the first to share a Qiskit run with Q-Lab.</div>
-            <a href="/register" style={{ background: "#6366f1", color: "#fff", padding: "10px 24px", borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
-              Get started free →
-            </a>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, marginBottom: 28 }}>
-              {runs.map(r => (
-                <a
-                  key={r.share_token}
-                  href={r.url}
-                  style={{
-                    display: "block", padding: "18px 20px", background: "var(--panel)",
-                    border: "1px solid var(--line)", borderRadius: 12, textDecoration: "none",
-                    transition: "border-color 0.15s, transform 0.15s",
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#6366f1"; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--line)"; (e.currentTarget as HTMLElement).style.transform = ""; }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", lineHeight: 1.3, maxWidth: "78%" }}>
-                      {r.circuit_name}
-                    </div>
-                    <HealthDot score={r.health_score} />
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                    {r.backend && (
-                      <span style={{ fontSize: 11, fontWeight: 600, background: "#6366f118", color: "#6366f1", borderRadius: 999, padding: "2px 8px" }}>
-                        {r.backend}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 11, fontWeight: 600, background: r.status === "completed" ? "#10b98118" : "#ef444418", color: r.status === "completed" ? "#10b981" : "#ef4444", borderRadius: 999, padding: "2px 8px" }}>
-                      {r.status}
-                    </span>
-                    {r.project && (
-                      <span style={{ fontSize: 11, background: "var(--surface)", color: "var(--muted)", borderRadius: 999, padding: "2px 8px" }}>
-                        {r.project}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--muted)" }}>
-                    {r.qubits != null && <span>⚛️ {r.qubits} qubits</span>}
-                    {r.depth != null && <span>📐 depth {r.depth}</span>}
-                    {r.created_at && <span style={{ marginLeft: "auto" }}>{new Date(r.created_at).toLocaleDateString()}</span>}
-                  </div>
-                </a>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {total > PAGE && (
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button disabled={offset === 0} onClick={() => { setLoading(true); setOffset(Math.max(0, offset - PAGE)); }}
-                  style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", cursor: offset > 0 ? "pointer" : "not-allowed", opacity: offset > 0 ? 1 : 0.4, color: "var(--text)", fontSize: 13 }}>
-                  ← Previous
-                </button>
-                <span style={{ padding: "8px 14px", fontSize: 13, color: "var(--muted)" }}>
-                  {offset + 1}–{Math.min(offset + PAGE, total)} of {total}
-                </span>
-                <button disabled={offset + PAGE >= total} onClick={() => { setLoading(true); setOffset(offset + PAGE); }}
-                  style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", cursor: offset + PAGE < total ? "pointer" : "not-allowed", opacity: offset + PAGE < total ? 1 : 0.4, color: "var(--text)", fontSize: 13 }}>
-                  Next →
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* SEO footer CTA */}
-        <div style={{ marginTop: 48, textAlign: "center", padding: "32px 24px", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02))", borderRadius: 16, border: "1px solid rgba(99,102,241,0.15)" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}>Track your quantum experiments with Q-Lab</div>
-          <div style={{ color: "var(--muted)", fontSize: 14, marginBottom: 20, maxWidth: 520, margin: "0 auto 20px" }}>
-            Automatically capture every Qiskit circuit run — calibration, health scores, AI insights, and QPU cost comparison across IBM, IonQ, and Rigetti.
-          </div>
-          <a href="/register" style={{ display: "inline-block", background: "#6366f1", color: "#fff", padding: "12px 28px", borderRadius: 10, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
-            Get started free →
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+  return <Suspense fallback={null}><Gallery /></Suspense>;
 }
