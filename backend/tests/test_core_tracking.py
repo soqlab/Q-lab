@@ -257,3 +257,14 @@ def test_api_key_create_use_list_and_revoke(users):
 def test_api_keys_require_sign_in():
     assert client.get("/api/v1/users/me/api-keys").status_code == 401
     assert client.post("/api/v1/users/me/api-keys", json={"name": "x"}).status_code == 401
+
+
+def test_a_deleted_accounts_api_keys_stop_working():
+    """Regression: deleting an account switched off its sessions but its SDK keys still uploaded runs."""
+    from tests.helpers import make_user
+    owner = make_user(prefix="del")
+    key = client.post("/api/v1/users/me/api-keys", headers=owner, json={"name": "sdk"}).json()["key"]
+    via_key = {"X-QLab-Api-Key": key}
+    assert client.get("/api/v1/runs", headers=via_key).status_code == 200
+    assert client.delete("/auth/me", headers=owner).status_code == 200
+    assert client.get("/api/v1/runs", headers=via_key).status_code == 401

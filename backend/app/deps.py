@@ -100,6 +100,8 @@ def get_identity(
         row.last_used_at = datetime.now(timezone.utc)
         db.commit()
         user = db.scalar(select(User).where(User.id == row.user_id))
+        if user is not None and not user.is_active:  # a deleted (deactivated) account's keys stop too
+            raise HTTPException(status_code=401, detail="Invalid API key")
         return Identity(user=user, api_key_row=row)
 
     # Legacy shared keys
