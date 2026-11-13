@@ -7,6 +7,20 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Pick the machine before you run (`/hardware/pick`, Ctrl+K, and "Where should I run this next?"
+  on a run page): paste or drop an OpenQASM 2/3 circuit, or take one of your runs', and the page
+  answers which IBM machine to use, e.g. "On ibm_a expect ≈0.84; on ibm_b ≈0.71: qubit 3's
+  readout error on ibm_b is the weak point." The circuit is compiled for each machine against a
+  target rebuilt from the calibration the hardware board reads, and scored as gate × readout ×
+  idle-decoherence factors (`app/machine_pick.py`); labelled as an estimate from calibration at
+  the stated time. Without `QISKIT_IBM_TOKEN` it says there is no calibration and estimates
+  nothing. `POST /api/v1/machine-pick` needs a signed-in caller, is rate-limited and bounded
+  (40 qubits, 4000 operations, 30 s, two at a time).
+- Drift alarm (`GET /api/v1/runs/{id}/drift`, the run page's answer and the project timeline):
+  when the same circuit runs again on the same backend and the counts move beyond shot noise
+  (p < 0.01), it says so and whether your side (compiled circuit, transpiler settings, package
+  versions) or the machine (recorded calibration of the qubits used) changed, or that it can't
+  tell without calibration snapshots (`app/drift.py`). No migration.
 - Passkeys (WebAuthn). The sign-in page is one "Sign in with passkey" button (with passkey
   autofill); sign-up creates a passkey, never a password; Settings lists, renames, adds and
   removes passkeys (never the last one). Google and GitHub sign-in stay. With

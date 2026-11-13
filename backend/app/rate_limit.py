@@ -54,3 +54,4 @@ class RateLimiter:
 auth_limiter = RateLimiter(max_calls=10, period=60)   # 10 auth attempts / min / IP
 write_limiter = RateLimiter(max_calls=300, period=60)  # 300 writes / min / IP
 read_limiter = RateLimiter(max_calls=600, period=60)   # 600 reads / min / IP
+pick_limiter = RateLimiter(max_calls=12, period=60)  # machine-pick estimates (CPU) / min / IP

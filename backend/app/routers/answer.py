@@ -13,6 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..drift import timeline_marks as drift_marks
 from ..deps import Identity, get_identity
 from ..models import Project, Run
 from ..run_answer import LEVELS, Level, answer, ideal_distribution, measure
@@ -70,6 +71,8 @@ def project_timeline(slug: str, db: Session = Depends(get_db), identity: Optiona
     # The ideal distribution depends only on the circuit: work it out once per circuit.
     ideals: dict[str, Any] = {}
     items = []
+    # Same circuit, same backend, result moved beyond shot noise (app/drift.py): marked on the strip.
+    marks = drift_marks(list(reversed(runs)))
     for r in reversed(runs):
         key = (r.fingerprint or {}).get("qasm_sha256") or r.qasm or ""
         known = None
@@ -88,6 +91,7 @@ def project_timeline(slug: str, db: Session = Depends(get_db), identity: Optiona
             "num_qubits": (r.fingerprint or {}).get("num_qubits"),
             "depth": (r.fingerprint or {}).get("depth"),
             "measure": None if m is None else {"kind": m["kind"], "value": round(m["value"], 6)},
+            "drift": marks.get(r.run_id),
         })
     return {
         "slug": slug,

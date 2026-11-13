@@ -6,6 +6,7 @@ import { qlabApiPath } from "../../../../../lib/api";
 import { useDetail, withDetail } from "../../../../../lib/dial";
 import { setCommandContext } from "../../../../../components/CommandPalette";
 import { useAnswer } from "../../../../../components/RunAnswer";
+import { DriftLine } from "../../../../../components/DriftAlarm";
 
 /*
  * A project as time. The strip is every run of the project in order; dragging along it (or the
@@ -18,6 +19,8 @@ type TRun = {
   run_id: string; circuit_name: string | null; circuit_hash: string | null; backend: string | null; status: string;
   created_at: string | null; num_qubits: number | null; depth: number | null;
   measure: { kind: "ideal_share" | "top_share"; value: number } | null;
+  // Same circuit, same backend as an earlier run in this list: did the result move beyond shot noise?
+  drift?: { previous_run_id: string; tvd: number; p_value: number; drifted: boolean } | null;
 };
 type Timeline = { slug: string; name: string; total: number; shown: number; truncated: boolean; runs: TRun[] };
 
@@ -93,6 +96,14 @@ function Strip({ runs, index, onPick }: { runs: TRun[]; index: number; onPick: (
                 fill={r.status === "failed" ? "var(--danger)" : i === index ? "var(--text)" : "var(--c-runs)"} />
             : <line key={r.run_id} x1={x(i)} x2={x(i)} y1={y(lo) - 5} y2={y(lo) + 2} stroke={r.status === "failed" ? "var(--danger)" : "var(--muted)"} />
         ))}
+        {/* Drift: the result moved from the previous run of the same circuit on the same machine. */}
+        {runs.map((r, i) => (r.drift?.drifted && r.measure ? (
+          <g key={`d-${r.run_id}`}>
+            <circle cx={x(i)} cy={y(r.measure.value)} r={7} fill="none" stroke="var(--warn)" strokeWidth={1.4} />
+            <line x1={x(i)} x2={x(i)} y1={2} y2={8} stroke="var(--warn)" strokeWidth={2} />
+            <title>{`Drift: TVD ${r.drift.tvd.toFixed(3)} from run ${r.drift.previous_run_id.slice(0, 8)} (p = ${r.drift.p_value.toPrecision(2)})`}</title>
+          </g>
+        ) : null))}
         <line x1={x(index)} x2={x(index)} y1={4} y2={H - 4} stroke="var(--accent)" strokeWidth={1} />
       </svg>
       <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--muted)", padding: "2px 10px 0" }}>
@@ -140,6 +151,7 @@ function Moment({ run, prev, slug }: { run: TRun; prev?: TRun; slug: string }) {
         <p className="summary-line" style={{ fontSize: 16 }}>
           {a.state === "loading" ? "Working out what this run shows…" : a.state === "error" ? "This run's answer couldn't be worked out." : a.data!.sentence}
         </p>
+        {run.drift && <DriftLine runId={run.run_id} />}
         {prev ? (
           diff.length ? (
             <div className="table-wrap">
@@ -227,9 +239,10 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
   }
 
   const measured = runs.filter((r) => r.measure);
+  const drifted = runs.filter((r) => r.drift?.drifted).length;
   const circuits = new Set(runs.map((r) => r.circuit_hash ?? r.circuit_name)).size;
   const summary = `${d.name}: ${d.total} run${d.total === 1 ? "" : "s"} of ${circuits} circuit${circuits === 1 ? "" : "s"} from ${day(runs[0].created_at)} to ${day(runs[runs.length - 1].created_at)}`
-    + `${d.truncated ? ` (the latest ${d.shown} are shown)` : ""}. ${measured.length === runs.length ? "Every run has a result." : `${measured.length} have a result to score.`} Drag along the strip to move through them.`;
+    + `${d.truncated ? ` (the latest ${d.shown} are shown)` : ""}. ${measured.length === runs.length ? "Every run has a result." : `${measured.length} have a result to score.`} ${drifted ? ` ${drifted} moved beyond shot noise from the run before it of the same circuit on the same machine (ringed in amber).` : ""} Drag along the strip to move through them.`;
 
   return (
     <main className="page">

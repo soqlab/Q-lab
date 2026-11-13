@@ -771,6 +771,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
   useEffect(() => {
     if (!run) return;
     const items = [
+      { id: "here:pick", kind: "here" as const, title: "Where should I run this next?", hint: "Rank the machines for this circuit from their calibration", href: `/hardware/pick?run=${run.run_id}` },
       { id: "here:verify", kind: "here" as const, title: "Verify this run", hint: "Check its record independently", href: `/verify/${run.run_id}` },
       { id: "here:bundle", kind: "here" as const, title: "Download this run's reproduction bundle", hint: "Circuit, results, calibration, script (.zip)", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)) },
       { id: "here:qasm", kind: "here" as const, title: "Download this run's circuit (QASM)", hint: "OpenQASM text", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)) },
@@ -810,6 +811,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <div className="actions-group">Compare and share</div>
             <div className="actions-item"><DiffButton runId={run.run_id} /></div>
             <Link href={`/search/circuits?anchor=${run.run_id}`}><Search size={15} aria-hidden="true" /> Similar circuits</Link>
+            <Link href={`/hardware/pick?run=${run.run_id}`}><Activity size={15} aria-hidden="true" /> Where should I run this next?</Link>
             <div className="actions-item"><ShareButton runId={run.run_id} /></div>
             <div className="actions-item"><BadgeButton runId={run.run_id} /></div>
             <div className="actions-group d-expert">Write it up</div>

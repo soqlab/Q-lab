@@ -7,6 +7,7 @@ export const PLACES: Place[] = [
   { href: "/runs", title: "Runs", group: "Core", keywords: ["history", "experiments", "home"] },
   { href: "/projects", title: "Projects", group: "Core", keywords: ["timeline", "experiments"] },
   { href: "/hardware", title: "Hardware board", group: "Core", keywords: ["ibm", "backends", "queue", "calibration", "benchmark", "qpu"] },
+  { href: "/hardware/pick", title: "Pick the machine before you run", group: "Core", keywords: ["where", "run", "next", "best", "backend", "fidelity", "estimate", "predict", "calibration", "choose", "qasm"] },
   { href: "/compare", title: "Compare two runs", group: "Core", keywords: ["diff", "difference", "why"] },
   { href: "/trust", title: "Trust: what this Q-Lab runs and loads", group: "Core", keywords: ["commit", "verify", "privacy", "csp"] },
   { href: "/runs", title: "Run History", group: "Core" },

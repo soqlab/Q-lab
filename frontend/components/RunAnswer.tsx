@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { qlabApiPath } from "../lib/api";
 import { useDetail, withDetail, type Detail } from "../lib/dial";
+import { DriftLine } from "./DriftAlarm";
 
 export type Measure = {
   kind: "ideal_share" | "top_share"; value: number; shots: number;
@@ -72,6 +73,7 @@ export default function RunAnswer({ runId, project, backend, answer }: {
         <p className="summary-line" style={{ fontSize: 17 }} aria-live="polite">
           {a.state === "loading" ? "Working out what this run shows…" : a.state === "error" ? "The answer for this run couldn't be worked out right now." : d!.sentence}
         </p>
+        {a.state !== "loading" && <DriftLine runId={runId} />}
         {d && <p className="d-plain-only" style={{ margin: 0, fontSize: 15 }}><b>Next:</b> {nextStep(d)}</p>}
         {d?.measure && (
           <dl className="readouts d-standard">
@@ -121,6 +123,7 @@ export default function RunAnswer({ runId, project, backend, answer }: {
           {backend && /^ibm/.test(backend) && (
             <Link href={withDetail(`/hardware/${encodeURIComponent(backend)}`, detail)} style={{ textDecoration: "underline" }}>{backend} on the hardware board</Link>
           )}
+          <Link href={withDetail(`/hardware/pick?run=${encodeURIComponent(runId)}`, detail)} style={{ textDecoration: "underline" }}>Where should I run this next?</Link>
           <Link href={`/verify/${encodeURIComponent(runId)}`} style={{ textDecoration: "underline" }}>Verify this run</Link>
         </div>
       </div>
