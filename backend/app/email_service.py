@@ -171,7 +171,7 @@ def _send_via_smtp(
     try:
         port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USER", "")
-        smtp_pass = os.getenv("SMTP_PASS", "")
+        smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD", "")
 
         # Gmail requires the envelope sender to match the authenticated account.
         # Use smtp_user as the actual sender; keep a friendly display name.

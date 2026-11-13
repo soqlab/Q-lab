@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_PASS = os.environ.get("SMTP_PASS") or os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM = os.environ.get("SMTP_FROM", "qlab@example.com")
 
 

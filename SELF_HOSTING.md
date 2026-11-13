@@ -13,7 +13,26 @@ configured.
 ## Requirements
 
 - Docker & Docker Compose
-- A PostgreSQL database (or use the bundled one)
+- A database: SQLite or PostgreSQL (see below)
+
+## Database: SQLite or PostgreSQL
+
+Both are supported. Q-Lab picks one from `DATABASE_URL`:
+
+- **SQLite** (`sqlite:///./data/qlab.db`, also the default when `DATABASE_URL` is unset): one file,
+  no database server. Keep the `data/` directory on a persistent volume and back that file up. This
+  is what the hosted Q-Lab at qlab.soqlab.com runs: SQLite on a persistent disk, in one container
+  (`render.yaml`, `deploy/render-single`). It suits one server; it does not suit several backend
+  instances writing at once.
+- **PostgreSQL** (`postgresql+psycopg://user:pass@host/db`): what `docker-compose.yml` and
+  `docker-compose.prod.yml` start, for installs that want a separate database server, its backups
+  and replication, or more than one backend instance.
+
+On startup the backend creates any missing tables and columns itself, on either database.
+`backend/alembic` holds the same changes as Alembic migrations for those who manage the schema
+with Alembic (see `backend/MIGRATIONS.md`). To move an existing PostgreSQL install to SQLite, set
+`MIGRATE_FROM_DATABASE_URL` to the PostgreSQL URL and `DATABASE_URL` to the SQLite one; the data is
+copied once, on first start.
 
 ## Quick Start
 
@@ -31,20 +50,21 @@ The app is now running at `http://localhost:3000`.
 
 | Variable | Required | Description |
 |---|---|---|
-| `QLAB_SECRET_KEY` | Yes | 32+ char random string for JWT signing and credential encryption |
-| `DATABASE_URL` | Yes | PostgreSQL connection string (`postgresql+psycopg://user:pass@host/db`) |
+| `QLAB_SECRET_KEY` | Yes | 32+ char random string. Signs sessions and encrypts saved provider keys and integration secrets (webhook secrets, Slack/Teams/GitHub tokens). Changing it signs everyone out and makes those saved secrets unreadable: they have to be entered again |
+| `DATABASE_URL` | No | `sqlite:///./data/qlab.db` (the default) or a PostgreSQL URL (`postgresql+psycopg://user:pass@host/db`); see above |
 | `QLAB_APP_URL` | Yes | Your public URL (e.g. `https://qlab.yourdomain.com`) |
 | `SMTP_HOST` | No | SMTP server for email verification |
 | `SMTP_PORT` | No | SMTP port (default 587) |
 | `SMTP_USER` | No | SMTP username |
-| `SMTP_PASSWORD` | No | SMTP password |
+| `SMTP_PASSWORD` | No | SMTP password (`SMTP_PASS` also works) |
 | `SMTP_FROM` | No | From address for outgoing emails |
 | `ENVIRONMENT` | No | Set to `production` to disable `/docs` and `/redoc` |
 | `QLAB_PASSKEYS_ONLY` | No | `true`: passkeys only. No password is set, reset or accepted; "forgot password" emails a single-use 15-minute link that registers a new passkey; a password user signs in once more with the password and must add a passkey, after which the password is deleted; creating or revoking API keys needs a passkey session. Google and GitHub create no accounts and give no session: an account made with them that has no passkey yet can use them once, to create its passkey, after which they are refused for it. Needs https (or `http://localhost`). Default off. |
 | `QLAB_WEBAUTHN_RP_ID` | No | Passkey domain (default: the host of `QLAB_APP_URL`). Passkeys are bound to it: changing it later strands existing passkeys |
+| `QLAB_ERASURE_INTERVAL_SECONDS` | No | How often the backend erases accounts whose 7-day deletion grace period is over (default `3600`). `0` turns the schedule off; an admin can then run `POST /api/v1/gdpr/delete/process` |
 | `QLAB_WEBAUTHN_ORIGINS` | No | Extra origins allowed to use passkeys, comma-separated (default: only `QLAB_APP_URL`'s origin) |
 
-## Docker Compose
+## Docker Compose (PostgreSQL)
 
 ```yaml
 version: "3.9"
@@ -125,7 +145,7 @@ export QLAB_TELEMETRY=off
 
 ## Data & Privacy
 
-All experiment data is stored in your PostgreSQL database. Nothing is sent to external services unless you explicitly configure integrations (Zenodo, SMTP, etc.).
+All experiment data is stored in your database (the SQLite file or your PostgreSQL server). Nothing is sent to external services unless you explicitly configure integrations (Zenodo, SMTP, etc.).
 
 ## Support
 
