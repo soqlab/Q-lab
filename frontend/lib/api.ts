@@ -822,6 +822,15 @@ export async function generateShareLink(token: string, runId: string): Promise<{
   return res.json();
 }
 
+/** Turns the run's public link off: the old link stops working and the run leaves the gallery. */
+export async function stopSharing(token: string, runId: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/v1/runs/${runId}/share`), {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to turn sharing off");
+}
+
 export async function fetchPublicRun(shareToken: string): Promise<QLabRun> {
   const res = await fetch(apiUrl(`/api/v1/runs/public/${shareToken}`), { cache: "no-store" });
   if (!res.ok) throw new Error("Shared run not found");

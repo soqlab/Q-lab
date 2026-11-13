@@ -9,7 +9,7 @@ import ReproduceRun, { downloadFromApi } from "../../../../components/ReproduceR
 import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
-  fetchRun, fetchRunHealth, generateShareLink, qlabApiPath,
+  fetchRun, fetchRunHealth, generateShareLink, qlabApiPath, stopSharing,
   listRunNotes, createRunNote, updateRunNote, deleteRunNote,
   deleteRun, updateRunTags, getRunBadgeUrl,
   getPaperPackageUrl, getOverleafLink,
@@ -179,18 +179,34 @@ function ScoreGauge({ score }: { score: number | null | undefined }) {
   );
 }
 
-function ShareButton({ runId }: { runId: string }) {
+function ShareButton({ runId, sharedUrl }: { runId: string; sharedUrl: string | null }) {
   const { token } = useAuth();
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(sharedUrl);
   const [sharing, setSharing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleShare() {
     if (!token) return;
     setSharing(true);
+    setError(null);
     try {
       const { share_url } = await generateShareLink(token, runId);
       setShareUrl(share_url);
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleStop() {
+    if (!token) return;
+    setSharing(true);
+    setError(null);
+    try {
+      await stopSharing(token, runId);
+      setShareUrl(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to turn sharing off");
     } finally {
       setSharing(false);
     }
@@ -215,6 +231,11 @@ function ShareButton({ runId }: { runId: string }) {
         <a className="button secondary" href={shareUrl} target="_blank" rel="noreferrer" style={{ height: 34, fontSize: 12, padding: "0 10px", textDecoration: "none" }}>
           Open
         </a>
+        <button className="button secondary" style={{ height: 34, fontSize: 12, padding: "0 10px" }} onClick={() => void handleStop()}
+          disabled={sharing} type="button" title="Turn the public link off: it stops working and the run leaves the gallery">
+          {sharing ? "Stopping…" : "Stop sharing"}
+        </button>
+        {error && <span style={{ fontSize: 12, color: "var(--danger)" }}>{error}</span>}
       </div>
     );
   }
@@ -814,7 +835,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <div className="actions-item"><DiffButton runId={run.run_id} /></div>
             <Link href={`/search/circuits?anchor=${run.run_id}`}><Search size={15} aria-hidden="true" /> Similar circuits</Link>
             <Link href={`/hardware/pick?run=${run.run_id}`}><Activity size={15} aria-hidden="true" /> Where should I run this next?</Link>
-            <div className="actions-item"><ShareButton runId={run.run_id} /></div>
+            <div className="actions-item"><ShareButton runId={run.run_id} sharedUrl={run.share_page_url ?? null} /></div>
             <div className="actions-item"><BadgeButton runId={run.run_id} /></div>
             <div className="actions-group d-expert">Write it up</div>
             <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download><Download size={15} aria-hidden="true" /> Report (Markdown)</a>

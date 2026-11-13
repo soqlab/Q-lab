@@ -1553,6 +1553,23 @@ def generate_share_token(
     }
 
 
+@app.delete("/api/v1/runs/{run_id}/share")
+def stop_sharing(
+    run_id: str,
+    identity: Identity = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Turn a run's public link off: the link stops working and the run leaves the gallery.
+    Sharing it again makes a new link."""
+    run = _find_run(db, run_id)
+    was_shared = run.share_token is not None
+    run.share_token = None
+    db.commit()
+    if was_shared:
+        log_audit(db, "run.unshared", "run", run_id, identity=identity)
+    return {"shared": False, "run_id": run_id}
+
+
 @app.get("/api/v1/runs/public/{share_token}")
 def get_public_run(share_token: str, db: Session = Depends(get_db)):
     from sqlalchemy import text as _text
