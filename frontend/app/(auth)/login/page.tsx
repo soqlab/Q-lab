@@ -33,6 +33,8 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [enrolment, setEnrolment] = useState<string | null>(null);
+  // The passkey prompt ended without a passkey (NotAllowedError): none for Q-Lab here, or closed.
+  const [noPasskey, setNoPasskey] = useState(false);
   // Rendered on the server as supported; the browser decides after hydration.
   const supported = useSyncExternalStore(() => () => {}, passkeysSupported, () => true);
 
@@ -45,12 +47,17 @@ function LoginForm() {
     router.push(next);
   }
 
-  async function attempt(fn: () => Promise<void>) {
+  async function attempt(fn: () => Promise<void>, passkeyPrompt = false) {
     setError(null);
+    setNoPasskey(false);
     setLoading(true);
     try {
       await fn();
     } catch (err) {
+      if (passkeyPrompt && err instanceof DOMException && err.name === "NotAllowedError") {
+        setNoPasskey(true);
+        return;
+      }
       const msg = passkeyErrorMessage(err);
       setError(msg === "email_not_verified"
         ? "This password account's email address isn't confirmed yet. Use the link Q-Lab emailed you, then try again."
@@ -60,7 +67,14 @@ function LoginForm() {
     }
   }
 
-  const signIn = () => attempt(async () => done(await signInWithPasskey()));
+  const signIn = () => attempt(async () => done(await signInWithPasskey()), true);
+  const revealPassword = () => {
+    setShowPassword(true);
+    setNoPasskey(false);
+    setError(null);
+    // The form renders on the next frame; put the cursor in it.
+    requestAnimationFrame(() => document.getElementById("login-email")?.focus());
+  };
   const enrol = () => attempt(async () => { if (enrolment) done(await addPasskey(enrolment)); });
   const withPassword = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +116,7 @@ function LoginForm() {
           </div>
           <div className={s.linkRow}>
             <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
-            <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); }}>
+            <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); setNoPasskey(false); }}>
               {showPassword ? "Hide" : "Use email and password"}
             </button>
           </div>
@@ -121,6 +135,22 @@ function LoginForm() {
         <div className={s.error}>This browser can&apos;t use passkeys on this address. Passkeys need a current browser and https.</div>
       )}
       {error && <div className={s.error} role="alert">{error}</div>}
+      {noPasskey && (
+        <div className={s.notice} role="alert">
+          <p className={s.lead}>No Q-Lab passkey came back from this browser.</p>
+          <p className={s.note}>
+            If you made your account with email and password,{" "}
+            <button type="button" className={s.link} onClick={revealPassword}>use that below</button>{" "}
+            and you&apos;ll create a passkey after. New here?{" "}
+            <Link className={s.link} href="/register">Create an account</Link>. Passkey on your phone? Choose
+            &lsquo;use a phone&rsquo; in the browser prompt. Lost it?{" "}
+            <Link className={s.link} href="/recover">Use a recovery code</Link>.
+          </p>
+          <p className={s.note}>
+            The browser doesn&apos;t say whether it found no passkey or the prompt was closed, so Q-Lab can&apos;t tell which.
+          </p>
+        </div>
+      )}
 
       {showPassword && (
         <form onSubmit={withPassword} style={{ display: "grid", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
