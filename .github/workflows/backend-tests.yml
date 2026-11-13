@@ -27,7 +27,24 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt pytest pytest-cov
       - name: Run tests
-        run: pytest tests -q --cov=app --cov-fail-under=75 --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY
+        run: pytest tests -q --cov=app --cov-fail-under=75 --cov-report=term --cov-report=markdown-append:$GITHUB_STEP_SUMMARY --junitxml=junit.xml
+      - name: Name each failing test
+        # One annotation per failed test, so the cause shows on the run page and through the API
+        # without opening the log.
+        if: failure()
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET, os
+          if not os.path.exists("junit.xml"):
+              print("::error title=No test report::pytest did not write junit.xml (it failed before or during collection)")
+              raise SystemExit(0)
+          for case in ET.parse("junit.xml").iter("testcase"):
+              for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  msg = (bad.get("message") or "").replace("
+", " ")[:900]
+                  name = f"{case.get('classname')}.{case.get('name')}"
+                  print(f"::error title={name}::{msg}")
+          PY
       - name: Core tracking path coverage
         # Ingest, run storage, read/compare, auth and run visibility. Raise the floor as tests are added.
         run: >-
