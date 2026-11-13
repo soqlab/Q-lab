@@ -138,16 +138,20 @@ async function create(begin: Begin): Promise<Record<string, unknown>> {
   return registrationJSON(cred);
 }
 
-/** New account: the passkey is the only way in; no password is ever set. */
-export async function signUpWithPasskey(email: string, name: string, orgName?: string): Promise<AuthResponse> {
-  const begin = await post<Begin>("/auth/passkeys/signup/begin", { email, name, org_name: orgName || null });
+/**
+ * New account from a passkey and a name. No email and no password: the passkey is the way in,
+ * and the response carries ten one-time recovery codes, shown once.
+ */
+export async function signUpWithPasskey(name: string, orgName?: string): Promise<AuthResponse> {
+  const begin = await post<Begin>("/auth/passkeys/signup/begin", { name, org_name: orgName || null });
   const credential = await create(begin);
   return post<AuthResponse>("/auth/passkeys/signup/finish", { challenge_id: begin.challenge_id, credential });
 }
 
 /**
- * Sign in with a discoverable passkey. With `conditional`, the request waits for the person to
- * pick a passkey from the browser's autofill on an input with autocomplete="username webauthn".
+ * Sign in with a discoverable passkey: nothing typed. The browser lists the passkeys it can reach
+ * for this site, including a phone's through its QR code. With `conditional`, the request waits
+ * for a pick from autofill on an input with autocomplete="username webauthn".
  */
 export async function signInWithPasskey(opts: { conditional?: boolean; signal?: AbortSignal } = {}): Promise<AuthResponse> {
   const begin = await post<Begin>("/auth/passkeys/login/begin", {});
@@ -178,9 +182,46 @@ export async function recoverWithPasskey(linkToken: string): Promise<AuthRespons
   return post<AuthResponse>("/auth/passkeys/recovery/finish", { challenge_id: begin.challenge_id, token: linkToken, credential });
 }
 
+/** Account recovery with a one-time code: registers a new passkey on the account and signs in. */
+export async function recoverWithCode(code: string): Promise<AuthResponse & { recovery_codes_remaining: number }> {
+  const begin = await post<Begin>("/auth/passkeys/recovery-code/begin", { code });
+  const credential = await create(begin);
+  return post("/auth/passkeys/recovery-code/finish", { challenge_id: begin.challenge_id, code, credential });
+}
+
+export type RecoveryCodeStatus = { remaining: number; total: number; created_at: string | null };
+
+export async function recoveryCodeStatus(token: string): Promise<RecoveryCodeStatus> {
+  const res = await fetch(apiUrl("/auth/passkeys/recovery-codes"), { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load recovery codes");
+  return res.json();
+}
+
+/** A new set of ten codes; the old set stops working. Needs a passkey session. */
+export async function newRecoveryCodes(token: string): Promise<RecoveryCodeStatus & { codes: string[] }> {
+  return post("/auth/passkeys/recovery-codes", {}, token);
+}
+
+export type EmailState = { email: string | null; email_verified: boolean; verification_sent: boolean; role: string };
+
+/** Add, change or (with null) remove the account's optional email address. */
+export async function setAccountEmail(token: string, email: string | null): Promise<EmailState> {
+  const res = await fetch(apiUrl("/auth/me/email"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    const detail = Array.isArray(err.detail) ? "Enter a valid email address" : err.detail;
+    throw new Error(typeof detail === "string" ? detail : "Failed to save the email address");
+  }
+  return res.json();
+}
+
 export type PasswordSignIn =
   | ({ kind: "session" } & AuthResponse)
-  | { kind: "enrol"; enrolment_token: string; user: { email: string; name: string } };
+  | { kind: "enrol"; enrolment_token: string; user: { email: string | null; name: string } };
 
 /** Password sign-in for accounts that still have one. With passkeys-only it only lets them add a passkey. */
 export async function passwordSignIn(email: string, password: string): Promise<PasswordSignIn> {

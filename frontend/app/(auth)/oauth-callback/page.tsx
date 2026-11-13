@@ -13,7 +13,8 @@ function OAuthCallback() {
   useEffect(() => {
     const token = searchParams.get("token");
     const error = searchParams.get("error");
-    const next = searchParams.get("next") || "/runs";
+    const raw = searchParams.get("next") || "/runs";
+    const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/runs";
 
     if (error || !token) {
       router.push("/login?error=oauth_failed");
@@ -29,16 +30,8 @@ function OAuthCallback() {
   }, []); // eslint-disable-line
 
   return (
-    <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <div style={{ textAlign: "center" }}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5"
-          style={{ animation: "spin 1s linear infinite", display: "block", margin: "0 auto 16px" }}>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-          <path d="M12 2a10 10 0 0 1 10 10"/>
-        </svg>
-        <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>Signing you in…</p>
-      </div>
+    <main style={{ display: "grid", placeItems: "center", minHeight: "100vh", background: "var(--bg)" }}>
+      <p className="mono" role="status" style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>Signing you in…</p>
     </main>
   );
 }

@@ -3,12 +3,13 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Atom } from "lucide-react";
+import AuthFrame from "../AuthFrame";
+import s from "../auth.module.css";
 
+// Only on servers that still allow passwords (QLAB_PASSKEYS_ONLY off): the emailed link sets a new one.
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  const token = useSearchParams().get("token") ?? "";
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -16,12 +17,12 @@ function ResetPasswordForm() {
   const [formError, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const error = formError ?? (token ? null : "Missing or invalid reset link. Please request a new one.");
+  const error = formError ?? (token ? null : "This reset link is missing its code. Request a new one.");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== confirm) { setError("Passwords do not match"); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirm) { setError("The two passwords don't match."); return; }
+    if (password.length < 8) { setError("Use at least 8 characters."); return; }
     setError(null);
     setLoading(true);
     try {
@@ -30,8 +31,8 @@ function ResetPasswordForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, new_password: password }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.detail ?? "Reset failed");
+      const data = (await r.json().catch(() => ({}))) as { detail?: unknown };
+      if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Reset failed");
       setDone(true);
       setTimeout(() => router.push("/login"), 3000);
     } catch (err) {
@@ -42,76 +43,40 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="auth-shell">
-      <div className="auth-card">
-        <div className="auth-brand">
-          <div className="brand-mark" style={{ width: 40, height: 40 }}>
-            <Atom size={20} aria-hidden="true" />
-          </div>
-          <div>
-            <span>Q-Lab</span>
-            <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>State of Quantum</div>
-          </div>
+    <AuthFrame
+      caption="Reset password"
+      links={!done ? (
+        <div className={s.linkRow}>
+          <span>Link expired?</span>
+          <Link className={s.link} href="/forgot-password">Request a new one</Link>
         </div>
-        <h1 className="auth-title">New password</h1>
-        <p className="auth-sub">Choose a strong password for your account</p>
-
-        {done ? (
-          <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-            <p style={{ fontWeight: 600, marginBottom: 8 }}>Password updated!</p>
-            <p style={{ fontSize: 14, color: "var(--color-muted)", marginBottom: 20 }}>
-              Redirecting you to sign in…
-            </p>
-            <Link href="/login" style={{ color: "#1d6f8f", fontWeight: 600, fontSize: 14 }}>
-              Sign in now
-            </Link>
+      ) : undefined}
+    >
+      <h1 className={s.title}>Choose a new password</h1>
+      {done ? (
+        <>
+          <p className={s.lead} role="status">Password updated. Taking you to sign in…</p>
+          <Link className={s.secondary} href="/login">Sign in now</Link>
+        </>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+          <div className={s.field}>
+            <label className={s.label} htmlFor="reset-new">New password</label>
+            <input id="reset-new" className={s.input} type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              required autoFocus autoComplete="new-password" placeholder="At least 8 characters" disabled={!token} />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="auth-form">
-            <label className="auth-label">New password</label>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoFocus
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              disabled={!token}
-            />
-            <label className="auth-label">Confirm password</label>
-            <input
-              className="input"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              autoComplete="new-password"
-              disabled={!token}
-            />
-            {error && <div className="auth-error">{error}</div>}
-            <button
-              className="button"
-              type="submit"
-              disabled={loading || !token}
-              style={{ width: "100%", justifyContent: "center" }}
-            >
-              {loading ? "Updating…" : "Set new password"}
-            </button>
-          </form>
-        )}
-
-        {!done && (
-          <p className="auth-footer">
-            <Link href="/forgot-password" style={{ color: "#1d6f8f" }}>
-              Request a new link
-            </Link>
-          </p>
-        )}
-      </div>
-    </main>
+          <div className={s.field}>
+            <label className={s.label} htmlFor="reset-confirm">Confirm password</label>
+            <input id="reset-confirm" className={s.input} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+              required autoComplete="new-password" disabled={!token} />
+          </div>
+          {error && <div className={s.error} role="alert">{error}</div>}
+          <button className={s.primary} type="submit" disabled={loading || !token}>
+            {loading ? "Updating…" : "Set new password"}
+          </button>
+        </form>
+      )}
+    </AuthFrame>
   );
 }
 

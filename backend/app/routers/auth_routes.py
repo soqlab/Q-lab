@@ -83,7 +83,7 @@ def _user_response(user: User, token: str) -> dict:
             "name": user.name,
             "role": user.role,
             "org_id": user.org_id,
-            "email_verified": getattr(user, "email_verified", False),
+            "email_verified": bool(user.email) and bool(getattr(user, "email_verified", False)),
         },
     }
 
@@ -93,10 +93,15 @@ def has_passkey(db: Session, user_id: int) -> bool:
                       .where(PasskeyCredential.user_id == user_id)) or 0) > 0
 
 
-def new_account(db: Session, email: str, name: str, org_name: str | None, password_hash: str) -> User:
-    """Create (not yet commit) a user. password_hash is "" for passkey and OAuth accounts."""
-    _owner_email = os.getenv("QLAB_OWNER_EMAIL", "").strip().lower()
-    role = "owner" if (_owner_email and email.lower() == _owner_email) else "researcher"
+def is_owner_email(email: str | None) -> bool:
+    owner = os.getenv("QLAB_OWNER_EMAIL", "").strip().lower()
+    return bool(owner and email and email.strip().lower() == owner)
+
+
+def new_account(db: Session, email: str | None, name: str, org_name: str | None, password_hash: str) -> User:
+    """Create (not yet commit) a user. password_hash is "" for passkey and OAuth accounts.
+    email is None for an account created with a passkey and a name only."""
+    role = "owner" if is_owner_email(email) else "researcher"
 
     org: Organization | None = None
     if org_name:
@@ -115,7 +120,7 @@ def new_account(db: Session, email: str, name: str, org_name: str | None, passwo
         org_id=org.id if org else None,
         # A self-hosted install with no mail server (e.g. inside a network with no internet) can
         # never deliver the confirmation email, so there is nothing to wait for.
-        email_verified=not is_email_configured(),
+        email_verified=bool(email) and not is_email_configured(),
     )
     db.add(user)
     db.flush()
@@ -144,7 +149,7 @@ def finish_signup(db: Session, user: User, request: Request, amr: str) -> dict:
     log_audit(db, "auth.register", "user", str(user.id), request=request, user_id=user.id, org_id=user.org_id)
 
     # Send verification email — token stored in DB so it survives redeploys
-    if not user.email_verified:
+    if user.email and not user.email_verified:
         try:
             verify_token = secrets.token_urlsafe(32)
             user.verify_token = verify_token
@@ -222,7 +227,73 @@ def me(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)
                                     .where(PasskeyCredential.user_id == identity.user.id)) or 0
         out["has_password"] = bool(identity.user.password_hash)
         out["passkeys_only"] = passkeys_only()
+        from ..recovery_codes import remaining
+        out["recovery_codes_remaining"] = remaining(db, identity.user.id)
+        out["email_verified"] = bool(identity.user.email) and bool(identity.user.email_verified)
     return out
+
+
+class EmailPayload(BaseModel):
+    email: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def email_shape(cls, v: Optional[str]) -> Optional[str]:
+        v = (v or "").strip()
+        if not v:
+            return None
+        if len(v) > 254 or "@" not in v or v.startswith("@") or v.endswith("@"):
+            raise ValueError("Enter a valid email address")
+        return v
+
+
+@router.put("/me/email", dependencies=[Depends(auth_limiter)])
+def set_email(payload: EmailPayload, request: Request, identity: Identity = Depends(require_auth),
+              db: Session = Depends(get_db)):
+    """Add, change or remove the account's optional email address (null removes it).
+
+    The address is for notifications, and for emailed recovery if the user asks for a link. It is
+    never needed to sign in. When the server sends mail, a new address is confirmed by a link
+    before anything else is sent to it. Changing it needs a passkey session on an account that
+    has a passkey, as adding a passkey does: an address is a way back into the account.
+    """
+    user = identity.user
+    if user is None or identity.api_key_row is not None:
+        raise HTTPException(status_code=403, detail="session_required")
+    if has_passkey(db, user.id) and identity.amr != "passkey":
+        raise HTTPException(status_code=403, detail="passkey_session_required")
+    email = payload.email
+    if email and email != user.email and db.scalar(select(User.id).where(User.email == email, User.id != user.id)):
+        raise HTTPException(status_code=409, detail="That email address is used by another account")
+    if email != user.email:
+        user.email = email
+        user.verify_token = None
+        user.verify_token_expires = None
+        user.reset_token = None  # a recovery link sent to the old address stops working
+        user.reset_token_expires = None
+        mail = is_email_configured()
+        user.email_verified = bool(email) and not mail
+        # Without mail an address can't be confirmed; QLAB_OWNER_EMAIL then makes its owner the
+        # server owner only while the server has no owner yet (as signing up with it always did).
+        if email and not mail and is_owner_email(email) and user.role != "owner" and not db.scalar(
+                select(User.id).where(User.role == "owner", User.is_active.is_(True))):
+            user.role = "owner"
+        db.commit()
+        if email and mail:
+            try:
+                verify_token = secrets.token_urlsafe(32)
+                user.verify_token = verify_token
+                user.verify_token_expires = time.time() + _VERIFY_TTL_SECONDS
+                db.commit()
+                app_url = os.getenv("QLAB_APP_URL", "")
+                send_verification_email(to_email=email, verify_url=f"{app_url}/verify-email?token={verify_token}")
+            except Exception:
+                pass
+        log_audit(db, "auth.email_changed" if email else "auth.email_removed", "user", str(user.id),
+                  identity=identity, request=request)
+    return {"email": user.email, "email_verified": bool(user.email) and bool(user.email_verified),
+            "verification_sent": bool(user.email) and not user.email_verified and is_email_configured(),
+            "role": user.role}
 
 
 @router.post("/refresh")
@@ -299,6 +370,8 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user.email_verified = True
     user.verify_token = None
     user.verify_token_expires = None
+    if is_owner_email(user.email):  # a confirmed QLAB_OWNER_EMAIL is the server owner
+        user.role = "owner"
     db.commit()
 
     return {"message": "Email verified successfully. You can now use all features."}
@@ -333,6 +406,8 @@ def resend_verification(identity: Identity = Depends(require_auth), db: Session 
     user = db.scalar(select(User).where(User.id == identity.user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if not user.email:
+        raise HTTPException(status_code=400, detail="This account has no email address. Add one in settings.")
     if user.email_verified:
         return {"message": "Email is already verified"}
 
@@ -368,9 +443,10 @@ def delete_account(identity: Identity = Depends(require_auth), db: Session = Dep
     user.is_active = False
     db.commit()
 
-    try:
-        send_account_deleted_email(to_email=user_email, user_name=user_name)
-    except Exception:
-        pass
+    if user_email:
+        try:
+            send_account_deleted_email(to_email=user_email, user_name=user_name)
+        except Exception:
+            pass
 
     return {"message": "Account deleted successfully"}

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, LogIn, UserPlus } from "lucide-react";
 import { acceptInvite, validateInvite, type InviteInfo } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import AuthFrame from "../AuthFrame";
+import s from "../auth.module.css";
 
 function JoinInner() {
   const searchParams = useSearchParams();
@@ -17,11 +19,12 @@ function JoinInner() {
   const [checkError, setValidError] = useState<string | null>(null);
   // Without a token there is nothing to check.
   const validating = inviteToken ? checking : false;
-  const validError = inviteToken ? checkError : "No invite token provided.";
+  const validError = inviteToken ? checkError : "This invite link is missing its code.";
 
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  const back = `/join?token=${encodeURIComponent(inviteToken)}`;
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -32,7 +35,7 @@ function JoinInner() {
 
   async function handleAccept() {
     if (!authToken) {
-      router.push(`/login?redirect=/join?token=${encodeURIComponent(inviteToken)}`);
+      router.push(`/login?next=${encodeURIComponent(back)}`);
       return;
     }
     setAccepting(true);
@@ -40,7 +43,7 @@ function JoinInner() {
     try {
       await acceptInvite(authToken, inviteToken);
       setAccepted(true);
-      setTimeout(() => router.push("/runs"), 2500);
+      router.push("/team");
     } catch (err) {
       setAcceptError(err instanceof Error ? err.message : "Failed to accept invite");
     } finally {
@@ -49,102 +52,43 @@ function JoinInner() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(135deg, #0d1b2a 0%, #1a3a5c 100%)",
-      fontFamily: "Inter, Segoe UI, Arial, sans-serif",
-    }}>
-      <div style={{ width: "100%", maxWidth: 440, margin: "0 auto", padding: "0 24px" }}>
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>Q-Lab</div>
-          <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>Quantum Systems of Record</div>
-        </div>
-
-        <div style={{ background: "#fff", borderRadius: 16, padding: "36px 32px", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
-          {validating && (
-            <div style={{ textAlign: "center", color: "#5f6f80", padding: "24px 0" }}>Validating invite…</div>
-          )}
-
-          {validError && (
+    <AuthFrame caption="Team invite">
+      {validating && <p className={s.note} role="status">Checking the invite…</p>}
+      {validError && (
+        <>
+          <h1 className={s.title}>This invite doesn&apos;t work</h1>
+          <p className={s.lead}>{validError}</p>
+          <Link className={s.secondary} href="/login">Go to sign in</Link>
+        </>
+      )}
+      {accepted && <p className={s.lead} role="status">You joined the team. Opening it…</p>}
+      {!validating && !validError && !accepted && info && (
+        <>
+          <h1 className={s.title}>Join {info.org_name}</h1>
+          <p className={s.lead}>
+            You&apos;re invited as <strong>{info.role}</strong>. The invite expires on{" "}
+            {new Date(info.expires_at).toLocaleDateString()}.
+          </p>
+          {acceptError && <div className={s.error} role="alert">{acceptError}</div>}
+          {user ? (
             <>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#e74c3c", marginBottom: 8 }}>Invite invalid</div>
-                <div style={{ color: "#5f6f80", fontSize: 14 }}>{validError}</div>
-              </div>
-              <a href="/login" style={{ display: "block", textAlign: "center", color: "#1d6f8f", fontSize: 14 }}>Go to login →</a>
+              <p className={s.note}>Signed in as <strong>{user.name || user.email || "you"}</strong>.</p>
+              <button className={s.primary} onClick={() => void handleAccept()} disabled={accepting}>
+                {accepting ? "Joining…" : `Join ${info.org_name}`}
+              </button>
+              <Link className={s.link} href={`/login?next=${encodeURIComponent(back)}`}>Use a different account</Link>
+            </>
+          ) : (
+            <>
+              <Link className={s.primary} href={`/register?next=${encodeURIComponent(back)}`} style={{ textDecoration: "none" }}>
+                Create an account
+              </Link>
+              <Link className={s.secondary} href={`/login?next=${encodeURIComponent(back)}`}>I have an account: sign in</Link>
             </>
           )}
-
-          {accepted && (
-            <div style={{ textAlign: "center", padding: "16px 0" }}>
-              <CheckCircle size={48} style={{ color: "#27ae60", marginBottom: 16 }} />
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Welcome to the team!</div>
-              <div style={{ color: "#5f6f80", fontSize: 14 }}>Redirecting to dashboard…</div>
-            </div>
-          )}
-
-          {!validating && !validError && !accepted && info && (
-            <>
-              <div style={{ textAlign: "center", marginBottom: 28 }}>
-                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
-                  {"You've been invited"}
-                </div>
-                <p style={{ color: "#5f6f80", fontSize: 14, margin: 0 }}>
-                  Join <strong style={{ color: "#1d6f8f" }}>{info.org_name}</strong> as a{" "}
-                  <strong style={{ textTransform: "capitalize" }}>{info.role}</strong>
-                </p>
-                <p style={{ color: "#9aa8b6", fontSize: 12, marginTop: 6 }}>
-                  Invite for: {info.email} · Expires {new Date(info.expires_at).toLocaleDateString()}
-                </p>
-              </div>
-
-              {acceptError && (
-                <div className="auth-error" style={{ marginBottom: 16 }}>{acceptError}</div>
-              )}
-
-              {user ? (
-                <>
-                  <div style={{ background: "#f7f8fa", borderRadius: 10, padding: "12px 16px", marginBottom: 18, fontSize: 13, color: "#5f6f80" }}>
-                    Logged in as <strong>{user.email}</strong>
-                  </div>
-                  <button
-                    className="button"
-                    style={{ width: "100%", height: 44, fontSize: 15 }}
-                    onClick={() => void handleAccept()}
-                    disabled={accepting}
-                  >
-                    <CheckCircle size={16} />
-                    {accepting ? "Joining…" : `Accept & join ${info.org_name}`}
-                  </button>
-                  <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#9aa8b6" }}>
-                    Not you?{" "}
-                    <a href="/login" style={{ color: "#1d6f8f" }}>Switch account</a>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <a
-                    href={`/login?redirect=${encodeURIComponent(`/join?token=${inviteToken}`)}`}
-                    className="button"
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", height: 44, fontSize: 15, textDecoration: "none", marginBottom: 10 }}
-                  >
-                    <LogIn size={16} /> Log in to accept
-                  </a>
-                  <a
-                    href={`/register?email=${encodeURIComponent(info.email)}&redirect=${encodeURIComponent(`/join?token=${inviteToken}`)}`}
-                    className="button secondary"
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", height: 44, fontSize: 15, textDecoration: "none" }}
-                  >
-                    <UserPlus size={16} /> Create new account
-                  </a>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </AuthFrame>
   );
 }
 
