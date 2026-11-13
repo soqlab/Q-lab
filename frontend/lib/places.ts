@@ -10,6 +10,7 @@ export const PLACES: Place[] = [
   { href: "/hardware/pick", title: "Pick the machine before you run", group: "Core", keywords: ["where", "run", "next", "best", "backend", "fidelity", "estimate", "predict", "calibration", "choose", "qasm"] },
   { href: "/compare", title: "Compare two runs", group: "Core", keywords: ["diff", "difference", "why"] },
   { href: "/trust", title: "Trust: what this Q-Lab runs and loads", group: "Core", keywords: ["commit", "verify", "privacy", "csp"] },
+  { href: "/privacy", title: "Privacy: what Q-Lab keeps about you", group: "Core", keywords: ["data", "gdpr", "cookies", "delete", "export", "personal"] },
   { href: "/runs", title: "Run History", group: "Core" },
   { href: "/analytics", title: "Analytics", group: "Core" },
   { href: "/projects", title: "Projects", group: "Core" },

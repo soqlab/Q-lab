@@ -46,7 +46,10 @@ export default function AuthFrame({ caption, aside, children, links }: {
             Runs shared publicly{" "}
             <b>{shared === null ? "…" : shared === "unavailable" ? "—" : shared.toLocaleString("en-US")}</b>
           </span>
-          <Link href="/gallery">Open the gallery</Link>
+          <span className={s.readoutLinks}>
+            <Link href="/gallery">Open the gallery</Link>
+            <Link href="/privacy">Privacy</Link>
+          </span>
         </p>
       </div>
     </main>

@@ -271,7 +271,7 @@ def request_deletion(
             "Anonymized aggregate statistics",
             "Audit logs (required by law for 7 years)",
         ],
-        "contact": "privacy@qlab.app",
+        "contact": "contact@soqlab.com",
     }
 
 

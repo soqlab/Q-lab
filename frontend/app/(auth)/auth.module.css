@@ -88,3 +88,4 @@
 }
 .readout b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .readout a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.readoutLinks { display: flex; gap: 14px; }

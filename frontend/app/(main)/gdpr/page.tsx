@@ -793,9 +793,9 @@ export default function GDPRPage() {
             )}
 
             <div style={{ marginTop: 16, padding: "12px 14px", background: "#1d6f8f11", border: "1px solid #1d6f8f33", borderRadius: 8, fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-              <strong style={{ color: "#38bdf8" }}>Data Controller:</strong> Q-Lab is the data controller for all personal data.
-              For GDPR queries or to contact our Data Protection Officer, email{" "}
-              <a href="mailto:privacy@qlab.app" style={{ color: "#38bdf8" }}>privacy@qlab.app</a>.
+              <strong style={{ color: "#38bdf8" }}>Privacy questions:</strong> what Q-Lab keeps and who sees it is set out in
+              the <a href="/privacy" style={{ color: "#38bdf8" }}>privacy notice</a>. For requests, email{" "}
+              <a href="mailto:contact@soqlab.com" style={{ color: "#38bdf8" }}>contact@soqlab.com</a>.
             </div>
           </div>
         </SectionCard>
