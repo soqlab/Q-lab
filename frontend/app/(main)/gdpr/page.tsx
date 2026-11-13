@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Download, Trash2, Shield, AlertTriangle, FileText, CheckCircle, Activity,
-  Clock, Database, Lock, Users, ChevronDown, ChevronUp,
+  Download, Trash2, Shield, AlertTriangle, FileText, CheckCircle,
+  Clock, Database, Lock, ChevronDown, ChevronUp,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useAuth } from "../../../lib/auth";
 
 const API_PREFIX = "/qlab-api";
@@ -30,24 +29,9 @@ interface RetentionPolicy {
   name: string;
   retain_runs_days: number;
   anonymize_after_days: number;
-  retain_logs_days: number;
   applies_to_projects: string[];
   enabled: boolean;
   created_at: string;
-}
-
-interface ComplianceReport {
-  generated_at: string;
-  total_users: number;
-  total_runs: number;
-  pending_deletion_requests: number;
-  retention_policies_active: number;
-  oldest_data_date?: string;
-  data_categories: Record<string, string>;
-  lawful_basis: string;
-  data_processors: string[];
-  data_subject_rights: Record<string, string>;
-  recommendations: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +94,6 @@ export default function GDPRPage() {
 
   const [runs, setRuns] = useState<Run[]>([]);
   const [policies, setPolicies] = useState<RetentionPolicy[]>([]);
-  const [compliance, setCompliance] = useState<ComplianceReport | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Section states
@@ -142,10 +125,9 @@ export default function GDPRPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [runsRes, policiesRes, compRes] = await Promise.all([
+      const [runsRes, policiesRes] = await Promise.all([
         fetch(apiUrl("/api/v1/runs"), { cache: "no-store", headers: authHeaders(token) }),
         fetch(apiUrl("/api/v1/gdpr/retention-policies"), { cache: "no-store", headers: authHeaders(token) }),
-        fetch(apiUrl("/api/v1/gdpr/compliance-report"), { cache: "no-store", headers: authHeaders(token) }),
       ]);
       if (runsRes.ok) {
         const data = await runsRes.json() as Run[];
@@ -154,10 +136,6 @@ export default function GDPRPage() {
       if (policiesRes.ok) {
         const data = await policiesRes.json() as { policies: RetentionPolicy[] };
         setPolicies(data.policies ?? []);
-      }
-      if (compRes.ok) {
-        const data = await compRes.json() as ComplianceReport;
-        setCompliance(data);
       }
     } finally {
       setLoading(false);
@@ -255,7 +233,7 @@ export default function GDPRPage() {
       const res = await fetch(apiUrl("/api/v1/gdpr/retention-policy"), {
         method: "POST",
         headers: { ...authHeaders(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newPolicy, retain_logs_days: 2557, applies_to_projects: [], enabled: true }),
+        body: JSON.stringify({ ...newPolicy, applies_to_projects: [], enabled: true }),
       });
       if (!res.ok) throw new Error("Policy creation failed");
       await loadAll();
@@ -667,166 +645,16 @@ export default function GDPRPage() {
           </SectionCard>
         )}
 
-        {/* ---- 5. Compliance Status ---- */}
-        {compliance && (
-          <SectionCard title="Compliance Status" icon={<FileText size={16} style={{ color: "#22c55e" }} />} defaultOpen={false}>
-            <div style={{ padding: "16px 18px" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>
-                Report generated {new Date(compliance.generated_at).toLocaleString()}
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-                {([
-                  ["Total Users", compliance.total_users, Users],
-                  ["Total Runs", compliance.total_runs, Activity],
-                  ["Pending Deletions", compliance.pending_deletion_requests, Clock],
-                  ["Active Policies", compliance.retention_policies_active, Shield],
-                ] satisfies [string, number, LucideIcon][]).map(([label, value, Icon]) => (
-                  <div
-                    key={String(label)}
-                    style={{
-                      background: "var(--input-bg, #0d1b2a)",
-                      border: "1px solid var(--line)",
-                      borderRadius: 8,
-                      padding: "14px 16px",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                      <Icon size={13} style={{ color: "#64748b" }} />
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{String(label)}</span>
-                    </div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: Number(compliance.pending_deletion_requests) > 0 && String(label) === "Pending Deletions" ? "#f59e0b" : "var(--strong)" }}>
-                      {String(value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Recommendations */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Recommendations
-                </div>
-                {compliance.recommendations.map((rec, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex", gap: 10, padding: "10px 14px", borderRadius: 8,
-                      background: rec.includes("No immediate") ? "#22c55e11" : "#f59e0b11",
-                      border: `1px solid ${rec.includes("No immediate") ? "#22c55e33" : "#f59e0b33"}`,
-                      marginBottom: 8, fontSize: 13, lineHeight: 1.5,
-                      color: rec.includes("No immediate") ? "#86efac" : "#fcd34d",
-                    }}
-                  >
-                    {rec.includes("No immediate")
-                      ? <CheckCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      : <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
-                    {rec}
-                  </div>
-                ))}
-              </div>
-
-              {/* Lawful basis */}
-              <div style={{
-                background: "var(--input-bg, #0d1b2a)", border: "1px solid var(--line)",
-                borderRadius: 8, padding: "14px 16px", fontSize: 13,
-              }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Lawful Basis</div>
-                <div style={{ color: "var(--muted)", lineHeight: 1.6 }}>{compliance.lawful_basis}</div>
-              </div>
-            </div>
-          </SectionCard>
-        )}
-
-        {/* ---- 6. Data Categories ---- */}
-        <SectionCard title="Data Categories &amp; Legal Basis" icon={<Database size={16} style={{ color: "#94a3b8" }} />} defaultOpen={false}>
-          <div style={{ padding: "16px 18px" }}>
-            <div style={{ display: "grid", gap: 10 }}>
-              {compliance && Object.entries(compliance.data_categories).map(([key, description]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex", gap: 12,
-                    padding: "12px 14px",
-                    background: "var(--input-bg, #0d1b2a)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: key.includes("personal") || key === "user_accounts" ? "#f59e0b" : "#22c55e",
-                      flexShrink: 0, marginTop: 5,
-                    }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, textTransform: "capitalize" as const }}>
-                      {key.replace(/_/g, " ")}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3, lineHeight: 1.5 }}>
-                      {description}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {compliance?.data_processors && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Third-Party Data Processors
-                </div>
-                {compliance.data_processors.map((dp) => (
-                  <div
-                    key={dp}
-                    style={{
-                      padding: "9px 14px",
-                      borderBottom: "1px solid var(--line)",
-                      fontSize: 13,
-                      color: "var(--muted)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#64748b", flexShrink: 0 }} />
-                    {dp}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {compliance?.data_subject_rights && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Your GDPR Rights &amp; API Endpoints
-                </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {Object.entries(compliance.data_subject_rights).map(([right, endpoint]) => (
-                    <div
-                      key={right}
-                      style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "var(--input-bg, #0d1b2a)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 12 }}
-                    >
-                      <span style={{ color: "var(--text)", fontWeight: 600, textTransform: "capitalize" as const }}>
-                        Right to {right}
-                      </span>
-                      <code style={{ color: "#38bdf8", background: "#1d6f8f22", padding: "1px 6px", borderRadius: 4 }}>
-                        {endpoint}
-                      </code>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginTop: 16, padding: "12px 14px", background: "#1d6f8f11", border: "1px solid #1d6f8f33", borderRadius: 8, fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-              <strong style={{ color: "#38bdf8" }}>Privacy questions:</strong> what Q-Lab keeps and who sees it is set out in
-              the <a href="/privacy" style={{ color: "#38bdf8" }}>privacy notice</a>. For requests, email{" "}
+        <section className="panel">
+          <div style={{ padding: "14px 18px", display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
+            <FileText size={16} style={{ color: "#38bdf8", flexShrink: 0, marginTop: 2 }} />
+            <div>
+              What Q-Lab collects, who else receives it, how long it is kept and your rights are set out in the{" "}
+              <a href="/privacy" style={{ color: "#38bdf8" }}>privacy notice</a>. For anything else, email{" "}
               <a href="mailto:contact@soqlab.com" style={{ color: "#38bdf8" }}>contact@soqlab.com</a>.
             </div>
           </div>
-        </SectionCard>
+        </section>
       </div>
     </main>
   );

@@ -408,3 +408,9 @@ def test_gdpr_retention_policy_deletes_only_old_runs():
     assert applied["applied"] is True
     assert client.get(f"/api/v1/runs/{old}", headers=admin).status_code == 404
     assert client.get(f"/api/v1/runs/{new}", headers=admin).status_code == 200
+
+
+def test_gdpr_compliance_report_is_gone(alice):
+    """It named the wrong processors, a PUT /users/me that doesn't exist and a 7-year audit log
+    retention nothing implements, and showed every user the server's user and run totals."""
+    assert client.get("/api/v1/gdpr/compliance-report", headers=alice).status_code == 404

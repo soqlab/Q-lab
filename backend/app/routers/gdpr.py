@@ -10,7 +10,6 @@ Endpoints:
   POST /api/v1/gdpr/retention-policy                — create retention policy
   GET  /api/v1/gdpr/retention-policies              — list retention policies
   POST /api/v1/gdpr/retention-policy/{policy_id}/apply  — dry-run or apply policy
-  GET  /api/v1/gdpr/compliance-report               — GDPR compliance status report
 """
 from __future__ import annotations
 
@@ -23,7 +22,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -56,7 +55,6 @@ class RetentionPolicy(BaseModel):
     policy_id: str
     name: str
     retain_runs_days: int = 0       # 0 = keep forever
-    retain_logs_days: int = 2557    # ~7 years default for legal
     anonymize_after_days: int = 0   # 0 = never
     applies_to_projects: List[str] = []
     enabled: bool = True
@@ -75,7 +73,6 @@ class AnonymizeBody(BaseModel):
 class RetentionPolicyInput(BaseModel):
     name: str
     retain_runs_days: int = 0
-    retain_logs_days: int = 2557
     anonymize_after_days: int = 0
     applies_to_projects: List[str] = []
     enabled: bool = True
@@ -314,7 +311,6 @@ def create_retention_policy(
         "policy_id": policy_id,
         "name": body.name,
         "retain_runs_days": body.retain_runs_days,
-        "retain_logs_days": body.retain_logs_days,
         "anonymize_after_days": body.anonymize_after_days,
         "applies_to_projects": body.applies_to_projects,
         "enabled": body.enabled,
@@ -424,67 +420,4 @@ def apply_retention_policy(
         "oldest_affected_date": oldest.isoformat() if oldest else None,
         "newest_affected_date": newest.isoformat() if newest else None,
         "applied": not dry_run,
-    }
-
-
-@router.get("/compliance-report")
-def compliance_report(
-    identity: Identity = Depends(require_auth),
-    db: Session = Depends(get_db),
-):
-    """Generate a GDPR compliance status report."""
-    now = _utcnow_str()
-
-    total_users = db.scalar(select(func.count()).select_from(User)) or 0
-    total_runs = db.scalar(select(func.count()).select_from(Run)) or 0
-
-    # Oldest data
-    oldest_run = db.scalar(select(Run.created_at).order_by(Run.created_at.asc()).limit(1))
-
-    all_requests = store_list(db, NS_REQUESTS)
-    pending_deletions = sum(
-        1 for r in all_requests
-        if r.get("request_type") == "delete" and r.get("status") in ("pending_confirmation", "pending")
-    )
-
-    policies = store_list(db, NS_POLICIES)
-    active_policies = sum(1 for p in policies if p.get("enabled", True))
-
-    recommendations = []
-    if not policies:
-        recommendations.append("No retention policies defined. Consider setting a retention policy to manage data lifecycle.")
-    if pending_deletions > 0:
-        recommendations.append(f"{pending_deletions} pending deletion request(s). Process within 30 days as required by GDPR.")
-    if oldest_run:
-        age_days = (datetime.now(timezone.utc) - (oldest_run if oldest_run.tzinfo else oldest_run.replace(tzinfo=timezone.utc))).days
-        if age_days > 365 * 3 and not policies:
-            recommendations.append("Data older than 3 years exists without a retention policy. Consider reviewing data minimisation obligations.")
-    if not recommendations:
-        recommendations.append("No immediate compliance issues detected.")
-
-    return {
-        "generated_at": now,
-        "total_users": total_users,
-        "total_runs": total_runs,
-        "pending_deletion_requests": pending_deletions,
-        "retention_policies_active": active_policies,
-        "oldest_data_date": oldest_run.isoformat() if oldest_run else None,
-        "data_categories": {
-            "circuit_data": "Scientific/technical data — not personal data under GDPR recital 26",
-            "user_accounts": "Personal data (username, email) — requires lawful basis",
-            "api_keys": "Technical data — functional necessity for service delivery",
-            "audit_logs": "Operational logs — retained 7 years per legal/regulatory requirement",
-        },
-        "lawful_basis": "Legitimate interest (scientific research, Art. 89) and contractual necessity (Art. 6(1)(b))",
-        "data_processors": [
-            "Anthropic (AI insights — optional feature, no data retained beyond session)",
-            "Resend (email delivery — optional, only when notifications enabled)",
-        ],
-        "data_subject_rights": {
-            "access": "GET /api/v1/gdpr/export/request",
-            "portability": "GET /api/v1/gdpr/export/request",
-            "erasure": "POST /api/v1/gdpr/delete/request",
-            "rectification": "PUT /api/v1/users/me",
-        },
-        "recommendations": recommendations,
     }
