@@ -369,7 +369,7 @@ def test_gdpr_export_contains_only_the_callers_runs(alice, bob):
     assert export.status_code == 200
     run_ids = {r["run_id"] for r in export.json()["runs"]}
     assert mine in run_ids and theirs not in run_ids
-    assert client.get(req["download_url"], headers=bob).status_code == 403
+    assert client.get(req["download_url"], headers=bob).status_code == 404  # not yours: as if it did not exist
 
 
 def test_gdpr_anonymize_and_deletion_request(alice, bob):

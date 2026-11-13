@@ -1,4 +1,4 @@
-"""Erasing an account (GDPR Art. 17).
+"""Erasing an account (GDPR Art. 17) and exporting everything held about it (Art. 15 and 20).
 
 Deleting an account is a request with a grace period:
 
@@ -29,13 +29,13 @@ import pathlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import Table, select, update
+from sqlalchemy import Table, or_, select, update
 from sqlalchemy.orm import Session
 
 from .database import Base
 from .models import (
-    AuditLog, GenericRecord, NotificationChannel, NotificationLog, Organization,
-    OrgInvite, Project, Run, User,
+    APIKey, ApiCredential, AuditLog, GenericRecord, NotificationChannel, NotificationLog, Organization,
+    OrgInvite, PasskeyCredential, Project, RecoveryCode, Run, User, Webhook,
 )
 
 log = logging.getLogger("qlab.erasure")
@@ -44,6 +44,14 @@ GRACE_DAYS = 7
 NS_PENDING = "account_erasure"
 NS_REQUESTS = "gdpr_requests"   # the GDPR page's request log (app/routers/gdpr.py)
 NS_EXPORTS = "gdpr_exports"
+
+# Never copied into an export: secrets and their hashes.
+_SECRET_COLUMNS = {
+    "password_hash", "key_hash", "code_hash", "public_key", "encrypted_key", "secret", "webhook_secret",
+    "challenge", "verify_token", "reset_token",
+}
+_SECRET_FIELDS = ("token", "secret", "password", "api_key", "apikey", "webhook_url", "private")
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -304,3 +312,111 @@ def erase(db: Session, user_id: int, notify: bool = True) -> str | None:
         except Exception:
             log.exception("erasure: could not send the confirmation email")
     return code
+
+
+# ── Export ────────────────────────────────────────────────────────────────────
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return None
+    return value
+
+
+def _is_secret_field(key: Any) -> bool:
+    name = str(key).lower()
+    return not name.startswith("has_") and name != "share_token" and any(s in name for s in _SECRET_FIELDS)
+
+
+def _redact(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: ("[not exported: secret]" if _is_secret_field(k) and v else _redact(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact(v) for v in value]
+    return value
+
+
+def _row(obj: Any, table: Table | None = None) -> dict[str, Any]:
+    table = table if table is not None else obj.__table__
+    out = {}
+    for col in table.c:
+        if col.name in _SECRET_COLUMNS:
+            if col.name in ("secret", "webhook_secret", "encrypted_key"):
+                out["has_" + col.name] = bool(getattr(obj, col.key, None))
+            continue
+        out[col.name] = _jsonable(getattr(obj, col.key, None))
+    return out
+
+
+def export(db: Session, user: User) -> dict[str, Any]:
+    """Everything Q-Lab holds about this user, without secrets (key hashes, passkey public keys,
+    saved provider keys, webhook signing secrets and integration tokens are listed, not copied)."""
+    uid = user.id
+    owners = {f"user:{uid}"}
+    runs = db.scalars(select(Run).where(Run.created_by_user_id == uid).order_by(Run.created_at)).all()
+    run_ids = {r.run_id for r in runs}
+    org = db.get(Organization, user.org_id) if user.org_id else None
+
+    project_ids = {r.project_id for r in runs if r.project_id}
+    projects = db.scalars(select(Project).where(
+        (Project.created_by_user_id == uid) | (Project.id.in_(project_ids or {-1})))).all()
+
+    other_tables: dict[str, list[dict[str, Any]]] = {}
+    covered = {"users", "runs", "projects", "audit_logs", "api_keys", "passkey_credentials", "recovery_codes",
+               "api_credentials", "webhooks", "notification_channels", "organizations", "generic_records"}
+    for table in Base.metadata.sorted_tables:
+        if table.name in covered:
+            continue
+        conds = []
+        for col in ("created_by_user_id", "user_id", "invited_by_user_id"):
+            if col in table.c:
+                conds.append(table.c[col] == uid)
+        if "run_id" in table.c and run_ids:
+            conds.append(table.c.run_id.in_(run_ids))
+        if "email" in table.c and user.email:
+            conds.append(table.c.email == user.email)
+        if not conds:
+            continue
+        rows = db.execute(select(table).where(or_(*conds))).all()
+        if rows:
+            other_tables[table.name] = [_redact({c.name: _jsonable(v) for c, v in zip(table.c, r)
+                                                 if c.name not in _SECRET_COLUMNS}) for r in rows]
+
+    store = []
+    for record in db.scalars(select(GenericRecord)).all():
+        if record.namespace in (NS_EXPORTS, NS_PENDING):
+            continue
+        if _record_is_theirs(record, uid, owners, run_ids, user.email) or (
+                record.namespace == NS_REQUESTS and (record.data or {}).get("user_id") == uid):
+            store.append({"namespace": record.namespace, "record_id": record.record_id,
+                          "data": _redact(record.data), "created_at": _jsonable(record.created_at)})
+
+    channels = db.scalars(select(NotificationChannel).where(NotificationChannel.created_by_user_id == uid)).all()
+    erasure = pending(db, uid)
+    return {
+        "export_format": "qlab-account-export/1",
+        "exported_at": _now().isoformat(),
+        "profile": {
+            "id": uid, "name": user.name, "email": user.email, "email_verified": user.email_verified,
+            "role": user.role, "is_active": user.is_active, "has_password": bool(user.password_hash),
+            "created_at": _jsonable(user.created_at), "last_login_at": _jsonable(user.last_login_at),
+            "login_count": user.login_count,
+            "organization": {"id": org.id, "slug": org.slug, "name": org.name} if org else None,
+            "scheduled_erasure": erasure,
+        },
+        "runs": [_row(r) for r in runs],
+        "shares": [{"run_id": r.run_id, "share_token": r.share_token} for r in runs if r.share_token],
+        "projects": [_row(p) for p in projects],
+        "api_keys": [_row(k) for k in db.scalars(select(APIKey).where(APIKey.user_id == uid)).all()],
+        "passkeys": [_row(p) for p in db.scalars(select(PasskeyCredential).where(PasskeyCredential.user_id == uid)).all()],
+        "recovery_codes": [_row(c) for c in db.scalars(select(RecoveryCode).where(RecoveryCode.user_id == uid)).all()],
+        "provider_keys": [_row(c) for c in db.scalars(select(ApiCredential).where(ApiCredential.created_by_user_id == uid)).all()],
+        "webhooks": [_redact(_row(w)) for w in db.scalars(select(Webhook).where(Webhook.created_by_user_id == uid)).all()],
+        "notification_channels": [_redact(_row(c)) for c in channels],
+        "security_log": [_row(e) for e in db.scalars(
+            select(AuditLog).where((AuditLog.user_id == uid) | (
+                (AuditLog.resource_type == "user") & (AuditLog.resource_id == str(uid)))).order_by(AuditLog.created_at)).all()],
+        "other_records": other_tables,
+        "stored_records": store,
+    }

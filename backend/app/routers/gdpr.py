@@ -34,10 +34,7 @@ from ..store import store_get, store_list, store_put
 router = APIRouter(prefix="/api/v1/gdpr", tags=["gdpr"])
 
 NS_REQUESTS = "gdpr_requests"
-NS_EXPORTS = "gdpr_exports"
 NS_POLICIES = "retention_policies"
-
-QLAB_VERSION = "1.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -98,23 +95,6 @@ def _require_user(identity: Identity) -> User:
     return identity.user
 
 
-def _serialize_run(r: Run) -> dict[str, Any]:
-    return {
-        "run_id": r.run_id,
-        "circuit_name": r.circuit_name,
-        "backend": r.backend,
-        "status": r.status,
-        "project_slug": r.project_slug,
-        "qasm": r.qasm,
-        "parameters": r.parameters,
-        "calibration": r.calibration,
-        "results": r.results,
-        "tags": r.tags,
-        "share_token": r.share_token,
-        "created_at": r.created_at.isoformat() if r.created_at else None,
-    }
-
-
 def _hash_pii(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()[:16]
 
@@ -128,39 +108,16 @@ def request_export(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    """GDPR Article 20 — Data Portability. Generate full export immediately."""
+    """GDPR Articles 15 and 20: everything Q-Lab holds about you, as JSON (app/erasure.py export()).
+
+    The export is built when you download it, so it is always current and no copy is kept."""
+    from ..erasure import export
+
     user = _require_user(identity)
     request_id = f"gdpr_exp_{uuid.uuid4().hex[:12]}"
     now = _utcnow_str()
-
-    # Collect all runs for this user
-    runs: list[Run] = db.scalars(
-        select(Run).where(Run.created_by_user_id == user.id).order_by(Run.created_at.desc())
-    ).all()
-
-    # Collect projects touched by this user
-    project_slugs = list({r.project_slug for r in runs if r.project_slug})
-
-    export_payload = {
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "role": user.role,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
-        },
-        "runs": [_serialize_run(r) for r in runs],
-        "projects": project_slugs,
-        "export_date": now,
-        "qlab_version": QLAB_VERSION,
-        "gdpr_article": "Article 20 - Right to Data Portability",
-    }
-
-    # Store export
-    store_put(db, NS_EXPORTS, request_id, export_payload)
-
-    # Store request record
-    req_record = {
+    record_count = len(export(db, user)["runs"])
+    store_put(db, NS_REQUESTS, request_id, {
         "request_id": request_id,
         "user_id": user.id,
         "request_type": "export",
@@ -169,21 +126,13 @@ def request_export(
         "requested_at": now,
         "completed_at": now,
         "download_url": f"/api/v1/gdpr/export/{request_id}",
-    }
-    store_put(db, NS_REQUESTS, request_id, req_record)
-
-    log_audit(
-        db,
-        action="gdpr.export.completed",
-        resource_type="gdpr_export",
-        resource_id=request_id,
-        identity=identity,
-    )
-
+    })
+    log_audit(db, action="gdpr.export.completed", resource_type="gdpr_export", resource_id=request_id,
+              identity=identity)
     return {
         "request_id": request_id,
         "status": "completed",
-        "record_count": len(runs),
+        "record_count": record_count,
         "export_ready": True,
         "download_url": f"/api/v1/gdpr/export/{request_id}",
     }
@@ -195,27 +144,18 @@ def download_export(
     identity: Identity = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
-    """Download a previously generated export."""
+    """Download your export. Only the person who asked for it can download it."""
+    from ..erasure import export
+
     user = _require_user(identity)
-
-    # Verify ownership
     req = store_get(db, NS_REQUESTS, request_id)
-    if not req:
+    if not req or req.get("request_type") != "export" or req.get("user_id") != user.id:
         raise HTTPException(404, "Export request not found")
-    if req.get("user_id") != user.id and (not identity.role or identity.role not in ("admin", "owner")):
-        raise HTTPException(403, "Access denied")
-
-    export_data = store_get(db, NS_EXPORTS, request_id)
-    if not export_data:
-        raise HTTPException(404, "Export data not found or expired")
-
-    content = json.dumps(export_data, indent=2, default=str)
-    filename = f"qlab_gdpr_export_{user.id}_{request_id}.json"
-
+    content = json.dumps(export(db, user), indent=2, default=str)
     return Response(
         content=content,
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="qlab_export_{request_id}.json"'},
     )
 
 

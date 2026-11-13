@@ -1,8 +1,9 @@
-"""Deleting an account erases it after a 7-day grace period; signing in cancels.
+"""Deleting an account erases it after a 7-day grace period; signing in cancels; exports are complete.
 
 Regression: "Delete account" only switched the account off (while its email said the data had
 been permanently deleted), and GDPR deletion requests were recorded but never carried out.
 """
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -158,3 +159,34 @@ def test_admin_can_run_due_erasures():
     admin = make_user(role="admin", prefix="erad")
     assert client.post("/api/v1/gdpr/delete/process", headers=make_user(prefix="erx")).status_code == 403
     assert client.post("/api/v1/gdpr/delete/process", headers=admin).status_code == 200
+
+
+def test_export_holds_everything_but_no_secrets():
+    alice = make_user(prefix="ere")
+    a = _fill(alice)
+    req = client.post("/api/v1/gdpr/export/request", headers=alice).json()
+    assert req["record_count"] == 1
+    r = client.get(f"/api/v1/gdpr/export/{req['request_id']}", headers=alice)
+    assert r.status_code == 200
+    data = r.json()
+    for section in ("profile", "runs", "shares", "projects", "api_keys", "passkeys", "recovery_codes",
+                    "provider_keys", "webhooks", "notification_channels", "security_log", "other_records",
+                    "stored_records"):
+        assert section in data, section
+    assert data["profile"]["email"] == _email(alice)
+    assert data["runs"][0]["run_id"] == a["run"]
+    assert data["shares"][0]["share_token"] == a["share"]
+    assert data["projects"][0]["slug"] == a["project"]
+    assert "sdk" in {k["name"] for k in data["api_keys"]} and not any("key_hash" in k for k in data["api_keys"])
+    assert data["passkeys"][0]["name"] == "Laptop" and "public_key" not in data["passkeys"][0]
+    assert data["webhooks"][0]["has_secret"] is True and "secret" not in data["webhooks"][0]
+    assert data["notification_channels"][0]["config"]["webhook_url"] == "[not exported: secret]"
+    assert any(e["action"] == "auth.login" for e in data["security_log"])
+    assert data["other_records"]["run_notes"][0]["content"] == "my note"
+    assert any(s["namespace"] == "researcher_profiles" for s in data["stored_records"])
+    text = json.dumps(data)
+    assert a["key"] not in text and "SECRET" not in text
+
+    # Someone else's export is not yours to download.
+    other = make_user(prefix="erf")
+    assert client.get(f"/api/v1/gdpr/export/{req['request_id']}", headers=other).status_code == 404

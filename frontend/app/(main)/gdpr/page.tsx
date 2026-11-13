@@ -183,6 +183,23 @@ export default function GDPRPage() {
     }
   }
 
+  // The export needs the session token, which a plain link can't send.
+  async function downloadExport(requestId: string) {
+    setExportError(null);
+    try {
+      const res = await fetch(apiUrl(`/api/v1/gdpr/export/${requestId}`), { cache: "no-store", headers: authHeaders(token) });
+      if (!res.ok) throw new Error("Download failed");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qlab_export_${requestId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : "Download failed");
+    }
+  }
+
   async function requestDeletion() {
     if (!deleteConfirm) return;
     setDeleteLoading(true);
@@ -284,9 +301,10 @@ export default function GDPRPage() {
         <SectionCard title="Your Data Export" icon={<Download size={16} style={{ color: "#38bdf8" }} />}>
           <div style={{ padding: "16px 18px" }}>
             <p style={{ margin: "0 0 14px", color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>
-              Under <strong style={{ color: "var(--text)" }}>GDPR Article 20</strong> (Right to Data Portability),
-              you can request a complete machine-readable copy of all your data stored in Q-Lab.
-              The export includes all your runs, QASM circuits, parameters, results, and settings.
+              A JSON file with everything Q-Lab holds about your account: your profile, runs (circuits, results,
+              calibration, environment), share links, projects, notes, API keys, passkeys and recovery codes (names
+              and dates only, never the keys or their hashes), saved provider keys, webhooks, notification channels
+              and integrations (without their secrets), and the security log entries about you.
             </p>
 
             {exportResult ? (
@@ -298,10 +316,12 @@ export default function GDPRPage() {
                 <div style={{ fontSize: 13, color: "#86efac", marginBottom: 10 }}>
                   {exportResult.record_count} run{exportResult.record_count !== 1 ? "s" : ""} included
                 </div>
-                <a
-                  href={apiUrl(`/api/v1/gdpr/export/${exportResult.request_id}`)}
-                  download
+                <button
+                  type="button"
+                  onClick={() => void downloadExport(exportResult.request_id)}
                   style={{
+                    border: "none",
+                    cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
@@ -315,7 +335,7 @@ export default function GDPRPage() {
                   }}
                 >
                   <Download size={14} /> Download JSON Export
-                </a>
+                </button>
               </div>
             ) : exportError ? (
               <div style={{ background: "#ef444422", border: "1px solid #ef444455", borderRadius: 8, padding: "10px 14px", color: "#fca5a5", fontSize: 13, marginBottom: 14 }}>
