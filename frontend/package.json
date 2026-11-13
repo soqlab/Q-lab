@@ -8,7 +8,8 @@
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "lint": "eslint .",
     "typecheck": "node scripts/check-types.mjs",
-    "lint:ci": "node scripts/check-lint.mjs"
+    "lint:ci": "node scripts/check-lint.mjs",
+    "check:third-party": "node scripts/check-no-third-party.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.68.0",

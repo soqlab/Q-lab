@@ -881,13 +881,6 @@ function HeroFabric() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-// Third-party badges: hidden where they can't load (a self-hosted install with no internet),
-// rather than showing broken images.
-function hideBadge(e: React.SyntheticEvent<HTMLImageElement>) {
-  const link = e.currentTarget.closest("a");
-  if (link) link.style.display = "none";
-}
-
 const noSubscription = () => () => {};
 
 export default function LandingPage() {
@@ -1011,15 +1004,9 @@ export default function LandingPage() {
               </div>
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: "#3d506a", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "ui-monospace,monospace" }}>Featured on</span>
-                <a href="https://buildlist.io/?ref=cb60ee99-6bed-47ba-93c6-08916112a6e4" target="_blank" rel="noopener noreferrer">
-                  <img src="https://buildlist.io/badge.svg" onError={hideBadge} alt="Featured on Buildlist" style={{ height: 28, width: "auto", opacity: 0.85, verticalAlign: "middle" }} />
-                </a>
-                <a target="_blank" rel="noopener noreferrer" href="https://betalist.com/startups/q-lab?utm_campaign=badge-q-lab&utm_medium=badge&utm_source=badge-featured">
-                  <img alt="Featured on BetaList" width="117" height="40" style={{ width: 117, height: 40, opacity: 0.85, verticalAlign: "middle" }} src="https://betalist.com/badges/featured?id=180588&theme=dark" onError={hideBadge} />
-                </a>
-                <a href="https://peerpush.com/p/q-lab" target="_blank" rel="noopener noreferrer">
-                  <img src="https://peerpush.com/p/q-lab/badge.png" onError={hideBadge} alt="Q-Lab on PeerPush" style={{ height: 28, width: "auto", opacity: 0.85, verticalAlign: "middle" }} />
-                </a>
+                <a href="https://buildlist.io/?ref=cb60ee99-6bed-47ba-93c6-08916112a6e4" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#94a3b8", textDecoration: "underline", fontFamily: "ui-monospace,monospace" }}>Buildlist</a>
+                <a target="_blank" rel="noopener noreferrer" href="https://betalist.com/startups/q-lab" style={{ fontSize: 12, color: "#94a3b8", textDecoration: "underline", fontFamily: "ui-monospace,monospace" }}>BetaList</a>
+                <a href="https://peerpush.com/p/q-lab" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#94a3b8", textDecoration: "underline", fontFamily: "ui-monospace,monospace" }}>PeerPush</a>
               </div>
             </div>
 

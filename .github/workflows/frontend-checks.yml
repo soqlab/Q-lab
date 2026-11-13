@@ -29,5 +29,7 @@ jobs:
         run: npm run typecheck
       - name: Lint (may not add errors; see .lint-baseline)
         run: npm run lint:ci
+      - name: No third-party requests (CSP and source scan)
+        run: npm run check:third-party
       - name: Production build
         run: npm run build
