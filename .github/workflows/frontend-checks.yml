@@ -33,3 +33,60 @@ jobs:
         run: npm run check:third-party
       - name: Production build
         run: npm run build
+
+  # Reproducible build: the same commit, built twice on two fresh runners in different directories,
+  # must give byte-identical output (scripts/trust/hash-tree.mjs: .next/static and .next/server,
+  # minus three files of per-build secrets). The digest is what the deploy log records.
+  reproducible-build:
+    name: Reproducible build ${{ matrix.run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - run: a
+            dir: qlab-a
+          - run: b
+            dir: build/elsewhere/qlab-b
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ${{ matrix.dir }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20"
+      - name: Build and hash
+        working-directory: ${{ matrix.dir }}/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/trust/hash-tree.mjs > "$GITHUB_WORKSPACE/tree-${{ matrix.run }}.txt"
+          tail -n 1 "$GITHUB_WORKSPACE/tree-${{ matrix.run }}.txt"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tree-${{ matrix.run }}
+          path: tree-${{ matrix.run }}.txt
+          if-no-files-found: error
+
+  reproducible-compare:
+    name: Both builds are identical
+    needs: reproducible-build
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: trees
+          merge-multiple: true
+      - name: Compare
+        run: |
+          if ! diff -u trees/tree-a.txt trees/tree-b.txt; then
+            echo "::error::The two builds of ${GITHUB_SHA} differ (files listed above): the frontend build is not reproducible."
+            exit 1
+          fi
+          echo "::notice::Reproducible: $(tail -n 1 trees/tree-a.txt)"

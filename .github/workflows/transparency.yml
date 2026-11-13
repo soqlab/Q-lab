@@ -1,0 +1,138 @@
+# Public log of every deploy of Q-Lab.
+#
+# Render deploys main, so every push to main is a deploy. For each one this workflow appends one
+# JSON line to transparency/log.jsonl on the orphan `transparency` branch:
+#   commit, commit_time   the commit deployed and its committer time (UTC)
+#   time                  when the entry was logged
+#   run_url               this workflow run
+#   tree_sha256           digest of the frontend build of this commit (frontend/scripts/trust/hash-tree.mjs);
+#                         Frontend Checks proves two independent builds give the same digest
+#   rekor_log_index/url   the entry's keyless Sigstore signature, recorded in the public Rekor log
+#                         (omitted if signing failed; the bundle is in transparency/bundles/)
+# Nothing is committed to main. The branch history is public, so a rewritten entry would show.
+# The app's /trust page shows the log, fetched by the backend (GET /api/v1/public/deploys), so the
+# visitor's browser never contacts GitHub.
+#
+# Every action is pinned to a full commit SHA; the comment names the tag.
+
+name: Transparency log
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# No concurrency group: GitHub would drop all but the newest queued run, and every deploy must get
+# its entry. Runs that race for the transparency branch retry (see "Append").
+
+jobs:
+  record:
+    name: Log this deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push to the transparency branch
+      id-token: write   # Sigstore certificate for the entry's signature
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20"
+
+      - name: Build the frontend and hash it
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          tree="$(node scripts/trust/hash-tree.mjs --digest | cut -d' ' -f1)"
+          echo "TREE_SHA256=$tree" >> "$GITHUB_ENV"
+          echo "::notice::Frontend build digest $tree"
+
+      - name: Write the entry
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          commit_time="$(date -u -d "@$(git show -s --format=%ct "$GITHUB_SHA")" +%Y-%m-%dT%H:%M:%SZ)"
+          # -j: no trailing newline, so the signed bytes equal the entry's `signed` field exactly.
+          jq -cjn \
+            --arg commit "$GITHUB_SHA" \
+            --arg commit_time "$commit_time" \
+            --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg run "$RUN_URL" \
+            --arg tree "$TREE_SHA256" \
+            '{commit: $commit, commit_time: $commit_time, time: $time, run_url: $run, tree_sha256: $tree}' > "$RUNNER_TEMP/entry.json"
+          cat "$RUNNER_TEMP/entry.json"; echo
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the entry (Sigstore, keyless)
+        id: sign
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes --bundle "$RUNNER_TEMP/entry.sigstore.json" "$RUNNER_TEMP/entry.json"
+          # Old and new bundle formats keep the Rekor index in different places.
+          index="$(jq -r '.verificationMaterial.tlogEntries[0].logIndex // .rekorBundle.Payload.logIndex // empty' "$RUNNER_TEMP/entry.sigstore.json")"
+          [ -n "$index" ] || { echo "::warning::No Rekor log index in the bundle"; exit 1; }
+          echo "index=$index" >> "$GITHUB_OUTPUT"
+
+      - name: Append to transparency/log.jsonl
+        env:
+          REKOR_INDEX: ${{ steps.sign.outputs.index }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The signed bytes are entry.json; the log line adds where to find the signature.
+          if [ -n "${REKOR_INDEX:-}" ]; then
+            line="$(jq -c --arg i "$REKOR_INDEX" --arg b "transparency/bundles/${GITHUB_SHA}.sigstore.json" \
+              '. + {rekor_log_index: ($i | tonumber), rekor_url: ("https://search.sigstore.dev/?logIndex=" + $i), bundle: $b, signed: (. | tojson)}' \
+              "$RUNNER_TEMP/entry.json")"
+          else
+            echo "::warning::The entry is logged without a signature."
+            line="$(jq -c . "$RUNNER_TEMP/entry.json")"
+          fi
+          echo "$line"
+
+          # Start from the branch as it is now, append, push; if another run pushed first, start over.
+          for attempt in 1 2 3 4 5; do
+            if git fetch --depth=1 origin transparency 2>/dev/null; then
+              git switch -C transparency FETCH_HEAD
+            else
+              git switch --orphan transparency
+              git rm -rfq . 2>/dev/null || true
+              {
+                echo "# Q-Lab transparency log"
+                echo
+                echo "One line per deploy of main in transparency/log.jsonl, written by"
+                echo ".github/workflows/transparency.yml on main. When an entry is signed, its \`signed\` field holds"
+                echo "the exact bytes that were signed and transparency/bundles/<commit>.sigstore.json the Sigstore"
+                echo "bundle. Verify with:"
+                echo
+                echo '    jq -j .signed <<< "$LINE" > entry.json'
+                echo '    cosign verify-blob --bundle transparency/bundles/<commit>.sigstore.json \'
+                echo '      --certificate-identity-regexp "^https://github.com/soqlab/Q-lab/.github/workflows/transparency.yml@" \'
+                echo '      --certificate-oidc-issuer https://token.actions.githubusercontent.com entry.json'
+                echo
+                echo "Nothing else writes to this branch."
+              } > README.md
+            fi
+            mkdir -p transparency/bundles
+            if [ -n "${REKOR_INDEX:-}" ]; then cp "$RUNNER_TEMP/entry.sigstore.json" "transparency/bundles/${GITHUB_SHA}.sigstore.json"; fi
+            echo "$line" >> transparency/log.jsonl
+            git add README.md transparency
+            git commit -qm "Deploy ${GITHUB_SHA::7}"
+            if git push origin HEAD:refs/heads/transparency; then exit 0; fi
+            echo "Push rejected (attempt $attempt); retrying on the updated branch."
+            git reset -q --hard
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not append to the transparency branch"
+          exit 1
