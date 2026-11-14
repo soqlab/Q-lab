@@ -4,6 +4,8 @@ Public, no sign-in:
     GET  /api/v1/rewind/machines           what is collected: machines, snapshot counts, first/last day
     GET  /api/v1/rewind/manifests/{date}   that UTC day's signed manifest (hashes, never contents)
     GET  /api/v1/rewind/public-key         the key manifests are signed with
+    POST /api/v1/rewind/run                replay a circuit on a machine as calibrated on a date
+                                           (no account needed; lower limits without one)
 
 Server owner, or the scheduled workflow with the X-Rewind-Trigger header (QLAB_REWIND_TRIGGER_TOKEN):
     POST /api/v1/rewind/harvest            harvest now (in the background)
@@ -16,13 +18,15 @@ import os
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import Identity, get_identity, log_audit
 from ..rewind import harvest as hv
+from ..rate_limit import rewind_run_limiter, rewind_run_user_limiter
+from ..rewind import replay as rp
 from ..rewind import signing, store
 from ..rewind.snapshot import MACHINE_RE, PROVIDER
 
@@ -131,6 +135,40 @@ def backfill_now(body: BackfillRequest, x_rewind_trigger: Optional[str] = Header
     if who == "owner":
         log_audit(db, "rewind.backfill", "rewind", body.machine or PROVIDER, identity=identity)
     return {"started": started, "reason": None if started else "A harvest or backfill is already running."}
+
+
+class RunRequest(BaseModel):
+    machine: str = Field(max_length=61)
+    date: str = Field(max_length=10)
+    circuit: str = Field(max_length=400_000)
+    format: Optional[str] = Field(default=None, max_length=8)
+    shots: int = 1024
+    seed: Optional[int] = Field(default=None, ge=0, le=2**31 - 1)
+
+
+@router.post("/api/v1/rewind/run")
+def run(body: RunRequest, request: Request, identity: Optional[Identity] = Depends(get_identity),
+        db: Session = Depends(get_db)):
+    signed_in = identity is not None
+    if signed_in and identity.user_id is not None:
+        rewind_run_user_limiter.check(f"user:{identity.user_id}")
+    else:
+        rewind_run_limiter(request)
+    if not MACHINE_RE.match(body.machine):
+        raise HTTPException(status_code=422, detail="Not a machine name.")
+    if not store.DATE_RE.match(body.date):
+        raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD.")
+    try:
+        day = date.fromisoformat(body.date)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Not a calendar date.")
+    try:
+        out = rp.run_limited(lambda: rp.replay(db, body.machine, day, body.circuit, body.format, body.shots,
+                                               body.seed, signed_in=signed_in, include_simulated=hv.simulated()))
+    except rp.ReplayError as exc:
+        headers = {"Retry-After": "10"} if exc.status == 503 else None
+        raise HTTPException(status_code=exc.status, detail=exc.message, headers=headers)
+    return {**out, "limits": rp.limits(signed_in)}
 
 
 @router.on_event("startup")

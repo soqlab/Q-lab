@@ -7,6 +7,18 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Rewind, part 2: the replica (`app/rewind/replay.py`, `POST /api/v1/rewind/run`, no account needed,
+  and `python -m app.rewind run --machine ibm_fez --date 2026-11-14 --qasm file.qasm --shots 4000`).
+  The calibration stored nearest the date (the answer says which, and how many days off) becomes an
+  Aer noise model: thermal relaxation from T1/T2 over each gate's duration, depolarizing for the
+  rest of the reported gate error, and (asymmetric where reported) readout error. The circuit
+  (OpenQASM 2/3 or base64 QPY) is compiled for that day's coupling map and errors with fixed seeds,
+  only the qubits it touches are simulated, and the counts come back with the snapshot's sha256,
+  the software versions and a noise model summary, labelled "Simulated from IBM-published
+  calibration of <machine> as of <date>; not affiliated with or endorsed by IBM." `accuracy` is
+  null until it is measured. Limits: 20 qubits after compiling, 8192 shots signed in and 4096
+  without an account, a work bound, one replay at a time, 60 s, per-address rate limit (all env
+  settings, see SELF_HOSTING.md). Nothing runs on real hardware.
 - Rewind, part 1: the calibration harvester (`app/rewind/`). Once a day, for every IBM machine the
   server's `QISKIT_IBM_TOKEN` sees, it stores the calibration (qubits, coupling map, basis gates,
   T1/T2, readout errors and durations, gate errors and durations, `last_update_date`, the useful
