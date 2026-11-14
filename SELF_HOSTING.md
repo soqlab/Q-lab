@@ -66,9 +66,59 @@ The app is now running at `http://localhost:3000`.
 | `QISKIT_IBM_TOKEN` | No | IBM Quantum API key (the free open plan is enough). Turns on the hardware board, machine pick and Rewind's calibration harvest. Without it they say so and show nothing |
 | `QLAB_REWIND_DIR` | No | Where Rewind keeps calibration snapshots and manifests (default `backend/data/rewind`, on the data disk). Keep it on persistent storage: a day's calibration can't be collected again later |
 | `QLAB_REWIND_SIGNING_KEY` | No | Signs Rewind's daily manifests (Ed25519 + ML-DSA-65). Make one with `python -m app.rewind keygen` (from `backend/`); keep it secret. Without it manifests are stored unsigned and the API says so |
+| `QLAB_CERT_SIGNING_KEY` | No | Signs provenance certificates (Ed25519 + ML-DSA-65), same `qrk1:` form as the Rewind key (`python -m app.rewind keygen`). Optional: without it certificates are signed with `QLAB_REWIND_SIGNING_KEY`; without either they are issued unsigned and say so. The public key is at `/api/v1/certificates/public-key` |
 | `QLAB_REWIND_TRIGGER_TOKEN` | No | Lets the scheduled workflow (`.github/workflows/rewind-harvest.yml`, repository secret of the same name) start a harvest with the `X-Rewind-Trigger` header |
 | `QLAB_REWIND_MAX_QUBITS` | No | Rewind replays: most qubits after compiling (default `20`, at most `28`; a statevector needs 16 × 2^n bytes and Aer's shot branching keeps several). Also `QLAB_REWIND_MAX_SHOTS` (`8192`), `QLAB_REWIND_MAX_SHOTS_ANON` (`4096`, without an account), `QLAB_REWIND_MAX_WORK` (`3e9` shots × operations × 2^qubits, half without an account), `QLAB_REWIND_TIME_LIMIT_S` (`60`), `QLAB_REWIND_CONCURRENCY` (`1`, at most `2`), `QLAB_REWIND_MAX_MEMORY_MB` (`256`), `QLAB_REWIND_THREADS` (`1`), `QLAB_REWIND_DENSITY_MAX` (`10`: density matrix up to this many qubits), `QLAB_REWIND_SHOT_BRANCHING` (`on`: Aer's shot branching, about 10x faster but far more memory; off by default) |
 | `QLAB_REWIND_EVERY_HOURS` | No | Hours between harvests (default `20`). `QLAB_REWIND_SCHEDULER=off` stops the background harvest; `QLAB_REWIND_AUTO_BACKFILL=off` stops the automatic backfill |
+
+## Provenance certificates and the Reproduced badge
+
+Every run has a signed provenance certificate (`GET /api/v1/runs/{id}/certificate`, the run's
+Actions menu, "Certificate"): hashes of the circuit as given to the compiler, as compiled and as
+stored, the machine, a hash of the calibration recorded with the run (and the matching Rewind
+snapshot when one was stored), package versions, transpiler settings, seeds, shots, a hash of the
+counts, and how re-runs compared. It holds hashes and settings, never the circuit, counts or
+calibration themselves, and nothing about the uploader. Only the owner can fetch it, or anyone
+once the run is shared.
+
+A shared run also gets a public page, `/verified/<share token>`, that says whether re-runs agreed
+and checks the certificate in the visitor's browser, and a badge, `/verified/<share token>/badge.svg`
+("reproduced", "reproduced 2/3", "didn't reproduce", "not yet reproduced"). Re-runs that count are
+the owner's own and those other accounts shared. Turning sharing off takes both down (404; the
+badge then reads "not shared").
+
+### Verify a certificate offline
+
+The verifier is one file that needs only Python and `cryptography` 46 or newer
+(`backend/app/provenance/verify.py`, also served at `/api/v1/certificates/verify.py`):
+
+```bash
+pip install "cryptography>=46"
+curl -o verify_certificate.py https://qlab.soqlab.com/qlab-api/api/v1/certificates/verify.py
+python verify_certificate.py --file qlab-certificate-<run>.json --key qrk-<the key id you trust>
+python verify_certificate.py --token <share token>             # fetch a shared run's certificate
+python verify_certificate.py --file c.json --qasm circuit.qasm  # and check a circuit file against it
+```
+
+It prints `VALID` (exit 0) only when the body's SHA-256 matches and both signatures verify. What
+is checked: `body_sha256` is the SHA-256 of the `certificate` object as canonical JSON (keys
+sorted, no whitespace, only integers, strings, booleans and null; decimals are strings); the
+signed text is
+
+```
+qlab-provenance-certificate/1
+key <key id>
+signed-at <UTC time>
+body-sha256 <hex>
+```
+
+signed with Ed25519 and with ML-DSA-65 (FIPS 204, context string `qlab-provenance-certificate/1`).
+The key id is `qrk-` + the first 32 hex digits of SHA-256(`qlab-rewind-key/1` + newline + ML-DSA-65
+public key + Ed25519 public key). A certificate carries its own public key, so pin the key id: the hosted
+one is at `https://qlab.soqlab.com/qlab-api/api/v1/certificates/public-key`. The same check runs in
+the browser on `/verified/...` and `/certificate` (any saved certificate file), with
+@noble/post-quantum 0.7.1 and @noble/curves 2.4.0 served from the site itself
+(`frontend/public/vendor/qlab-pq-verify.js`, built by `tools/pq-verify-js`).
 
 ## Docker Compose (PostgreSQL)
 

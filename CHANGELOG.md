@@ -6,6 +6,29 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Added
+
+- Provenance certificate for every run (run page Actions menu and Ctrl+K: "Certificate";
+  `GET /api/v1/runs/{id}/certificate`, `?download=1` for the `.json`): a signed statement, schema
+  `qlab-provenance-certificate/1`, of the circuit hashes (as stored, as given to `transpile()`, as
+  compiled: QPY and QASM), the machine, a hash of the calibration recorded with the run plus the
+  matching Rewind snapshot's sha256 when one is stored, package and Python versions, transpiler
+  settings, seeds, shots, a hash of the counts, the run record's digest from /verify, and how its
+  re-runs compared. Hashes and settings only; nothing about the uploader. Signed with Ed25519 +
+  ML-DSA-65 by `QLAB_CERT_SIGNING_KEY`, or Rewind's `QLAB_REWIND_SIGNING_KEY` when that is not set
+  (public key at `/api/v1/certificates/public-key`). Owner only, or anyone once the run is shared.
+  Checked offline by `backend/app/provenance/verify.py` (standard library + `cryptography`, served at
+  `/api/v1/certificates/verify.py`; how-to in SELF_HOSTING.md) and in the browser, with
+  @noble/post-quantum 0.7.1 and @noble/curves 2.4.0 vendored from `tools/pq-verify-js` (no CDN).
+  `/certificate` checks any saved certificate file without uploading it.
+- Reproduced badge: a shared run gets `/verified/<share token>`, answer first ("Reproduced: 2
+  independent re-runs agreed within shot noise (TVD ≤ 0.02). Certificate verified in your
+  browser."), and `/verified/<share token>/badge.svg` with Markdown, HTML and LaTeX
+  (`\href{...}{Reproduced on Q-Lab}`) to copy (run page: "Badge for your paper"). The badge shows the
+  current state honestly: reproduced, reproduced 2/3, didn't reproduce, or not yet reproduced. Re-runs
+  that count are the owner's and other accounts' shared ones, so a stranger can't add or remove a
+  "reproduced". Unsharing takes the page and the badge down.
+
 ## [0.4.0] - 2026-11-14
 
 The first `qlab-sdk` on PyPI since 0.1.0: 0.3.0 was prepared but never tagged or published, so

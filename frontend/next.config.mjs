@@ -85,6 +85,11 @@ const nextConfig = {
         source: "/qlab-api/:path*",
         destination: `${apiUrl}/:path*`,
       },
+      // The Reproduced badge for papers and READMEs, on the site's own address (app/verified/).
+      {
+        source: "/verified/:token/badge.svg",
+        destination: `${apiUrl}/api/v1/public/verified/:token/badge.svg`,
+      },
     ];
     if (!backendHosts.length) return api;
     return {

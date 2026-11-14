@@ -6,7 +6,7 @@ import { use, useEffect, useRef, useState } from "react";
 import RunAnswer, { useAnswer } from "../../../../components/RunAnswer";
 import { setCommandContext } from "../../../../components/CommandPalette";
 import ReproduceRun, { downloadFromApi } from "../../../../components/ReproduceRun";
-import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
+import { ArrowLeft, Award, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send, ShieldCheck } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   fetchRun, fetchRunHealth, generateShareLink, qlabApiPath, stopSharing,
@@ -796,6 +796,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       { id: "here:reproduce", kind: "here" as const, title: "Reproduce this run", hint: "Script with the recorded circuit, versions, seeds, settings and shots (.py)", run: () => { void downloadFromApi(`/api/v1/runs/${run.run_id}/reproduce.py`, `reproduce_${run.run_id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12)}.py`); document.getElementById("reproduce")?.scrollIntoView({ behavior: "smooth" }); } },
       { id: "here:pick", kind: "here" as const, title: "Where should I run this next?", hint: "Rank the machines for this circuit from their calibration", href: `/hardware/pick?run=${run.run_id}` },
       { id: "here:verify", kind: "here" as const, title: "Verify this run", hint: "Check its record independently", href: `/verify/${run.run_id}` },
+      { id: "here:certificate", kind: "here" as const, title: "Provenance certificate", hint: "Signed record of circuit, machine, calibration, versions and re-runs (.json)", href: `/runs/${run.run_id}/certificate` },
+      ...(run.is_shared ? [{ id: "here:paper-badge", kind: "here" as const, title: "Badge for your paper", hint: "Reproduced badge and Markdown, HTML, LaTeX to cite it", href: `/runs/${run.run_id}/certificate#badge` }] : []),
       { id: "here:bundle", kind: "here" as const, title: "Download this run's reproduction bundle", hint: "Circuit, results, calibration, script (.zip)", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)) },
       { id: "here:qasm", kind: "here" as const, title: "Download this run's circuit (QASM)", hint: "OpenQASM text", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)) },
       { id: "here:list-circuit", kind: "here" as const, title: "Every run of this circuit", hint: "Same circuit hash", href: run.fingerprint.qasm_sha256 ? `/runs?circuit=${run.fingerprint.qasm_sha256}` : `/runs?q=${encodeURIComponent(run.circuit_name ?? "")}` },
@@ -837,6 +839,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <Link href={`/hardware/pick?run=${run.run_id}`}><Activity size={15} aria-hidden="true" /> Where should I run this next?</Link>
             <div className="actions-item"><ShareButton runId={run.run_id} sharedUrl={run.share_page_url ?? null} /></div>
             <div className="actions-item"><BadgeButton runId={run.run_id} /></div>
+            <Link href={`/runs/${run.run_id}/certificate`}><ShieldCheck size={15} aria-hidden="true" /> Certificate</Link>
+            {run.is_shared && <Link href={`/runs/${run.run_id}/certificate#badge`}><Award size={15} aria-hidden="true" /> Badge for your paper</Link>}
             <div className="actions-group d-expert">Write it up</div>
             <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.md`)} download><Download size={15} aria-hidden="true" /> Report (Markdown)</a>
             <a className="d-expert" href={qlabApiPath(`/api/v1/runs/${run.run_id}/report.tex`)} download><FileCode size={15} aria-hidden="true" /> Report (LaTeX tables)</a>
