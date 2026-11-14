@@ -17,9 +17,13 @@ Steps, all deterministic for the same input (fixed transpiler and simulator seed
 4. AerSimulator: density matrix up to QLAB_REWIND_DENSITY_MAX qubits (one exact run, then sampled),
    statevector trajectories above it (each shot its own run, so the work is bounded up front).
 
-Not modelled: decoherence while a qubit waits between gates, crosstalk, leakage, coherent
-(over-rotation) errors, and drift during the day. The answer lists these. How close a replica
-comes to the real machine is measured later (part 3); until then accuracy is null.
+An explicit delay instruction gets thermal relaxation over its duration, like a gate.
+
+Not modelled: decoherence while a qubit waits between gates (other than in an explicit delay),
+crosstalk, leakage, coherent (over-rotation) errors, and drift during the day. The answer lists
+these. How close replicas come to the real machine is measured by a benchmark on real hardware
+(app/rewind/bench.py, docs/REWIND_METHOD.md); each answer carries the latest result for its machine,
+or accuracy null with a note when that machine has not been measured yet.
 
 Rewind never sends a circuit to real hardware.
 """
@@ -47,7 +51,7 @@ MAX_QPY_BYTES = 256_000
 MAX_OPERATIONS = 4_000
 MAX_TWO_QUBIT = 1_500
 NOT_MODELLED = [
-    "decoherence while a qubit waits between gates",
+    "decoherence while a qubit waits between gates (explicit delays are modelled)",
     "crosstalk between neighbouring qubits",
     "leakage out of the qubit states",
     "coherent (over- or under-rotation) errors",
@@ -331,6 +335,42 @@ def localize(isa) -> tuple[Any, list[int]]:
     return out, used
 
 
+_DELAY_TO_NS = {"s": 1e9, "ms": 1e6, "us": 1e3, "µs": 1e3, "ns": 1.0, "ps": 1e-3}
+
+
+def relax_delays(local, record: dict[str, Any], physical: list[int], dt_s: Optional[float] = None) -> tuple[Any, int]:
+    """The circuit with each delay replaced by thermal relaxation over its duration on that qubit
+    (T1/T2 from the calibration), and how many were replaced. A delay counted in dt needs dt
+    (the machine's sample time, from the calibration's configuration unless given); without it the
+    delay is left as an ideal wait."""
+    if not any(i.operation.name == "delay" for i in local.data):
+        return local, 0
+    from qiskit import QuantumCircuit
+
+    noise = record.get("noise") or {}
+    t1, t2 = noise.get("t1_us") or [], noise.get("t2_us") or []
+    dt = dt_s if dt_s else (record.get("configuration") or {}).get("dt")
+    out = QuantumCircuit(*local.qregs, *local.cregs, name=local.name)
+    done = 0
+    for inst in local.data:
+        op = inst.operation
+        if op.name != "delay":
+            out.append(op, inst.qubits, inst.clbits)
+            continue
+        unit = getattr(op, "unit", "dt")
+        dur = float(op.params[0]) if op.params else 0.0
+        ns = dur * dt * 1e9 if unit == "dt" and dt else dur * _DELAY_TO_NS[unit] if unit in _DELAY_TO_NS else None
+        if not ns or ns <= 0:
+            out.append(op, inst.qubits, inst.clbits)
+            continue
+        q = local.find_bit(inst.qubits[0]).index
+        pq = physical[q]
+        err = _relaxation(t1[pq] if pq < len(t1) else None, t2[pq] if pq < len(t2) else None, ns)
+        out.append(err.to_instruction(), inst.qubits)
+        done += 1
+    return out, done
+
+
 def simulate(local, model, shots: int, seed: int, method: str) -> dict[str, int]:
     from qiskit_aer import AerSimulator
 
@@ -411,12 +451,16 @@ def replay(db: Session, machine: str, day: date, circuit_text: str, fmt: Optiona
                                "Use fewer shots or a smaller circuit.")
     model, summary = build_noise_model(record, physical)
     summary["method"] = method
+    local, delays = relax_delays(local, record, physical)
+    summary["delays_relaxed"] = delays
     seed = SEED_SIMULATOR if seed is None else int(seed)
     started = time.monotonic()
     counts = simulate(local, model, shots, seed, method)
     cal = row.calibrated_at if row.calibrated_at.tzinfo else row.calibrated_at.replace(tzinfo=timezone.utc)
     gap, note = _gap_note(day, cal)
     two_q = sum(1 for i in local.data if len(i.qubits) == 2 and i.operation.name != "barrier")
+    from . import bench
+    accuracy, accuracy_note = bench.accuracy_for(db, machine, include_simulated=include_simulated)
     return {
         "label": label(machine, cal),
         "machine": machine,
@@ -432,8 +476,8 @@ def replay(db: Session, machine: str, day: date, circuit_text: str, fmt: Optiona
         "noise_model": summary,
         "software": versions(),
         "seconds": round(time.monotonic() - started, 3),
-        "accuracy": None,
-        "accuracy_note": ACCURACY_NOTE,
+        "accuracy": accuracy,
+        "accuracy_note": accuracy_note,
         "real_hardware": False,
         "notes": notes,
     }

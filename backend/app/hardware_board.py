@@ -464,28 +464,33 @@ def live_backend(name: str) -> Optional[dict[str, Any]]:
 # Scheduling: one row says when the next benchmark is due; claiming it is a conditional UPDATE.
 # ---------------------------------------------------------------------------
 
-def _state(db: Session, first_due: Optional[datetime] = None):
+# Row 1 is the board's schedule; row 2 is Rewind's accuracy benchmark (app/rewind/bench.py).
+BOARD_STATE = 1
+
+
+def _state(db: Session, first_due: Optional[datetime] = None, state_id: int = BOARD_STATE):
     """The state row, made on first use; the first benchmark is due at once (or at first_due)."""
     from .models import HardwareBoardState
-    row = db.get(HardwareBoardState, 1)
+    row = db.get(HardwareBoardState, state_id)
     if row is None:
         try:
-            row = HardwareBoardState(id=1, next_due=first_due or _now())
+            row = HardwareBoardState(id=state_id, next_due=first_due or _now())
             db.add(row)
             db.commit()
         except IntegrityError:  # another worker made it first
             db.rollback()
-            row = db.get(HardwareBoardState, 1)
+            row = db.get(HardwareBoardState, state_id)
     return row
 
 
-def claim_due(db: Session, now: Optional[datetime] = None, force: bool = False) -> bool:
+def claim_due(db: Session, now: Optional[datetime] = None, force: bool = False, state_id: int = BOARD_STATE,
+              days: Optional[float] = None) -> bool:
     """True for exactly one caller when a benchmark is due; it then moves next_due forward."""
     from .models import HardwareBoardState
     now = now or _now()
-    _state(db, first_due=now)
-    days = every_days() or 7.0
-    stmt = update(HardwareBoardState).where(HardwareBoardState.id == 1)
+    _state(db, first_due=now, state_id=state_id)
+    days = days or every_days() or 7.0
+    stmt = update(HardwareBoardState).where(HardwareBoardState.id == state_id)
     if not force:
         stmt = stmt.where(HardwareBoardState.next_due <= now)
     res = db.execute(stmt.values(next_due=now + timedelta(days=days), last_submitted=now))
@@ -493,8 +498,8 @@ def claim_due(db: Session, now: Optional[datetime] = None, force: bool = False) 
     return res.rowcount == 1
 
 
-def _note(db: Session, message: str) -> None:
-    row = _state(db)
+def _note(db: Session, message: str, state_id: int = BOARD_STATE) -> None:
+    row = _state(db, state_id=state_id)
     row.last_message = message[:2000]
     db.commit()
 
@@ -515,8 +520,11 @@ def _versions() -> dict[str, str]:
 
 
 def _qasm(circuit) -> str:
-    from qiskit import qasm2
-    return qasm2.dumps(circuit)
+    from qiskit import qasm2, qasm3
+    try:
+        return qasm2.dumps(circuit)
+    except Exception:  # e.g. a delay, which OpenQASM 2 can't express
+        return qasm3.dumps(circuit)
 
 
 def _fingerprint(circuit, qasm: str) -> dict[str, Any]:
@@ -601,8 +609,21 @@ def choose_backends(p) -> list:
     return sorted(found, key=lambda b: b.name)[:_max_backends()]
 
 
-def submit_to(db: Session, backend, is_sim: bool):
-    """Transpile the set for one machine, submit one job, and record it as pending."""
+def _qpy_b64(circuit) -> str:
+    import base64
+    import io
+
+    from qiskit import qpy
+    buf = io.BytesIO()
+    qpy.dump(circuit, buf)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def submit_to(db: Session, backend, is_sim: bool, benchmarks: Optional[list[dict[str, Any]]] = None,
+              set_version: str = SET_VERSION, shots: int = SHOTS, keep_isa: bool = False):
+    """Transpile a set (the board's by default) for one machine, submit one job, record it as pending.
+
+    keep_isa stores each compiled circuit (QPY, base64) so it can be replayed exactly as it ran."""
     from qiskit.transpiler import generate_preset_pass_manager
     from qiskit_ibm_runtime import SamplerV2
 
@@ -610,7 +631,7 @@ def submit_to(db: Session, backend, is_sim: bool):
 
     pm = generate_preset_pass_manager(optimization_level=OPTIMIZATION_LEVEL, backend=backend, seed_transpiler=SEED_TRANSPILER)
     isas, meta = [], []
-    for b in BENCHMARKS:
+    for b in (BENCHMARKS if benchmarks is None else benchmarks):
         logical = b["build"]()
         qasm = _qasm(logical)
         isa = pm.run(logical)
@@ -632,15 +653,18 @@ def submit_to(db: Session, backend, is_sim: bool):
             },
             "calibration": _calibration_for(backend, isa, physical),
         })
+        if keep_isa:
+            meta[-1]["isa_qpy"] = _qpy_b64(isa)
+            meta[-1]["dt"] = getattr(backend, "dt", None)
     # A simulated preview is seeded, so it gives the same counts every time (and tests are stable).
     sampler = SamplerV2(mode=backend, options={"simulator": {"seed_simulator": 20261113}}) if is_sim else SamplerV2(mode=backend)
-    job = sampler.run(isas, shots=SHOTS)
+    job = sampler.run(isas, shots=shots)
     p = _provider()
     if isinstance(p, _Simulated):
         p.remember(job)
     row = HardwareBoardJob(
         job_id=str(job.job_id()), backend=backend.name, backend_qubits=backend.num_qubits,
-        set_version=SET_VERSION, shots=SHOTS, simulated=is_sim, status="pending",
+        set_version=set_version, shots=shots, simulated=is_sim, status="pending",
         submitted_at=_now(), circuits=meta, results=[], versions=_versions(),
     )
     db.add(row)
@@ -650,17 +674,29 @@ def submit_to(db: Session, backend, is_sim: bool):
 
 
 def submit_benchmark(db: Session) -> list:
+    from . import qpu_budget
+
     p = _provider()
     rows, problems = [], []
     backends = choose_backends(p)
     if not backends:
         _note(db, "No operational IBM machine was available to this key, so no benchmark was submitted.")
         return []
+    sim = simulated()
     for b in backends:
+        est = qpu_budget.estimate_seconds(len(BENCHMARKS), SHOTS)
+        held = qpu_budget.reserve(db, SOURCE, b.name, est, simulated=sim)
+        if held is None:
+            problems.append(f"{b.name}: not submitted (it would take the server past its shared QPU budget of "
+                            f"{qpu_budget.budget_seconds():g} s per 28 days)")
+            continue
         try:
-            rows.append(submit_to(db, b, simulated()))
+            row = submit_to(db, b, sim)
+            qpu_budget.attach(db, held, row.job_id)
+            rows.append(row)
         except Exception as exc:
             db.rollback()
+            qpu_budget.release(db, held)
             problems.append(f"{b.name}: not submitted ({type(exc).__name__}: {str(exc)[:200]})")
     _note(db, "; ".join(problems) if problems else f"Submitted to {', '.join(r.backend for r in rows)}.")
     return rows
@@ -776,7 +812,13 @@ def collect_pending(db: Session, now: Optional[datetime] = None) -> dict[str, in
                 failed += 1
                 continue
             row.error = None
-            _record_runs(db, row, counts)
+            from . import qpu_budget
+            qpu_budget.record_actual(db, row.job_id, qpu_budget.usage_of(job))
+            if is_rewind_bench(row.set_version):
+                from .rewind import bench
+                bench.record_hardware(db, row, counts, job)
+            else:
+                _record_runs(db, row, counts)
             done += 1
         elif status in ("ERROR", "FAILED", "CANCELLED", "CANCELED"):
             msg = ""
@@ -793,6 +835,11 @@ def collect_pending(db: Session, now: Optional[datetime] = None) -> dict[str, in
             db.commit()
             still += 1
     return {"done": done, "pending": still, "failed": failed}
+
+
+def is_rewind_bench(set_version: str) -> bool:
+    """Rewind's accuracy benchmark jobs share this table and its polling, not the board's display."""
+    return str(set_version or "").startswith("rewind-bench")
 
 
 def tick(db: Session, force: bool = False) -> dict[str, Any]:
@@ -823,6 +870,14 @@ def _loop(session_factory: Callable[[], Session]) -> None:
                     log.info("hardware board: %s", result)
         except Exception as exc:
             log.warning("hardware board: tick failed: %s: %s", type(exc).__name__, str(exc)[:300])
+        try:  # Rewind's accuracy benchmark runs on this thread too, so the two never submit at once
+            from .rewind import bench
+            with session_factory() as db:
+                result = bench.tick(db)
+                if result.get("submitted") or result.get("compared"):
+                    log.info("rewind bench: %s", result)
+        except Exception as exc:
+            log.warning("rewind bench: tick failed: %s: %s", type(exc).__name__, str(exc)[:300])
         _stop.wait(TICK_S)
 
 
@@ -877,13 +932,14 @@ def _run_points(rows: list) -> list[dict[str, Any]]:
 def board(db: Session, backend: Optional[str] = None) -> dict[str, Any]:
     from .models import HardwareBoardJob, HardwareBoardState
 
-    q = select(HardwareBoardJob).order_by(HardwareBoardJob.submitted_at.asc())
+    q = select(HardwareBoardJob).order_by(HardwareBoardJob.submitted_at.asc()).where(
+        HardwareBoardJob.set_version.notlike("rewind-bench%"))
     if backend:
         q = q.where(HardwareBoardJob.backend == backend)
     if not simulated():  # a preview's results never show on a real board
         q = q.where(HardwareBoardJob.simulated.is_(False))
     rows = db.scalars(q).all()
-    state = db.get(HardwareBoardState, 1)
+    state = db.get(HardwareBoardState, BOARD_STATE)
     pending = [r for r in rows if r.status == "pending"]
     ended = [r for r in rows if r.status in ("error", "cancelled", "abandoned")][-10:]
     live = live_status() if configured() else {"fetched_at": None, "error": None, "backends": [], "simulated": False}

@@ -6,6 +6,14 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Added
+
+- **Rewind accuracy.** Once a week the server runs a fixed 20-circuit benchmark (`rewind-bench-1`) on a few
+  real IBM machines, replays the same compiled circuits on the replica of the calibration in force when
+  each job ran, and publishes the Hellinger fidelity between the two (`GET /api/v1/rewind/accuracy`,
+  method in `docs/REWIND_METHOD.md`). Replays now say how well their machine matched, or that it
+  hasn't been measured. The hardware board and the benchmark share one QPU budget per 28 days.
+
 ## [0.4.0] - 2026-11-14
 
 The first `qlab-sdk` on PyPI since 0.1.0: 0.3.0 was prepared but never tagged or published, so
