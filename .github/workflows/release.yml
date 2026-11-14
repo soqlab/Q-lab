@@ -33,7 +33,7 @@ jobs:
           check() { if [ "$2" != "$VERSION" ]; then echo "::error::$1 is '$2', tag is '$VERSION'"; fail=1; fi; }
           check qlab_sdk/pyproject.toml "$(grep -m1 '^version = ' qlab_sdk/pyproject.toml | cut -d'"' -f2)"
           check qlab_sdk/qlab/__init__.py "$(grep -m1 '__version__' qlab_sdk/qlab/__init__.py | cut -d'"' -f2)"
-          check frontend/package.json "$(node -p "require('./frontend/package.json').version")"
+          check frontend/package.json "$(python3 -c "import json; print(json.load(open('frontend/package.json'))['version'])")"
           check backend/app/main.py "$(grep -m1 -E '^    version="' backend/app/main.py | cut -d'"' -f2)"
           grep -q "^## \[$VERSION\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no '## [$VERSION]' section"; fail=1; }
           exit $fail

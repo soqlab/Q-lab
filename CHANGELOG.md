@@ -6,6 +6,31 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-14
+
+The first `qlab-sdk` on PyPI since 0.1.0: 0.3.0 was prepared but never tagged or published, so
+its changes (below) ship in this release too. What you get:
+
+- **Passkey-only sign-in.** No passwords: sign up with a passkey and a name (email optional),
+  with one-time recovery codes. Older password and Google/GitHub accounts move to a passkey once.
+- **Answer first.** Every run opens with one sentence on whether it did better or worse than
+  the last comparable run, and why; projects have a timeline you drag through; Ctrl K finds
+  any run, circuit, project or backend.
+- **Pick the machine before you run.** Paste a circuit and see the expected result on each IBM
+  machine from its current calibration, with the weak point named.
+- **Drift alarm.** When the same circuit on the same backend moves beyond shot noise, the run
+  says so and whether your side or the machine changed.
+- **Reproduce a run** with one command (`uv run reproduce_<id>.py`), pinned to the recorded
+  circuit, package versions, seeds and settings, and see whether the re-run agreed.
+- **Your data.** Deleting an account erases it after 7 days; the export holds everything kept
+  about you; shared runs can be unshared; integration secrets are stored encrypted; a plain
+  privacy notice and terms; the dashboard tracks nothing and loads nothing from other sites.
+- **SDK.** Amazon Braket and IonQ capture, seeds and calibration from Qiskit 2 targets, QPY
+  circuits, `qlab ci check`; Aer's `SamplerV2` (and runtime local mode) is recorded once, not
+  twice; no install ping for self-hosted setups.
+- **No invented numbers.** Every Labs tool computes from your runs, exact simulation or your
+  input, or it was removed; hardware prices come from one sourced table.
+
 ### Added
 - Privacy notice at `/privacy` (linked from the sign-in pages, the app footer, the home page and
   Ctrl+K): what the hosted Q-Lab keeps, what the SDK sends, what is stored in the browser, who else
@@ -74,6 +99,32 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 - CI runs ruff on `backend/` and `qlab_sdk/` (`ruff.toml`: syntax errors and undefined names).
 - Tests for the core tracking API: runs, projects, compare, search, API keys, and checks that
   one user cannot read, change or delete another's runs.
+- Answer first: a run opens with one sentence comparing it with the latest earlier run of the
+  same circuit (share of shots on the outcomes the noise-free circuit can produce; shot noise
+  decides whether a change is real, and a cause is named only when calibration or the compiled
+  circuit accounts for it), then the evidence (`GET /api/v1/runs/{id}/answer`). Project timelines
+  (`/projects/<slug>/timeline`), `/compare?a=&b=` links, a "how technical" dial (plain, standard,
+  expert), and a command bar (Ctrl K, Cmd K or /) that recognises run ids, circuit hashes,
+  projects, backends and circuit names (`GET /api/v1/lookup`).
+- Why two runs differ (`GET /api/v1/runs/{a}/explain-diff/{b}`, the compare page): shot noise,
+  compiler or setup changes, or calibration drift on the qubits used, or that the data can't tell.
+- Verify this run (`/verify/<id>`, `GET /api/v1/runs/{id}/verify`): checks anyone can repeat
+  (circuit hash, counts against shots, the headline result, the record's SHA-256), each shown as
+  pass, fail or can't check.
+- Hardware board (`/hardware`): IBM Quantum machines' state, queue and calibration, and a
+  scheduled benchmark whose results are ordinary shared runs. Migration `006_hardware_board`.
+- Accounts without email: sign-up asks for a passkey and a display name; ten single-use recovery
+  codes; the email address is optional (`PUT /auth/me/email`). Migration
+  `005_usernameless_accounts`.
+- Stop sharing a run from its page (`DELETE /api/v1/runs/{id}/share`).
+- Terms page at `/terms`; a `/trust` page showing the commit each half runs, every request the
+  page makes and the CSP as sent; `GET /api/v1/build`.
+- Reproducible dashboard build (CI builds twice and fails on any difference) and a public,
+  signed deploy log on the `transparency` branch.
+- Offline install inside a company network (`deploy/internal`): one-file bundle, the company's
+  own HTTPS certificate, no outbound connections.
+- Signed releases: build provenance for every release file, keyless cosign signatures on the
+  images, CycloneDX SBOMs.
 
 ### Changed
 - With `QLAB_PASSKEYS_ONLY`, Google and GitHub no longer sign anyone in or create accounts. An account
@@ -99,6 +150,29 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   defaulted. Sample people, circuits, claims and graphs are no longer created, and old ones are
   removed.
 - The talent board requires sign-in and shows a profile's email only to its owner.
+- Pages whose numbers are simulated or sample data now say so in a visible notice, driven by the
+  `X-QLab-Data: illustrative` response header. See `backend/app/illustrative.py`.
+- Q-Lab has no server-wide IBM or IonQ key: `IBM_QUANTUM_TOKEN` and `IONQ_API_KEY` are no longer
+  read. Each user saves their own key under Credentials.
+- The backend runs on Qiskit 2.6, qiskit-aer 0.18 and qiskit-ibm-runtime 0.51, and uses IBM's new
+  `IBMQuantumComputeService` name.
+- A nightly CI job tests the SDK against the latest Qiskit release and its development branch.
+- The SDK's anonymous install ping is sent only when it talks to the hosted service;
+  self-hosted setups never contact SOQLAB. It reports the real SDK version.
+- Deleting an account (Settings or the GDPR page) locks it at once, turns off its share links
+  and erases it 7 days later: runs, projects nobody else uses, keys, passkeys, webhooks and the
+  rest; the security log keeps a pseudonym. Signing in before then cancels it. It used to only
+  switch the account off.
+- The data export holds everything kept about the account (never keys, hashes or secrets), is
+  built when downloaded, and only the person who asked can download it.
+- The dashboard no longer records page views and loads nothing from other sites; the CSP allows
+  only Q-Lab, and CI fails if that changes.
+- The sidebar is gone: one bar holds Runs, Projects, Hardware, Compare, the input, the dial and
+  the account. The signed-out home page shows live server state and public runs instead of
+  decoration. Public run lists show the share of shots on expected outcomes instead of a
+  "quality" score.
+- The GDPR "compliance report", which claimed things that were not true, is removed; the GDPR
+  page links to the privacy notice.
 
 ### Removed
 - Cost Arbitrage: its device error rates, T1, fidelity, queue times and availability were random.
@@ -112,6 +186,15 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   retired server. The SDK is `qlab_sdk/`.
 
 ### Security
+- Slack, Teams and GitHub tokens, webhook and CI signing secrets and notification channel
+  addresses were stored in plain text; they are now encrypted with the key vault's key
+  (migration `008_encrypt_integration_secrets`).
+- Webhooks, notification channels and the records of about 20 tools were one pool for every
+  caller, often without sign-in; they now belong to their creator (or organisation), and events
+  go only to channels whose owner can see the run.
+- Gate angles in user QASM no longer go through `eval()`. User-supplied URLs (AI endpoints,
+  webhooks, notification channels, calibration peers) must resolve to public addresses
+  (`QLAB_ALLOW_PRIVATE_URLS=1` for a company install). OAuth sign-in uses state and PKCE.
 - Projects were shared across every account: anyone could list all project names and rename or
   redescribe someone else's project. A project is now visible to its creator and to whoever can
   see a run in it; another user's slug is refused.
@@ -120,6 +203,8 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   organisation's. Older jobs, which recorded no owner, are no longer listed.
 
 ### Fixed
+- SDK: Aer's `SamplerV2`, and qiskit-ibm-runtime's local mode, which uses it, recorded each run
+  twice (its inner `backend.run` call runs on a worker thread). It is now one run.
 - Quantum hardware prices were out of date, some wrong by orders of magnitude, and had no source.
   IonQ on Amazon Braket, for example, was priced at $0.00097 a shot. AWS charges $0.08 a shot plus
   $0.30 a task. Rigetti was priced at $0.00035 a shot; AWS charges $0.000425. All prices now come
@@ -145,17 +230,6 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 - Noise simulation, ZX simplification and circuit search refused any circuit containing `sx`, which
   every circuit transpiled for IBM has, and quietly returned less or nothing.
 - Onboarding no longer offers the raw Render address as a fallback for the hosted API.
-
-### Changed
-- Pages whose numbers are simulated or sample data now say so in a visible notice, driven by the
-  `X-QLab-Data: illustrative` response header. See `backend/app/illustrative.py`.
-- Q-Lab has no server-wide IBM or IonQ key: `IBM_QUANTUM_TOKEN` and `IONQ_API_KEY` are no longer
-  read. Each user saves their own key under Credentials.
-- The backend runs on Qiskit 2.6, qiskit-aer 0.18 and qiskit-ibm-runtime 0.51, and uses IBM's new
-  `IBMQuantumComputeService` name.
-- A nightly CI job tests the SDK against the latest Qiskit release and its development branch.
-- The SDK's anonymous install ping is sent only when it talks to the hosted service;
-  self-hosted setups never contact SOQLAB. It reports the real SDK version.
 
 ## [0.3.0] - 2026-10-26
 
@@ -200,5 +274,6 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 - An unused `/qlab-api` route handler that buffered every response.
 - The committed `python_installer.exe`.
 
-[Unreleased]: https://github.com/soqlab/Q-lab/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/soqlab/Q-lab/releases/tag/v0.3.0
+[Unreleased]: https://github.com/soqlab/Q-lab/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/soqlab/Q-lab/releases/tag/v0.4.0
+[0.3.0]: https://github.com/soqlab/Q-lab/tree/8c1f44c044dee10355ec149498f8cffc3aaaf5e8

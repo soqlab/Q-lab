@@ -234,7 +234,7 @@ _OPENAPI_URL = None if _ENV == "production" else "/openapi.json"
 
 app = FastAPI(
     title="Q-Lab API",
-    version="0.3.0",
+    version="0.4.0",
     description="Quantum Systems of Record — professional experiment tracking for quantum researchers.",
     docs_url=_DOCS_URL,
     redoc_url=_REDOC_URL,

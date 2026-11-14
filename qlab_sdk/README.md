@@ -1,12 +1,14 @@
 # Q-Lab SDK
 
-Passive experiment tracker for Qiskit workflows.
+Passive experiment tracker for Qiskit, Amazon Braket and IonQ workflows.
 
 ## Installation
 
 ```bash
-pip install -e .
+pip install "qlab-sdk[qiskit]"
 ```
+
+Python 3.10 or newer. From a checkout of the repository: `pip install -e qlab_sdk`.
 
 ## Quick Start
 

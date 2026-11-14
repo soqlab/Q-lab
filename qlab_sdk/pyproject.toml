@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qlab-sdk"
-version = "0.3.0"
+version = "0.4.0"
 description = "Passive experiment tracker for Qiskit, Amazon Braket and IonQ workflows"
 readme = "README.md"
 license = "MIT"
@@ -37,6 +37,8 @@ dev   = ["build", "twine", "pytest", "pytest-asyncio", "pytest-cov", "ruff"]
 [project.urls]
 Homepage   = "https://github.com/soqlab/Q-lab"
 Repository = "https://github.com/soqlab/Q-lab"
+Changelog  = "https://github.com/soqlab/Q-lab/blob/main/CHANGELOG.md"
+Issues     = "https://github.com/soqlab/Q-lab/issues"
 
 [project.scripts]
 qlab = "qlab.cli:main"
