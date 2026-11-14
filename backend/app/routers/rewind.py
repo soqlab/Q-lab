@@ -5,7 +5,15 @@ Public, no sign-in:
     GET  /api/v1/rewind/manifests/{date}   that UTC day's signed manifest (hashes, never contents)
     GET  /api/v1/rewind/public-key         the key manifests are signed with
     POST /api/v1/rewind/run                replay a circuit on a machine as calibrated on a date
-                                           (no account needed; lower limits without one)
+                                           (no account needed; lower limits without one), with its
+                                           Hellinger fidelity against the noiseless distribution
+    GET  /api/v1/rewind/machines/{m}/days  the days with a stored calibration of that machine
+    GET  /api/v1/rewind/watch              each machine's medians over time (QPU Watch)
+    POST /api/v1/rewind/compare            the same circuit on one calibration per month (up to 12),
+    GET  /api/v1/rewind/compare/{job}      run in the background; poll for progress
+
+Signed in:
+    POST /api/v1/rewind/save               replay again and keep it as a run (marked simulated, never hardware)
 
 Server owner, or the scheduled workflow with the X-Rewind-Trigger header (QLAB_REWIND_TRIGGER_TOKEN):
     POST /api/v1/rewind/harvest            harvest now (in the background)
@@ -18,14 +26,16 @@ import os
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import Identity, get_identity, log_audit
+from ..deps import Identity, get_identity, log_audit, require_auth
 from ..rewind import harvest as hv
-from ..rate_limit import rewind_run_limiter, rewind_run_user_limiter
+from ..rate_limit import (rewind_compare_limiter, rewind_compare_user_limiter, rewind_run_limiter,
+                          rewind_run_user_limiter)
+from ..rewind import compare as cmp
 from ..rewind import replay as rp
 from ..rewind import signing, store
 from ..rewind.snapshot import MACHINE_RE, PROVIDER
@@ -163,12 +173,176 @@ def run(body: RunRequest, request: Request, identity: Optional[Identity] = Depen
     except ValueError:
         raise HTTPException(status_code=422, detail="Not a calendar date.")
     try:
-        out = rp.run_limited(lambda: rp.replay(db, body.machine, day, body.circuit, body.format, body.shots,
-                                               body.seed, signed_in=signed_in, include_simulated=hv.simulated()))
+        out = rp.run_limited(lambda: cmp.replay_with_ideal(db, body.machine, day, body.circuit, body.format, body.shots,
+                                                           body.seed, signed_in=signed_in,
+                                                           include_simulated=hv.simulated()))
     except rp.ReplayError as exc:
-        headers = {"Retry-After": "10"} if exc.status == 503 else None
-        raise HTTPException(status_code=exc.status, detail=exc.message, headers=headers)
+        raise _http(exc)
     return {**out, "limits": rp.limits(signed_in)}
+
+
+def _http(exc: rp.ReplayError) -> HTTPException:
+    headers = {"Retry-After": "10"} if exc.status == 503 else None
+    return HTTPException(status_code=exc.status, detail=exc.message, headers=headers)
+
+
+def _day(raw: str) -> date:
+    if not store.DATE_RE.match(raw):
+        raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD.")
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Not a calendar date.")
+
+
+def _machine(name: str) -> str:
+    if not MACHINE_RE.match(name):
+        raise HTTPException(status_code=422, detail="Not a machine name.")
+    return name
+
+
+@router.get("/api/v1/rewind/machines/{machine}/days")
+def stored_days(machine: str, db: Session = Depends(get_db)):
+    """Days a replay can be asked for, each with the calibration it would use."""
+    days = cmp.stored_days(db, _machine(machine), hv.simulated())
+    return {"machine": machine, "simulated": hv.simulated(), "days": days,
+            "monthly": cmp.monthly_days(db, machine, hv.simulated())}
+
+
+@router.get("/api/v1/rewind/watch")
+def watch(days: int = Query(default=30, ge=1, le=3650), db: Session = Depends(get_db)):
+    """Each machine's medians over the last `days` days stored (one point per day). Medians only:
+    the calibration itself is IBM's and is not republished."""
+    include_sim = hv.simulated()
+    out = []
+    for m in store.machines(db, include_simulated=include_sim):
+        pts = cmp.series(db, m["machine"], include_sim, days)
+        out.append({"machine": m["machine"], "snapshots": m["snapshots"], "first_date": m["first_date"],
+                    "last_date": m["last_date"], "latest": pts[-1] if pts else None, "series": pts})
+    return {"collecting": hv.configured(), "simulated": include_sim,
+            "reason": None if hv.configured() else hv.not_configured_reason(), "days": days,
+            "metrics": list(cmp.METRICS), "machines": out,
+            "note": "Medians across each machine's qubits and gates, from IBM-published calibration. "
+                    "Not affiliated with or endorsed by IBM."}
+
+
+class CompareRequest(BaseModel):
+    machine: str = Field(max_length=61)
+    circuit: str = Field(max_length=400_000)
+    format: Optional[str] = Field(default=None, max_length=8)
+    shots: int = 1024
+    seed: Optional[int] = Field(default=None, ge=0, le=2**31 - 1)
+    months: int = Field(default=cmp.MAX_MONTHS, ge=2, le=cmp.MAX_MONTHS)
+
+
+@router.post("/api/v1/rewind/compare", status_code=202)
+def compare(body: CompareRequest, request: Request, identity: Optional[Identity] = Depends(get_identity),
+            db: Session = Depends(get_db)):
+    signed_in = identity is not None
+    _machine(body.machine)
+    cap = rp.max_shots(signed_in)
+    if body.shots < 1 or body.shots > cap:
+        raise HTTPException(status_code=422, detail=f"shots must be between 1 and {cap}"
+                            + ("" if signed_in else " without an account") + ".")
+    days = cmp.monthly_days(db, body.machine, hv.simulated(), body.months)
+    if len(days) < 2:
+        n = len(days)
+        raise HTTPException(status_code=409, detail=f"Comparing across time needs calibrations of {body.machine} "
+                                                    f"from at least two months; {n} month{'' if n == 1 else 's'} stored.")
+    try:
+        circuit = cmp.parse_for_ideal(body.circuit, body.format)
+        rp.check_circuit(circuit, rp.max_qubits())
+    except rp.ReplayError as exc:
+        raise _http(exc)
+    if cmp.busy():
+        raise HTTPException(status_code=503, detail="Another comparison is running; try again in a minute.",
+                            headers={"Retry-After": "60"})
+    if signed_in and identity.user_id is not None:
+        rewind_compare_user_limiter.check(f"user:{identity.user_id}")
+    else:
+        rewind_compare_limiter(request)
+    from ..database import SessionLocal
+    doc = cmp.start_compare(body.machine, days, body.circuit, body.format, body.shots, body.seed, signed_in,
+                            hv.simulated(), SessionLocal, circuit)
+    if doc is None:
+        raise HTTPException(status_code=503, detail="Another comparison is running; try again in a minute.",
+                            headers={"Retry-After": "60"})
+    return doc
+
+
+@router.get("/api/v1/rewind/compare/{job}")
+def compare_progress(job: str):
+    try:
+        doc = cmp.read_job(job)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Not a comparison id.")
+    if doc is None:
+        raise HTTPException(status_code=404, detail="No such comparison here (they are kept for a day).")
+    return doc
+
+
+class SaveRequest(RunRequest):
+    project: Optional[str] = Field(default=None, max_length=120)
+    name: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/api/v1/rewind/save")
+def save(body: SaveRequest, request: Request, identity: Identity = Depends(require_auth),
+         db: Session = Depends(get_db)):
+    """Replay again (the same inputs give the same counts) and keep it as a run. The run is marked
+    as a simulation everywhere it shows: backend "rewind:<machine>", tags rewind and simulated, and
+    context.rewind with the calibration's sha256."""
+    import hashlib
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from ..main import RunPayload, _project_visible, _upsert_run
+    from ..models import Project
+
+    if identity.user_id is not None:
+        rewind_run_user_limiter.check(f"user:{identity.user_id}")
+    _machine(body.machine)
+    day = _day(body.date)
+    slug = (body.project or "").strip() or None
+    if slug:
+        existing = db.scalar(select(Project).where(Project.slug == slug))
+        if existing is not None and not _project_visible(db, existing, identity):
+            raise HTTPException(status_code=403, detail="That project isn't yours.")
+    try:
+        out = rp.run_limited(lambda: cmp.replay_with_ideal(db, body.machine, day, body.circuit, body.format, body.shots,
+                                                           body.seed, signed_in=True, include_simulated=hv.simulated()))
+    except rp.ReplayError as exc:
+        raise _http(exc)
+    is_qasm = (body.format or "").lower() == "qasm" or "OPENQASM" in body.circuit[:2000]
+    qasm = body.circuit if is_qasm else None
+    facts = out["circuit"]
+    payload = RunPayload(
+        run_id=f"rewind-{uuid.uuid4().hex[:20]}",
+        circuit_name=(body.name or "").strip() or f"Rewind replay on {body.machine}",
+        qasm=qasm,
+        backend=f"rewind:{body.machine}",
+        fingerprint={"num_qubits": facts["num_qubits"], "depth": facts["depth"], "size": facts["operations"],
+                     **({"qasm_sha256": hashlib.sha256(qasm.encode("utf-8")).hexdigest()} if qasm else {})},
+        context={"rewind": {"machine": body.machine, "requested_date": out["requested_date"], "snapshot": out["snapshot"],
+                            "label": out["label"], "accuracy": out["accuracy"], "accuracy_note": out["accuracy_note"],
+                            "real_hardware": False, "notes": out["notes"],
+                            "ideal": {k: out["ideal"].get(k) for k in ("hellinger_fidelity", "share_on_ideal_outcomes")}}},
+        parameters={},
+        execution={"shots": out["shots"], "simulator": "qiskit-aer", "method": out["noise_model"]["method"],
+                   "real_hardware": False, "seed_simulator": out["seeds"]["simulator"],
+                   "seed_transpiler": out["seeds"]["transpiler"]},
+        transpiler={**out["transpiled"]},
+        results={"counts": out["counts"]},
+        project=slug,
+        tags=["rewind", "simulated"],
+        status="completed",
+        created_at=datetime.now(timezone.utc),
+    )
+    run = _upsert_run(db, payload, identity)
+    log_audit(db, "rewind.saved", "run", run.run_id, identity=identity, request=request)
+    return {"run_id": run.run_id, "url": f"/runs/{run.run_id}", "label": out["label"], "snapshot": out["snapshot"]}
 
 
 @router.on_event("startup")

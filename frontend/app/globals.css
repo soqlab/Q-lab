@@ -708,6 +708,7 @@ tbody tr:hover { background: var(--panel-2); }
   --c-board: #f59e0b;
   --c-compare: #34d399;
   --c-trust: #94a3b8;
+  --c-rewind: #f472b6;
 }
 
 .inst-label {

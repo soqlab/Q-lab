@@ -139,14 +139,20 @@ function WarmupBanner() {
   );
 }
 
+// Pages anyone can use without an account (each says what signing in adds).
+const PUBLIC_PATHS = ["/rewind"];
+const isPublic = (p: string | null) => !!p && PUBLIC_PATHS.some((x) => p === x || p.startsWith(`${x}/`));
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
   const router = useRouter();
+  const open = isPublic(usePathname());
 
   useEffect(() => {
-    if (!loading && !token) router.replace("/login");
-  }, [token, loading, router]);
+    if (!open && !loading && !token) router.replace("/login");
+  }, [open, token, loading, router]);
 
+  if (open) return <>{children}</>;
   if (loading || !token) return null;
   return <>{children}</>;
 }
@@ -208,6 +214,7 @@ const CHANNELS = [
   { href: "/projects", label: "Projects", c: "var(--c-map)", match: (p: string) => p.startsWith("/projects") },
   { href: "/hardware", label: "Hardware", c: "var(--c-board)", match: (p: string) => p === "/hardware" || p.startsWith("/hardware/") },
   { href: "/compare", label: "Compare", c: "var(--c-compare)", match: (p: string) => p === "/compare" },
+  { href: "/rewind", label: "Rewind", c: "var(--c-rewind)", match: (p: string) => p === "/rewind" },
 ];
 
 function Dial() {

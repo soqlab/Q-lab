@@ -11,7 +11,7 @@ import { useCallback, useSyncExternalStore } from "react";
 const CORE_EXACT = [
   "/",
   "/runs", "/projects", "/timeline", "/analytics", "/compare", "/benchmarks", "/reproducibility",
-  "/backends", "/calibration", "/intel", "/cost-oracle", "/hardware",
+  "/backends", "/calibration", "/intel", "/cost-oracle", "/hardware", "/rewind",
   "/assistant", "/onboarding",
   "/integrations", "/webhooks",
   "/team",

@@ -9,6 +9,8 @@ export const PLACES: Place[] = [
   { href: "/hardware", title: "Hardware board", group: "Core", keywords: ["ibm", "backends", "queue", "calibration", "benchmark", "qpu"] },
   { href: "/hardware/pick", title: "Pick the machine before you run", group: "Core", keywords: ["where", "run", "next", "best", "backend", "fidelity", "estimate", "predict", "calibration", "choose", "qasm"] },
   { href: "/compare", title: "Compare two runs", group: "Core", keywords: ["diff", "difference", "why"] },
+  { href: "/rewind", title: "Rewind: run a circuit on a machine as it was on a past date", group: "Core", keywords: ["rewind", "replay", "past", "history", "calibration", "date", "ibm", "simulate", "noise", "watch", "qpu", "drift", "trend", "time"] },
+  { href: "/rewind?tab=watch", title: "QPU Watch: each machine today and its trend", group: "Core", keywords: ["watch", "qpu", "t1", "t2", "error", "readout", "trend", "condition", "rewind"] },
   { href: "/trust", title: "Trust: what this Q-Lab runs and loads", group: "Core", keywords: ["commit", "verify", "privacy", "csp"] },
   { href: "/privacy", title: "Privacy: what Q-Lab keeps about you", group: "Core", keywords: ["data", "gdpr", "cookies", "delete", "export", "personal"] },
   { href: "/runs", title: "Run History", group: "Core" },

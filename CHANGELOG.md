@@ -6,6 +6,31 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 
 ## [Unreleased]
 
+### Added
+- Rewind's screen, `/rewind`, open without an account (a new Rewind channel in the top bar and in
+  Ctrl K). Pick a machine, slide over the days that machine has a stored calibration for (it shows
+  which calibration that day uses), paste or drop a circuit or take an example (Bell, GHZ-5, a QFT
+  round trip), and Run (Ctrl+Enter). The answer comes first ("On ibm_fez as of 3 Oct 2026, your
+  Bell circuit gave 00/11 in 94% of shots…"), then the counts (top 12 and "other", with the
+  noiseless probability marked), the IBM label, the accuracy note as the API gives it, the
+  calibration's sha256 (copyable), software versions, and what isn't modelled (behind the dial).
+  With no IBM key the page says collection hasn't started and shows nothing invented.
+- Compare across time: the same circuit on one calibration per month, up to 12 months, run one
+  after another on the server (`POST /api/v1/rewind/compare`, poll `GET /api/v1/rewind/compare/{job}`)
+  and drawn as a line of Hellinger fidelity, or share of shots on the noiseless outcomes.
+- `POST /api/v1/rewind/run` also returns `ideal`: the Hellinger fidelity against the noiseless
+  distribution (exact, from Aer's statevector, capped like the replay) and the share of shots on
+  the outcomes the noiseless circuit can give. A circuit that measures part-way says why there is none.
+- QPU Watch, a tab on `/rewind`: each machine's latest median T1, T2, two-qubit and readout error,
+  with sparklines over 30 days, 90 days or a year, led by a sentence ("ibm_fez's two-qubit error is
+  the lowest it's been in 30 days"). `GET /api/v1/rewind/watch` gives medians only, never a
+  calibration's contents; `GET /api/v1/rewind/machines/{machine}/days` lists the stored days.
+- "Rewind this run" on a run's page (Actions and Ctrl K) when its backend is a machine Rewind has
+  calibration for: opens `/rewind` with that machine, the run's day and its circuit.
+- Signed in, "Save this to Q-Lab" keeps a replay as a run (`POST /api/v1/rewind/save`): replayed
+  again on the server, so the counts can't be edited, with backend `rewind:<machine>`, tags
+  `rewind` and `simulated`, and the calibration's sha256; its page says it is a replay, not hardware.
+
 ## [0.4.0] - 2026-11-14
 
 The first `qlab-sdk` on PyPI since 0.1.0: 0.3.0 was prepared but never tagged or published, so

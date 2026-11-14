@@ -6,7 +6,7 @@ import { use, useEffect, useRef, useState } from "react";
 import RunAnswer, { useAnswer } from "../../../../components/RunAnswer";
 import { setCommandContext } from "../../../../components/CommandPalette";
 import ReproduceRun, { downloadFromApi } from "../../../../components/ReproduceRun";
-import { ArrowLeft, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
+import { ArrowLeft, History, Check, Copy, Download, ExternalLink, FileCode, GitCompare, Package, Activity, Search, Share2, ZoomIn, ZoomOut, Maximize2, MessageSquare, Pencil, Trash2, Send } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   fetchRun, fetchRunHealth, generateShareLink, qlabApiPath, stopSharing,
@@ -767,6 +767,26 @@ function OverleafButton({ runId }: { runId: string }) {
   );
 }
 
+/** /rewind prefilled with this run's machine, day and circuit, when Rewind has that machine. */
+function rewindHref(run: QLabRun, machines: string[]): string | null {
+  if (!run.backend || !run.qasm || !machines.includes(run.backend)) return null;
+  const q = new URLSearchParams({ machine: run.backend, date: run.created_at.slice(0, 10), run: run.run_id });
+  return `/rewind?${q}`;
+}
+
+/** A run kept from Rewind is a simulation: say so before anything else on the page. */
+function RewindNotice({ run }: { run: QLabRun }) {
+  const rw = (run.context as { rewind?: { label?: string; snapshot?: { sha256?: string }; machine?: string; requested_date?: string } } | undefined)?.rewind;
+  if (!rw) return null;
+  return (
+    <div className="alert alert-warn" role="note" style={{ margin: 0 }}>
+      <strong>Rewind replay, not a hardware run.</strong> {rw.label ?? "Simulated from a stored calibration."}
+      {rw.snapshot?.sha256 ? <> Calibration <span className="mono">{rw.snapshot.sha256.slice(0, 12)}</span>.</> : null}
+      {rw.machine && rw.requested_date ? <> <Link href={`/rewind?${new URLSearchParams({ machine: rw.machine, date: rw.requested_date })}`} style={{ textDecoration: "underline" }}>Open in Rewind</Link></> : null}
+    </div>
+  );
+}
+
 export default function RunDetailPage({ params: paramsPromise }: { params: Promise<{ runId: string }> }) {
   const params = use(paramsPromise);
   const [run, setRun] = useState<QLabRun | null>(null);
@@ -775,6 +795,17 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
   const [health, setHealth] = useState<Record<string, number | null>>({});
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Machines Rewind has calibration for: "Rewind this run" shows only when the run's backend is one.
+  const [rewindable, setRewindable] = useState<string[]>([]);
+
+  useEffect(() => {
+    let on = true;
+    fetch(qlabApiPath("/api/v1/rewind/machines"), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { machines: [] }))
+      .then((d: { machines?: { machine: string }[] }) => { if (on) setRewindable((d.machines ?? []).map((m) => m.machine)); })
+      .catch(() => {});
+    return () => { on = false; };
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -800,11 +831,12 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       { id: "here:qasm", kind: "here" as const, title: "Download this run's circuit (QASM)", hint: "OpenQASM text", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)) },
       { id: "here:list-circuit", kind: "here" as const, title: "Every run of this circuit", hint: "Same circuit hash", href: run.fingerprint.qasm_sha256 ? `/runs?circuit=${run.fingerprint.qasm_sha256}` : `/runs?q=${encodeURIComponent(run.circuit_name ?? "")}` },
       ...(run.project ? [{ id: "here:timeline", kind: "here" as const, title: `${run.project} timeline at this run`, hint: "Scrub through the project", href: `/projects/${encodeURIComponent(run.project)}/timeline?run=${run.run_id}` }] : []),
+      ...(rewindHref(run, rewindable) ? [{ id: "here:rewind", kind: "here" as const, title: "Rewind this run", hint: `Replay it on ${run.backend} as calibrated that day (simulated)`, href: rewindHref(run, rewindable)! }] : []),
       ...(run.backend && /^ibm/.test(run.backend) ? [{ id: "here:hw", kind: "here" as const, title: `${run.backend} on the hardware board`, hint: "Live status and benchmark history", href: `/hardware/${run.backend}` }] : []),
     ];
     setCommandContext(items);
     return () => setCommandContext([]);
-  }, [run]);
+  }, [run, rewindable]);
 
   if (error) return <main className="page"><div className="empty">{error}</div></main>;
   if (!run) return <main className="page"><div className="empty">Loading run…</div></main>;
@@ -817,6 +849,8 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
   return (
     <main className="page">
       <RunAnswer runId={run.run_id} project={run.project} backend={run.backend} answer={answer} />
+
+      <RewindNotice run={run} />
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <Link className="button secondary" href={run.project ? `/runs?project=${encodeURIComponent(run.project)}` : "/runs"} style={{ height: 34 }}>
@@ -835,6 +869,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
             <div className="actions-item"><DiffButton runId={run.run_id} /></div>
             <Link href={`/search/circuits?anchor=${run.run_id}`}><Search size={15} aria-hidden="true" /> Similar circuits</Link>
             <Link href={`/hardware/pick?run=${run.run_id}`}><Activity size={15} aria-hidden="true" /> Where should I run this next?</Link>
+            {rewindHref(run, rewindable) && <Link href={rewindHref(run, rewindable)!}><History size={15} aria-hidden="true" /> Rewind this run</Link>}
             <div className="actions-item"><ShareButton runId={run.run_id} sharedUrl={run.share_page_url ?? null} /></div>
             <div className="actions-item"><BadgeButton runId={run.run_id} /></div>
             <div className="actions-group d-expert">Write it up</div>

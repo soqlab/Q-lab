@@ -57,3 +57,5 @@ read_limiter = RateLimiter(max_calls=600, period=60)   # 600 reads / min / IP
 pick_limiter = RateLimiter(max_calls=12, period=60)  # machine-pick estimates (CPU) / min / IP
 rewind_run_limiter = RateLimiter(max_calls=6, period=60)  # Rewind replays without an account / min / IP
 rewind_run_user_limiter = RateLimiter(max_calls=20, period=60)  # Rewind replays / min / account
+rewind_compare_limiter = RateLimiter(max_calls=2, period=600)  # Rewind comparisons (12 replays each) without an account / 10 min / IP
+rewind_compare_user_limiter = RateLimiter(max_calls=6, period=600)  # Rewind comparisons / 10 min / account
