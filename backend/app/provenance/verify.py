@@ -16,9 +16,11 @@ signatures verify:
   * Ed25519 (RFC 8032);
   * ML-DSA-65 (FIPS 204), with the context string ``qlab-provenance-certificate/1``.
 
-The body is hashed as canonical JSON: object keys sorted, no whitespace, strings escaped as
-JSON.stringify does (non-ASCII left as UTF-8), and only integers, strings, booleans and null as
-values (a decimal is written as a string, so no implementation has to agree on float formatting).
+The body is hashed as canonical JSON in the RFC 8785 (JCS) form, restricted so that it is also
+what ``json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False)`` and JSON.stringify
+with sorted keys write: ASCII object keys, and only integers (|n| < 2^53), strings, booleans and
+null as values (a decimal is written as a string, so no implementation has to agree on float
+formatting). Any RFC 8785 library gives the same bytes; SOQLAB Witness receipts use the same form.
 ``body_sha256`` is the SHA-256 of those UTF-8 bytes. The signed bytes are plain text::
 
     qlab-provenance-certificate/1

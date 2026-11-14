@@ -58,6 +58,14 @@ def test_canonical_json_is_stable():
     assert cv.body_sha256(a) == "0d63744b28eec2f60fc32f58b3064b7adea03bebee9f222a25bf18198cbf167f"
 
 
+def test_canonical_json_is_rfc8785():
+    """The same bytes as any RFC 8785 (JCS) implementation, as SOQLAB Witness receipts use."""
+    rfc8785 = pytest.importorskip("rfc8785")
+    sample = {"schema": cv.CERT_FORMAT, "a": {"z": "\u00e9\n\"\x01\x7f\u2028 \\ /", "y": -3,
+                                              "b": [1, None, True, False, "\U0001f600"]}, "B": 2 ** 53 - 1, "_": ""}
+    assert cv.canonical_bytes(sample) == rfc8785.dumps(sample)
+
+
 @pytest.mark.parametrize("bad", [{"x": 0.5}, {"x": 2 ** 60}, {"x": "\ud800"}, {1: "a"}, {"ü": 1}, {"x": {1, 2}}])
 def test_canonical_json_refuses_what_browsers_would_write_differently(bad):
     with pytest.raises(cv.CertificateError):

@@ -103,8 +103,8 @@ python verify_certificate.py --file c.json --qasm circuit.qasm  # and check a ci
 ```
 
 It prints `VALID` (exit 0) only when the body's SHA-256 matches and both signatures verify. What
-is checked: `body_sha256` is the SHA-256 of the `certificate` object as canonical JSON (keys
-sorted, no whitespace, only integers, strings, booleans and null; decimals are strings); the
+is checked: `body_sha256` is the SHA-256 of the `certificate` object as RFC 8785 canonical JSON
+(keys sorted, no whitespace, only integers, strings, booleans and null; decimals are strings); the
 signed text is
 
 ```
