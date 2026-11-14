@@ -1,0 +1,40 @@
+# Asks the hosted backend for Rewind's daily calibration harvest (backend/app/rewind/harvest.py).
+#
+# The backend also harvests on its own every 20 hours while it is up; this makes sure a day is not
+# missed when the server was asleep or restarting. A day's calibration can't be collected later.
+# With the repository secret QLAB_REWIND_TRIGGER_TOKEN (the same value as the backend's env var)
+# it starts a harvest; without it, it only wakes the server so its own scheduler runs.
+name: Rewind harvest
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ask the backend to harvest
+        env:
+          TRIGGER: ${{ secrets.QLAB_REWIND_TRIGGER_TOKEN }}
+        run: |
+          for attempt in 1 2 3 4; do
+            curl -fsS --max-time 60 https://qlab-backend.onrender.com/health >/dev/null && break
+            sleep 20
+          done
+          if [ -z "$TRIGGER" ]; then
+            echo "::notice::No QLAB_REWIND_TRIGGER_TOKEN secret: the server was woken; its own scheduler harvests."
+            exit 0
+          fi
+          code=$(curl -sS -o out.json -w '%{http_code}' --max-time 60 -X POST \
+            -H "X-Rewind-Trigger: $TRIGGER" https://qlab-backend.onrender.com/api/v1/rewind/harvest)
+          cat out.json; echo
+          case "$code" in
+            202) ;;
+            409) echo "::warning::The backend has no IBM Quantum key, so nothing is harvested." ;;
+            *) echo "::error::Harvest request answered $code"; exit 1 ;;
+          esac

@@ -866,3 +866,27 @@ class HardwareBoardState(Base):
     next_due: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_submitted: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class MachineSnapshot(Base):
+    """One quantum computer's calibration as the provider reported it, kept for Rewind.
+
+    The calibration itself is a gzip-compressed canonical JSON file under QLAB_REWIND_DIR
+    (app/rewind/); this row is its index. sha256 is of the uncompressed canonical JSON, so it names
+    the content whatever the compression. Written only by the server's harvester."""
+    __tablename__ = "machine_snapshots"
+    __table_args__ = (
+        UniqueConstraint("provider", "machine", "calibrated_at", name="uq_machine_snapshots_calibration"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40), index=True)
+    machine: Mapped[str] = mapped_column(String(120), index=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    calibrated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_path: Mapped[str] = mapped_column(String(500), unique=True)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sdk_versions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # harvest | backfill | simulated
+    source: Mapped[str] = mapped_column(String(20), index=True)
