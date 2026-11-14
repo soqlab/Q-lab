@@ -32,6 +32,18 @@ its changes (below) ship in this release too. What you get:
   input, or it was removed; hardware prices come from one sourced table.
 
 ### Added
+- Rewind, part 1: the calibration harvester (`app/rewind/`). Once a day, for every IBM machine the
+  server's `QISKIT_IBM_TOKEN` sees, it stores the calibration (qubits, coupling map, basis gates,
+  T1/T2, readout errors and durations, gate errors and durations, `last_update_date`, the useful
+  parts of the configuration) as one gzip-compressed canonical JSON file per calibration under
+  `QLAB_REWIND_DIR`, indexed in `machine_snapshots` (migration `009_rewind_snapshots`); repeats are
+  skipped. Each UTC day gets a manifest of file hashes, signed with Ed25519 + ML-DSA-65 when
+  `QLAB_REWIND_SIGNING_KEY` is set (`GET /api/v1/rewind/manifests/{date}`, checked by
+  `backend/app/rewind/verify.py`, which runs on its own). A backfill walks back through IBM's
+  calibration history (`properties(datetime=)`) and starts by itself as soon as there is a key;
+  `python -m app.rewind probe` shows how far back it goes. `GET /api/v1/rewind/machines` says what
+  is collected, or that nothing is because there is no key. The calibration files themselves are
+  never served.
 - Privacy notice at `/privacy` (linked from the sign-in pages, the app footer, the home page and
   Ctrl+K): what the hosted Q-Lab keeps, what the SDK sends, what is stored in the browser, who else
   receives data, retention and deletion, contact.

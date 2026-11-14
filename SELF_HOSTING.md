@@ -63,6 +63,11 @@ The app is now running at `http://localhost:3000`.
 | `QLAB_WEBAUTHN_RP_ID` | No | Passkey domain (default: the host of `QLAB_APP_URL`). Passkeys are bound to it: changing it later strands existing passkeys |
 | `QLAB_ERASURE_INTERVAL_SECONDS` | No | How often the backend erases accounts whose 7-day deletion grace period is over (default `3600`). `0` turns the schedule off; an admin can then run `POST /api/v1/gdpr/delete/process` |
 | `QLAB_WEBAUTHN_ORIGINS` | No | Extra origins allowed to use passkeys, comma-separated (default: only `QLAB_APP_URL`'s origin) |
+| `QISKIT_IBM_TOKEN` | No | IBM Quantum API key (the free open plan is enough). Turns on the hardware board, machine pick and Rewind's calibration harvest. Without it they say so and show nothing |
+| `QLAB_REWIND_DIR` | No | Where Rewind keeps calibration snapshots and manifests (default `backend/data/rewind`, on the data disk). Keep it on persistent storage: a day's calibration can't be collected again later |
+| `QLAB_REWIND_SIGNING_KEY` | No | Signs Rewind's daily manifests (Ed25519 + ML-DSA-65). Make one with `python -m app.rewind keygen` (from `backend/`); keep it secret. Without it manifests are stored unsigned and the API says so |
+| `QLAB_REWIND_TRIGGER_TOKEN` | No | Lets the scheduled workflow (`.github/workflows/rewind-harvest.yml`, repository secret of the same name) start a harvest with the `X-Rewind-Trigger` header |
+| `QLAB_REWIND_EVERY_HOURS` | No | Hours between harvests (default `20`). `QLAB_REWIND_SCHEDULER=off` stops the background harvest; `QLAB_REWIND_AUTO_BACKFILL=off` stops the automatic backfill |
 
 ## Docker Compose (PostgreSQL)
 
