@@ -119,7 +119,10 @@ export function verdict(m: WatchMachine, key: MetricKey, windowDays: number): { 
   const last = m.latest?.[key];
   if (last == null || vals.length < 2) return { text: `${m.machine}'s ${meta.label} has too little history here for a trend.`, rank: "none" };
   const lo = Math.min(...vals), hi = Math.max(...vals);
-  const span = Math.min(windowDays, Math.round((Date.parse(m.series[m.series.length - 1].calibrated_at) - Date.parse(m.series[0].calibrated_at)) / 86400000) + 1);
+  // The whole window when the stored history reaches back past it, otherwise as far as it goes.
+  const lastT = Date.parse(m.series[m.series.length - 1].calibrated_at);
+  const covers = Date.parse(`${m.first_date}T00:00:00Z`) <= lastT - windowDays * 86400000;
+  const span = covers ? windowDays : Math.max(1, Math.round((lastT - Date.parse(m.series[0].calibrated_at)) / 86400000) + 1);
   const good = meta.better === "low" ? last <= lo : last >= hi;
   const bad = meta.better === "low" ? last >= hi : last <= lo;
   if (good) return { text: `${m.machine}'s ${meta.label} is the ${meta.better === "low" ? "lowest" : "highest"} it's been in ${span} days (${meta.fmt(last)}).`, rank: "best" };

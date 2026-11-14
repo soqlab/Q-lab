@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { day, pct } from "./data";
 import s from "./rewind.module.css";
 
@@ -52,7 +52,17 @@ export function CountBars({ counts, shots, ideal, top = 12 }: {
 /** One metric over the monthly replays, with a hover readout per point. */
 export function TimeLine({ points, label }: { points: { date: string; v: number | null; sha?: string }[]; label: string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640, H = 200, L = 44, R = 14, T = 12, B = 28;
+  // Drawn at the width it is shown at, so the text stays 10 px on a phone and on a wide screen.
+  const box = useRef<HTMLElement>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(260, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const H = 200, L = 40, R = 14, T = 12, B = 28;
   const vals = points.map((p) => p.v).filter((v): v is number => v != null);
   if (!points.length) return null;
   const lo = vals.length ? Math.max(0, Math.floor((Math.min(...vals) - 0.02) * 20) / 20) : 0;
@@ -63,8 +73,9 @@ export function TimeLine({ points, label }: { points: { date: string; v: number 
   const ticks = [lo, lo + span / 2, lo + span].map((v) => Math.round(v * 1000) / 1000);
   const path = points.map((p, i) => (p.v == null ? null : `${x(i)},${y(p.v)}`)).filter(Boolean).join(" ");
   const h = hover != null ? points[hover] : null;
+  const every = Math.max(1, Math.ceil(points.length * 72 / Math.max(1, W - L - R)));
   return (
-    <figure className={s.chart} onMouseLeave={() => setHover(null)}>
+    <figure ref={box} className={s.chart} onMouseLeave={() => setHover(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${label} by calibration month: ${points.map((p) => `${day(p.date)} ${p.v == null ? "no result" : p.v.toFixed(3)}`).join("; ")}`}>
         {ticks.map((t) => (
           <g key={t}>
@@ -72,8 +83,8 @@ export function TimeLine({ points, label }: { points: { date: string; v: number 
             <text x={L - 6} y={y(t) + 3} textAnchor="end" className={s.tick}>{t.toFixed(2)}</text>
           </g>
         ))}
-        {points.map((p, i) => (i === 0 || i === points.length - 1 || points.length <= 6 || i % 2 === 0) && (
-          <text key={p.date} x={x(i)} y={H - 8} textAnchor="middle" className={s.tick}>{day(p.date).replace(/^\d+ /, "")}</text>
+        {points.map((p, i) => i % every === 0 && (
+          <text key={p.date} x={x(i)} y={H - 8} textAnchor={i === 0 && points.length > 1 ? "start" : "middle"} className={s.tick}>{day(p.date).replace(/^\d+ /, "")}</text>
         ))}
         {path && <polyline points={path} className={s.line} />}
         {hover != null && <line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} className={s.cross} />}

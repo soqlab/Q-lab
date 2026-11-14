@@ -414,7 +414,7 @@ function CompareAcross({ machine, text, shots, seed, months }: { machine: string
   if (job && ok.length >= 2) {
     const best = ok.reduce((a, b) => (b.v! > a.v! ? b : a)), worst = ok.reduce((a, b) => (b.v! < a.v! ? b : a));
     const what = metric === "hellinger" ? "Hellinger fidelity" : "share on the noiseless outcomes";
-    line = `${running ? "So far: " : ""}best in ${day(best.date)} (${what} ${best.v!.toFixed(3)}), worst in ${day(worst.date)} (${worst.v!.toFixed(3)}).`;
+    line = `${running ? "So far: " : ""}best with the calibration of ${day(best.date)} (${what} ${best.v!.toFixed(3)}), worst with that of ${day(worst.date)} (${worst.v!.toFixed(3)}).`;
   }
   return (
     <section className="frame" aria-busy={running}>
@@ -502,7 +502,7 @@ function WatchTab() {
           </article>
         ))}
       </div>
-      {data && <p className={s.note}>Medians across each machine&apos;s qubits and gates, one point per day (that day&apos;s last calibration), over the last {n} days stored. {data.note}</p>}
+      {data && <p className={s.note}>One point per day (that day&apos;s last calibration), over the last {n} days stored. {data.note}</p>}
     </section>
   );
 }
