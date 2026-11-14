@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import UserMenu from "./UserMenu";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const noSubscription = () => () => {};
 import { useAuth } from "../../lib/auth";
@@ -217,6 +217,44 @@ const CHANNELS = [
   { href: "/rewind", label: "Rewind", c: "var(--c-rewind)", match: (p: string) => p === "/rewind" },
 ];
 
+/**
+ * The channel row. On a narrow screen it scrolls sideways: the edge that has more channels
+ * behind it fades out, and the current channel is scrolled into view.
+ */
+function Channels({ pathname, d }: { pathname: string; d: ReturnType<typeof useDetail>[0] }) {
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = nav.current;
+    if (!el) return;
+    const mark = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      el.dataset.moreLeft = String(el.scrollLeft > 1);
+      el.dataset.moreRight = String(max - el.scrollLeft > 1);
+    };
+    const cur = el.querySelector<HTMLElement>('[aria-current="page"]');
+    if (cur) {
+      const left = cur.offsetLeft - el.offsetLeft, right = left + cur.offsetWidth;
+      if (left < el.scrollLeft) el.scrollLeft = Math.max(0, left - 24);
+      else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth + 24;
+    }
+    mark();
+    el.addEventListener("scroll", mark, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(mark);
+    ro?.observe(el);
+    return () => { el.removeEventListener("scroll", mark); ro?.disconnect(); };
+  }, [pathname]);
+  return (
+    <nav ref={nav} className="channels" aria-label="Parts of Q-Lab">
+      {CHANNELS.map((c) => (
+        <Link key={c.href} href={withDetail(c.href, d)} aria-current={c.match(pathname) ? "page" : undefined}
+          style={{ ["--ch" as string]: c.c }}>
+          <i aria-hidden="true" />{c.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 function Dial() {
   const [d, setD] = useDetail();
   return (
@@ -240,14 +278,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <header className="shell-bar">
         <Link href={withDetail("/runs", d)} className="shell-word" aria-label="Q-Lab, your runs">Q-LAB</Link>
-        <nav className="channels" aria-label="Parts of Q-Lab">
-          {CHANNELS.map((c) => (
-            <Link key={c.href} href={withDetail(c.href, d)} aria-current={c.match(pathname) ? "page" : undefined}
-              style={{ ["--ch" as string]: c.c }}>
-              <i aria-hidden="true" />{c.label}
-            </Link>
-          ))}
-        </nav>
+        <Channels pathname={pathname} d={d} />
         <button type="button" className="cmd-trigger" onClick={() => openCommand()} aria-keyshortcuts="Control+K Meta+K /">
           <span>Find a run, project, backend, circuit hash, or any page…</span>
           <kbd aria-hidden="true">{mac ? "⌘K" : "Ctrl K"}</kbd>

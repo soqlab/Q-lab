@@ -92,6 +92,14 @@
 .sparkRead small { font-size: 10.5px; }
 .sparkNone { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 
+/* Compare across time: at phone width the table fits the column instead of scrolling sideways. */
+@media (max-width: 560px) {
+  .ctable th, .ctable td { padding: 6px 5px; }
+  .ctable thead th { white-space: normal; vertical-align: bottom; }
+  .ctable .top { white-space: normal; }
+  .ctable .top span { white-space: nowrap; }
+}
+
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (max-width: 920px) {

@@ -438,7 +438,7 @@ function CompareAcross({ machine, text, shots, seed, months }: { machine: string
         {job && points.length > 0 && job.ideal.available && <TimeLine points={points} label={metric === "hellinger" ? "Hellinger fidelity" : "Share of shots on the noiseless outcomes"} />}
         {job && (
           <div className="table-wrap d-standard">
-            <table className={board.table}>
+            <table className={`${board.table} ${s.ctable}`}>
               <thead><tr><th>Month</th><th className="r">Hellinger</th><th className="r">On ideal</th><th>Top outcome</th><th className={board.hideNarrow}>Calibration</th></tr></thead>
               <tbody>
                 {job.results.map((x) => (
@@ -447,7 +447,7 @@ function CompareAcross({ machine, text, shots, seed, months }: { machine: string
                     {x.status === "ok" ? <>
                       <td className="r num">{fid(x.hellinger_fidelity)}</td>
                       <td className="r num">{x.share_on_ideal_outcomes == null ? "—" : pct(x.share_on_ideal_outcomes)}</td>
-                      <td className="mono">{x.top?.[0] ? `${x.top[0][0]} (${pct(x.top[0][1])})` : "—"}</td>
+                      <td className={`mono ${s.top}`}>{x.top?.[0] ? <>{x.top[0][0]} <span>({pct(x.top[0][1])})</span></> : "—"}</td>
                       <td className={`mono ${board.hideNarrow}`}>{x.snapshot?.sha256.slice(0, 12)}</td>
                     </> : <td colSpan={4} className={board.muted} style={{ whiteSpace: "normal" }}>{x.status === "error" ? x.error : x.status === "running" ? "running…" : "waiting"}</td>}
                   </tr>

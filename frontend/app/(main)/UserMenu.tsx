@@ -19,7 +19,7 @@ export default function UserMenu() {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div className="user-menu" style={{ display: "flex", alignItems: "center", gap: 12 }}>
       {/* Theme toggle */}
       <button
         onClick={toggle}
@@ -41,6 +41,7 @@ export default function UserMenu() {
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
           <div
+            className="user-menu-avatar"
             style={{
               width: 30, height: 30, borderRadius: "50%",
               background: "var(--strong)", color: "#fff",
@@ -50,14 +51,15 @@ export default function UserMenu() {
           >
             {user.name.charAt(0).toUpperCase()}
           </div>
-          <span style={{ color: "var(--text)", fontWeight: 500 }}>{user.name}</span>
+          <span className="user-menu-name" style={{ color: "var(--text)", fontWeight: 500 }}>{user.name}</span>
 
           <button
             className="button secondary"
             onClick={logout}
+            title={`Sign out ${user.name}`}
             style={{ fontSize: 13, height: 32, padding: "0 10px" }}
           >
-            <LogOut size={14} aria-hidden="true" /> Sign out
+            <LogOut size={14} aria-hidden="true" /> <span className="user-menu-out">Sign out</span>
           </button>
         </div>
       )}

@@ -80,7 +80,8 @@ const AUTH_SHIM = `(function(){
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The theme script below sets data-theme before React hydrates; that attribute is expected to differ.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {API_BASE && <script dangerouslySetInnerHTML={{ __html: API_SHIM }} />}
         {/* After API_SHIM, so it wraps it and sees the original /qlab-api URL. */}

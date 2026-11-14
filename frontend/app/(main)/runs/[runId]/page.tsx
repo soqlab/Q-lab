@@ -407,14 +407,14 @@ function TagEditor({ runId, initialTags, onSaved }: { runId: string; initialTags
         {!tags.length && <span style={{ fontSize: 13, color: "var(--muted)" }}>No tags</span>}
       </div>
       {token && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input
             className="input"
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
             placeholder="Add tag…"
-            style={{ height: 32, minWidth: 0, flex: 1 }}
+            style={{ height: 32, minWidth: 120, flex: 1 }}
           />
           <button className="button secondary" style={{ height: 32, fontSize: 13, padding: "0 10px" }} onClick={addTag} type="button">Add</button>
           <button className="button" style={{ height: 32, fontSize: 13, padding: "0 12px" }} onClick={() => void save()} disabled={saving} type="button">
@@ -933,7 +933,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
           <KeyValue label="Created" value={new Date(run.created_at).toLocaleString()} />
           <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--line)", fontSize: 14, alignItems: "flex-start", gap: 12 }}>
             <span style={{ color: "var(--muted)", fontWeight: 500, flexShrink: 0 }}>Tags</span>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <TagEditor runId={run.run_id} initialTags={tags} onSaved={setTags} />
             </div>
           </div>

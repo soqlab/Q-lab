@@ -204,6 +204,8 @@ button, input, select, textarea { font: inherit; }
 .page {
   padding: 26px 28px 38px;
   display: grid;
+  /* One column as wide as the screen: a long select or readout can't widen the page. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
@@ -231,6 +233,8 @@ button, input, select, textarea { font: inherit; }
   color: var(--text);
   transition: border-color 0.15s, background 0.2s;
 }
+/* A select sizes itself to its longest option; never wider than its row. */
+select.input { max-width: 100%; text-overflow: ellipsis; }
 
 .input:focus {
   outline: none;
@@ -793,7 +797,15 @@ html:not([data-detail="plain"]) .d-plain-only { display: none !important; }
   padding: 8px 18px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
 .shell-word { font-family: var(--mono); font-weight: 700; letter-spacing: 0.14em; font-size: 13px; color: var(--text); }
-.channels { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.channels { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; overscroll-behavior-x: contain; }
+.channels::-webkit-scrollbar { display: none; }
+/* More channels past an edge: that edge fades (set by Channels in app/(main)/layout.tsx). */
+.channels[data-more-right="true"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.channels[data-more-left="true"] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.channels[data-more-left="true"][data-more-right="true"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
 .channels a {
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   font-size: 13px; color: var(--muted); padding: 6px 10px; border-radius: 4px;
@@ -839,7 +851,17 @@ html:not([data-detail="plain"]) .d-plain-only { display: none !important; }
 @media (max-width: 720px) {
   .shell-bar { gap: 8px; padding: 8px 12px; }
   .cmd-trigger { order: 3; flex-basis: 100%; max-width: none; }
-  .channels { order: 4; flex-basis: 100%; }
+  .channels { order: 4; flex-basis: calc(100% + 24px); margin: 0 -12px; padding: 0 12px; scroll-padding: 0 12px; }
+  .channels a { padding: 6px 8px; }
+  /* Signed in on a phone: the word, the dial and the account controls share one row. */
+  .shell-tools { gap: 8px; }
+  .user-menu { gap: 8px !important; }
+  .user-menu-name { display: none; }
+  .user-menu-out { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .dial button { padding: 5px 7px; }
+}
+@media (max-width: 420px) {
+  .user-menu-avatar { display: none !important; }
   .page { padding: 16px 12px 24px; }
 }
 

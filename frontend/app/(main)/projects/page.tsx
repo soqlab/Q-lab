@@ -10,7 +10,7 @@ function ProjectCard({ project }: { project: Project }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "14px 18px", borderBottom: "1px solid var(--line)", gap: 16,
+      padding: "14px 18px", borderBottom: "1px solid var(--line)", gap: 12, flexWrap: "wrap",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         <div style={{
@@ -29,7 +29,7 @@ function ProjectCard({ project }: { project: Project }) {
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginLeft: "auto" }}>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{project.run_count}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>runs</div>
@@ -130,7 +130,7 @@ export default function ProjectsPage() {
         <section className="panel">
           <div className="panel-header"><h2>Create Project</h2></div>
           <form onSubmit={handleCreate} style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 13, color: "var(--muted)" }}>Slug <span style={{ color: "var(--muted)", fontWeight: 400 }}>(URL-safe, auto-formatted)</span></label>
                 <input className="input" value={slug} onChange={e => handleSlugInput(e.target.value)} placeholder="e.g. vqe-2026" required />

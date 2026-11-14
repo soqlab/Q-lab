@@ -97,7 +97,11 @@ export function TimeLine({ points, label }: { points: { date: string; v: number 
         ))}
       </svg>
       {h && (
-        <div className={s.tip} style={{ left: `${(x(hover!) / W) * 100}%`, top: `${((h.v == null ? T : y(h.v)) / H) * 100}%` }}>
+        <div className={s.tip} style={{
+          left: `${(x(hover!) / W) * 100}%`, top: `${((h.v == null ? T : y(h.v)) / H) * 100}%`,
+          // Near an edge the label hangs inward so it never leaves the chart (or widens the page).
+          transform: `translate(${x(hover!) / W < 0.2 ? "-12px" : x(hover!) / W > 0.8 ? "calc(-100% + 12px)" : "-50%"}, calc(-100% - 12px))`,
+        }}>
           <b className="num">{h.v == null ? "—" : h.v.toFixed(3)}</b>
           <small>{day(h.date)}{h.sha ? ` · ${h.sha.slice(0, 10)}` : ""}</small>
         </div>
