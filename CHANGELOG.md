@@ -28,6 +28,9 @@ its changes (below) ship in this release too. What you get:
 - **SDK.** Amazon Braket and IonQ capture, seeds and calibration from Qiskit 2 targets, QPY
   circuits, `qlab ci check`; Aer's `SamplerV2` (and runtime local mode) is recorded once, not
   twice; no install ping for self-hosted setups.
+- **Rewind, part 1.** Given an IBM key, the server archives every IBM machine's calibration once
+  a day, and back through IBM's history, with signed daily manifests: the record that will
+  answer "what was the machine like when my run ran".
 - **No invented numbers.** Every Labs tool computes from your runs, exact simulation or your
   input, or it was removed; hardware prices come from one sourced table.
 
