@@ -36,6 +36,7 @@ from .routers import build_info as build_info_router
 from .routers import hardware_board as hardware_board_router
 from .routers import rewind as rewind_router
 from .routers import certificate as certificate_router
+from .routers import rewind_accuracy as rewind_accuracy_router
 from .routers import oauth as oauth_router
 from .routers import passkeys as passkeys_router
 from .routers.notes import run_notes_router, notes_router
@@ -272,6 +273,7 @@ app.include_router(build_info_router.router)
 app.include_router(hardware_board_router.router)
 app.include_router(rewind_router.router)
 app.include_router(certificate_router.router)
+app.include_router(rewind_accuracy_router.router)
 app.include_router(team.router)
 app.include_router(run_notes_router)
 app.include_router(notes_router)

@@ -28,6 +28,11 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   current state honestly: reproduced, reproduced 2/3, didn't reproduce, or not yet reproduced. Re-runs
   that count are the owner's and other accounts' shared ones, so a stranger can't add or remove a
   "reproduced". Unsharing takes the page and the badge down.
+- **Rewind accuracy.** Once a week the server runs a fixed 20-circuit benchmark (`rewind-bench-1`) on a few
+  real IBM machines, replays the same compiled circuits on the replica of the calibration in force when
+  each job ran, and publishes the Hellinger fidelity between the two (`GET /api/v1/rewind/accuracy`,
+  method in `docs/REWIND_METHOD.md`). Replays now say how well their machine matched, or that it
+  hasn't been measured. The hardware board and the benchmark share one QPU budget per 28 days.
 
 ## [0.4.0] - 2026-11-14
 
