@@ -262,8 +262,10 @@ def compare(body: CompareRequest, request: Request, identity: Optional[Identity]
     else:
         rewind_compare_limiter(request)
     from ..database import SessionLocal
+    from ..rewind import bench
+    accuracy, note = bench.accuracy_for(db, body.machine, include_simulated=hv.simulated())
     doc = cmp.start_compare(body.machine, days, body.circuit, body.format, body.shots, body.seed, signed_in,
-                            hv.simulated(), SessionLocal, circuit)
+                            hv.simulated(), SessionLocal, circuit, accuracy, note)
     if doc is None:
         raise HTTPException(status_code=503, detail="Another comparison is running; try again in a minute.",
                             headers={"Retry-After": "60"})

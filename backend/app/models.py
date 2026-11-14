@@ -890,3 +890,48 @@ class MachineSnapshot(Base):
     sdk_versions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # harvest | backfill | simulated
     source: Mapped[str] = mapped_column(String(20), index=True)
+
+
+class QpuUsage(Base):
+    """One job's share of the server's IBM QPU time: the hardware board's and Rewind's benchmark
+    jobs both draw on the same open-plan allowance (app/qpu_budget.py). A row is written before a
+    job is submitted (with IBM's estimate formula) and gets the usage IBM reports once it ends."""
+    __tablename__ = "qpu_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # hardware-board | rewind-bench
+    source: Mapped[str] = mapped_column(String(40), index=True)
+    machine: Mapped[str] = mapped_column(String(120))
+    job_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    simulated: Mapped[bool] = mapped_column(Boolean, default=False)
+    reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    estimated_seconds: Mapped[float] = mapped_column(Float)
+    actual_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class RewindAccuracy(Base):
+    """One Rewind benchmark job on real hardware and how its replica compared (app/rewind/bench.py).
+
+    Made when the hardware job ends (status "waiting"), filled when the replica has been run on the
+    calibration in force at the job's execution time (status "done"). Written only by the server."""
+    __tablename__ = "rewind_accuracy"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    machine: Mapped[str] = mapped_column(String(120), index=True)
+    bench_version: Mapped[str] = mapped_column(String(40))
+    simulated: Mapped[bool] = mapped_column(Boolean, default=False)
+    # waiting | done | error
+    status: Mapped[str] = mapped_column(String(20), index=True, default="waiting")
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    measured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    shots: Mapped[int] = mapped_column(Integer)
+    snapshot_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    snapshot_calibrated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    snapshot_rule: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    median: Mapped[float | None] = mapped_column(Float, nullable=True)
+    worst: Mapped[float | None] = mapped_column(Float, nullable=True)
+    n_circuits: Mapped[int] = mapped_column(Integer, default=0)
+    # Per circuit: id, hardware counts, replica counts, the three Hellinger fidelities.
+    circuits: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -30,6 +30,31 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 - Signed in, "Save this to Q-Lab" keeps a replay as a run (`POST /api/v1/rewind/save`): replayed
   again on the server, so the counts can't be edited, with backend `rewind:<machine>`, tags
   `rewind` and `simulated`, and the calibration's sha256; its page says it is a replay, not hardware.
+- Provenance certificate for every run (run page Actions menu and Ctrl+K: "Certificate";
+  `GET /api/v1/runs/{id}/certificate`, `?download=1` for the `.json`): a signed statement, schema
+  `qlab-provenance-certificate/1`, of the circuit hashes (as stored, as given to `transpile()`, as
+  compiled: QPY and QASM), the machine, a hash of the calibration recorded with the run plus the
+  matching Rewind snapshot's sha256 when one is stored, package and Python versions, transpiler
+  settings, seeds, shots, a hash of the counts, the run record's digest from /verify, and how its
+  re-runs compared. Hashes and settings only; nothing about the uploader. Signed with Ed25519 +
+  ML-DSA-65 by `QLAB_CERT_SIGNING_KEY`, or Rewind's `QLAB_REWIND_SIGNING_KEY` when that is not set
+  (public key at `/api/v1/certificates/public-key`). Owner only, or anyone once the run is shared.
+  Checked offline by `backend/app/provenance/verify.py` (standard library + `cryptography`, served at
+  `/api/v1/certificates/verify.py`; how-to in SELF_HOSTING.md) and in the browser, with
+  @noble/post-quantum 0.7.1 and @noble/curves 2.4.0 vendored from `tools/pq-verify-js` (no CDN).
+  `/certificate` checks any saved certificate file without uploading it.
+- Reproduced badge: a shared run gets `/verified/<share token>`, answer first ("Reproduced: 2
+  independent re-runs agreed within shot noise (TVD ≤ 0.02). Certificate verified in your
+  browser."), and `/verified/<share token>/badge.svg` with Markdown, HTML and LaTeX
+  (`\href{...}{Reproduced on Q-Lab}`) to copy (run page: "Badge for your paper"). The badge shows the
+  current state honestly: reproduced, reproduced 2/3, didn't reproduce, or not yet reproduced. Re-runs
+  that count are the owner's and other accounts' shared ones, so a stranger can't add or remove a
+  "reproduced". Unsharing takes the page and the badge down.
+- **Rewind accuracy.** Once a week the server runs a fixed 20-circuit benchmark (`rewind-bench-1`) on a few
+  real IBM machines, replays the same compiled circuits on the replica of the calibration in force when
+  each job ran, and publishes the Hellinger fidelity between the two (`GET /api/v1/rewind/accuracy`,
+  method in `docs/REWIND_METHOD.md`). Replays now say how well their machine matched, or that it
+  hasn't been measured. The hardware board and the benchmark share one QPU budget per 28 days.
 
 ## [0.4.0] - 2026-11-14
 

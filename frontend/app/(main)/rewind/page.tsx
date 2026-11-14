@@ -10,7 +10,7 @@ import board from "../../../components/board/board.module.css";
 import { Seg } from "../../../components/board/parts";
 import { CountBars, Spark, TimeLine } from "./charts";
 import {
-  apiError, type CompareJob, day, type Days, EXAMPLES, fid, type Machines, METRICS, type MetricKey, nearestDay, pct,
+  type Accuracy, apiError, type CompareJob, day, type Days, EXAMPLES, fid, type Machines, METRICS, type MetricKey, nearestDay, pct,
   type Replay, sentence, stamp, verdict, type Watch,
 } from "./data";
 import s from "./rewind.module.css";
@@ -311,10 +311,7 @@ function Result({ r, signedIn, text, name, seed }: { r: Replay; signedIn: boolea
         <div className="frame-body" style={{ display: "grid", gap: 12 }}>
           <div className="table-wrap"><CountBars counts={r.counts} shots={r.shots} ideal={r.ideal?.available ? r.ideal.top : undefined} /></div>
           <p className={s.label} role="note">{r.label}</p>
-          <p className={s.note}>
-            <b>Accuracy:</b> {r.accuracy == null ? "not measured" : typeof r.accuracy === "number" ? fid(r.accuracy) : JSON.stringify(r.accuracy)}
-            {r.accuracy_note ? `. ${r.accuracy_note}.`.replace(/\.\.$/, ".") : ""}
-          </p>
+          <AccuracyLine a={r.accuracy} note={r.accuracy_note} />
           {r.snapshot.gap_days !== 0 && <p className={s.note}>{r.snapshot.note}</p>}
           {r.notes.map((n) => <p key={n} className={s.note}>{n}</p>)}
           <dl className={s.facts}>
@@ -338,6 +335,16 @@ function Result({ r, signedIn, text, name, seed }: { r: Replay; signedIn: boolea
       </section>
       {signedIn && <SaveRun r={r} text={text} name={name} seed={seed} />}
     </>
+  );
+}
+
+/** How well replicas of this machine matched real runs, in the API's own words. */
+function AccuracyLine({ a, note }: { a: Accuracy; note: string | null }) {
+  return (
+    <p className={s.note} role="note">
+      <b>Accuracy against real hardware:</b> {a == null ? (note ? `${note.replace(/\.$/, "")}.` : "not measured yet.") : note}
+      {a && <span className="d-expert mono"> (median {fid(a.median)}, worst {fid(a.worst)}, {a.n_circuits} circuits, measured {stamp(a.measured_at)}{a.simulated ? ", simulated preview" : ""})</span>}
+    </p>
   );
 }
 
@@ -449,7 +456,8 @@ function CompareAcross({ machine, text, shots, seed, months }: { machine: string
             </table>
           </div>
         )}
-        {job && <p className={s.note}>{job.label} Accuracy: {job.accuracy == null ? "not measured" : String(job.accuracy)}{job.accuracy_note ? ` (${job.accuracy_note})` : ""}.</p>}
+        {job && <p className={s.note}>{job.label}</p>}
+        {job && <AccuracyLine a={job.accuracy} note={job.accuracy_note} />}
       </div>
     </section>
   );

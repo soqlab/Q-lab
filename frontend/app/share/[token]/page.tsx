@@ -67,9 +67,14 @@ export default function PublicSharePage({ params: paramsPromise }: { params: Pro
             Shared Run
           </span>
         </div>
-        <Link href="/" style={{ color: "#94a3b8", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
-          <ExternalLink size={14} /> Open Q-Lab
-        </Link>
+        <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+          <Link href={`/verified/${encodeURIComponent(params.token)}`} style={{ color: "#94a3b8", fontSize: 13, textDecoration: "none" }}>
+            Reproduced? Certificate
+          </Link>
+          <Link href="/" style={{ color: "#94a3b8", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+            <ExternalLink size={14} /> Open Q-Lab
+          </Link>
+        </div>
       </header>
 
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px" }}>

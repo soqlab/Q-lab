@@ -1,0 +1,18 @@
+{
+  "name": "qlab-pq-verify-bundle",
+  "private": true,
+  "description": "Builds frontend/public/vendor/qlab-pq-verify.js: ML-DSA-65, Ed25519 and SHA-256 verification for provenance certificates in the browser, from @noble/post-quantum, served from Q-Lab's own origin.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "@noble/post-quantum": "0.7.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

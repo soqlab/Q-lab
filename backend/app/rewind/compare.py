@@ -272,7 +272,8 @@ def _gated(fn: Callable[[], Any]) -> Any:
 
 def start_compare(machine: str, days: list[str], text: str, fmt: Optional[str], shots: int, seed: Optional[int],
                   signed_in: bool, include_simulated: bool, session_factory: Callable[[], Session],
-                  circuit) -> Optional[dict[str, Any]]:
+                  circuit, accuracy: Optional[dict[str, Any]] = None,
+                  accuracy_note: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Start the job in the background; None when another comparison is running here."""
     if not _running.acquire(blocking=False):
         return None
@@ -284,7 +285,7 @@ def start_compare(machine: str, days: list[str], text: str, fmt: Optional[str], 
         "job": job, "machine": machine, "status": "running", "shots": shots, "started_at": _now(), "finished_at": None,
         "ideal": {"available": None, "reason": None, "top": []},
         "results": [{"date": d, "status": "pending"} for d in days],
-        "accuracy": None, "accuracy_note": rp.ACCURACY_NOTE, "real_hardware": False,
+        "accuracy": accuracy, "accuracy_note": accuracy_note or rp.ACCURACY_NOTE, "real_hardware": False,
         "label": f"Simulated from IBM-published calibrations of {machine}; not affiliated with or endorsed by IBM.",
     }
     try:

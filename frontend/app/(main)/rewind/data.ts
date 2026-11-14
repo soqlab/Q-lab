@@ -21,6 +21,11 @@ export type Ideal = {
   available: boolean; reason: string | null; hellinger_fidelity: number | null;
   share_on_ideal_outcomes: number | null; top: [string, number][]; outcomes: number | null;
 };
+/** How close replicas of a machine came to its real runs (backend/app/rewind/bench.py), or null. */
+export type Accuracy = {
+  median: number; worst: number; n_circuits: number; measured_at: string; simulated: boolean; poor_match: boolean;
+  window?: { days: number; runs: number; median: number | null; worst: number | null }; details?: string;
+} | null;
 export type Replay = {
   label: string; machine: string; requested_date: string;
   snapshot: { calibrated_at: string; sha256: string; source: string; gap_days: number; note: string; manifest_date: string };
@@ -32,7 +37,7 @@ export type Replay = {
     readout_error_median: number | null; basis_gates: string[] | null;
   };
   software: Record<string, string>; seconds: number;
-  accuracy: unknown; accuracy_note: string | null; real_hardware: boolean; notes: string[];
+  accuracy: Accuracy; accuracy_note: string | null; real_hardware: boolean; notes: string[];
   ideal?: Ideal;
   limits?: { qubits: number; shots: number };
 };
@@ -44,7 +49,7 @@ export type CompareRow = {
 export type CompareJob = {
   job: string; machine: string; status: "running" | "done" | "failed"; shots: number; error?: string;
   ideal: { available: boolean | null; reason: string | null; top: [string, number][] };
-  results: CompareRow[]; accuracy: unknown; accuracy_note: string | null; label: string;
+  results: CompareRow[]; accuracy: Accuracy; accuracy_note: string | null; label: string;
 };
 export type WatchMachine = { machine: string; snapshots: number; first_date: string; last_date: string; latest: Medians | null; series: Medians[] };
 export type Watch = { collecting: boolean; simulated: boolean; reason: string | null; days: number; machines: WatchMachine[]; note: string };
