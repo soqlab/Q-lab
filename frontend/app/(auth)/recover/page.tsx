@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
-import { passkeyErrorMessage, recoverWithCode, recoverWithPasskey } from "../../../lib/passkeys";
+import { fetchPasskeyConfig, passkeyErrorMessage, recoverWithCode, recoverWithPasskey } from "../../../lib/passkeys";
+import { recoverWithSoqlab, soqlabMessage } from "../../../lib/soqlab";
 import AuthFrame from "../AuthFrame";
 import s from "../auth.module.css";
 
@@ -19,6 +20,16 @@ function RecoverForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState<number | null>(null);
+  // When offered: the recovery ends in a SOQLAB passkey, linked to this Q-Lab account only.
+  const [soqlab, setSoqlab] = useState(false);
+
+  useEffect(() => {
+    void fetchPasskeyConfig().then((c) => setSoqlab(!!c.soqlab_id));
+  }, []);
+
+  const soqlabRecover = (proof: { code?: string; token?: string }) => run(async () => {
+    try { await recoverWithSoqlab(proof); } catch (err) { throw new Error(soqlabMessage(err)); }
+  });
 
   async function run(fn: () => Promise<void>) {
     setError(null);
@@ -74,6 +85,11 @@ function RecoverForm() {
         <button className={s.primary} type="button" onClick={() => void withLink()} disabled={loading}>
           {loading ? "Waiting for your passkey…" : "Create passkey and sign in"}
         </button>
+        {soqlab && (
+          <button className={s.secondary} type="button" onClick={() => void soqlabRecover({ token })} disabled={loading}>
+            Create a SOQLAB passkey instead
+          </button>
+        )}
         <Link className={s.link} href="/recover">Use a recovery code instead</Link>
       </AuthFrame>
     );
@@ -115,6 +131,12 @@ function RecoverForm() {
         <button className={s.primary} type="submit" disabled={loading || code.replace(/[^0-9a-z]/gi, "").length < 16}>
           {loading ? "Waiting for your passkey…" : "Create a new passkey"}
         </button>
+        {soqlab && (
+          <button className={s.secondary} type="button" onClick={() => void soqlabRecover({ code })}
+            disabled={loading || code.replace(/[^0-9a-z]/gi, "").length < 16}>
+            Create a SOQLAB passkey instead
+          </button>
+        )}
         <p className={s.note}>Five tries per 15 minutes from one internet address, so codes can&apos;t be guessed.</p>
       </form>
     </AuthFrame>
