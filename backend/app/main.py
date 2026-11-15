@@ -64,6 +64,7 @@ from .routers import hardware_intel as hardware_intel_router
 from .routers import institute_admin as institute_admin_router
 from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
+from .routers import why_failed as why_failed_router
 from .routers import answer as answer_router
 from .routers import machine_pick as machine_pick_router
 from .routers import reproduce as reproduce_router
@@ -301,6 +302,7 @@ app.include_router(hardware_intel_router.router)
 app.include_router(institute_admin_router.router)
 app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
+app.include_router(why_failed_router.router)
 app.include_router(answer_router.router)
 app.include_router(machine_pick_router.router)
 app.include_router(reproduce_router.router)
