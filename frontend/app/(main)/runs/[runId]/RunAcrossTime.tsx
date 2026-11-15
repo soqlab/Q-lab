@@ -7,6 +7,7 @@
  * in the coming days. Backend: GET /api/v1/runs/{id}/timeline[/replay|/forecast] (app/time_dial.py).
  */
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl, getStoredToken } from "../../../../lib/api";
 import s from "./RunAcrossTime.module.css";
@@ -287,7 +288,10 @@ export default function RunAcrossTime({ runId }: { runId: string }) {
     <section className="frame" aria-labelledby="across-time-h">
       <div className="frame-head">
         <h2 id="across-time-h" className="inst-label">This run across time</h2>
-        <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{machine}</span>
+        <Link className="mono" style={{ fontSize: 11, color: "var(--muted)", textDecoration: "underline" }}
+          href={timeline.state === "ready" ? `/rewind?${new URLSearchParams({ machine, ...(timeline.run_date ? { date: timeline.run_date } : {}), run: timeline.run_id })}` : "/rewind"}>
+          {machine} in Rewind
+        </Link>
       </div>
       <div className={s.body}>
         <div className={s.track}>
