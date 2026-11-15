@@ -27,6 +27,14 @@ services:
       # Sign-in is passkeys only: no password is set, reset or accepted (see SELF_HOSTING.md).
       - key: QLAB_PASSKEYS_ONLY
         value: "true"
+      # Sign in with SOQLAB (backend/app/routers/soqlab_id.py): off until all three are set.
+      # Issuer https://id.soqlab.com; register https://qlab.soqlab.com/soqlab-callback there.
+      - key: QLAB_SOQLAB_ID_ISSUER
+        sync: false
+      - key: QLAB_SOQLAB_ID_CLIENT_ID
+        sync: false
+      - key: QLAB_SOQLAB_ID_CLIENT_SECRET
+        sync: false
     healthCheckPath: /health
     disk:
       name: qlab-data

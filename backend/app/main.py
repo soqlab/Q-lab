@@ -39,6 +39,7 @@ from .routers import certificate as certificate_router
 from .routers import rewind_accuracy as rewind_accuracy_router
 from .routers import oauth as oauth_router
 from .routers import passkeys as passkeys_router
+from .routers import soqlab_id as soqlab_id_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
 from .routers import sweeps as sweeps_router
@@ -264,6 +265,7 @@ app.add_middleware(MarkIllustrativeData)
 app.include_router(auth_routes.router)
 app.include_router(oauth_router.router)
 app.include_router(passkeys_router.router)
+app.include_router(soqlab_id_router.router)
 app.include_router(users.router)
 app.include_router(benchmarks.router)
 app.include_router(webhooks.router)
