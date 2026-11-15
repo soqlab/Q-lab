@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import logging
 import sys
 import typing
 from typing import Any
@@ -105,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.check:
             return check(client)
+        # stdout is the protocol; httpx would log each URL (with its query) at INFO.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
         build_server(client).run("stdio")
         return 0
     finally:
