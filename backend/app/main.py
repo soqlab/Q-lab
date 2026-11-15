@@ -66,6 +66,7 @@ from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
 from .routers import answer as answer_router
 from .routers import machine_pick as machine_pick_router
+from .routers import time_dial as time_dial_router
 from .routers import reproduce as reproduce_router
 from .routers import verify_run as verify_run_router
 from .routers import pub_report as pub_report_router
@@ -303,6 +304,7 @@ app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
 app.include_router(answer_router.router)
 app.include_router(machine_pick_router.router)
+app.include_router(time_dial_router.router)
 app.include_router(reproduce_router.router)
 app.include_router(verify_run_router.router)
 app.include_router(pub_report_router.router)
