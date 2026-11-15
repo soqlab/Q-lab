@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from tests.helpers import client
@@ -24,6 +25,9 @@ from tests.test_passkeys import ORIGIN, SoftAuthenticator, add_passkey, bearer, 
 ISSUER = "https://id.soqlab.example"
 CLIENT_ID = "qlab"
 SECRET = "client-secret-for-tests-" + "x" * 16
+LINK_KEY = ec.generate_private_key(ec.SECP256R1())
+LINK_PEM = LINK_KEY.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                  serialization.NoEncryption()).decode()
 
 
 class FakeIssuer:
@@ -93,6 +97,8 @@ def issuer(monkeypatch):
     monkeypatch.setenv("QLAB_SOQLAB_ID_ISSUER", ISSUER)
     monkeypatch.setenv("QLAB_SOQLAB_ID_CLIENT_ID", CLIENT_ID)
     monkeypatch.setenv("QLAB_SOQLAB_ID_CLIENT_SECRET", SECRET)
+    # As Render holds it: one line with "\\n" escapes.
+    monkeypatch.setenv("QLAB_SOQLAB_ID_LINK_KEY", LINK_PEM.replace("\n", "\\n"))
     monkeypatch.setattr(rate_limit.auth_limiter, "max_calls", 1000)
     fake = FakeIssuer()
     monkeypatch.setattr(soqlab_id, "_http", fake.http)
@@ -112,13 +118,29 @@ def start(purpose="login", **body) -> dict:
     return r.json()
 
 
-def finish(begun: dict, code: str, flow: str | None = None):
-    return client.post("/auth/soqlab/callback", json={"code": code, "state": begun["state"],
-                                                       "flow": flow or begun["flow"]})
+def finish(begun: dict, code: str, flow: str | None = None, iss: str | None = ISSUER):
+    body = {"code": code, "state": begun["state"], "flow": flow or begun["flow"]}
+    if iss is not None:
+        body["iss"] = iss
+    return client.post("/auth/soqlab/callback", json=body)
+
+
+def read_ticket(url: str) -> dict:
+    """What id.soqlab.com does with a ticket: ES256 only, with Q-Lab's public link key."""
+    raw = _q(url)["ticket"]
+    assert jwt.get_unverified_header(raw)["alg"] == "ES256"
+    claims = jwt.decode(raw, LINK_KEY.public_key(), algorithms=["ES256"], audience=ISSUER)
+    assert claims["exp"] - claims["iat"] <= 300 and 16 <= len(claims["jti"]) <= 128
+    for name in ("iss", "sub", "code_challenge", "state", "nonce", "redirect_uri"):
+        assert claims[name], name
+    return claims
 
 
 def soqlab_sign_in(fake: FakeIssuer, sub: str, purpose="login", **body):
     begun = start(purpose, **body)
+    if purpose == "signup":  # through /link: the ID token carries the ticket's jti
+        t = read_ticket(begun["authorize_url"])
+        return finish(begun, fake.issue(sub, t["nonce"], t["code_challenge"], link_ticket=t["jti"]))
     q = _q(begun["authorize_url"])
     return finish(begun, fake.issue(sub, q["nonce"], q["code_challenge"]))
 
@@ -128,14 +150,12 @@ def ticket(token: str | None = None, **body) -> dict:
                     headers=bearer(token) if token else {})
     assert r.status_code == 200, r.text
     begun = r.json()
-    raw = _q(begun["authorize_url"])["ticket"]
-    claims = jwt.decode(raw, SECRET, algorithms=["HS256"], audience=ISSUER)
-    return {**begun, "ticket": claims}
+    return {**begun, "ticket": read_ticket(begun["authorize_url"])}
 
 
 def link(fake: FakeIssuer, token: str, sub: str):
     t = ticket(token)
-    return finish(t, fake.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"]))
+    return finish(t, fake.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"], link_ticket=t["ticket"]["jti"]))
 
 
 def passkey_account() -> dict:
@@ -145,7 +165,8 @@ def passkey_account() -> dict:
 # ── Off by default ───────────────────────────────────────────────────────────
 
 def test_flag_off_routes_are_404_and_config_says_off(monkeypatch):
-    for name in ("QLAB_SOQLAB_ID_ISSUER", "QLAB_SOQLAB_ID_CLIENT_ID", "QLAB_SOQLAB_ID_CLIENT_SECRET"):
+    for name in ("QLAB_SOQLAB_ID_ISSUER", "QLAB_SOQLAB_ID_CLIENT_ID", "QLAB_SOQLAB_ID_CLIENT_SECRET",
+                 "QLAB_SOQLAB_ID_LINK_KEY"):
         monkeypatch.delenv(name, raising=False)
     assert client.get("/auth/passkeys/config").json()["soqlab_id"] is False
     assert client.post("/auth/soqlab/start", json={"purpose": "login"}).status_code == 404
@@ -163,6 +184,16 @@ def test_flag_off_routes_are_404_and_config_says_off(monkeypatch):
     monkeypatch.setenv("QLAB_SOQLAB_ID_CLIENT_ID", CLIENT_ID)
     assert client.get("/auth/passkeys/config").json()["soqlab_id"] is False
     monkeypatch.setenv("QLAB_SOQLAB_ID_CLIENT_SECRET", SECRET)
+    assert client.get("/auth/passkeys/config").json()["soqlab_id"] is False  # no link key: off
+    other = ec.generate_private_key(ec.SECP384R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    public = LINK_KEY.public_key().public_bytes(serialization.Encoding.PEM,
+                                                serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    for bad in ("not a key", other, public):
+        monkeypatch.setenv("QLAB_SOQLAB_ID_LINK_KEY", bad)
+        assert client.get("/auth/passkeys/config").json()["soqlab_id"] is False
+    monkeypatch.setenv("QLAB_SOQLAB_ID_LINK_KEY", LINK_PEM)
+    assert client.get("/auth/passkeys/config").json()["soqlab_id"] is True
     monkeypatch.setenv("QLAB_SOQLAB_ID_ISSUER", "http://id.soqlab.example")
     assert client.get("/auth/passkeys/config").json()["soqlab_id"] is False
 
@@ -176,10 +207,14 @@ def test_flag_on_config_says_on(issuer):
 def test_signup_then_sign_in_with_the_same_soqlab_passkey(issuer):
     sub = "pairwise-" + uuid.uuid4().hex
     begun = start("signup", name="Ada")
-    q = _q(begun["authorize_url"])
-    assert q["prompt"] == "create" and q["code_challenge_method"] == "S256" and q["scope"] == "openid"
-    assert q["redirect_uri"] == f"{ORIGIN}/soqlab-callback" and q["client_id"] == CLIENT_ID
-    made = finish(begun, issuer.issue(sub, q["nonce"], q["code_challenge"]))
+    # Sign-up is a link ticket for an account that doesn't exist yet, never /authorize.
+    assert begun["authorize_url"].startswith(f"{ISSUER}/link?")
+    t = read_ticket(begun["authorize_url"])
+    assert t["iss"] == CLIENT_ID and t["sub"].startswith("new-") and t["redirect_uri"] == f"{ORIGIN}/soqlab-callback"
+    login = _q(start()["authorize_url"])
+    assert "prompt" not in login and login["code_challenge_method"] == "S256" and login["scope"] == "openid"
+    assert login["redirect_uri"] == f"{ORIGIN}/soqlab-callback" and login["client_id"] == CLIENT_ID
+    made = finish(begun, issuer.issue(sub, t["nonce"], t["code_challenge"], link_ticket=t["jti"]))
     assert made.status_code == 200, made.text
     body = made.json()
     assert len(body["recovery_codes"]) == 10 and body["api_key"] and body["user"]["email"] is None
@@ -204,9 +239,8 @@ def test_link_a_passkey_account_then_unlink(issuer):
     t = ticket(acct["access_token"])
     claims = t["ticket"]
     assert claims["iss"] == CLIENT_ID and claims["aud"] == ISSUER and claims["sub"] == str(acct["user"]["id"])
-    assert claims["exp"] - claims["iat"] <= 300 and claims["jti"] and claims["purpose"] == "link"
     assert claims["redirect_uri"] == f"{ORIGIN}/soqlab-callback" and t["authorize_url"].startswith(f"{ISSUER}/link?")
-    done = finish(t, issuer.issue(sub, claims["nonce"], claims["code_challenge"]))
+    done = finish(t, issuer.issue(sub, claims["nonce"], claims["code_challenge"], link_ticket=claims["jti"]))
     assert done.status_code == 200, done.text
     assert soqlab_sign_in(issuer, sub).json()["user"]["id"] == acct["user"]["id"]
     status = client.get("/auth/soqlab/status", headers=bearer(acct["access_token"])).json()
@@ -271,9 +305,9 @@ def test_recovery_code_ends_in_a_soqlab_passkey_once(issuer):
     acct = passkey_account()
     code = acct["recovery_codes"][0]
     t = ticket(purpose="recover", code=code)
-    assert t["ticket"]["purpose"] == "recover" and t["ticket"]["sub"] == str(acct["user"]["id"])
+    assert t["ticket"]["sub"] == str(acct["user"]["id"])
     sub = "rec-" + uuid.uuid4().hex
-    done = finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"]))
+    done = finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"], link_ticket=t["ticket"]["jti"]))
     assert done.status_code == 200, done.text
     assert done.json()["recovery_codes_remaining"] == 9
     # The code is used up.
@@ -349,8 +383,8 @@ def test_replayed_link_ticket_flow_is_refused(issuer):
     acct = passkey_account()
     t = ticket(acct["access_token"])
     sub = "tk-" + uuid.uuid4().hex
-    assert finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"])).status_code == 200
-    again = finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"]))
+    assert finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"], link_ticket=t["ticket"]["jti"])).status_code == 200
+    again = finish(t, issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"], link_ticket=t["ticket"]["jti"]))
     assert again.status_code == 400
 
 
@@ -374,3 +408,37 @@ def test_discovery_on_another_origin_is_refused(issuer, monkeypatch):
     monkeypatch.setattr(soqlab_id, "_http", http)
     soqlab_id._discovery.clear()
     assert client.post("/auth/soqlab/start", json={"purpose": "login"}).status_code == 503
+
+
+def test_issuer_in_the_redirect_must_be_ours(issuer):
+    sub = _linked_sub(issuer)
+    begun = start()
+    q = _q(begun["authorize_url"])
+    for iss in (None, "", "https://evil.example"):
+        assert finish(begun, issuer.issue(sub, q["nonce"], q["code_challenge"]), iss=iss).status_code == 400, iss
+    # Refused before anything is used up: with the right iss the same round trip still works.
+    assert finish(begun, issuer.issue(sub, q["nonce"], q["code_challenge"])).status_code == 200
+
+
+def test_link_ticket_in_the_id_token_must_match(issuer):
+    acct = passkey_account()
+    sub = "lt-" + uuid.uuid4().hex
+    for wrong in ({}, {"link_ticket": "someone-elses-ticket-0000"}):
+        t = ticket(acct["access_token"])
+        code = issuer.issue(sub, t["ticket"]["nonce"], t["ticket"]["code_challenge"], **wrong)
+        assert finish(t, code).status_code == 401
+    # A plain sign-in whose ID token carries a link_ticket is refused too.
+    linked = _linked_sub(issuer)
+    begun = start()
+    q = _q(begun["authorize_url"])
+    assert finish(begun, issuer.issue(linked, q["nonce"], q["code_challenge"], link_ticket="x" * 32)).status_code == 401
+    # Signing up with a SOQLAB passkey that already has a Q-Lab account is refused, not merged.
+    assert soqlab_sign_in(issuer, linked, "signup", name="Again").status_code == 409
+
+
+def test_hs256_tickets_are_gone(issuer):
+    acct = passkey_account()
+    r = client.post("/auth/soqlab/link-ticket", json={"purpose": "link"}, headers=bearer(acct["access_token"]))
+    raw = _q(r.json()["authorize_url"])["ticket"]
+    with pytest.raises(jwt.PyJWTError):
+        jwt.decode(raw, SECRET, algorithms=["HS256"], audience=ISSUER)

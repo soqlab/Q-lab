@@ -1,12 +1,14 @@
 """Sign in with SOQLAB: one passkey (made at id.soqlab.com) for Q-Lab and SOQLAB's other products.
 
-Off unless QLAB_SOQLAB_ID_ISSUER, QLAB_SOQLAB_ID_CLIENT_ID and QLAB_SOQLAB_ID_CLIENT_SECRET are all
-set (and QLAB_APP_URL, which gives the redirect URI). Off, every route here answers 404 and
+Off unless QLAB_SOQLAB_ID_ISSUER, QLAB_SOQLAB_ID_CLIENT_ID, QLAB_SOQLAB_ID_CLIENT_SECRET and
+QLAB_SOQLAB_ID_LINK_KEY (an EC P-256 private key, PEM; "\\n" escapes allowed) are all set, the key
+parses, and QLAB_APP_URL gives the redirect URI. Off, every route here answers 404 and
 /auth/passkeys/config says soqlab_id: false, so the sign-in pages show nothing new.
 
 The protocol is OpenID Connect, authorization code with PKCE (S256):
 
   POST /auth/soqlab/start        {purpose: login|signup, ...}        where to send the browser
+                                 (sign-up goes through /link with a ticket for a new account)
   POST /auth/soqlab/link-ticket  {purpose: link|recover, ...}        id.soqlab.com/link?ticket=…
   POST /auth/soqlab/callback     {code, state, flow}                 a normal Q-Lab session
   GET  /auth/soqlab/status                                           is this account linked
@@ -28,8 +30,10 @@ or name: Q-Lab maps that subject to its own account and issues its own token, ex
 sign-in does (amr "passkey", idp "soqlab").
 
 Linking needs a recent sign-in (10 minutes), or for recovery a valid recovery code or emailed link,
-and goes through a short ticket Q-Lab signs (HS256 with the client secret, 5 minutes, single-use
-jti) that id.soqlab.com checks before it makes the passkey.
+and goes through a short ticket Q-Lab signs (ES256 with Q-Lab's private link key, whose public half
+id.soqlab.com holds; 5 minutes; single-use jti). The ID token that comes back after /link carries
+that jti as link_ticket, and it must match; a plain sign-in's ID token must carry none. Every
+redirect back carries iss (RFC 9207), which must be the configured issuer.
 """
 from __future__ import annotations
 
@@ -43,11 +47,14 @@ import secrets
 import time
 import uuid
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, Optional
 from urllib.parse import quote, urlencode, urlparse
 
 import httpx
 import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from jwt import PyJWTError
 from pydantic import BaseModel, Field
@@ -87,15 +94,31 @@ def _issuer_ok(issuer: str) -> bool:
     return p.scheme == "http" and p.hostname in ("localhost", "127.0.0.1")
 
 
-def settings() -> Optional[dict[str, str]]:
-    """{issuer, client_id, client_secret, redirect_uri}, or None when the feature is off."""
+@lru_cache(maxsize=4)
+def _link_key(pem: str):
+    """The private link key (EC P-256) from its PEM, or None if it isn't one."""
+    try:
+        key = serialization.load_pem_private_key(pem.replace("\\n", "\n").strip().encode(), password=None)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(key, ec.EllipticCurvePrivateKey) or key.curve.name != "secp256r1":
+        return None
+    return key
+
+
+def settings() -> Optional[dict[str, Any]]:
+    """{issuer, client_id, client_secret, link_key, redirect_uri}, or None when the feature is off."""
     issuer = os.getenv("QLAB_SOQLAB_ID_ISSUER", "").strip().rstrip("/")
     client_id = os.getenv("QLAB_SOQLAB_ID_CLIENT_ID", "").strip()
     secret = os.getenv("QLAB_SOQLAB_ID_CLIENT_SECRET", "").strip()
+    pem = os.getenv("QLAB_SOQLAB_ID_LINK_KEY", "").strip()
     app_url = os.getenv("QLAB_APP_URL", "").strip().rstrip("/")
-    if not (issuer and client_id and secret and app_url) or not _issuer_ok(issuer):
+    if not (issuer and client_id and secret and pem and app_url) or not _issuer_ok(issuer):
         return None
-    return {"issuer": issuer, "client_id": client_id, "client_secret": secret,
+    key = _link_key(pem)
+    if key is None:
+        return None
+    return {"issuer": issuer, "client_id": client_id, "client_secret": secret, "link_key": key,
             "redirect_uri": f"{app_url}/soqlab-callback"}
 
 
@@ -103,7 +126,7 @@ def enabled() -> bool:
     return settings() is not None
 
 
-def _cfg() -> dict[str, str]:
+def _cfg() -> dict[str, Any]:
     cfg = settings()
     if cfg is None:
         raise HTTPException(status_code=404, detail="Not Found")
@@ -143,7 +166,7 @@ def _http(method: str, url: str, *, data: dict | None = None, headers: dict | No
                 return res.status_code, None
 
 
-def _fetch_json(url: str, cfg: dict[str, str]) -> dict:
+def _fetch_json(url: str, cfg: dict[str, Any]) -> dict:
     if _origin(url) != _origin(cfg["issuer"]):
         raise ValueError("URL is not on the issuer's origin")
     status, body = _http("GET", url)
@@ -157,7 +180,7 @@ _jwks: dict[str, tuple[float, dict]] = {}
 _jwks_forced: dict[str, float] = {}
 
 
-def _metadata(cfg: dict[str, str]) -> dict:
+def _metadata(cfg: dict[str, Any]) -> dict:
     issuer = cfg["issuer"]
     cached = _discovery.get(issuer)
     if cached and time.time() - cached[0] < CACHE_SECONDS:
@@ -172,7 +195,7 @@ def _metadata(cfg: dict[str, str]) -> dict:
     return doc
 
 
-def _signing_key(cfg: dict[str, str], kid: str):
+def _signing_key(cfg: dict[str, Any], kid: str):
     issuer = cfg["issuer"]
     uri = _metadata(cfg)["jwks_uri"]
 
@@ -199,12 +222,12 @@ def _signing_key(cfg: dict[str, str], kid: str):
     return key
 
 
-def _basic(cfg: dict[str, str]) -> str:
+def _basic(cfg: dict[str, Any]) -> str:
     raw = f"{quote(cfg['client_id'], safe='')}:{quote(cfg['client_secret'], safe='')}".encode()
     return "Basic " + base64.b64encode(raw).decode()
 
 
-def verify_id_token(cfg: dict[str, str], token: str, nonce: str) -> dict:
+def verify_id_token(cfg: dict[str, Any], token: str, nonce: str) -> dict:
     """The checked claims of an ID token from the configured issuer. Raises ValueError."""
     try:
         header = jwt.get_unverified_header(token)
@@ -238,7 +261,7 @@ def verify_id_token(cfg: dict[str, str], token: str, nonce: str) -> dict:
     return claims
 
 
-def _exchange(cfg: dict[str, str], code: str, verifier: str) -> str:
+def _exchange(cfg: dict[str, Any], code: str, verifier: str) -> str:
     """Code + PKCE verifier for an ID token, at the issuer's token endpoint."""
     status, body = _http("POST", _metadata(cfg)["token_endpoint"], data={
         "grant_type": "authorization_code", "code": code, "redirect_uri": cfg["redirect_uri"],
@@ -249,7 +272,7 @@ def _exchange(cfg: dict[str, str], code: str, verifier: str) -> str:
     return body["id_token"]
 
 
-def remote_unlink(cfg: dict[str, str], subject: str) -> bool:
+def remote_unlink(cfg: dict[str, Any], subject: str) -> bool:
     """Ask id.soqlab.com to delete its link for this subject. Best effort."""
     try:
         status, _ = _http("POST", f"{cfg['issuer']}/unlink", data={"sub": subject},
@@ -325,6 +348,19 @@ class CallbackPayload(BaseModel):
     code: str = Field(min_length=1, max_length=2048)
     state: str = Field(min_length=16, max_length=128)
     flow: str = Field(min_length=16, max_length=128)
+    # RFC 9207: the issuer that sent the browser back. Must be the configured one.
+    iss: str = Field(default="", max_length=255)
+
+
+def _ticket_url(cfg: dict[str, Any], f: dict[str, str], jti: str, sub: str) -> str:
+    """id.soqlab.com/link with a ticket signed ES256 by Q-Lab's private link key (5 minutes)."""
+    now = int(time.time())
+    ticket = jwt.encode({
+        "iss": cfg["client_id"], "aud": cfg["issuer"], "sub": sub, "jti": jti, "iat": now,
+        "exp": now + TICKET_TTL_SECONDS, "code_challenge": f["code_challenge"], "state": f["state"],
+        "nonce": f["nonce"], "redirect_uri": cfg["redirect_uri"],
+    }, cfg["link_key"], algorithm="ES256", headers={"typ": "JWT"})
+    return f"{cfg['issuer']}/link?{urlencode({'ticket': ticket})}"
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -343,12 +379,17 @@ def start(payload: StartPayload, db: Session = Depends(get_db)):
         endpoint = _metadata(cfg)["authorization_endpoint"]
     except Exception as exc:  # noqa: BLE001 - any issuer failure is "unavailable"
         raise _unavailable(exc) from None
-    f = _new_flow(db, payload.purpose, data=data)
+    if payload.purpose == "signup":
+        # A new account is a link ticket for an account that doesn't exist yet: its placeholder id
+        # lives only in this round trip, and the account is made when the ticket comes back.
+        jti = uuid.uuid4().hex
+        data["new_account"] = "new-" + secrets.token_urlsafe(18)
+        f = _new_flow(db, "signup", data=data, jti=jti)
+        return {"authorize_url": _ticket_url(cfg, f, jti, data["new_account"]), "state": f["state"], "flow": f["flow"]}
+    f = _new_flow(db, "login")
     params = {"response_type": "code", "client_id": cfg["client_id"], "redirect_uri": cfg["redirect_uri"],
               "scope": "openid", "state": f["state"], "nonce": f["nonce"], "code_challenge": f["code_challenge"],
               "code_challenge_method": "S256"}
-    if payload.purpose == "signup":
-        params["prompt"] = "create"
     return {"authorize_url": f"{endpoint}?{urlencode(params)}", "state": f["state"], "flow": f["flow"]}
 
 
@@ -412,17 +453,9 @@ def link_ticket(payload: TicketPayload, request: Request, authorization: Optiona
         raise _unavailable(exc) from None
     jti = uuid.uuid4().hex
     f = _new_flow(db, payload.purpose, user_id=user.id, data=data, jti=jti)
-    now = int(time.time())
-    ticket = jwt.encode({
-        "iss": cfg["client_id"], "aud": cfg["issuer"], "sub": str(user.id), "jti": jti, "iat": now,
-        "exp": now + TICKET_TTL_SECONDS, "redirect_uri": cfg["redirect_uri"], "state": f["state"],
-        "nonce": f["nonce"], "code_challenge": f["code_challenge"], "code_challenge_method": "S256",
-        "purpose": payload.purpose,
-    }, cfg["client_secret"], algorithm="HS256", headers={"typ": "JWT"})
     log_audit(db, f"auth.soqlab_{payload.purpose}_started", "user", str(user.id), request=request,
               user_id=user.id, org_id=user.org_id)
-    return {"authorize_url": f"{cfg['issuer']}/link?{urlencode({'ticket': ticket})}", "state": f["state"],
-            "flow": f["flow"]}
+    return {"authorize_url": _ticket_url(cfg, f, jti, str(user.id)), "state": f["state"], "flow": f["flow"]}
 
 
 def _claim(db: Session, payload: CallbackPayload) -> SoqlabFlow:
@@ -445,9 +478,17 @@ def _claim(db: Session, payload: CallbackPayload) -> SoqlabFlow:
 def callback(payload: CallbackPayload, request: Request, db: Session = Depends(get_db)):
     """Finish a round trip: the code is exchanged, the ID token checked, then the Q-Lab account."""
     cfg = _cfg()
+    if not hmac.compare_digest(payload.iss.encode(), cfg["issuer"].encode()):
+        raise HTTPException(status_code=400, detail="This sign-in didn't come back from SOQLAB. Start again.")
     flow = _claim(db, payload)
     try:
         claims = verify_id_token(cfg, _exchange(cfg, payload.code, flow.code_verifier), flow.nonce)
+        ticket = claims.get("link_ticket")
+        if flow.jti:  # came back from /link: it must be our ticket
+            if not isinstance(ticket, str) or not hmac.compare_digest(ticket.encode(), flow.jti.encode()):
+                raise ValueError("link_ticket mismatch")
+        elif ticket is not None:  # a plain sign-in carries none
+            raise ValueError("unexpected link_ticket")
     except (ValueError, httpx.HTTPError, UnsafeURL) as exc:
         log.warning("[soqlab-id] sign-in refused: %s", exc)
         log_audit(db, "auth.soqlab_refused", meta={"purpose": flow.purpose}, request=request)
@@ -455,7 +496,7 @@ def callback(payload: CallbackPayload, request: Request, db: Session = Depends(g
     subject, issuer = claims["sub"], cfg["issuer"]
     linked = _identity_for(db, issuer, subject)
 
-    if flow.purpose in ("login", "signup") and linked is not None:
+    if flow.purpose == "login" and linked is not None:
         user = db.get(User, linked.user_id)
         from .. import erasure
         erasure.cancel_if_pending(db, user)
@@ -469,7 +510,10 @@ def callback(payload: CallbackPayload, request: Request, db: Session = Depends(g
         raise HTTPException(status_code=404, detail=NOT_LINKED)
 
     if flow.purpose == "signup":
+        if linked is not None:
+            raise HTTPException(status_code=409, detail="That SOQLAB passkey already belongs to a Q-Lab account. Sign in with it.")
         data = flow.data or {}
+        # The account and its link are made in one commit.
         user = new_account(db, None, data.get("name") or "Q-Lab account", data.get("org_name"), password_hash="")
         db.add(SoqlabIdentity(user_id=user.id, issuer=issuer, subject=subject,
                               last_used_at=datetime.now(timezone.utc)))

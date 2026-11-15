@@ -71,7 +71,8 @@ export async function recoverWithSoqlab(proof: { code?: string; token?: string }
 }
 
 /** Finish on /soqlab-callback: the code and state from the address, the flow secret from this tab. */
-export async function finishSoqlab(code: string, state: string): Promise<SoqlabResult> {
+/** `iss` is the issuer the redirect named (RFC 9207); the server checks it is the configured one. */
+export async function finishSoqlab(code: string, state: string, iss: string): Promise<SoqlabResult> {
   let pending: Pending | null = null;
   try { pending = JSON.parse(sessionStorage.getItem(FLOW_KEY) || "null") as Pending | null; } catch { pending = null; }
   sessionStorage.removeItem(FLOW_KEY);
@@ -79,7 +80,7 @@ export async function finishSoqlab(code: string, state: string): Promise<SoqlabR
     throw new Error("This sign-in didn't start in this tab, or took longer than 10 minutes. Start again.");
   }
   const resp = await call<AuthResponse & { soqlab_linked?: boolean; recovery_codes_remaining?: number }>(
-    "/auth/soqlab/callback", { method: "POST", body: JSON.stringify({ code, state, flow: pending.flow }) },
+    "/auth/soqlab/callback", { method: "POST", body: JSON.stringify({ code, state, iss, flow: pending.flow }) },
   );
   return { ...resp, purpose: pending.purpose, next: safeNext(pending.next) };
 }
@@ -99,7 +100,7 @@ export function soqlabMessage(err: unknown): string {
   const msg = err instanceof Error ? err.message : "";
   switch (msg) {
     case "soqlab_not_linked":
-      return "No Q-Lab account uses this SOQLAB passkey yet. Sign in with your older Q-Lab passkey and link it in Settings, or create a new account.";
+      return "This SOQLAB passkey isn't linked to Q-Lab. Sign in with your older Q-Lab passkey and link it in Settings, or create a new account.";
     case "recent_sign_in_required":
       return "For your safety, sign in again first, then create the SOQLAB passkey within 10 minutes.";
     case "passkey_session_required":
