@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { qlabApiPath } from "../../../../../lib/api";
-import { useDetail, withDetail } from "../../../../../lib/dial";
-import { setCommandContext } from "../../../../../components/CommandPalette";
-import { useAnswer } from "../../../../../components/RunAnswer";
-import { DriftLine } from "../../../../../components/DriftAlarm";
-import { ReproductionLine } from "../../../../../components/ReproduceRun";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { qlabApiPath } from "../../../../lib/api";
+import { useDetail, withDetail } from "../../../../lib/dial";
+import { setCommandContext } from "../../../../components/CommandPalette";
+import { useAnswer } from "../../../../components/RunAnswer";
+import { DriftLine } from "../../../../components/DriftAlarm";
+import { ReproductionLine } from "../../../../components/ReproduceRun";
 
 /*
+ * The project scrubber, on the project's page (/projects/:slug/timeline redirects there).
  * A project as time. The strip is every run of the project in order; dragging along it (or the
  * arrow keys on the slider) moves through them. The view below shows the run under the cursor:
  * its one-sentence answer, and what differs from the run before it, highlighted. The selected run
@@ -192,8 +193,7 @@ function Moment({ run, prev, slug }: { run: TRun; prev?: TRun; slug: string }) {
   );
 }
 
-export default function TimelinePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+export default function ProjectScrubber({ slug }: { slug: string }) {
   const [tl, setTl] = useState<{ slug: string; state: "ok" | "error" | "missing"; data?: Timeline } | null>(null);
   const [index, setIndex] = useState<number | null>(null);
 
@@ -242,12 +242,12 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
     return () => setCommandContext([]);
   }, [cur, slug]);
 
-  if (!tl || tl.slug !== slug) return <main className="page"><p className="summary-line">Loading the project&apos;s history…</p></main>;
-  if (tl.state === "missing") return <main className="page"><p className="summary-line">There is no project called “{slug}” among the runs you can see.</p></main>;
-  if (tl.state === "error" || !tl.data) return <main className="page"><p className="summary-line">The project&apos;s history couldn&apos;t be loaded right now.</p></main>;
+  if (!tl || tl.slug !== slug) return <p className="summary-line">Loading the project&apos;s history…</p>;
+  if (tl.state === "missing") return null;
+  if (tl.state === "error" || !tl.data) return <p className="summary-line">The project&apos;s history couldn&apos;t be loaded right now.</p>;
   const d = tl.data;
   if (!runs.length || index === null || !cur) {
-    return <main className="page"><p className="summary-line">{d.name} has no runs yet. Runs appear here when a script records them with <span className="mono">project=&quot;{slug}&quot;</span>.</p></main>;
+    return <p className="summary-line">{d.name} has no runs yet. Runs appear here when a script records them with <span className="mono">project=&quot;{slug}&quot;</span>.</p>;
   }
 
   const measured = runs.filter((r) => r.measure);
@@ -262,7 +262,7 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
     + `${d.truncated ? ` (the latest ${d.shown} are shown)` : ""}. ${measured.length === runs.length ? "Every run has a result." : `${measured.length} have a result to score.`} ${drifted ? ` ${drifted} moved beyond shot noise from the run before it of the same circuit on the same machine (ringed in amber).` : ""}${reproText} Drag along the strip to move through them.`;
 
   return (
-    <main className="page">
+    <div id="history" style={{ display: "grid", gap: 14, marginBottom: 18 }}>
       <p className="summary-line">{summary}</p>
       <section className="frame">
         <div className="frame-head">
@@ -284,6 +284,6 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
         </div>
       </section>
       <Moment run={cur} prev={runs[index - 1]} slug={slug} />
-    </main>
+    </div>
   );
 }

@@ -233,7 +233,7 @@ function RunsInner() {
           <div className="frame-head">
             <h2 className="inst-label">Runs ({runs.length}{runs.length >= 500 ? ", newest 500" : ""})</h2>
             {applied.project && (
-              <Link href={withDetail(`/projects/${encodeURIComponent(applied.project)}/timeline`, detail)} style={{ fontSize: 12, textDecoration: "underline" }}>
+              <Link href={withDetail(`/projects/${encodeURIComponent(applied.project)}`, detail)} style={{ fontSize: 12, textDecoration: "underline" }}>
                 Scrub through {applied.project} as a timeline →
               </Link>
             )}

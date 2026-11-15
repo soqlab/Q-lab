@@ -832,7 +832,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       { id: "here:bundle", kind: "here" as const, title: "Download this run's reproduction bundle", hint: "Circuit, results, calibration, script (.zip)", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/bundle.zip`)) },
       { id: "here:qasm", kind: "here" as const, title: "Download this run's circuit (QASM)", hint: "OpenQASM text", run: () => window.location.assign(qlabApiPath(`/api/v1/runs/${run.run_id}/qasm`)) },
       { id: "here:list-circuit", kind: "here" as const, title: "Every run of this circuit", hint: "Same circuit hash", href: run.fingerprint.qasm_sha256 ? `/runs?circuit=${run.fingerprint.qasm_sha256}` : `/runs?q=${encodeURIComponent(run.circuit_name ?? "")}` },
-      ...(run.project ? [{ id: "here:timeline", kind: "here" as const, title: `${run.project} timeline at this run`, hint: "Scrub through the project", href: `/projects/${encodeURIComponent(run.project)}/timeline?run=${run.run_id}` }] : []),
+      ...(run.project ? [{ id: "here:timeline", kind: "here" as const, title: `${run.project} timeline at this run`, hint: "Scrub through the project", href: `/projects/${encodeURIComponent(run.project)}?run=${run.run_id}` }] : []),
       ...(rewindHref(run, rewindable) ? [{ id: "here:rewind", kind: "here" as const, title: "Rewind this run", hint: `Replay it on ${run.backend} as calibrated that day (simulated)`, href: rewindHref(run, rewindable)! }] : []),
       ...(run.backend && /^ibm/.test(run.backend) ? [{ id: "here:hw", kind: "here" as const, title: `${run.backend} on the hardware board`, hint: "Live status and benchmark history", href: `/hardware/${run.backend}` }] : []),
     ];

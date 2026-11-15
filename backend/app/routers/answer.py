@@ -147,7 +147,7 @@ def lookup(q: str = Query(min_length=1, max_length=200), db: Session = Depends(g
         n = db.scalar(select(func.count()).select_from(Run).where(Run.project_slug == p.slug)) or 0
         mine = identity is not None and p.created_by_user_id == identity.user_id
         if n or mine:
-            add("project", p.name or p.slug, f"/projects/{p.slug}/timeline", f"Project · {n} run{'s' if n != 1 else ''}")
+            add("project", p.name or p.slug, f"/projects/{p.slug}", f"Project · {n} run{'s' if n != 1 else ''}")
         if len([m for m in out if m["kind"] == "project"]) >= 5:
             break
 

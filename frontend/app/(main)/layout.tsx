@@ -214,7 +214,6 @@ const CHANNELS = [
   { href: "/runs", label: "Runs", c: "var(--c-runs)", match: (p: string) => p === "/runs" || p.startsWith("/runs/") },
   { href: "/projects", label: "Projects", c: "var(--c-map)", match: (p: string) => p.startsWith("/projects") },
   { href: "/hardware", label: "Hardware", c: "var(--c-board)", match: (p: string) => p === "/hardware" || p.startsWith("/hardware/") },
-  { href: "/rewind", label: "Rewind", c: "var(--c-rewind)", match: (p: string) => p === "/rewind" },
 ];
 
 /**

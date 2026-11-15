@@ -108,7 +108,7 @@ export default function AdvantageTimelinePage() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
           <TrendingUp size={28} color="#f59e0b" />
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, color: "#e2e8f0" }}>Advantage Timeline Projector</h1>
+            <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, color: "#e2e8f0" }}>Quantum advantage projector</h1>
             <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.9rem" }}>Project when quantum algorithms will outperform classical counterparts</p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function AdvantageTimelinePage() {
               }}
             >
               <Play size={16} />
-              {loading ? "Projecting..." : "Project Timeline"}
+              {loading ? "Projecting…" : "Project the year"}
             </button>
 
             {error && (
@@ -188,7 +188,7 @@ export default function AdvantageTimelinePage() {
             {result === null ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 420, color: "#64748b" }}>
                 <Clock size={56} color="#334155" />
-                <p style={{ marginTop: "1rem" }}>Select an algorithm and run to see the timeline projection</p>
+                <p style={{ marginTop: "1rem" }}>Pick an algorithm and project the year it could beat classical computers</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>

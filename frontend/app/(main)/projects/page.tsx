@@ -20,7 +20,7 @@ function ProjectCard({ project }: { project: Project }) {
           <Folder size={18} color="var(--strong)" aria-hidden="true" />
         </div>
         <div style={{ minWidth: 0 }}>
-          <Link href={`/projects/${project.slug}/timeline`} style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", textDecoration: "none" }}>
+          <Link href={`/projects/${project.slug}`} style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", textDecoration: "none" }}>
             {project.name}
           </Link>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
@@ -34,14 +34,11 @@ function ProjectCard({ project }: { project: Project }) {
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{project.run_count}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>runs</div>
         </div>
-        <Link className="button secondary" href={`/projects/${project.slug}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
-          <Folder size={14} aria-hidden="true" /> Dashboard
+        <Link className="button" href={`/projects/${encodeURIComponent(project.slug)}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
+          <Folder size={14} aria-hidden="true" /> Open
         </Link>
         <Link className="button secondary" href={`/runs?project=${encodeURIComponent(project.slug)}`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
           <History size={14} aria-hidden="true" /> Runs
-        </Link>
-        <Link className="button" href={`/projects/${encodeURIComponent(project.slug)}/timeline`} style={{ fontSize: 13, height: 32, padding: "0 12px" }}>
-          Timeline
         </Link>
       </div>
     </div>
