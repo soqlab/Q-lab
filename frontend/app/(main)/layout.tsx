@@ -140,7 +140,7 @@ function WarmupBanner() {
 }
 
 // Pages anyone can use without an account (each says what signing in adds).
-const PUBLIC_PATHS = ["/rewind"];
+const PUBLIC_PATHS = ["/rewind", "/papers"];
 const isPublic = (p: string | null) => !!p && PUBLIC_PATHS.some((x) => p === x || p.startsWith(`${x}/`));
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -215,6 +215,7 @@ const CHANNELS = [
   { href: "/hardware", label: "Hardware", c: "var(--c-board)", match: (p: string) => p === "/hardware" || p.startsWith("/hardware/") },
   { href: "/compare", label: "Compare", c: "var(--c-compare)", match: (p: string) => p === "/compare" },
   { href: "/rewind", label: "Rewind", c: "var(--c-rewind)", match: (p: string) => p === "/rewind" },
+  { href: "/papers", label: "Papers", c: "var(--c-papers)", match: (p: string) => p === "/papers" },
 ];
 
 /**

@@ -59,3 +59,5 @@ rewind_run_limiter = RateLimiter(max_calls=6, period=60)  # Rewind replays witho
 rewind_run_user_limiter = RateLimiter(max_calls=20, period=60)  # Rewind replays / min / account
 rewind_compare_limiter = RateLimiter(max_calls=2, period=600)  # Rewind comparisons (12 replays each) without an account / 10 min / IP
 rewind_compare_user_limiter = RateLimiter(max_calls=6, period=600)  # Rewind comparisons / 10 min / account
+papers_find_limiter = RateLimiter(max_calls=6, period=600)  # papers fetched from arXiv/GitHub without an account / 10 min / IP
+papers_find_user_limiter = RateLimiter(max_calls=30, period=600)  # papers fetched / 10 min / account

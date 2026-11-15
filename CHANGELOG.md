@@ -7,6 +7,27 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Reproduce a paper, `/papers`, open without an account (a new Papers channel in the top bar and in
+  Ctrl K). Paste an arXiv link or id: Q-Lab reads the paper's arXiv source and, if its abstract or
+  comments link one, its GitHub repository, and lists the OpenQASM 2/3 circuits it finds (files,
+  LaTeX listings, Markdown fences, triple-quoted strings). Pick one and run it on a replica of an
+  IBM machine as calibrated on a chosen day (Rewind), or on the ideal (noiseless) simulator, which
+  is what runs when no calibration is stored, labelled as such. Type the paper's reported success
+  probability, fidelity or distribution and the result shows side by side with a verdict line
+  ("Matches the paper: … inside the ±0.03 that 1,024 shots and rounding allow"). A bitstring table
+  found in the paper's files can be used, marked "extracted, check it". Copy a link to the
+  comparison, or, signed in, save it as a run tagged `paper` and `simulated`.
+  API: `GET /api/v1/papers/status`, `POST /api/v1/papers/find`, `/run`, `/compare`, `/save`.
+  Code from papers is never run: a paper whose circuits are only in Python says so and asks for
+  OpenQASM. Fetches go only to arXiv and GitHub over https, through the internal-address check, with
+  size and time limits; archives are read in memory with limits on entries, file sizes and unpacked
+  bytes, and refuse traversal names, links and special files.
+
+### Security
+- OpenQASM `include` statements other than `qelib1.inc` and `stdgates.inc` are refused before
+  parsing (Rewind, the machine pick and papers). Qiskit's readers would otherwise open any file an
+  include names on the server, and their error messages quoted what they read.
+
 - Rewind's screen, `/rewind`, open without an account (a new Rewind channel in the top bar and in
   Ctrl K). Pick a machine, slide over the days that machine has a stored calibration for (it shows
   which calibration that day uses), paste or drop a circuit or take an example (Bell, GHZ-5, a QFT

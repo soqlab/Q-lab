@@ -247,12 +247,29 @@ def qasm3_to_qasm2(text: str) -> str:
     return "".join(x + ("\n" if x.endswith("}") else ";\n") for x in out)
 
 
+STANDARD_INCLUDES = frozenset({"qelib1.inc", "stdgates.inc"})
+_INCLUDE = re.compile(r"\binclude\s*\"([^\"]*)\"")
+
+
+def refuse_file_includes(text: str) -> None:
+    """Qiskit's QASM readers open any file an include names, absolute paths too, and their error
+    messages quote what they read. So only the two standard libraries (built into the readers) may
+    be included; anything else is refused before parsing, and no file on the server is ever read."""
+    body = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+    for name in _INCLUDE.findall(body):
+        if name.strip() not in STANDARD_INCLUDES:
+            raise CircuitError(f"The circuit includes “{name[:60]}”. Only the standard qelib1.inc and stdgates.inc "
+                               "can be included; paste any other gate definitions into the circuit itself.")
+
+
 def parse_circuit(text: str):
     """A QuantumCircuit from OpenQASM 2 or 3 text, with idle qubits dropped. Raises CircuitError."""
     if not isinstance(text, str) or not text.strip():
         raise CircuitError("Paste an OpenQASM 2 or 3 circuit, or pick one of your runs.")
     if len(text.encode("utf-8")) > MAX_QASM_BYTES:
         raise CircuitError(f"The circuit text is over {MAX_QASM_BYTES // 1000} kB; the estimate takes smaller circuits.")
+    refuse_file_includes(text)
     from qiskit import qasm2
 
     is3 = bool(re.search(r"OPENQASM\s+3", text))
