@@ -146,6 +146,12 @@ def _ensure_compat_columns() -> None:
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notification_channels_created_by_user_id "
                                   "ON notification_channels(created_by_user_id)"))
 
+    if "api_keys" in tables:
+        key_cols = {c["name"] for c in inspector.get_columns("api_keys")}
+        if "scope" not in key_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE api_keys ADD COLUMN scope VARCHAR(16) NOT NULL DEFAULT 'full'"))
+
     if "audit_logs" in tables:
         audit_cols = {c["name"] for c in inspector.get_columns("audit_logs")}
         with engine.begin() as conn:

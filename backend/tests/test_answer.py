@@ -144,7 +144,7 @@ def test_lookup_recognises_run_ids_hashes_projects_and_backends():
         return {(m["kind"], m["href"]) for m in r.json()["matches"]}
     assert ("run", f"/runs/{rid}") in kinds(rid[:10])
     assert ("circuit", f"/runs?circuit={'ab12cd34' * 8}") in kinds("ab12cd34ab")
-    assert ("project", f"/projects/{project}/timeline") in kinds(project)
+    assert ("project", f"/projects/{project}") in kinds(project)
     got = kinds("ibm_kingston")
     assert ("backend", "/runs?backend=ibm_kingston") in got
     assert ("hardware", "/hardware/ibm_kingston") in got

@@ -31,6 +31,8 @@ qiskit = ["qiskit>=1.0"]
 braket = ["amazon-braket-sdk>=1.80"]
 ionq = ["qiskit>=1.0", "qiskit-ionq>=1.0"]
 jupyter = ["ipython>=7.0", "ipywidgets>=7.0"]
+# qlab-mcp: read-only tools for your own AI assistant over MCP (stdio). docs/ASK_YOUR_ASSISTANT.md
+mcp = ["mcp>=2.3,<3"]
 all = ["qiskit>=1.0", "ipython>=7.0", "ipywidgets>=7.0"]
 dev   = ["build", "twine", "pytest", "pytest-asyncio", "pytest-cov", "ruff"]
 
@@ -42,6 +44,7 @@ Issues     = "https://github.com/soqlab/Q-lab/issues"
 
 [project.scripts]
 qlab = "qlab.cli:main"
+qlab-mcp = "qlab.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where   = ["."]

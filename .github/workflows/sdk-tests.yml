@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e ".[dev]" pytest-cov "${{ matrix.qiskit }}" "${{ matrix.aer }}" "${{ matrix.runtime }}"
+        run: pip install -e ".[dev,mcp]" pytest-cov "${{ matrix.qiskit }}" "${{ matrix.aer }}" "${{ matrix.runtime }}"
       - name: Installed Qiskit
         run: pip show qiskit qiskit-aer qiskit-ibm-runtime | grep -E "^(Name|Version)"
       - name: Run tests

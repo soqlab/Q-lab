@@ -190,6 +190,28 @@ against a local HTTP stand-in for `api.ionq.co/v0.4` with hand-written responses
 been made on AWS or IonQ cloud devices with these hooks, so field names in live responses that
 differ from the published schemas would show up as missing calibration, not as an error.
 
+## Ask your assistant (MCP)
+
+`qlab-mcp` lets your own AI assistant answer questions about your runs ("why did last night's run
+get worse?") over the Model Context Protocol. It runs on your machine over stdio and can only read:
+each tool is a `GET` to Q-Lab's API with a **read-only** API key (Settings, API keys, tick
+"Read-only"); Q-Lab refuses other keys and records each tool call in its audit log.
+
+```bash
+pip install "qlab-sdk[mcp]"
+QLAB_API_URL=https://qlab.soqlab.com/qlab-api QLAB_API_KEY=qlab_... qlab-mcp --check
+```
+
+```json
+{"mcpServers": {"qlab": {"command": "qlab-mcp",
+  "env": {"QLAB_API_URL": "https://qlab.soqlab.com/qlab-api", "QLAB_API_KEY": "qlab_your_read_only_key"}}}}
+```
+
+Tools: `list_recent_runs`, `run_summary`, `compare_runs`, `why_outcome`, `run_drift`,
+`run_across_time`, `run_forecast`, `hardware_board`, `machines_available`, `rewind_status`.
+Setup for self-hosted servers, what is logged and the limits:
+[docs/ASK_YOUR_ASSISTANT.md](https://github.com/soqlab/Q-lab/blob/main/docs/ASK_YOUR_ASSISTANT.md).
+
 ## CI baseline checks
 
 `qlab ci check` compares a run's measurement counts with a baseline run and fails

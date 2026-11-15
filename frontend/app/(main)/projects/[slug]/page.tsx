@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle, XCircle, Clock, TrendingUp, BarChart2, Layers } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Clock, TrendingUp, BarChart2 } from "lucide-react";
+import ProjectScrubber from "./ProjectScrubber";
 import { fetchProjectStats, ProjectStats, ProjectTimelinePoint, healthColor, qlabApiPath } from "../../../../lib/api";
 
 // ------------------------------------------------------------------
@@ -184,13 +185,6 @@ export default function ProjectPage({ params: paramsPromise }: { params: Promise
         >
           <BarChart2 size={15} /> Export CSV
         </a>
-        <Link
-          className="button"
-          href={`/projects/${encodeURIComponent(params.slug)}/timeline`}
-          style={{ fontSize: 13 }}
-        >
-          <Layers size={15} /> Timeline
-        </Link>
         <Link className="button secondary" href={`/runs?project=${encodeURIComponent(params.slug)}`} style={{ fontSize: 13 }}>
           View runs
         </Link>
@@ -199,6 +193,8 @@ export default function ProjectPage({ params: paramsPromise }: { params: Promise
       {data.description && (
         <p style={{ margin: "4px 0 14px", fontSize: 14, color: "var(--muted)" }}>{data.description}</p>
       )}
+
+      <ProjectScrubber slug={params.slug} />
 
       {/* KPI strip */}
       <div className="summary-grid">

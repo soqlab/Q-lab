@@ -100,6 +100,9 @@ const nextConfig = {
       { source: "/backends/:backend", destination: "/hardware/:backend" },
       { source: "/hardware-rec", destination: "/hardware/pick" },
       { source: "/cost-oracle", destination: "/hardware/pick" },
+      // A project's history is scrubbed on the project's page (?run= is kept: redirects pass the query on).
+      { source: "/projects/:slug/timeline", destination: "/projects/:slug" },
+      { source: "/timeline", destination: "/projects" },
     ].map((r) => ({ ...r, ...notApi, permanent: false }));
   },
 

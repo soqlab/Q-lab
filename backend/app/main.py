@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from .analytics import get_timeseries
 from .backends import QUANTUM_BACKENDS
 from .database import DATA_DIR, SessionLocal, get_db, init_db
+from .read_only_keys import ReadOnlyKeys
 from .deps import Identity, get_identity, log_audit, require_auth
 from .events import event_stream, publish_sync, set_event_loop
 from .health_score import compute_health_score, health_breakdown
@@ -69,6 +70,7 @@ from .routers import explain_diff as explain_diff_router
 from .routers import why_failed as why_failed_router
 from .routers import answer as answer_router
 from .routers import machine_pick as machine_pick_router
+from .routers import time_dial as time_dial_router
 from .routers import reproduce as reproduce_router
 from .routers import verify_run as verify_run_router
 from .routers import pub_report as pub_report_router
@@ -249,6 +251,10 @@ app = FastAPI(
     dependencies=[Depends(scope_runs_to_caller)],
 )
 
+# Read-only API keys stay read-only, and AI assistants (X-Client: mcp/...) need one; logged.
+# Added first, so CORS wraps its refusals too.
+app.add_middleware(ReadOnlyKeys)
+
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -309,6 +315,7 @@ app.include_router(explain_diff_router.router)
 app.include_router(why_failed_router.router)
 app.include_router(answer_router.router)
 app.include_router(machine_pick_router.router)
+app.include_router(time_dial_router.router)
 app.include_router(reproduce_router.router)
 app.include_router(verify_run_router.router)
 app.include_router(pub_report_router.router)

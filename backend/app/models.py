@@ -77,6 +77,9 @@ class APIKey(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # "full" (the SDK uploads runs with it) or "read" (GET only; the one an AI assistant may use,
+    # see app/read_only_keys.py).
+    scope: Mapped[str] = mapped_column(String(16), default="full", server_default="full")
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
     org: Mapped["Organization | None"] = relationship(back_populates="api_keys")

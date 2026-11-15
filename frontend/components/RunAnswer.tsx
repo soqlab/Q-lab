@@ -116,7 +116,7 @@ export default function RunAnswer({ runId, project, backend, answer }: {
             </Link>
           )}
           {project && (
-            <Link href={withDetail(`/projects/${encodeURIComponent(project)}/timeline?run=${encodeURIComponent(runId)}`, detail)} style={{ textDecoration: "underline" }}>
+            <Link href={withDetail(`/projects/${encodeURIComponent(project)}?run=${encodeURIComponent(runId)}`, detail)} style={{ textDecoration: "underline" }}>
               See it in the {project} timeline
             </Link>
           )}

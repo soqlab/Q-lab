@@ -126,7 +126,8 @@ export default function PrivacyPage() {
             <li>
               <strong>SOQLAB ID</strong> (id.soqlab.com, run by SOQLAB): only if you sign in with SOQLAB or link a SOQLAB
               passkey, where Q-Lab offers it. Your browser goes there to use the passkey and comes back. When you link,
-              Q-Lab sends it a short-lived, single-use ticket carrying your Q-Lab account number, so the new passkey
+              Q-Lab sends it a short-lived, single-use ticket, signed by Q-Lab, carrying your Q-Lab account number (for a new
+              account, a placeholder), so the new passkey
               attaches to this account alone. Q-Lab receives the per-product identifier above, nothing else, and sends
               no run data. Q-Lab and SOQLAB&apos;s other products never see each other&apos;s data. Unlinking in Settings
               deletes the link here and asks SOQLAB ID to delete it too.
