@@ -16,7 +16,12 @@ function SoqlabCallback() {
   const router = useRouter();
   const params = useSearchParams();
   const ran = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+  // What id.soqlab.com sent back, read once.
+  const [back] = useState(() => ({ code: params.get("code"), state: params.get("state"), denied: params.get("error") }));
+  // Not an error to dwell on: the person closed the SOQLAB page, or the passkey wasn't used.
+  const [error, setError] = useState<string | null>(() => (back.denied || !back.code || !back.state)
+    ? (back.denied === "access_denied" ? "SOQLAB sign-in was cancelled. Nothing changed." : "SOQLAB didn't send a sign-in back. Start again.")
+    : null);
   const [done, setDone] = useState<SoqlabResult | null>(null);
   const [step, setStep] = useState<"codes" | "key" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -24,15 +29,9 @@ function SoqlabCallback() {
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
-    const code = params.get("code");
-    const state = params.get("state");
-    const denied = params.get("error");
     window.history.replaceState(null, "", "/soqlab-callback");
-    if (denied || !code || !state) {
-      // Not an error to dwell on: the person closed the SOQLAB page, or the passkey wasn't used.
-      setError(denied === "access_denied" ? "SOQLAB sign-in was cancelled. Nothing changed." : "SOQLAB didn't send a sign-in back. Start again.");
-      return;
-    }
+    const { code, state, denied } = back;
+    if (denied || !code || !state) return;
     finishSoqlab(code, state)
       .then((resp) => {
         setSession(resp.access_token, resp.user);
