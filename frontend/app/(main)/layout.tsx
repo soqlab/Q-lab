@@ -11,7 +11,7 @@ import { isCorePath, useLabs } from "../../lib/labs";
 import IllustrativeNotice from "./IllustrativeNotice";
 import RecoveryPrompt from "../../components/RecoveryPrompt";
 import CommandPalette, { openCommand } from "../../components/CommandPalette";
-import { DETAILS, DETAIL_LABEL, useDetail, useDetailSync, withDetail } from "../../lib/dial";
+import { useDetail, useDetailSync, withDetail } from "../../lib/dial";
 import { FRONTEND_COMMIT, commitUrl, shortSha } from "../../lib/build";
 
 function SWUpdater() {
@@ -170,10 +170,11 @@ function LabsGate({ children }: { children: React.ReactNode }) {
         <h1 style={{ margin: 0, fontSize: 24 }}>This is an experimental tool</h1>
         <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
           It is part of Q-Lab Labs: early tools that are less tested than the core tracker. Turn on Labs to
-          use it. You can switch Labs off again from the command bar (Ctrl K, then “Labs”).
+          use it. All Labs tools are listed on the Labs page, where you can switch Labs off again.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
           <button className="button" onClick={() => setLabs(true)}>Turn on Labs</button>
+          <Link href="/labs" className="button secondary" style={{ textDecoration: "none" }}>All Labs tools</Link>
           <Link href="/runs" className="button secondary" style={{ textDecoration: "none" }}>Back to runs</Link>
         </div>
       </div>
@@ -213,7 +214,6 @@ const CHANNELS = [
   { href: "/runs", label: "Runs", c: "var(--c-runs)", match: (p: string) => p === "/runs" || p.startsWith("/runs/") },
   { href: "/projects", label: "Projects", c: "var(--c-map)", match: (p: string) => p.startsWith("/projects") },
   { href: "/hardware", label: "Hardware", c: "var(--c-board)", match: (p: string) => p === "/hardware" || p.startsWith("/hardware/") },
-  { href: "/compare", label: "Compare", c: "var(--c-compare)", match: (p: string) => p === "/compare" },
   { href: "/rewind", label: "Rewind", c: "var(--c-rewind)", match: (p: string) => p === "/rewind" },
   { href: "/papers", label: "Papers", c: "var(--c-papers)", match: (p: string) => p === "/papers" },
 ];
@@ -256,20 +256,6 @@ function Channels({ pathname, d }: { pathname: string; d: ReturnType<typeof useD
   );
 }
 
-function Dial() {
-  const [d, setD] = useDetail();
-  return (
-    <div className="dial" role="group" aria-label="How technical">
-      {DETAILS.map((x) => (
-        <button key={x} type="button" aria-pressed={d === x} onClick={() => setD(x)}
-          title={x === "plain" ? "Plain words: the answer and little else" : x === "expert" ? "Everything, including raw records" : "The usual view"}>
-          {DETAIL_LABEL[x]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const [d] = useDetail();
@@ -285,7 +271,6 @@ function Shell({ children }: { children: React.ReactNode }) {
           <kbd aria-hidden="true">{mac ? "⌘K" : "Ctrl K"}</kbd>
         </button>
         <div className="shell-tools">
-          <Dial />
           <UserMenu />
         </div>
       </header>

@@ -22,7 +22,7 @@ function CertificateView({ cert }: { cert: CertificationResult }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ borderRadius: 12, border: `1px solid ${cert.certified ? "var(--ok)" : "var(--danger)"}`, padding: 16 }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: cert.certified ? "var(--ok)" : "var(--danger)" }}>
-          {cert.certified ? "Signal certified" : "Not certified"}
+          {cert.certified ? "Signal confirmed" : "Signal not confirmed"}
         </div>
         <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>{cert.name}</div>
       </div>
@@ -121,24 +121,24 @@ export default function CertifyPage() {
   }
 
   async function open(certId: string) {
-    try { setShown(await getCertification(certId)); } catch { setCertError("Could not load that certificate."); }
+    try { setShown(await getCertification(certId)); } catch { setCertError("Could not load that check."); }
   }
 
   return (
     <main style={{ minHeight: "100vh", color: "var(--text)", padding: 24 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>XEB Certifier</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>XEB signal check</h1>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4, maxWidth: 720 }}>
           Tests whether your runs&apos; measured counts carry the ideal circuit&apos;s signal or could be uniform noise.
           Each run&apos;s counts are scored with the linear cross-entropy benchmark against the exact ideal distribution
-          of its stored circuit. This certifies fidelity to the circuit, not a quantum advantage.
+          of its stored circuit. This checks fidelity to the circuit; it is not a quantum advantage claim, and not a provenance certificate.
         </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 32 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 16, padding: 24 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>New certificate</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>New check</h2>
             <form onSubmit={handleCertify} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={label}>Name</label>
@@ -168,7 +168,7 @@ export default function CertifyPage() {
           </div>
 
           <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 16, padding: 24 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Your certificates</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Your checks</h2>
             {certsLoading ? (
               <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading…</p>
             ) : certsList.length === 0 ? (
@@ -180,7 +180,7 @@ export default function CertifyPage() {
                     style={{ textAlign: "left", background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: "var(--text)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                       <span style={{ fontWeight: 600 }}>{c.name}</span>
-                      <span style={{ color: c.certified ? "var(--ok)" : "var(--danger)", fontSize: 12 }}>{c.certified ? "Certified" : "Not certified"}</span>
+                      <span style={{ color: c.certified ? "var(--ok)" : "var(--danger)", fontSize: 12 }}>{c.certified ? "Confirmed" : "Not confirmed"}</span>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--muted)" }}>
                       XEB {c.linear_xeb === null ? "n/a" : c.linear_xeb.toFixed(4)} · p {fmtP(c.p_value)} · {c.n_runs} run(s) · {new Date(c.created_at).toLocaleString()}

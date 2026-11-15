@@ -111,6 +111,21 @@ export default function Landing() {
       </header>
 
       <main className={s.main}>
+        <section className={s.lead} aria-labelledby="lead-h">
+          <h1 id="lead-h" className={s.h1}>Every quantum run, kept with the machine as it was</h1>
+          <p className={s.p}>
+            Q-Lab records each Qiskit run with its circuit, its results and the calibration of the machine it ran on.
+            Open a run later and see what changed, compare it with another run, and, where this server collects
+            IBM calibrations, replay the circuit on that machine as it was on another date.
+          </p>
+          <div className={s.ctas}>
+            {signedIn
+              ? <Link href="/runs" className="button">Open your runs</Link>
+              : <Link href="/login" className="button">Sign in or create an account</Link>}
+            <Link href="/gallery" className="button secondary">See public runs</Link>
+          </div>
+        </section>
+
         <p className="summary-line" aria-live="polite">{summary}</p>
 
         <form className={s.input} role="search" onSubmit={submit}>
@@ -133,16 +148,6 @@ export default function Landing() {
             <dt>Runs shared publicly</dt>
             <dd>{gallery.state === "ok" ? gallery.data.total.toLocaleString("en-US") : "—"}
               <small>private runs are never counted</small></dd>
-          </div>
-          <div className="readout">
-            <dt>Dashboard commit</dt>
-            <dd>{FRONTEND_COMMIT ? <a href={commitUrl(FRONTEND_COMMIT)} rel="noreferrer">{shortSha(FRONTEND_COMMIT)}</a> : "—"}
-              <small>{FRONTEND_COMMIT ? "check it on GitHub" : "not recorded in this build"}</small></dd>
-          </div>
-          <div className="readout" aria-busy={build.state === "loading" || undefined}>
-            <dt>Backend commit</dt>
-            <dd>{backCommit ? <a href={commitUrl(backCommit)} rel="noreferrer">{shortSha(backCommit)}</a> : "—"}
-              <small>{backCommit ? (backCommit === FRONTEND_COMMIT ? "same as the dashboard" : "differs from the dashboard") : build.state === "loading" ? "asking…" : "not reported"}</small></dd>
           </div>
         </dl>
 
@@ -208,9 +213,11 @@ qlab.auto_track(api_key="YOUR_KEY")   # your key is in Settings once you sign in
       </main>
 
       <footer className={s.foot}>
-        <span>Q-Lab, MIT licence, a <a href="https://soqlab.com">SOQLAB</a> product</span>
+        <span>Q-Lab, quantum run tracker. MIT licence, a <a href="https://soqlab.com">SOQLAB</a> product</span>
         <a href="https://github.com/soqlab/Q-lab">Source</a>
         <a href="https://github.com/soqlab/Q-lab/blob/main/SELF_HOSTING.md">Run it yourself</a>
+        <span>Dashboard {FRONTEND_COMMIT ? <a href={commitUrl(FRONTEND_COMMIT)} rel="noreferrer">{shortSha(FRONTEND_COMMIT)}</a> : "commit not recorded"}</span>
+        <span aria-busy={build.state === "loading" || undefined}>Backend {backCommit ? <a href={commitUrl(backCommit)} rel="noreferrer">{shortSha(backCommit)}</a> : build.state === "loading" ? "…" : "commit not reported"}{backCommit && backCommit !== FRONTEND_COMMIT ? " (differs from the dashboard)" : ""}</span>
         <Link href="/trust">What this page loads</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>

@@ -1,6 +1,7 @@
-// Every place in the app, for the command bar (Ctrl K). There is no permanent menu: places are
-// one keystroke away. Pages outside the core are Labs pages (lib/labs.ts) and are offered only
-// when Labs is on.
+// Every place in the app the command bar (Ctrl K) offers. There is no permanent menu: places are
+// one keystroke away. Settings pages are found by typing ("audit", "webhooks") and are listed on
+// /settings. Labs pages (experimental, lib/labs.ts) are not in the command bar: with Labs on they
+// are listed on /labs.
 export type Place = { href: string; title: string; group: string; keywords?: string[] };
 
 export const PLACES: Place[] = [
@@ -15,16 +16,29 @@ export const PLACES: Place[] = [
   { href: "/trust", title: "Trust: what this Q-Lab runs and loads", group: "Core", keywords: ["commit", "verify", "privacy", "csp"] },
   { href: "/certificate", title: "Check a provenance certificate", group: "Core", keywords: ["verify", "signature", "reproduced", "badge", "ml-dsa", "provenance", "paper"] },
   { href: "/privacy", title: "Privacy: what Q-Lab keeps about you", group: "Core", keywords: ["data", "gdpr", "cookies", "delete", "export", "personal"] },
-  { href: "/runs", title: "Run History", group: "Core" },
-  { href: "/analytics", title: "Analytics", group: "Core" },
-  { href: "/projects", title: "Projects", group: "Core" },
   { href: "/timeline", title: "Timeline", group: "Core" },
-  { href: "/assistant", title: "Lab Assistant", group: "Core" },
-  { href: "/onboarding", title: "Quick Start", group: "Core" },
+  { href: "/labs", title: "Labs: the experimental tools", group: "Core", keywords: ["labs", "experimental", "tools", "analytics", "benchmarks", "assistant"] },
+  { href: "/feedback", title: "Send feedback", group: "Core", keywords: ["bug", "idea", "contact"] },
+  { href: "/settings", title: "Settings: account, API keys, passkeys", group: "Settings", keywords: ["account", "api", "key", "passkey", "profile", "recovery"] },
+  { href: "/team", title: "Team", group: "Settings", keywords: ["members", "invite", "org"] },
+  { href: "/integrations", title: "GitHub and Slack", group: "Settings", keywords: ["integrations", "github", "slack"] },
+  { href: "/webhooks", title: "Webhooks", group: "Settings" },
+  { href: "/settings/alerts", title: "Alerts", group: "Settings" },
+  { href: "/settings/notifications", title: "Notifications", group: "Settings" },
+  { href: "/credentials", title: "Provider credentials", group: "Settings", keywords: ["ibm", "token", "provider"] },
+  { href: "/settings/policy", title: "Policy gates", group: "Settings", keywords: ["policy", "admin"] },
+  { href: "/settings/rbac", title: "Roles and permissions", group: "Settings", keywords: ["rbac", "admin"] },
+  { href: "/settings/audit", title: "Audit log", group: "Settings", keywords: ["security", "admin"] },
+  { href: "/gdpr", title: "Export or delete your data", group: "Settings", keywords: ["gdpr", "privacy", "export"] },
+];
+
+/** Labs pages, by area. Shown on /labs when Labs is on; never in the command bar. */
+export const LABS_PLACES: Place[] = [
+  { href: "/analytics", title: "Analytics", group: "Analysis" },
+  { href: "/assistant", title: "Lab Assistant", group: "Analysis" },
   { href: "/campaigns", title: "Campaigns", group: "Experiments" },
   { href: "/sweep", title: "Param Sweep", group: "Experiments" },
   { href: "/benchmarks", title: "Benchmarks", group: "Experiments" },
-  { href: "/compare", title: "Compare Runs", group: "Experiments" },
   { href: "/compare/matrix", title: "Matrix Compare", group: "Experiments" },
   { href: "/compare/stats", title: "Stats Compare", group: "Experiments" },
   { href: "/predict", title: "Predict / Timing", group: "Experiments" },
@@ -44,19 +58,10 @@ export const PLACES: Place[] = [
   { href: "/bloch-animator", title: "Bloch Animator", group: "Circuits" },
   { href: "/figure-gen", title: "Figure Generator", group: "Circuits" },
   { href: "/code-export", title: "Code Exporter", group: "Circuits" },
-  { href: "/hardware-rec", title: "Hardware Rec", group: "Hardware" },
-  { href: "/calibration", title: "Calibration", group: "Hardware" },
-  { href: "/backends", title: "Backends", group: "Hardware" },
-  { href: "/hardware-drift", title: "HW Drift Alerts", group: "Hardware" },
-  { href: "/calibration-monitor", title: "Cal Monitor", group: "Hardware" },
   { href: "/network", title: "Cal Network", group: "Hardware" },
   { href: "/cal-forecast", title: "Cal Forecast", group: "Hardware" },
-  { href: "/compare/backends", title: "Backend Compare", group: "Hardware" },
-  { href: "/settings/decoherence", title: "Decoherence", group: "Hardware" },
-  { href: "/intel", title: "Hardware Intel", group: "Hardware" },
   { href: "/hardware-jobs", title: "Hardware Jobs", group: "Hardware" },
   { href: "/costs", title: "QPU Costs", group: "Hardware" },
-  { href: "/cost-oracle", title: "Cost Oracle", group: "Hardware" },
   { href: "/ask", title: "AI Research", group: "AI & Analysis" },
   { href: "/search/natural", title: "NLQ Search", group: "AI & Analysis" },
   { href: "/recommend", title: "Recommender", group: "AI & Analysis" },
@@ -99,7 +104,7 @@ export const PLACES: Place[] = [
   { href: "/complexity", title: "Complexity Analyzer", group: "Quantum Tools" },
   { href: "/advantage", title: "Advantage Detector", group: "Quantum Tools" },
   { href: "/advantage-timeline", title: "Advantage Timeline", group: "Quantum Tools" },
-  { href: "/certify", title: "XEB Certifier", group: "Quantum Tools" },
+  { href: "/certify", title: "XEB signal check", group: "Quantum Tools", keywords: ["xeb", "fidelity", "cross-entropy", "signal"] },
   { href: "/resource-estimator", title: "Resource Estimator", group: "Quantum Tools" },
   { href: "/optimizer-hub", title: "Optimizer Hub", group: "Quantum Tools" },
   { href: "/doi", title: "DOI / ORCID", group: "Publishing" },
@@ -119,8 +124,6 @@ export const PLACES: Place[] = [
   { href: "/research-graph", title: "Research Graph", group: "Publishing" },
   { href: "/replication", title: "Replication Mkt", group: "Publishing" },
   { href: "/blind-analysis", title: "Blind Analysis", group: "Publishing" },
-  { href: "/integrations", title: "GitHub + Slack", group: "Integrations" },
-  { href: "/webhooks", title: "Webhooks", group: "Integrations" },
   { href: "/cicd", title: "CI/CD", group: "Integrations" },
   { href: "/dispatch", title: "Dispatch Queue", group: "Integrations" },
   { href: "/jobs", title: "Job Executor", group: "Integrations" },
@@ -129,20 +132,10 @@ export const PLACES: Place[] = [
   { href: "/environment", title: "Env Snapshots", group: "Integrations" },
   { href: "/plugins", title: "Plugins", group: "Integrations" },
   { href: "/notebook", title: "Notebooks", group: "Integrations" },
-  { href: "/team", title: "Team", group: "Team & Community" },
   { href: "/departments", title: "Departments", group: "Team & Community" },
   { href: "/researchers", title: "Researchers", group: "Team & Community" },
   { href: "/social", title: "Social Graph", group: "Team & Community" },
   { href: "/talent", title: "Talent Board", group: "Team & Community" },
   { href: "/registry", title: "Exp Registry", group: "Team & Community" },
   { href: "/lab-inventory", title: "Lab Inventory", group: "Team & Community" },
-  { href: "/feedback", title: "Send Feedback", group: "Settings" },
-  { href: "/settings", title: "Settings", group: "Settings" },
-  { href: "/settings/policy", title: "Policy Gates", group: "Settings" },
-  { href: "/settings/rbac", title: "RBAC", group: "Settings" },
-  { href: "/settings/audit", title: "Audit Log", group: "Settings" },
-  { href: "/settings/alerts", title: "Alerts", group: "Settings" },
-  { href: "/settings/notifications", title: "Notifications", group: "Settings" },
-  { href: "/credentials", title: "Credentials", group: "Settings" },
-  { href: "/gdpr", title: "GDPR Tools", group: "Settings" },
 ];

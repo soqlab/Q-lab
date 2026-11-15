@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { qlabApiPath } from "../lib/api";
 import { DETAILS, DETAIL_LABEL, useDetail, withDetail, type Detail } from "../lib/dial";
-import { isCorePath, useLabs } from "../lib/labs";
+import { useLabs } from "../lib/labs";
 import { PLACES } from "../lib/places";
 
 /*
@@ -70,16 +70,15 @@ function localMatches(q: string, labs: boolean, detail: Detail, setDetail: (d: D
       title: `Show ${DETAIL_LABEL[d].toLowerCase()} detail`, hint: d === detail ? "Current level" : d === "plain" ? "Plain words, the answer and little else" : d === "expert" ? "Everything: counts, transpiler settings, raw records" : "The usual view",
       run: () => setDetail(d),
     })),
-    { id: "labs", kind: "command", group: "Commands", title: labs ? "Turn Labs off" : "Turn Labs on", hint: labs ? "Hide the experimental tools" : "Show the experimental tools (less tested)", run: () => setLabs(!labs) },
+    { id: "labs", kind: "command", group: "Commands", title: labs ? "Turn Labs off" : "Turn Labs on", hint: labs ? "Hide the experimental tools" : "Show the experimental tools (less tested), listed on /labs", run: () => setLabs(!labs) },
   ];
+  // Labs pages are not offered here (they are listed on /labs); settings pages appear when typed for.
   const places: Match[] = [];
   const seen = new Set<string>();
   for (const p of PLACES) {
     if (seen.has(p.href)) continue;
     seen.add(p.href);
-    const core = isCorePath(p.href);
-    if (!core && !labs) continue;
-    places.push({ id: `page:${p.href}`, kind: "page", group: core ? "Pages" : "Labs pages", title: p.title, hint: core ? p.group : `${p.group} · Labs`, href: p.href });
+    places.push({ id: `page:${p.href}`, kind: "page", group: p.group === "Settings" ? "Settings" : "Pages", title: p.title, hint: p.group, href: p.href });
   }
   const all = [...commands, ...places];
   if (!ws.length) return [...places.filter((p) => p.group === "Pages").slice(0, 8), ...commands];
