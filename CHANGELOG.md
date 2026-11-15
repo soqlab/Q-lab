@@ -7,7 +7,6 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
-<<<<<<< HEAD
 - Reproduce a paper, `/papers`, open without an account (a new Papers channel in the top bar and in
   Ctrl K). Paste an arXiv link or id: Q-Lab reads the paper's arXiv source and, if its abstract or
   comments link one, its GitHub repository, and lists the OpenQASM 2/3 circuits it finds (files,
@@ -23,13 +22,6 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   OpenQASM. Fetches go only to arXiv and GitHub over https, through the internal-address check, with
   size and time limits; archives are read in memory with limits on entries, file sizes and unpacked
   bytes, and refuse traversal names, links and special files.
-
-### Security
-- OpenQASM `include` statements other than `qelib1.inc` and `stdgates.inc` are refused before
-  parsing (Rewind, the machine pick and papers). Qiskit's readers would otherwise open any file an
-  include names on the server, and their error messages quoted what they read.
-
-=======
 - "Why this outcome?" on a run's page: pick a bar in "What was measured" and Q-Lab names the error
   sources that make that outcome likely ("Qubit 2's readout error (8.0%) explains ~70% of this
   outcome in the model"), with a confidence level and its reasons, and highlights them on the
@@ -39,7 +31,6 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   simulation, bounded (8 qubits, 800 operations, 30 s by default) and cached per run. Without a
   calibration from that day or the compiled circuit it says what's missing instead of guessing.
   `GET /api/v1/runs/{run_id}/why?outcome=…`; method in `docs/WHY_METHOD.md`.
->>>>>>> origin/main
 - Rewind's screen, `/rewind`, open without an account (a new Rewind channel in the top bar and in
   Ctrl K). Pick a machine, slide over the days that machine has a stored calibration for (it shows
   which calibration that day uses), paste or drop a circuit or take an example (Bell, GHZ-5, a QFT
@@ -88,6 +79,11 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
   each job ran, and publishes the Hellinger fidelity between the two (`GET /api/v1/rewind/accuracy`,
   method in `docs/REWIND_METHOD.md`). Replays now say how well their machine matched, or that it
   hasn't been measured. The hardware board and the benchmark share one QPU budget per 28 days.
+
+### Security
+- OpenQASM `include` statements other than `qelib1.inc` and `stdgates.inc` are refused before
+  parsing (Rewind, the machine pick and papers). Qiskit's readers would otherwise open any file an
+  include names on the server, and their error messages quoted what they read.
 
 ## [0.4.0] - 2026-11-14
 
