@@ -27,10 +27,15 @@ class Identity:
         api_key_row: Any = None,
         legacy: bool = False,
         amr: str | None = None,
+        auth_time: int | None = None,
+        idp: str | None = None,
     ):
         self.user = user
         # How a session token signed in (passkey | oauth | pwd); None for API keys.
         self.amr = amr
+        # When the session's sign-in happened (kept across refreshes), and "soqlab" for SOQLAB ID.
+        self.auth_time = auth_time
+        self.idp = idp
         self.api_key_row = api_key_row
         self.is_legacy = legacy
         self.org_id: int | None = (
@@ -80,7 +85,10 @@ def get_identity(
             user = db.scalar(select(User).where(User.id == user_id, User.is_active.is_(True)))
             if not user:
                 raise HTTPException(status_code=401, detail="User not found or inactive")
-            return Identity(user=user, amr=payload.get("amr") or "pwd")
+            auth_time = payload.get("auth_time")
+            return Identity(user=user, amr=payload.get("amr") or "pwd",
+                            auth_time=int(auth_time) if isinstance(auth_time, (int, float)) else None,
+                            idp=payload.get("idp") if isinstance(payload.get("idp"), str) else None)
         except HTTPException:
             raise
         except JWTError:

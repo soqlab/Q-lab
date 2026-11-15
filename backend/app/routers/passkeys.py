@@ -249,8 +249,10 @@ class Rename(BaseModel):
 @router.get("/config")
 def passkey_config():
     """What the sign-in page needs to know: is password sign-in still offered at all."""
+    from .soqlab_id import enabled as soqlab_id_enabled
     rp_id, _ = rp_config()
-    return {"passkeys_only": passkeys_only(), "rp_id": rp_id}
+    # soqlab_id: "Sign in with SOQLAB" is offered (app/routers/soqlab_id.py); off unless configured.
+    return {"passkeys_only": passkeys_only(), "rp_id": rp_id, "soqlab_id": soqlab_id_enabled()}
 
 
 # ── Sign-up ──────────────────────────────────────────────────────────────────

@@ -34,6 +34,9 @@ const isDev = process.env.NODE_ENV !== "production";
  * 'unsafe-inline' for scripts: Next.js writes each page's data into inline <script> tags, and the
  * app adds two small inline scripts (theme and sign-in token). 'unsafe-eval' only in development,
  * where React's dev tools need it.
+ * Sign in with SOQLAB (lib/soqlab.ts) needs no exception: the browser goes to id.soqlab.com by a
+ * top-level navigation and comes back to /soqlab-callback; every request the page makes stays on
+ * this site ('self'), so connect-src and form-action are unchanged.
  */
 export function contentSecurityPolicy() {
   const api = directApi ? ` ${directApi}` : "";

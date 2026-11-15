@@ -40,8 +40,13 @@ const bits = (k: string) => k.replace(/ /g, "");
  * The measured distribution in one ink. When the run's answer knows which outcomes the noise-free
  * circuit can produce (`expected`), those bars are filled and the rest are outlines, so the chart
  * shows exactly what the answer's percentage counts.
+ *
+ * With `onPick`, each bar is a button: picking an outcome asks why it was measured (WhyOutcome.tsx).
  */
-export default function MeasurementHistogram({ results, expected }: { results: Record<string, unknown>; expected?: string[] | null }) {
+export default function MeasurementHistogram({ results, expected, onPick, picked }: {
+  results: Record<string, unknown>; expected?: string[] | null;
+  onPick?: (state: string) => void; picked?: string | null;
+}) {
   const analysis = useMemo(() => {
     const counts = parseResults(results);
     if (!counts) return null;
@@ -90,8 +95,18 @@ export default function MeasurementHistogram({ results, expected }: { results: R
           const pct = (entry.count / maxCount) * 100;
           const prob = (entry.count / total * 100).toFixed(1);
           const exp = isExpected(entry.state);
+          const pickable = !!onPick && !isQuasiDist;
+          const Row = pickable ? "button" : "div";
+          const on = pickable && picked === bits(entry.state);
           return (
-            <div key={entry.state} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Row key={entry.state} {...(pickable ? {
+              type: "button" as const, onClick: () => onPick!(bits(entry.state)), "aria-pressed": on,
+              "aria-label": `Why ${entry.state}? Measured in ${prob}% of shots`,
+            } : {})} style={{ display: "flex", alignItems: "center", gap: 10, ...(pickable ? {
+              width: "calc(100% + 8px)", background: on ? "var(--panel-2)" : "transparent", border: "none",
+              padding: "2px 4px", margin: "0 -4px", cursor: "pointer", font: "inherit", color: "inherit",
+              textAlign: "left" as const, outline: on ? "1px solid var(--strong)" : undefined,
+            } : {}) }}>
               <code className="mono" style={{ width: 90, flexShrink: 0, fontSize: 12, textAlign: "right", color: exp || !expected ? "var(--text)" : "var(--muted)" }}>
                 {entry.state}
               </code>
@@ -109,9 +124,12 @@ export default function MeasurementHistogram({ results, expected }: { results: R
                 <span style={{ color: "var(--muted)" }}>{prob}%</span>
                 <span style={{ color: "var(--text)" }}>{isQuasiDist ? entry.count.toFixed(3) : entry.count.toLocaleString()}</span>
               </div>
-            </div>
+            </Row>
           );
         })}
+        {onPick && !isQuasiDist && (
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>Pick an outcome to see which part of the machine made it likely.</div>
+        )}
         {numStates > 16 && (
           <div style={{ fontSize: 12, color: "var(--muted)" }}>Showing the 16 most frequent of {numStates} outcomes.</div>
         )}

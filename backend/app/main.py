@@ -39,6 +39,7 @@ from .routers import certificate as certificate_router
 from .routers import rewind_accuracy as rewind_accuracy_router
 from .routers import oauth as oauth_router
 from .routers import passkeys as passkeys_router
+from .routers import soqlab_id as soqlab_id_router
 from .routers.notes import run_notes_router, notes_router
 from .routers import run_metrics as run_metrics_router
 from .routers import sweeps as sweeps_router
@@ -64,8 +65,10 @@ from .routers import hardware_intel as hardware_intel_router
 from .routers import institute_admin as institute_admin_router
 from .routers import stats_compare as stats_compare_router
 from .routers import explain_diff as explain_diff_router
+from .routers import why_failed as why_failed_router
 from .routers import answer as answer_router
 from .routers import machine_pick as machine_pick_router
+from .routers import time_dial as time_dial_router
 from .routers import reproduce as reproduce_router
 from .routers import verify_run as verify_run_router
 from .routers import pub_report as pub_report_router
@@ -263,6 +266,7 @@ app.add_middleware(MarkIllustrativeData)
 app.include_router(auth_routes.router)
 app.include_router(oauth_router.router)
 app.include_router(passkeys_router.router)
+app.include_router(soqlab_id_router.router)
 app.include_router(users.router)
 app.include_router(benchmarks.router)
 app.include_router(webhooks.router)
@@ -301,8 +305,10 @@ app.include_router(hardware_intel_router.router)
 app.include_router(institute_admin_router.router)
 app.include_router(stats_compare_router.router)
 app.include_router(explain_diff_router.router)
+app.include_router(why_failed_router.router)
 app.include_router(answer_router.router)
 app.include_router(machine_pick_router.router)
+app.include_router(time_dial_router.router)
 app.include_router(reproduce_router.router)
 app.include_router(verify_run_router.router)
 app.include_router(pub_report_router.router)

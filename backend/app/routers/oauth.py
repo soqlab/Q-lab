@@ -25,7 +25,7 @@ from ..auth import SECRET_KEY, create_access_token, create_enrolment_token, pass
 from ..database import get_db
 from ..deps import log_audit
 from ..email_service import send_welcome_email
-from ..models import PasskeyCredential, User
+from ..models import PasskeyCredential, SoqlabIdentity, User
 
 router = APIRouter(prefix="/auth", tags=["oauth"])
 log = logging.getLogger("qlab.oauth")
@@ -229,7 +229,7 @@ def _passkey_migration(db: Session, provider: str, email: str) -> RedirectRespon
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_no_account")
     if not user.is_active:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_failed")
-    if db.scalar(select(PasskeyCredential.id).where(PasskeyCredential.user_id == user.id)) is not None:
+    if db.scalar(select(PasskeyCredential.id).where(PasskeyCredential.user_id == user.id)) is not None or             db.scalar(select(SoqlabIdentity.id).where(SoqlabIdentity.user_id == user.id)) is not None:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=oauth_has_passkey")
     log_audit(db, "auth.login_oauth_enrol", "user", str(user.id), meta={"provider": provider},
               user_id=user.id, org_id=user.org_id)
