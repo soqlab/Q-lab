@@ -6,13 +6,13 @@ import { useCallback, useSyncExternalStore } from "react";
  * Labs: Q-Lab's experimental tools are hidden until the user turns Labs on.
  * The core is what the product promises: capture, compare and reproduce quantum runs,
  * plus account and team settings. Everything else in the app is a Labs page.
- * To graduate a page, add its path here.
+ * To graduate a page, add its path here. Labs pages are listed on /labs (lib/places.ts LABS_PLACES).
+ * Pages that were folded into a core page (/onboarding, /backends, /calibration, ...) redirect there
+ * from next.config.mjs, so they never reach this check.
  */
 const CORE_EXACT = [
   "/",
-  "/runs", "/projects", "/timeline", "/analytics", "/compare", "/benchmarks", "/reproducibility",
-  "/backends", "/calibration", "/intel", "/cost-oracle", "/hardware", "/rewind",
-  "/assistant", "/onboarding",
+  "/runs", "/projects", "/timeline", "/compare", "/hardware", "/rewind", "/labs",
   "/integrations", "/webhooks",
   "/team",
   "/settings", "/settings/policy", "/settings/rbac", "/settings/audit", "/settings/alerts",
@@ -20,7 +20,7 @@ const CORE_EXACT = [
   "/profile", "/billing", "/admin",
 ];
 // Paths whose sub-pages are core too (a run's detail page, a project's page, ...).
-const CORE_PREFIX = ["/runs/", "/hardware/", "/projects/", "/benchmarks/", "/backends/", "/profile/", "/admin/"];
+const CORE_PREFIX = ["/runs/", "/hardware/", "/projects/", "/profile/", "/admin/"];
 
 export function isCorePath(pathname: string): boolean {
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
