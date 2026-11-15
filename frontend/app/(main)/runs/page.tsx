@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, RefreshCw, Wifi, Download } from "lucide-react";
 import { createRunStream, healthColor, qlabApiPath, QLabRun, searchRuns } from "../../../lib/api";
@@ -9,18 +9,27 @@ import { useAuth } from "../../../lib/auth";
 import { useDetail, withDetail } from "../../../lib/dial";
 
 
-// Empty state: what is missing and how to get it. No pictures, no sample data.
-function QuickStart() {
-  return (
-    <section className="frame">
-      <div className="frame-head"><h2 className="inst-label">No runs yet</h2></div>
-      <div className="empty-state">
-        <p style={{ margin: "0 0 10px" }}>Runs appear here the moment a script that uses the Q-Lab SDK runs a circuit. Add two lines to any Qiskit script:</p>
-        <pre className="code">{`pip install qlab-sdk
+const noSubscription = () => () => {};
 
-import qlab
-qlab.auto_track(api_key="YOUR_KEY")`}</pre>
-        <p style={{ margin: "10px 0 0" }}>Your API key and a step-by-step guide are in <Link href="/onboarding" style={{ textDecoration: "underline" }}>Quick start</Link>.</p>
+// Empty state: what is missing and how to get it, in three steps. No pictures, no sample data.
+// (This is the quick start; /onboarding redirects here.)
+function QuickStart() {
+  const origin = useSyncExternalStore(noSubscription, () => window.location.origin, () => "");
+  const apiUrl = `${origin || "https://qlab.soqlab.com"}/qlab-api`;
+  return (
+    <section className="frame" aria-labelledby="quick-h">
+      <div className="frame-head"><h2 id="quick-h" className="inst-label">No runs yet</h2></div>
+      <div className="empty-state" style={{ textAlign: "left" }}>
+        <p style={{ margin: "0 0 10px" }}>Runs appear here the moment a script that uses the Q-Lab SDK runs a circuit. Three steps:</p>
+        <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 10, lineHeight: 1.55 }}>
+          <li>Make an API key in <Link href="/settings#api-keys" style={{ textDecoration: "underline" }}>Settings, API keys</Link>. It is shown once, so copy it then.</li>
+          <li>Install the SDK: <code>pip install &quot;qlab-sdk[qiskit]&quot;</code></li>
+          <li>Add two lines at the top of any Qiskit script, then run it as usual:
+            <pre className="code" style={{ marginTop: 6 }}>{`import qlab
+qlab.init(api_url="${apiUrl}", api_key="YOUR_KEY")`}</pre>
+            Every circuit it runs, on a simulator or real hardware, is recorded with its backend, calibration, transpiler settings and results.
+          </li>
+        </ol>
       </div>
     </section>
   );

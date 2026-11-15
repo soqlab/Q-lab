@@ -116,12 +116,16 @@ function LoginForm() {
             <span>No account yet?</span>
             <Link className={s.link} href="/register">Create one</Link>
           </div>
-          <div className={s.linkRow}>
-            <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
-            <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); setNoPasskey(false); }}>
-              {showPassword ? "Hide" : "Use email and password"}
-            </button>
-          </div>
+          {/* Passkey-only servers: the password form is for moving an old account to a passkey and is
+              offered when a sign-in finds no passkey (the notice below), not as a standing link. */}
+          {(!passkeysOnly || showPassword || !supported) && (
+            <div className={s.linkRow}>
+              <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
+              <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); setNoPasskey(false); }}>
+                {showPassword ? "Hide" : "Use email and password"}
+              </button>
+            </div>
+          )}
           {passkeysOnly && (
             <div className={s.linkRow}>
               <span>Made your account with Google or GitHub?</span>
