@@ -7,6 +7,16 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Ask your assistant: `qlab-mcp` (`pip install "qlab-sdk[mcp]"`), a read-only MCP server that runs
+  on your machine over stdio, so your own AI assistant can list your runs, summarise or compare
+  them, say why an outcome happened or why a run got worse, show a run across time and its
+  forecast, and read the hardware board and Rewind's history. Each tool is one `GET` with your own
+  key, under the same ownership checks as the dashboard. API keys now have a scope: tick
+  "Read-only" in Settings, API keys. A read-only key can only `GET` (anything else is refused before
+  it reaches an endpoint), and requests marked `X-Client: mcp/<tool>` need one: full keys and
+  sign-in tokens are refused with a message saying how to make one. Each tool call is written to
+  the audit log (`mcp.tool_call`: tool, key id and prefix, path, status; never the key or the
+  answer). Setup in `docs/ASK_YOUR_ASSISTANT.md`.
 - "Why this outcome?" on a run's page: pick a bar in "What was measured" and Q-Lab names the error
   sources that make that outcome likely ("Qubit 2's readout error (8.0%) explains ~70% of this
   outcome in the model"), with a confidence level and its reasons, and highlights them on the

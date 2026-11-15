@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -18,6 +18,8 @@ router = APIRouter(prefix="/api/v1/users", tags=["users"])
 class CreateKeyPayload(BaseModel):
     name: str
     expires_days: Optional[int] = None
+    # "read": GET only, the key an AI assistant uses over MCP (app/read_only_keys.py).
+    scope: Literal["full", "read"] = "full"
 
 
 class UpdateProfilePayload(BaseModel):
@@ -105,6 +107,7 @@ def create_api_key(
         key_hash=key_hash,
         key_prefix=prefix,
         expires_at=expires_at,
+        scope=payload.scope,
     )
     db.add(row)
     db.commit()
@@ -116,6 +119,7 @@ def create_api_key(
         "name": row.name,
         "key": full_key,
         "prefix": row.key_prefix,
+        "scope": row.scope,
         "expires_at": row.expires_at.isoformat() if row.expires_at else None,
         "created_at": row.created_at.isoformat(),
     }
@@ -136,6 +140,7 @@ def list_api_keys(
             "name": r.name,
             "prefix": r.key_prefix,
             "is_active": r.is_active,
+            "scope": r.scope or "full",
             "last_used_at": r.last_used_at.isoformat() if r.last_used_at else None,
             "expires_at": r.expires_at.isoformat() if r.expires_at else None,
             "created_at": r.created_at.isoformat(),

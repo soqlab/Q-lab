@@ -215,6 +215,8 @@ export type APIKeyInfo = {
   name: string;
   prefix: string;
   is_active: boolean;
+  /** "read": GET only, the key an AI assistant uses (docs/ASK_YOUR_ASSISTANT.md). */
+  scope?: "full" | "read";
   last_used_at: string | null;
   expires_at: string | null;
   created_at: string;
@@ -525,11 +527,11 @@ export async function changePassword(token: string, currentPassword: string, new
 // API Keys
 // ------------------------------------------------------------------
 
-export async function createAPIKey(token: string, name: string, expiresDays?: number): Promise<{ key: string } & APIKeyInfo> {
+export async function createAPIKey(token: string, name: string, expiresDays?: number, scope: "full" | "read" = "full"): Promise<{ key: string } & APIKeyInfo> {
   const res = await fetch(apiUrl("/api/v1/users/me/api-keys"), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ name, expires_days: expiresDays }),
+    body: JSON.stringify({ name, expires_days: expiresDays, scope }),
   });
   if (!res.ok) {
     // "passkey_session_required": the page asks for the passkey, then retries.

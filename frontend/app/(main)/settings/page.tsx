@@ -234,7 +234,14 @@ function KeyRow({ k, onRevoke }: { k: APIKeyInfo; onRevoke: (id: number) => void
 
   return (
     <tr>
-      <td>{k.name}</td>
+      <td>
+        {k.name}
+        {k.scope === "read" && (
+          <span title="Can only read. This is the key an AI assistant may use." style={{ marginLeft: 8, display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 11, border: "1px solid currentColor", opacity: 0.75 }}>
+            Read-only
+          </span>
+        )}
+      </td>
       <td>
         <code style={{ fontSize: 12, background: "#f0f3f7", padding: "2px 6px", borderRadius: 4 }}>
           {k.prefix}…
@@ -496,6 +503,7 @@ export default function SettingsPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
   const [expiresDays, setExpiresDays] = useState("");
+  const [readOnly, setReadOnly] = useState(false);
   const [insightsStatus, setInsightsStatus] = useState<{ available: boolean; model: string | null } | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -540,10 +548,11 @@ export default function SettingsPage() {
     setError(null);
     setNewKey(null);
     try {
-      const result = await withPasskey((t) => createAPIKey(t, keyName, expiresDays ? Number(expiresDays) : undefined));
+      const result = await withPasskey((t) => createAPIKey(t, keyName, expiresDays ? Number(expiresDays) : undefined, readOnly ? "read" : "full"));
       setNewKey(result.key);
       setKeyName("");
       setExpiresDays("");
+      setReadOnly(false);
       await load();
     } catch (err) {
       setError(passkeyErrorMessage(err));
@@ -607,10 +616,19 @@ export default function SettingsPage() {
             <label style={{ fontSize: 13, color: "#5f6f80" }}>Expires in days <span style={{ color: "#aaa" }}>(optional)</span></label>
             <input className="input" type="number" value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)} placeholder="e.g. 90" style={{ width: 130 }} min={1} />
           </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, minHeight: 36 }}>
+            <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />
+            Read-only
+          </label>
           <button className="button" type="submit" disabled={creating}>
             <Plus size={16} aria-hidden="true" /> {creating ? "Creating…" : "Create key"}
           </button>
         </form>
+        <p style={{ margin: "0 18px 14px", fontSize: 13, color: "#5f6f80" }}>
+          A read-only key can look at your runs but not change anything. It is the only kind of key
+          your AI assistant can use with Q-Lab;{" "}
+          <a href="https://github.com/soqlab/Q-lab/blob/main/docs/ASK_YOUR_ASSISTANT.md" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>set it up</a>.
+        </p>
         {newKey && (
           <div style={{ margin: "0 18px 18px", padding: 14, background: "#eaf6ef", border: "1px solid #c0e8d0", borderRadius: 8 }}>
             <p style={{ margin: "0 0 8px", fontSize: 13, color: "#1f8a5b", fontWeight: 600 }}>

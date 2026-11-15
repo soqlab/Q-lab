@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from .analytics import get_timeseries
 from .backends import QUANTUM_BACKENDS
 from .database import DATA_DIR, SessionLocal, get_db, init_db
+from .read_only_keys import ReadOnlyKeys
 from .deps import Identity, get_identity, log_audit, require_auth
 from .events import event_stream, publish_sync, set_event_loop
 from .health_score import compute_health_score, health_breakdown
@@ -248,6 +249,10 @@ app = FastAPI(
     # Every query on Run made while serving a request is limited to what the caller may see.
     dependencies=[Depends(scope_runs_to_caller)],
 )
+
+# Read-only API keys stay read-only, and AI assistants (X-Client: mcp/...) need one; logged.
+# Added first, so CORS wraps its refusals too.
+app.add_middleware(ReadOnlyKeys)
 
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
