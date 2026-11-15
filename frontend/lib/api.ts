@@ -197,6 +197,8 @@ export type AuthUser = {
   passkeys?: number;
   has_password?: boolean;
   passkeys_only?: boolean;
+  /** /auth/me only: the account signs in with a SOQLAB passkey too. */
+  soqlab_linked?: boolean;
   recovery_codes_remaining?: number;
 };
 

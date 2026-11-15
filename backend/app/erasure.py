@@ -220,6 +220,8 @@ def erase(db: Session, user_id: int, notify: bool = True) -> str | None:
         db.commit()
         return None
     email, name, org_id = user.email, user.name, user.org_id
+    from .models import SoqlabIdentity
+    soqlab_subject = db.scalar(select(SoqlabIdentity.subject).where(SoqlabIdentity.user_id == user_id))
 
     others_in_org = bool(org_id) and db.scalar(
         select(User.id).where(User.org_id == org_id, User.id != user_id).limit(1)) is not None
@@ -304,6 +306,12 @@ def erase(db: Session, user_id: int, notify: bool = True) -> str | None:
     db.add(AuditLog(action="account.erased", resource_type="user", resource_id=code,
                     meta={"subject": code, "runs": len(run_ids)}))
     db.commit()
+
+    if soqlab_subject:  # the link row went with the account; ask SOQLAB ID to forget its side too
+        from .routers import soqlab_id
+        cfg = soqlab_id.settings()
+        if cfg:
+            soqlab_id.remote_unlink(cfg, soqlab_subject)
 
     if notify and email:
         try:

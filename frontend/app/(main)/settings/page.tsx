@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Brain, Copy, Cpu, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   type PasskeyInfo,
 } from "../../../lib/passkeys";
 import { EmailPanel, RecoveryCodesPanel } from "./AccountRecovery";
+import SoqlabPanel from "./SoqlabPanel";
 
 // ── Provider credential types ─────────────────────────────────────────────────
 
@@ -474,6 +476,19 @@ function ChangePasswordPanel({ token }: { token: string }) {
   );
 }
 
+const MORE_SETTINGS: [string, string, string][] = [
+  ["/team", "Team", "members and invitations"],
+  ["/credentials", "Provider credentials", "IBM and other provider tokens"],
+  ["/integrations", "GitHub and Slack", "post run results where your team works"],
+  ["/webhooks", "Webhooks", "call your own service when a run arrives"],
+  ["/settings/alerts", "Alerts", "rules that flag a run"],
+  ["/settings/notifications", "Notifications", "where alerts are sent"],
+  ["/settings/policy", "Policy gates", "checks a run must pass"],
+  ["/settings/rbac", "Roles and permissions", "who may do what"],
+  ["/settings/audit", "Audit log", "security events on this account"],
+  ["/gdpr", "Export or delete your data", "a copy of everything Q-Lab keeps about you"],
+];
+
 export default function SettingsPage() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -573,6 +588,7 @@ export default function SettingsPage() {
 
       {/* Passkeys (sign-in) */}
       <PasskeysPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
+      <SoqlabPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
       <RecoveryCodesPanel withPasskey={withPasskey} reloadMe={reloadMe} />
       <EmailPanel me={me} withPasskey={withPasskey} reloadMe={reloadMe} />
 
@@ -580,7 +596,7 @@ export default function SettingsPage() {
       {me?.has_password && !me.passkeys_only && <ChangePasswordPanel token={token!} />}
 
       {/* Create key */}
-      <section className="panel">
+      <section className="panel" id="api-keys">
         <div className="panel-header"><h2>Create API Key</h2></div>
         <form onSubmit={handleCreate} style={{ padding: "16px 18px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -710,15 +726,24 @@ export default function SettingsPage() {
       {/* SDK usage */}
       <section className="panel">
         <div className="panel-header"><h2>SDK Setup</h2></div>
-        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install qlab-sdk
+        <pre className="code" style={{ margin: 0, borderRadius: "0 0 8px 8px" }}>{`pip install "qlab-sdk[qiskit]"
 
-from qlab import QLabTracker
+import qlab
+qlab.init(api_url="${typeof window === "undefined" ? "https://qlab.soqlab.com" : window.location.origin}/qlab-api", api_key="qlab_YOUR_KEY")
+# Every Qiskit circuit this script runs from here on is recorded.`}</pre>
+      </section>
 
-tracker = QLabTracker(
-    api_key="qlab_YOUR_KEY",
-    url="https://your-qlab-domain.com",
-)
-# Use tracker.run() or tracker.log_run() to track experiments.`}</pre>
+      {/* Team and administration: kept here, out of the command bar's first screen. */}
+      <section className="panel">
+        <div className="panel-header"><h2>Team and administration</h2></div>
+        <ul style={{ margin: 0, padding: "12px 18px 14px 36px", display: "grid", gap: 6, fontSize: 14 }}>
+          {MORE_SETTINGS.map(([href, label, what]) => (
+            <li key={href}><Link href={href} style={{ textDecoration: "underline" }}>{label}</Link> <span style={{ color: "var(--muted)" }}>{what}</span></li>
+          ))}
+          {(user?.role === "admin" || user?.role === "owner") && (
+            <li><Link href="/admin" style={{ textDecoration: "underline" }}>Server administration</Link> <span style={{ color: "var(--muted)" }}>users, usage and health of this Q-Lab</span></li>
+          )}
+        </ul>
       </section>
 
       {/* Danger zone */}

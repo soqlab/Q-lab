@@ -33,20 +33,29 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int, org_id: int | None, role: str, amr: str = "pwd") -> str:
-    """A session token. amr records how the user signed in: passkey, oauth or pwd."""
-    exp = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode(
-        {"sub": str(user_id), "org": str(org_id) if org_id else None, "role": role, "amr": amr, "exp": exp},
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+def create_access_token(user_id: int, org_id: int | None, role: str, amr: str = "pwd",
+                        auth_time: int | None = None, idp: str | None = None) -> str:
+    """A session token. amr records how the user signed in: passkey, oauth or pwd.
+
+    A sign-in through SOQLAB ID (id.soqlab.com) is a passkey sign-in too: amr is "passkey" and
+    idp is "soqlab". auth_time is when the person last proved who they are; a refreshed token keeps
+    it, so "signed in recently" (needed to link a SOQLAB passkey) can't be stretched by refreshing.
+    """
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    claims = {"sub": str(user_id), "org": str(org_id) if org_id else None, "role": role, "amr": amr, "exp": exp,
+              "auth_time": int(auth_time if auth_time is not None else now.timestamp())}
+    if idp:
+        claims["idp"] = idp
+    return jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def create_enrolment_token(user_id: int) -> str:
     """Short-lived token after a password sign-in: good only for registering a first passkey."""
-    exp = datetime.now(timezone.utc) + timedelta(minutes=ENROL_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": str(user_id), "scope": ENROL_SCOPE, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=ENROL_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode({"sub": str(user_id), "scope": ENROL_SCOPE, "exp": exp, "auth_time": int(now.timestamp())},
+                      SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> dict:

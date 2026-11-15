@@ -13,6 +13,7 @@ import {
   passwordSignIn,
   signInWithPasskey,
 } from "../../../lib/passkeys";
+import { linkSoqlab, soqlabMessage, startSoqlab } from "../../../lib/soqlab";
 import AuthFrame from "../AuthFrame";
 import s from "../auth.module.css";
 
@@ -28,6 +29,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(() => oauthError(searchParams.get("error")));
   const [loading, setLoading] = useState(false);
   const [passkeysOnly, setPasskeysOnly] = useState(true);
+  // "Sign in with SOQLAB" (one passkey for SOQLAB's products), when the server offers it.
+  const [soqlab, setSoqlab] = useState(false);
   // Accounts made with a password before passkeys: one last password sign-in, then a passkey.
   const [showPassword, setShowPassword] = useState(false);
   // Accounts made with Google or GitHub before passkeys: one last sign-in with them, then a passkey.
@@ -41,7 +44,7 @@ function LoginForm() {
   const supported = useSyncExternalStore(() => () => {}, passkeysSupported, () => true);
 
   useEffect(() => {
-    void fetchPasskeyConfig().then((c) => setPasskeysOnly(c.passkeys_only));
+    void fetchPasskeyConfig().then((c) => { setPasskeysOnly(c.passkeys_only); setSoqlab(!!c.soqlab_id); });
   }, []);
 
   function done(resp: AuthResponse) {
@@ -70,6 +73,9 @@ function LoginForm() {
   }
 
   const signIn = () => attempt(async () => done(await signInWithPasskey()), true);
+  const soqlabSignIn = () => attempt(async () => {
+    try { await startSoqlab("login", { next }); } catch (err) { throw new Error(soqlabMessage(err)); }
+  });
   const revealPassword = () => {
     setShowPassword(true);
     setNoPasskey(false);
@@ -78,6 +84,10 @@ function LoginForm() {
     requestAnimationFrame(() => document.getElementById("login-email")?.focus());
   };
   const enrol = () => attempt(async () => { if (enrolment) done(await addPasskey(enrolment)); });
+  const enrolSoqlab = () => attempt(async () => {
+    if (!enrolment) return;
+    try { await linkSoqlab(enrolment, next); } catch (err) { throw new Error(soqlabMessage(err)); }
+  });
   const withPassword = (e: React.FormEvent) => {
     e.preventDefault();
     void attempt(async () => {
@@ -96,8 +106,16 @@ function LoginForm() {
           once the passkey is saved, and from then on you sign in with the passkey alone.
         </p>
         {error && <div className={s.error} role="alert">{error}</div>}
-        <button className={s.primary} type="button" onClick={() => void enrol()} disabled={loading}>
-          {loading ? "Waiting for your passkey…" : "Create a passkey"}
+        {soqlab && (
+          <>
+            <button className={s.primary} type="button" onClick={() => void enrolSoqlab()} disabled={loading}>
+              Create a SOQLAB passkey
+            </button>
+            <p className={s.note}>One passkey for Q-Lab and SOQLAB&apos;s other products, made at id.soqlab.com. Q-Lab and the others still see none of each other&apos;s data.</p>
+          </>
+        )}
+        <button className={soqlab ? s.secondary : s.primary} type="button" onClick={() => void enrol()} disabled={loading}>
+          {loading ? "Waiting for your passkey…" : soqlab ? "Create a passkey for Q-Lab only" : "Create a passkey"}
         </button>
       </AuthFrame>
     );
@@ -116,12 +134,16 @@ function LoginForm() {
             <span>No account yet?</span>
             <Link className={s.link} href="/register">Create one</Link>
           </div>
-          <div className={s.linkRow}>
-            <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
-            <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); setNoPasskey(false); }}>
-              {showPassword ? "Hide" : "Use email and password"}
-            </button>
-          </div>
+          {/* Passkey-only servers: the password form is for moving an old account to a passkey and is
+              offered when a sign-in finds no passkey (the notice below), not as a standing link. */}
+          {(!passkeysOnly || showPassword || !supported) && (
+            <div className={s.linkRow}>
+              <span>{passkeysOnly ? "Made your account with a password?" : "Prefer a password?"}</span>
+              <button type="button" className={s.link} onClick={() => { setShowPassword((v) => !v); setError(null); setNoPasskey(false); }}>
+                {showPassword ? "Hide" : "Use email and password"}
+              </button>
+            </div>
+          )}
           {passkeysOnly && (
             <div className={s.linkRow}>
               <span>Made your account with Google or GitHub?</span>
@@ -134,12 +156,24 @@ function LoginForm() {
       }
     >
       <h1 className={s.title}>Sign in to Q-Lab</h1>
-      <p className={s.lead}>
-        Nothing to type. Your browser shows the passkeys it has for Q-Lab: on this device, on a
-        security key, or on your phone by scanning the code it shows.
-      </p>
-      <button className={s.primary} type="button" onClick={() => void signIn()} disabled={loading || !supported}>
-        {loading && !showPassword ? "Waiting for your passkey…" : "Sign in"}
+      {soqlab ? (
+        <p className={s.lead}>
+          Nothing to type. Use your SOQLAB passkey, the one passkey for Q-Lab and SOQLAB&apos;s other
+          products. Made your passkey on Q-Lab before? It still works.
+        </p>
+      ) : (
+        <p className={s.lead}>
+          Nothing to type. Your browser shows the passkeys it has for Q-Lab: on this device, on a
+          security key, or on your phone by scanning the code it shows.
+        </p>
+      )}
+      {soqlab && (
+        <button className={s.primary} type="button" onClick={() => void soqlabSignIn()} disabled={loading}>
+          Sign in with SOQLAB
+        </button>
+      )}
+      <button className={soqlab ? s.secondary : s.primary} type="button" onClick={() => void signIn()} disabled={loading || !supported}>
+        {loading && !showPassword ? "Waiting for your passkey…" : soqlab ? "Use my older Q-Lab passkey" : "Sign in"}
       </button>
       {!supported && (
         <div className={s.error}>This browser can&apos;t use passkeys on this address. Passkeys need a current browser and https.</div>

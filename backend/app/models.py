@@ -129,6 +129,42 @@ class RecoveryCode(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class SoqlabIdentity(Base):
+    """A Q-Lab account linked to a SOQLAB ID passkey (app/routers/soqlab_id.py).
+
+    subject is the pairwise identifier id.soqlab.com gives Q-Lab for that person: a different one
+    than it gives any other product, so it can't be matched with another product's records. No
+    email or name comes with it. One link per account and per subject; unlinking deletes the row."""
+    __tablename__ = "soqlab_identities"
+    __table_args__ = (UniqueConstraint("issuer", "subject", name="uq_soqlab_identities_issuer_subject"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    issuer: Mapped[str] = mapped_column(String(255))
+    subject: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SoqlabFlow(Base):
+    """One sign-in or link round trip through id.soqlab.com, used once (claimed atomically).
+
+    Only hashes of the state and of the browser binding (a secret the starting tab keeps in
+    sessionStorage) are stored. The PKCE verifier and nonce live here for at most 10 minutes."""
+    __tablename__ = "soqlab_flows"
+
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    binding_hash: Mapped[str] = mapped_column(String(64))
+    purpose: Mapped[str] = mapped_column(String(16))  # login | signup | link | recover
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    nonce: Mapped[str] = mapped_column(String(64))
+    code_verifier: Mapped[str] = mapped_column(String(128))
+    jti: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[float] = mapped_column(Float, index=True)
+    used_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
 # ---------------------------------------------------------------------------
 # Audit Log (append-only; not hash-chained)
 # ---------------------------------------------------------------------------

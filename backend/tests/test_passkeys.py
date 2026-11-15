@@ -150,7 +150,7 @@ def test_registration_options_are_discoverable_with_user_verification_and_rp_fro
     handle = base64.urlsafe_b64decode(options["user"]["id"] + "==")
     assert email.encode() not in handle and email.split("@")[0].encode() not in handle
     config = client.get("/auth/passkeys/config").json()
-    assert config == {"passkeys_only": False, "rp_id": RP_ID}
+    assert config == {"passkeys_only": False, "rp_id": RP_ID, "soqlab_id": False}
 
 
 def test_sign_in_with_a_discoverable_passkey_counts_signatures():

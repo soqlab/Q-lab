@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
-import { passkeyErrorMessage, passkeysSupported, signUpWithPasskey } from "../../../lib/passkeys";
+import { fetchPasskeyConfig, passkeyErrorMessage, passkeysSupported, signUpWithPasskey } from "../../../lib/passkeys";
+import { soqlabMessage, startSoqlab } from "../../../lib/soqlab";
 import AuthFrame from "../AuthFrame";
 import RecoveryCodes from "../RecoveryCodes";
 import s from "../auth.module.css";
@@ -27,6 +28,25 @@ function RegisterForm() {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const supported = useSyncExternalStore(() => () => {}, passkeysSupported, () => true);
+  // When the server offers it, a new account gets a SOQLAB passkey by default (made at
+  // id.soqlab.com, linked to this Q-Lab account only); a passkey for Q-Lab alone stays available.
+  const [soqlab, setSoqlab] = useState(false);
+
+  useEffect(() => {
+    void fetchPasskeyConfig().then((c) => setSoqlab(!!c.soqlab_id));
+  }, []);
+
+  async function withSoqlab(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await startSoqlab("signup", { name: name.trim(), orgName: org.trim() || undefined, next });
+    } catch (err) {
+      setError(soqlabMessage(err));
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +117,7 @@ function RegisterForm() {
         A name and a passkey. No email or password: your device makes the passkey with Face ID, a
         fingerprint, its PIN, a security key, or your phone.
       </p>
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+      <form onSubmit={soqlab ? withSoqlab : handleSubmit} style={{ display: "grid", gap: 12 }}>
         <div className={s.field}>
           <label className={s.label} htmlFor="reg-name">Name</label>
           <input id="reg-name" className={s.input} type="text" value={name} onChange={(e) => setName(e.target.value)}
@@ -116,12 +136,28 @@ function RegisterForm() {
           </span>
         </label>
         {error && <div className={s.error} role="alert">{error}</div>}
-        {!supported && (
+        {!supported && !soqlab && (
           <div className={s.error}>This browser can&apos;t create passkeys on this address. Passkeys need a current browser and https.</div>
         )}
-        <button className={s.primary} type="submit" disabled={loading || !agreed || !supported || !name.trim()}>
-          {loading ? "Waiting for your passkey…" : "Create account with a passkey"}
-        </button>
+        {soqlab ? (
+          <>
+            <button className={s.primary} type="submit" disabled={loading || !agreed || !name.trim()}>
+              {loading ? "Opening SOQLAB…" : "Create account with a SOQLAB passkey"}
+            </button>
+            <p className={s.note}>
+              One passkey for Q-Lab and SOQLAB&apos;s other products, made at id.soqlab.com. It is linked to
+              this Q-Lab account only, and no product sees another&apos;s data.
+            </p>
+            <button className={s.secondary} type="button" onClick={(e) => void handleSubmit(e)}
+              disabled={loading || !agreed || !supported || !name.trim()}>
+              Make a passkey for Q-Lab only
+            </button>
+          </>
+        ) : (
+          <button className={s.primary} type="submit" disabled={loading || !agreed || !supported || !name.trim()}>
+            {loading ? "Waiting for your passkey…" : "Create account with a passkey"}
+          </button>
+        )}
         <p className={s.note}>Want recovery by email as well? Add an address later in Settings. It&apos;s never needed to sign in.</p>
       </form>
     </AuthFrame>

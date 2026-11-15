@@ -232,6 +232,9 @@ def me(identity: Identity = Depends(require_auth), db: Session = Depends(get_db)
         from ..recovery_codes import remaining
         out["recovery_codes_remaining"] = remaining(db, identity.user.id)
         out["email_verified"] = bool(identity.user.email) and bool(identity.user.email_verified)
+        from ..models import SoqlabIdentity
+        out["soqlab_linked"] = db.scalar(select(SoqlabIdentity.id)
+                                         .where(SoqlabIdentity.user_id == identity.user.id)) is not None
     return out
 
 
@@ -302,7 +305,8 @@ def set_email(payload: EmailPayload, request: Request, identity: Identity = Depe
 def refresh_token(identity: Identity = Depends(require_auth)):
     if not identity.user or identity.api_key_row is not None:
         raise HTTPException(status_code=401, detail="Cannot refresh a non-user session")
-    token = create_access_token(identity.user.id, identity.org_id, identity.role, amr=identity.amr or "pwd")
+    token = create_access_token(identity.user.id, identity.org_id, identity.role, amr=identity.amr or "pwd",
+                                auth_time=identity.auth_time, idp=identity.idp)
     return {"access_token": token, "token_type": "bearer"}
 
 

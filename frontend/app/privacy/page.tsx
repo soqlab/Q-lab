@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 // Change this date whenever the page changes.
-const UPDATED = "2026-11-13";
+const UPDATED = "2026-11-15";
 
 function Section({ id, eyebrow, title, children }: { id: string; eyebrow: string; title: string; children: React.ReactNode }) {
   return (
@@ -47,7 +47,9 @@ export default function PrivacyPage() {
               give it, which kind of authenticator made it, whether it is backed up, and when it was added and last
               used. The private part of a passkey never leaves your device. Recovery codes and API keys are stored
               only as hashes. Accounts made before passkeys may still hold a password hash until their first passkey
-              is created, when it is deleted.
+              is created, when it is deleted. If you link a SOQLAB passkey: the identifier SOQLAB ID gives Q-Lab for
+              you (a different one for every SOQLAB product, so products can&apos;t match you by it), and when it was
+              linked and last used. No name or email comes with it.
             </li>
             <li>
               <strong>Sign-in and security records:</strong> when you last signed in and how many times. A log of
@@ -120,6 +122,14 @@ export default function PrivacyPage() {
               only if you save your own key with one. Q-Lab then sends it what the feature needs, such as a run&apos;s
               circuit, calibration and results, or your question and a summary of your runs. That provider&apos;s terms
               apply to what it receives. Without a key of yours, nothing is sent to any AI provider.
+            </li>
+            <li>
+              <strong>SOQLAB ID</strong> (id.soqlab.com, run by SOQLAB): only if you sign in with SOQLAB or link a SOQLAB
+              passkey, where Q-Lab offers it. Your browser goes there to use the passkey and comes back. When you link,
+              Q-Lab sends it a short-lived, single-use ticket carrying your Q-Lab account number, so the new passkey
+              attaches to this account alone. Q-Lab receives the per-product identifier above, nothing else, and sends
+              no run data. Q-Lab and SOQLAB&apos;s other products never see each other&apos;s data. Unlinking in Settings
+              deletes the link here and asks SOQLAB ID to delete it too.
             </li>
             <li>
               <strong>Google and GitHub</strong>: only if your account was made with one of them before passkeys and you

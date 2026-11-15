@@ -4,7 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth";
 import { fetchMe } from "../../../lib/api";
-import { addPasskey, passkeyErrorMessage } from "../../../lib/passkeys";
+import { addPasskey, fetchPasskeyConfig, passkeyErrorMessage } from "../../../lib/passkeys";
+import { linkSoqlab, soqlabMessage } from "../../../lib/soqlab";
 import AuthFrame from "../AuthFrame";
 import s from "../auth.module.css";
 
@@ -17,9 +18,11 @@ function OAuthCallback() {
   const [enrolment] = useState(() => searchParams.get("enrol"));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [soqlab, setSoqlab] = useState(false);
 
   useEffect(() => {
     if (enrolment) {
+      void fetchPasskeyConfig().then((c) => setSoqlab(!!c.soqlab_id));
       // Keep the token out of the address bar and history.
       window.history.replaceState(null, "", "/oauth-callback");
       return;
@@ -57,6 +60,18 @@ function OAuthCallback() {
     }
   }
 
+  async function enrolSoqlab() {
+    if (!enrolment) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await linkSoqlab(enrolment, "/runs");
+    } catch (err) {
+      setError(soqlabMessage(err));
+      setLoading(false);
+    }
+  }
+
   if (enrolment) {
     return (
       <AuthFrame caption="Sign in · one more step">
@@ -67,8 +82,16 @@ function OAuthCallback() {
         </p>
         <p className={s.note}>This step expires 15 minutes after you came back from Google or GitHub.</p>
         {error && <div className={s.error} role="alert">{error}</div>}
-        <button className={s.primary} type="button" onClick={() => void enrol()} disabled={loading}>
-          {loading ? "Waiting for your passkey…" : "Create a passkey"}
+        {soqlab && (
+          <>
+            <button className={s.primary} type="button" onClick={() => void enrolSoqlab()} disabled={loading}>
+              Create a SOQLAB passkey
+            </button>
+            <p className={s.note}>One passkey for Q-Lab and SOQLAB&apos;s other products, made at id.soqlab.com.</p>
+          </>
+        )}
+        <button className={soqlab ? s.secondary : s.primary} type="button" onClick={() => void enrol()} disabled={loading}>
+          {loading ? "Waiting for your passkey…" : soqlab ? "Create a passkey for Q-Lab only" : "Create a passkey"}
         </button>
       </AuthFrame>
     );
