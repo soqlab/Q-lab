@@ -15,6 +15,7 @@ import {
   type PasskeyInfo,
 } from "../../../lib/passkeys";
 import { EmailPanel, RecoveryCodesPanel } from "./AccountRecovery";
+import SoqlabPanel from "./SoqlabPanel";
 
 // ── Provider credential types ─────────────────────────────────────────────────
 
@@ -573,6 +574,7 @@ export default function SettingsPage() {
 
       {/* Passkeys (sign-in) */}
       <PasskeysPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
+      <SoqlabPanel me={me} reloadMe={reloadMe} withPasskey={withPasskey} />
       <RecoveryCodesPanel withPasskey={withPasskey} reloadMe={reloadMe} />
       <EmailPanel me={me} withPasskey={withPasskey} reloadMe={reloadMe} />
 

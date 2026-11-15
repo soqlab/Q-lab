@@ -13,7 +13,8 @@ export type PasskeyInfo = {
   transports: string[];
 };
 
-export type PasskeyConfig = { passkeys_only: boolean; rp_id: string };
+/** soqlab_id: "Sign in with SOQLAB" is offered (lib/soqlab.ts). */
+export type PasskeyConfig = { passkeys_only: boolean; rp_id: string; soqlab_id?: boolean };
 
 type Begin = { challenge_id: string; options: Record<string, unknown> };
 type Descriptor = { id: string; type: string; transports?: string[] };
@@ -128,7 +129,7 @@ export async function conditionalUiAvailable(): Promise<boolean> {
 
 export async function fetchPasskeyConfig(): Promise<PasskeyConfig> {
   const res = await fetch(apiUrl("/auth/passkeys/config"), { cache: "no-store" });
-  if (!res.ok) return { passkeys_only: true, rp_id: "" };
+  if (!res.ok) return { passkeys_only: true, rp_id: "", soqlab_id: false };
   return res.json();
 }
 

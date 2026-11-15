@@ -10,6 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { isCorePath, useLabs } from "../../lib/labs";
 import IllustrativeNotice from "./IllustrativeNotice";
 import RecoveryPrompt from "../../components/RecoveryPrompt";
+import SoqlabCard from "../../components/SoqlabCard";
 import CommandPalette, { openCommand } from "../../components/CommandPalette";
 import { DETAILS, DETAIL_LABEL, useDetail, useDetailSync, withDetail } from "../../lib/dial";
 import { FRONTEND_COMMIT, commitUrl, shortSha } from "../../lib/build";
@@ -290,6 +291,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <IllustrativeNotice />
       <RecoveryPrompt />
+      <SoqlabCard />
       <div className="shell-main"><LabsGate>{children}</LabsGate></div>
       <footer className="shell-foot">
         <ApiReading />
