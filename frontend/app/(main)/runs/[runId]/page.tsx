@@ -18,7 +18,7 @@ import {
 import { useToast } from "../../../../lib/toast";
 import { useAuth } from "../../../../lib/auth";
 import MetricsPanel from "./MetricsPanel";
-import MeasurementHistogram from "./MeasurementHistogram";
+import WhyOutcome from "./WhyOutcome";
 import TranspilerPanel from "./TranspilerPanel";
 import ResourceEstimatePanel from "./ResourceEstimatePanel";
 import AssertionsPanel from "./AssertionsPanel";
@@ -970,7 +970,7 @@ export default function RunDetailPage({ params: paramsPromise }: { params: Promi
       </section>
 
       {run.results && Object.keys(run.results).length > 0 && (
-        <div className="d-standard"><MeasurementHistogram results={run.results} expected={answer.data?.measure?.kind === "ideal_share" ? answer.data.measure.ideal_outcomes : null} /></div>
+        <div className="d-standard"><WhyOutcome runId={run.run_id} results={run.results} expected={answer.data?.measure?.kind === "ideal_share" ? answer.data.measure.ideal_outcomes : null} /></div>
       )}
 
       <div className="d-expert"><ShadowSimPanel runId={run.run_id} /></div>
