@@ -349,7 +349,7 @@ export default function TeamPage() {
                 { role: "viewer", desc: "Read runs, view analytics, download exports" },
                 { role: "researcher", desc: "All viewer rights + submit runs, create projects, manage own API keys" },
                 { role: "admin", desc: "All researcher rights + invite members, change roles, manage webhooks" },
-                { role: "owner", desc: "All admin rights + remove members, manage billing, delete org" },
+                { role: "owner", desc: "All admin rights + remove members, delete org" },
               ].map(({ role: r, desc }) => (
                 <tr key={r} style={{ borderTop: "1px solid #f0f3f7" }}>
                   <td style={{ padding: "8px 0", paddingRight: 24, whiteSpace: "nowrap" }}><RoleBadge role={r} /></td>

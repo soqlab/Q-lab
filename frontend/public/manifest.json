@@ -1,7 +1,7 @@
 {
-  "name": "Q-Lab — Quantum Experiment Tracker",
+  "name": "Q-Lab — quantum run tracker",
   "short_name": "Q-Lab",
-  "description": "Professional quantum experiment tracking for research teams",
+  "description": "Every Qiskit run, kept with the machine as it was",
   "start_url": "/runs",
   "display": "standalone",
   "background_color": "#0a0a0f",
@@ -14,8 +14,7 @@
   "screenshots": [],
   "categories": ["science", "productivity"],
   "shortcuts": [
-    { "name": "Recent Runs", "url": "/runs", "description": "View recent experiment runs" },
-    { "name": "Live Monitor", "url": "/live-monitor", "description": "Monitor backend status" },
-    { "name": "Submit Job", "url": "/jobs", "description": "Submit a quantum job" }
+    { "name": "Runs", "url": "/runs", "description": "Your recorded runs" },
+    { "name": "Hardware", "url": "/hardware", "description": "Each machine's state and calibration now" }
   ]
 }

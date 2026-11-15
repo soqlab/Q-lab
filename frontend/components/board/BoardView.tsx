@@ -43,6 +43,9 @@ export default function BoardView() {
   return (
     <main className={styles.page}>
       <Head title="Quantum hardware" sub="IBM Quantum, read live by this server" summary={summarize(b)} simulated={b.simulated} />
+      <p style={{ margin: 0, fontSize: 13 }}>
+        About to run a circuit? <Link href="/hardware/pick" style={{ textDecoration: "underline" }}>Pick the machine for it</Link>: each machine ranked by the fidelity its current calibration predicts.
+      </p>
 
       {!b.configured ? <Unconfigured /> : (
         <>

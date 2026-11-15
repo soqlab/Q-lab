@@ -82,6 +82,27 @@ const nextConfig = {
     proxyTimeout: 300_000,
   },
 
+  // Pages folded into another one. The old addresses keep working (bookmarks, links in papers and
+  // chats); ?backend=ibm_torino on an old hardware address opens that machine's page. Temporary
+  // (307), so a page can come back without browsers having cached the move. Not on backend host
+  // names: everything there belongs to the API.
+  async redirects() {
+    const notApi = backendHosts.length ? { missing: backendHosts.map((value) => ({ type: "host", value })) } : {};
+    const hardware = ["/backends", "/calibration", "/intel", "/hardware-drift", "/calibration-monitor", "/compare/backends", "/settings/decoherence"];
+    return [
+      // The quick start is the empty state of the run list.
+      { source: "/onboarding", destination: "/runs" },
+      // One hardware page: the board, each machine's page, and the machine picker.
+      ...hardware.flatMap((source) => [
+        { source, has: [{ type: "query", key: "backend", value: "(?<backend>[A-Za-z0-9_.-]{1,64})" }], destination: "/hardware/:backend" },
+        { source, destination: "/hardware" },
+      ]),
+      { source: "/backends/:backend", destination: "/hardware/:backend" },
+      { source: "/hardware-rec", destination: "/hardware/pick" },
+      { source: "/cost-oracle", destination: "/hardware/pick" },
+    ].map((r) => ({ ...r, ...notApi, permanent: false }));
+  },
+
   async rewrites() {
     const api = [
       {

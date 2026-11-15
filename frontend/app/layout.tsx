@@ -5,20 +5,20 @@ import { ToastProvider } from "../lib/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Q-Lab — Quantum Experiment Observatory",
-  description: "Automatically capture, compare, and reproduce every Qiskit circuit run. Track calibration, health scores, AI insights, and QPU cost across IBM, IonQ, Rigetti, and more.",
-  keywords: ["quantum computing", "Qiskit", "experiment tracking", "quantum observability", "QPU", "IBM Quantum", "IonQ", "circuit analysis"],
+  title: "Q-Lab — quantum run tracker",
+  description: "Q-Lab records every Qiskit run with its circuit, results and the calibration of the machine it ran on, so you can see what changed, compare runs and reproduce them. Free and open source.",
+  keywords: ["quantum computing", "Qiskit", "experiment tracking", "quantum run tracker", "QPU", "IBM Quantum", "calibration", "reproducibility"],
   authors: [{ name: "Q-Lab" }],
   openGraph: {
     type: "website",
     siteName: "Q-Lab",
-    title: "Q-Lab — Quantum Experiment Observatory",
-    description: "Automatically capture, compare, and reproduce every Qiskit circuit run. The missing observability layer for quantum computing research.",
+    title: "Q-Lab — quantum run tracker",
+    description: "Every Qiskit run, kept with the machine as it was: circuit, results and calibration, ready to compare and reproduce.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Q-Lab — Quantum Experiment Observatory",
-    description: "Automatically capture, compare, and reproduce every Qiskit circuit run.",
+    title: "Q-Lab — quantum run tracker",
+    description: "Every Qiskit run, kept with the machine as it was: circuit, results and calibration, ready to compare and reproduce.",
   },
 };
 
