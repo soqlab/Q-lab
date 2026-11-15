@@ -151,6 +151,10 @@ def test_flag_off_routes_are_404_and_config_says_off(monkeypatch):
     assert client.post("/auth/soqlab/start", json={"purpose": "login"}).status_code == 404
     assert client.post("/auth/soqlab/link-ticket", json={"purpose": "link"}).status_code == 404
     assert client.post("/auth/soqlab/callback", json={"code": "c", "state": "s" * 20, "flow": "f" * 20}).status_code == 404
+    # Before any body or sign-in check: nothing about the routes shows.
+    assert client.post("/auth/soqlab/callback", json={}).status_code == 404
+    assert client.post("/auth/soqlab/link-ticket").status_code == 404
+    assert client.get("/auth/soqlab/status").status_code == 404
     token = passkey_account()["access_token"]
     assert client.get("/auth/soqlab/status", headers=bearer(token)).status_code == 404
     assert client.delete("/auth/soqlab/link", headers=bearer(token)).status_code == 404

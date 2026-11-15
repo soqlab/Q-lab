@@ -63,7 +63,6 @@ from ..outbound import UnsafeURL, require_safe_url
 from ..rate_limit import auth_limiter
 from .auth_routes import _user_response, finish_signup, new_account
 
-router = APIRouter(prefix="/auth/soqlab", tags=["soqlab-id"])
 log = logging.getLogger("qlab.soqlab_id")
 
 FLOW_TTL_SECONDS = 10 * 60
@@ -109,6 +108,14 @@ def _cfg() -> dict[str, str]:
     if cfg is None:
         raise HTTPException(status_code=404, detail="Not Found")
     return cfg
+
+
+def _feature_on() -> None:
+    """Router-wide: when the feature is off, every route is 404 before any body or sign-in check."""
+    _cfg()
+
+
+router = APIRouter(prefix="/auth/soqlab", tags=["soqlab-id"], dependencies=[Depends(_feature_on)])
 
 
 # ── Talking to the issuer ────────────────────────────────────────────────────
