@@ -21,12 +21,12 @@ export class SimClient {
     if (this.w) return this.w;
     const w = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
     w.onmessage = (ev: MessageEvent) => {
-      const m = ev.data as { type: string; id?: number; done?: number; total?: number; message?: string } & Partial<RunResult> & Partial<Probe>;
+      const m = ev.data as { type: "probe" | "progress" | "result" | "error"; id?: number; done?: number; total?: number; message?: string } & Partial<Probe>;
       if (m.type === "probe") { const p = { gpu: m.gpu!, cpuMaxQubits: m.cpuMaxQubits! }; this.probeWaiters.splice(0).forEach((f) => f(p)); return; }
       const job = m.id != null ? this.pending.get(m.id) : undefined;
       if (!job) return;
       if (m.type === "progress") job.onProgress?.(m.done!, m.total!);
-      else if (m.type === "result") { this.pending.delete(m.id!); job.resolve(m as RunResult); }
+      else if (m.type === "result") { this.pending.delete(m.id!); job.resolve(ev.data as RunResult); }
       else if (m.type === "error") { this.pending.delete(m.id!); job.reject(new Error(m.message)); }
     };
     w.onerror = (ev) => {
