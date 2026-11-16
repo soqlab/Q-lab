@@ -17,6 +17,7 @@ import {
 } from "../../../lib/passkeys";
 import { EmailPanel, RecoveryCodesPanel } from "./AccountRecovery";
 import SoqlabPanel from "./SoqlabPanel";
+import DisplayLinksPanel from "./DisplayLinksPanel";
 
 // ── Provider credential types ─────────────────────────────────────────────────
 
@@ -740,6 +741,9 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      {/* Display links: Wall mode on an office screen */}
+      <DisplayLinksPanel me={me} withPasskey={withPasskey} />
 
       {/* SDK usage */}
       <section className="panel">

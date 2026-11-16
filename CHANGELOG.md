@@ -7,6 +7,21 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Wall mode, `/wall`: Q-Lab on an office screen (a TV or a monitor), one sentence and one number
+  in huge type, updated every minute. An owner or admin (or, without an organisation, anyone for
+  their own runs) makes a display link in Settings, Display links and picks what it shows: how the
+  latest run matched the ideal ("Bell on ibm_fez: 91% of shots landed on the expected outcomes ..."),
+  runs in the last 7 days, or on how many machines the drift alarm says results moved. Nobody signs
+  in on the screen. The link can read the wall and nothing else; it is stored hashed, shown once,
+  can expire, can be revoked (the screen stops at its next poll), stops when its creator is no
+  longer an admin, and lists who made it and when it was last used. Creating, changing and revoking
+  one is audit-logged. The token stays in the URL fragment and goes to the API only as the
+  `X-Qlab-Display` header; the page is noindex with `Referrer-Policy: no-referrer` and makes no
+  outside requests. It polls with `If-None-Match` (304 when nothing changed), backs off on errors,
+  and when Q-Lab can't be reached keeps the last value dimmed with how old it is. Dark by default,
+  with a light theme; content drifts a few pixels every few minutes against burn-in unless the
+  screen asks for reduced motion. API: `GET/POST /api/v1/display-links`, `PATCH/DELETE
+  /api/v1/display-links/{id}`, `GET /api/v1/wall`. Migration `014_display_links`.
 - Reproduce a paper, `/papers`, open without an account (a new Papers channel in the top bar and in
   Ctrl K). Paste an arXiv link or id: Q-Lab reads the paper's arXiv source and, if its abstract or
   comments link one, its GitHub repository, and lists the OpenQASM 2/3 circuits it finds (files,

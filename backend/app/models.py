@@ -974,3 +974,25 @@ class RewindAccuracy(Base):
     # Per circuit: id, hardware counts, replica counts, the three Hellinger fidelities.
     circuits: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DisplayLink(Base):
+    """A read-only link for an office display that shows Wall mode (app/wall.py).
+
+    Only the SHA-256 of the token is stored; the token itself is shown once, when the link is made.
+    It reads the wall's one sentence and one number for its creator's runs (and their organisation's),
+    nothing else, and stops working when revoked, when it expires, or when its creator can no longer
+    make display links."""
+    __tablename__ = "display_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    # last_run | runs_week | drift (app/wall.py METRICS)
+    metric: Mapped[str] = mapped_column(String(32), default="last_run")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
