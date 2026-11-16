@@ -74,8 +74,11 @@ export default function DisplayLinksPanel({ me, withPasskey }: {
   }
 
   useEffect(() => {
-    void load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!token || !allowed) return;
+    let live = true;
+    call<DisplayLink[]>(token, "/api/v1/display-links")
+      .then((list) => { if (live) setLinks(list); }, () => { if (live) setLinks([]); });
+    return () => { live = false; };
   }, [token, allowed]);
 
   if (!allowed) return null;

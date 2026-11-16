@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { qlabApiPath } from "../../lib/api";
 import styles from "./wall.module.css";
 
@@ -62,84 +62,91 @@ function readToken(): string | null {
   return /^qdl_[A-Za-z0-9_-]{20,190}$/.test(raw) ? raw : null;
 }
 
+function subscribeHash(cb: () => void) {
+  window.addEventListener("hashchange", cb);
+  return () => window.removeEventListener("hashchange", cb);
+}
+
+function readTheme(): "dark" | "light" {
+  try {
+    return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark"; // storage may be off
+  }
+}
+
+const themeListeners = new Set<() => void>();
+function subscribeTheme(cb: () => void) {
+  themeListeners.add(cb);
+  return () => { themeListeners.delete(cb); };
+}
+
 export default function WallView() {
-  const [token, setToken] = useState<string | null>(null);
-  const [data, setData] = useState<WallData | null>(null);
-  const [problem, setProblem] = useState<Problem>(null);
-  const [lastOk, setLastOk] = useState<number | null>(null);
+  // undefined while the page is being rendered on the server: the fragment is only known in the browser.
+  const token = useSyncExternalStore<string | null | undefined>(subscribeHash, readToken, () => undefined);
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as const);
+  // Everything below is kept per token, so a changed link never shows the previous link's data.
+  const [view, setView] = useState<{ token: string | null; data: WallData | null; problem: Problem; lastOk: number | null }>(
+    { token: null, data: null, problem: null, lastOk: null });
   const [now, setNow] = useState(() => Date.now());
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [shift, setShift] = useState({ x: 0, y: 0 });
-  const etag = useRef<string | null>(null);
-  const failures = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const read = () => {
-      setToken(readToken());
-      etag.current = null;
-    };
-    read();
-    try {
-      if (localStorage.getItem(THEME_KEY) === "light") setTheme("light");
-    } catch { /* storage may be off: dark it is */ }
-    window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
-  }, []);
-
-  const poll = useCallback(async () => {
     if (!token) return;
-    if (timer.current) clearTimeout(timer.current);
-    let next = POLL_MS;
-    try {
-      const headers: Record<string, string> = { "X-Qlab-Display": token };
-      if (etag.current) headers["If-None-Match"] = etag.current;
-      const res = await fetch(qlabApiPath("/api/v1/wall"), {
-        headers, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer",
-      });
-      if (res.status === 304) {
-        failures.current = 0;
-        setLastOk(Date.now());
-        setProblem(null);
-      } else if (res.ok) {
-        const body = (await res.json()) as WallData;
-        // Offline, the service worker answers 200 with {"error": "offline"}: not wall data.
-        if (typeof body?.sentence !== "string" || typeof body?.metric !== "string") throw new Error("not wall data");
-        etag.current = res.headers.get("ETag");
-        failures.current = 0;
-        setData(body);
-        setLastOk(Date.now());
-        setProblem(null);
-      } else if (res.status === 401) {
-        // Revoked, expired or wrong: the data shown so far is no longer this link's to show.
-        etag.current = null;
-        setData(null);
-        setProblem("invalid");
-        next = 10 * POLL_MS;
-      } else {
-        throw new Error(String(res.status));
-      }
-    } catch {
-      failures.current += 1;
-      setProblem("unreachable");
-      next = Math.min(MAX_BACKOFF_MS, POLL_MS * 2 ** Math.min(failures.current - 1, 4));
-    }
-    timer.current = setTimeout(() => { void poll(); }, next);
-  }, [token]);
+    const link = token;
+    let alive = true;
+    let etag: string | null = null;
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const update = (patch: Partial<typeof view>) =>
+      setView((v) => ({ ...(v.token === link ? v : { data: null, problem: null, lastOk: null }), token: link, ...patch }));
 
-  useEffect(() => {
-    if (!token) {
-      setProblem("no_token");
-      return;
+    async function tick() {
+      if (timer) clearTimeout(timer);
+      let next = POLL_MS;
+      try {
+        const headers: Record<string, string> = { "X-Qlab-Display": link };
+        if (etag) headers["If-None-Match"] = etag;
+        const res = await fetch(qlabApiPath("/api/v1/wall"), {
+          headers, cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer",
+        });
+        if (!alive) return;
+        if (res.status === 304) {
+          failures = 0;
+          update({ lastOk: Date.now(), problem: null });
+        } else if (res.ok) {
+          const body = (await res.json()) as WallData;
+          // Offline, the service worker answers 200 with {"error": "offline"}: not wall data.
+          if (typeof body?.sentence !== "string" || typeof body?.metric !== "string") throw new Error("not wall data");
+          etag = res.headers.get("ETag");
+          failures = 0;
+          update({ data: body, lastOk: Date.now(), problem: null });
+        } else if (res.status === 401) {
+          // Revoked, expired or wrong: what was shown so far is no longer this link's to show.
+          etag = null;
+          update({ data: null, problem: "invalid" });
+          next = 10 * POLL_MS;
+        } else {
+          throw new Error(String(res.status));
+        }
+      } catch {
+        if (!alive) return;
+        failures += 1;
+        update({ problem: "unreachable" });
+        next = Math.min(MAX_BACKOFF_MS, POLL_MS * 2 ** Math.min(failures - 1, 4));
+      }
+      if (alive) timer = setTimeout(() => { void tick(); }, next);
     }
-    void poll();
-    const onVisible = () => { if (document.visibilityState === "visible") void poll(); };
+
+    void tick();
+    const onVisible = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      alive = false;
       document.removeEventListener("visibilitychange", onVisible);
-      if (timer.current) clearTimeout(timer.current);
+      if (timer) clearTimeout(timer);
     };
-  }, [token, poll]);
+  }, [token]);
 
   // The footer's "x min ago" keeps counting between polls.
   useEffect(() => {
@@ -147,28 +154,24 @@ export default function WallView() {
     return () => clearInterval(id);
   }, []);
 
-  // Burn-in: a small drift every few minutes, only when motion is welcome.
+  // Burn-in: a small drift every few minutes. With reduced motion the CSS keeps it still.
   useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let id: ReturnType<typeof setInterval> | null = null;
-    const start = () => {
-      if (id) clearInterval(id);
-      id = null;
-      if (media.matches) { setShift({ x: 0, y: 0 }); return; }
-      id = setInterval(() => {
-        setShift({ x: Math.round((Math.random() - 0.5) * 24), y: Math.round((Math.random() - 0.5) * 16) });
-      }, SHIFT_MS);
-    };
-    start();
-    media.addEventListener("change", start);
-    return () => { media.removeEventListener("change", start); if (id) clearInterval(id); };
+    const id = setInterval(() => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      setShift({ x: Math.round((Math.random() - 0.5) * 24), y: Math.round((Math.random() - 0.5) * 16) });
+    }, SHIFT_MS);
+    return () => clearInterval(id);
   }, []);
 
   function toggleTheme() {
-    const t = theme === "dark" ? "light" : "dark";
-    setTheme(t);
-    try { localStorage.setItem(THEME_KEY, t); } catch { /* not remembered, still switched */ }
+    try { localStorage.setItem(THEME_KEY, theme === "dark" ? "light" : "dark"); } catch { /* not remembered */ }
+    themeListeners.forEach((cb) => cb());
   }
+
+  const current = view.token === token ? view : { data: null, problem: null, lastOk: null };
+  const data = current.data;
+  const lastOk = current.lastOk;
+  const problem: Problem = token === null ? "no_token" : current.problem;
 
   const stale = data !== null && (problem === "unreachable" || (lastOk !== null && now - lastOk > STALE_MS));
   const updated = lastOk !== null ? `${clock(lastOk)} (${ago(lastOk, now)})` : null;
