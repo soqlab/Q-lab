@@ -7,6 +7,15 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Your connection, right now: the sign-in pages and the app's footer say which key exchange this
+  browser and Q-Lab agreed on, read in the browser from Cloudflare's same-origin `/cdn-cgi/trace`:
+  "You're connected to Q-Lab with X25519MLKEM768 — quantum-safe key exchange." or "…with X25519 —
+  classical. Try a current Chrome, Edge, Firefox or Safari." Only `kex=` is read; the trace's IP address
+  is never shown, stored or sent (the privacy page says so). Self-hosted installs and local development
+  show nothing. The line is placed so its arrival moves nothing on the page.
+- Labs in the command bar: with "Show all Labs tools: on" (now in the account menu, on /labs and as a
+  command in Ctrl K) every Labs page is found by typing, grouped under Labs. With it off (the default)
+  the bar offers the core pages only, as before.
 - Reproduce a paper, `/papers`, open without an account (a new Papers channel in the top bar and in
   Ctrl K). Paste an arXiv link or id: Q-Lab reads the paper's arXiv source and, if its abstract or
   comments link one, its GitHub repository, and lists the OpenQASM 2/3 circuits it finds (files,

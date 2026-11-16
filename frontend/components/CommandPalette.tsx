@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { qlabApiPath } from "../lib/api";
 import { DETAILS, DETAIL_LABEL, useDetail, withDetail, type Detail } from "../lib/dial";
 import { useLabs } from "../lib/labs";
-import { PLACES } from "../lib/places";
+import { LABS_PLACES, PLACES } from "../lib/places";
 
 /*
  * The one input. Ctrl K, Cmd K or "/" opens it anywhere in the app. What you type is recognised
@@ -70,9 +70,10 @@ function localMatches(q: string, labs: boolean, detail: Detail, setDetail: (d: D
       title: `Show ${DETAIL_LABEL[d].toLowerCase()} detail`, hint: d === detail ? "Current level" : d === "plain" ? "Plain words, the answer and little else" : d === "expert" ? "Everything: counts, transpiler settings, raw records" : "The usual view",
       run: () => setDetail(d),
     })),
-    { id: "labs", kind: "command", group: "Commands", title: labs ? "Turn Labs off" : "Turn Labs on", hint: labs ? "Hide the experimental tools" : "Show the experimental tools (less tested), listed on /labs", run: () => setLabs(!labs) },
+    { id: "labs", kind: "command", group: "Commands", title: `Show all Labs tools: ${labs ? "on" : "off"}`, hint: labs ? "Turn off to keep this bar to the core pages" : `Turn on to find all ${LABS_PLACES.length} experimental tools here, under Labs`, run: () => setLabs(!labs) },
   ];
-  // Labs pages are not offered here (they are listed on /labs); settings pages appear when typed for.
+  // Settings pages appear when typed for. Labs pages (lib/labs.ts) appear, under "Labs", only with
+  // Labs on, and only when typed for: the empty bar stays the core.
   const places: Match[] = [];
   const seen = new Set<string>();
   for (const p of PLACES) {
@@ -80,11 +81,18 @@ function localMatches(q: string, labs: boolean, detail: Detail, setDetail: (d: D
     seen.add(p.href);
     places.push({ id: `page:${p.href}`, kind: "page", group: p.group === "Settings" ? "Settings" : "Pages", title: p.title, hint: p.group, href: p.href });
   }
+  if (labs) {
+    for (const p of LABS_PLACES) {
+      if (seen.has(p.href)) continue;
+      seen.add(p.href);
+      places.push({ id: `page:${p.href}`, kind: "page", group: "Labs", title: p.title, hint: `Labs · ${p.group}`, href: p.href });
+    }
+  }
   const all = [...commands, ...places];
   if (!ws.length) return [...places.filter((p) => p.group === "Pages").slice(0, 8), ...commands];
   return all
     .map((m) => {
-      const hay = `${m.title} ${m.hint} ${m.href ?? ""} ${(PLACES.find((p) => p.href === m.href)?.keywords ?? []).join(" ")}`.toLowerCase();
+      const hay = `${m.title} ${m.hint} ${m.href ?? ""} ${((PLACES.find((p) => p.href === m.href) ?? LABS_PLACES.find((p) => p.href === m.href))?.keywords ?? []).join(" ")}`.toLowerCase();
       if (!ws.every((w) => hay.includes(w))) return null;
       const t = m.title.toLowerCase();
       return { m, score: (t.startsWith(ws[0]) ? 3 : 0) + (t.includes(q.toLowerCase()) ? 2 : 0) + (m.group === "Pages" ? 1 : 0) };

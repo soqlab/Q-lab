@@ -12,6 +12,7 @@ import IllustrativeNotice from "./IllustrativeNotice";
 import RecoveryPrompt from "../../components/RecoveryPrompt";
 import SoqlabCard from "../../components/SoqlabCard";
 import CommandPalette, { openCommand } from "../../components/CommandPalette";
+import ConnectionLine from "../../components/ConnectionLine";
 import { useDetail, useDetailSync, withDetail } from "../../lib/dial";
 import { FRONTEND_COMMIT, commitUrl, shortSha } from "../../lib/build";
 
@@ -285,6 +286,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>
         <span>Press {mac ? "⌘K" : "Ctrl K"} or / for everything else</span>
+        {/* Last in the footer, so its arrival moves nothing above it. */}
+        <ConnectionLine />
       </footer>
       <CommandPalette />
     </div>

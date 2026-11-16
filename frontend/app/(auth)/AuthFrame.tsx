@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import s from "./auth.module.css";
+import ConnectionLine from "../../components/ConnectionLine";
 
 /** How many runs people have shared publicly, straight from the public gallery. null until known. */
 function usePublicRunCount(): number | null | "unavailable" {
@@ -52,6 +53,8 @@ export default function AuthFrame({ caption, aside, children, links }: {
             <Link href="/terms">Terms</Link>
           </span>
         </p>
+        {/* Out of the flow under the readout, so its arrival moves nothing on the centred page. */}
+        <p className={s.conn}><ConnectionLine /></p>
       </div>
     </main>
   );

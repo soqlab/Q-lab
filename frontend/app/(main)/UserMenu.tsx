@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { LogIn, LogOut, Moon, Sun } from "lucide-react";
+import { FlaskConical, LogIn, LogOut, Moon, Sun } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
 import { DETAILS, DETAIL_LABEL, useDetail, withDetail } from "../../lib/dial";
+import { useLabs } from "../../lib/labs";
 
 const DETAIL_HINT = {
   plain: "Plain words: the answer and little else",
@@ -24,6 +25,7 @@ export default function UserMenu() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const [d, setD] = useDetail();
+  const [labs, setLabs, labsReady] = useLabs();
   const box = useRef<HTMLDetailsElement>(null);
 
   // A page change closes it.
@@ -80,6 +82,12 @@ export default function UserMenu() {
             {theme === "dark" ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
             {theme === "dark" ? "Light theme" : "Dark theme"}
           </button>
+          {labsReady && (
+            <button type="button" onClick={() => setLabs(!labs)} aria-pressed={labs}>
+              <FlaskConical size={14} aria-hidden="true" />
+              Show all Labs tools: {labs ? "on" : "off"}
+            </button>
+          )}
           {user && (
             <>
               <Link href={withDetail("/settings", d)}>Settings</Link>

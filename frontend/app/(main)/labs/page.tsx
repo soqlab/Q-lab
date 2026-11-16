@@ -5,8 +5,8 @@ import { useLabs } from "../../../lib/labs";
 import { LABS_PLACES, type Place } from "../../../lib/places";
 import { useDetail, withDetail } from "../../../lib/dial";
 
-// Labs: every experimental tool, by area. They are kept out of the command bar so it only offers
-// what the tracker is for; this list is where they live.
+// Labs: every experimental tool, by area. With Labs off the command bar offers only what the tracker
+// is for; "Show all Labs tools: on" adds these to it, under Labs, and opens them here.
 export default function LabsPage() {
   const [labs, setLabs, ready] = useLabs();
   const [d] = useDetail();
@@ -23,15 +23,15 @@ export default function LabsPage() {
           <h1 id="labs-h" className="inst-label">Labs</h1>
           {ready && (
             <button type="button" className={labs ? "button secondary" : "button"} onClick={() => setLabs(!labs)} aria-pressed={labs}>
-              {labs ? "Turn Labs off" : "Turn Labs on"}
+              Show all Labs tools: {labs ? "on" : "off"}
             </button>
           )}
         </div>
         <div className="frame-body">
           <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6, maxWidth: 680 }}>
             Early tools that are less tested than the run tracker. {labs
-              ? "Labs is on in this browser: every tool below opens."
-              : "Turn Labs on to open them; the choice is kept in this browser."}
+              ? "Labs is on in this browser: every tool below opens, and the command bar (Ctrl K) finds them under Labs."
+              : "Turn it on to open them and to find them in the command bar (Ctrl K); the choice is kept in this browser."}
           </p>
         </div>
       </section>

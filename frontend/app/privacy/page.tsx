@@ -87,6 +87,12 @@ export default function PrivacyPage() {
             <Link className={s.link} href="/trust">Trust page</Link>). We do not sell your data, and we do not use it
             for advertising.
           </p>
+          <p>
+            To show which key exchange your browser used to reach Q-Lab, the sign-in page and the app&apos;s footer
+            read Cloudflare&apos;s <code className={s.mono}>/cdn-cgi/trace</code> on this site from your own browser;
+            that answer also holds your IP address, which the page never shows, stores or sends anywhere, and only the
+            key exchange name is used.
+          </p>
         </Section>
 
         <Section id="use-h" eyebrow="Use" title="How we use it">

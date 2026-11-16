@@ -1,7 +1,7 @@
 // Every place in the app the command bar (Ctrl K) offers. There is no permanent menu: places are
 // one keystroke away. Settings pages are found by typing ("audit", "webhooks") and are listed on
-// /settings. Labs pages (experimental, lib/labs.ts) are not in the command bar: with Labs on they
-// are listed on /labs.
+// /settings. Labs pages (experimental, lib/labs.ts) are listed on /labs; with Labs on ("Show all
+// Labs tools") the command bar finds them too, grouped under "Labs".
 export type Place = { href: string; title: string; group: string; keywords?: string[] };
 
 export const PLACES: Place[] = [
@@ -31,7 +31,7 @@ export const PLACES: Place[] = [
   { href: "/gdpr", title: "Export or delete your data", group: "Settings", keywords: ["gdpr", "privacy", "export"] },
 ];
 
-/** Labs pages, by area. Shown on /labs when Labs is on; never in the command bar. */
+/** Labs pages, by area. Listed on /labs; in the command bar (group "Labs") only while Labs is on. */
 export const LABS_PLACES: Place[] = [
   { href: "/analytics", title: "Analytics", group: "Analysis" },
   { href: "/assistant", title: "Lab Assistant", group: "Analysis" },
