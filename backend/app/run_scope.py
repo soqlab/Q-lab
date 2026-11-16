@@ -99,6 +99,20 @@ def unscoped() -> Iterator[None]:
         _scope.reset(token)
 
 
+@contextmanager
+def scoped_as(user_id: int, org_id: Optional[int]) -> Iterator[None]:
+    """Run queries inside this block as if this user (and organisation) were asking.
+
+    For a request made with something other than a sign-in, such as a display link
+    (app/wall.py): it stands for exactly what its creator may see.
+    """
+    token = _scope.set(scope_of(user_id, org_id))
+    try:
+        yield
+    finally:
+        _scope.reset(token)
+
+
 def sql_visibility(alias: str = "runs") -> tuple[str, dict[str, Any]]:
     """The same rule as a SQL condition, for hand-written queries that bypass the ORM filter.
 
@@ -130,4 +144,4 @@ def _limit_runs_to_caller(state) -> None:
     state.statement = state.statement.options(with_loader_criteria(Run, criteria, include_aliases=True))
 
 
-__all__ = ["scope_runs_to_caller", "visible", "current_scope", "scope_of", "sql_visibility", "unscoped", "UNSCOPED_PREFIXES"]
+__all__ = ["scope_runs_to_caller", "visible", "current_scope", "scope_of", "sql_visibility", "unscoped", "scoped_as", "UNSCOPED_PREFIXES"]

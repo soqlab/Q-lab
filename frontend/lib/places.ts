@@ -12,6 +12,7 @@ export const PLACES: Place[] = [
   { href: "/compare", title: "Compare two runs", group: "Core", keywords: ["diff", "difference", "why"] },
   { href: "/rewind", title: "Rewind: run a circuit on a machine as it was on a past date", group: "Core", keywords: ["rewind", "replay", "past", "history", "calibration", "date", "ibm", "simulate", "noise", "watch", "qpu", "drift", "trend", "time"] },
   { href: "/papers", title: "Reproduce a paper: run an arXiv paper's circuits next to its numbers", group: "Core", keywords: ["paper", "arxiv", "reproduce", "replicate", "qasm", "openqasm", "publication", "verify", "github", "results"] },
+  { href: "/try", title: "Try a circuit in your browser: exact simulation on your GPU, no account", group: "Core", keywords: ["try", "simulate", "simulator", "browser", "webgpu", "gpu", "qasm", "openqasm", "statevector", "run", "bell", "ghz", "grover", "qft", "demo", "playground"] },
   { href: "/rewind?tab=watch", title: "QPU Watch: each machine today and its trend", group: "Core", keywords: ["watch", "qpu", "t1", "t2", "error", "readout", "trend", "condition", "rewind"] },
   { href: "/trust", title: "Trust: what this Q-Lab runs and loads", group: "Core", keywords: ["commit", "verify", "privacy", "csp"] },
   { href: "/certificate", title: "Check a provenance certificate", group: "Core", keywords: ["verify", "signature", "reproduced", "badge", "ml-dsa", "provenance", "paper"] },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { qlabApiPath } from "../../../lib/api";
+import { readHandoff } from "../../../lib/sim/handoff";
 import { useAuth } from "../../../lib/auth";
 import { useDetail, withDetail } from "../../../lib/dial";
 import { setCommandContext } from "../../../components/CommandPalette";
@@ -29,9 +30,9 @@ type Project = { slug: string; name: string };
 function readParams() {
   try {
     const p = new URLSearchParams(window.location.search);
-    return { machine: p.get("machine"), date: p.get("date"), run: p.get("run"), tab: p.get("tab") === "watch" ? "watch" as Tab : "replay" as Tab };
+    return { machine: p.get("machine"), date: p.get("date"), run: p.get("run"), circuit: p.get("circuit"), tab: p.get("tab") === "watch" ? "watch" as Tab : "replay" as Tab };
   } catch {
-    return { machine: null, date: null, run: null, tab: "replay" as Tab };
+    return { machine: null, date: null, run: null, circuit: null, tab: "replay" as Tab };
   }
 }
 function writeParams(ch: Record<string, string | null>) {
@@ -119,6 +120,11 @@ export default function RewindPage() {
       const names = r.d.machines.map((m) => m.machine);
       setMachine(p.machine && names.includes(p.machine) ? p.machine : names[0] ?? "");
     });
+    // ?circuit= carries a circuit from /try (lib/sim/handoff.ts).
+    const carried = readHandoff(p.circuit);
+    if (carried) {
+      void Promise.resolve().then(() => { if (on) { setText(carried); setExample(null); setName("your circuit from Try"); } });
+    }
     if (p.run && localStorage.getItem("qlab_token")) {
       void getJson<{ run_id: string; qasm: string | null; circuit_name: string | null }>(`/api/v1/runs/${encodeURIComponent(p.run)}`).then((r) => {
         if (!on || !r.ok || !r.d.qasm) return;

@@ -151,6 +151,16 @@ const nextConfig = {
           { key: "Content-Security-Policy", value: contentSecurityPolicy() },
         ],
       },
+      {
+        // Wall mode (app/wall): opened with a display link, so it is never indexed and never tells
+        // another site where it was. Listed after the rule above, so these values win.
+        source: "/wall",
+        ...(backendHosts.length ? { missing: backendHosts.map((value) => ({ type: "host", value })) } : {}),
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
     ];
   },
 };

@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "node scripts/check-types.mjs",
     "lint:ci": "node scripts/check-lint.mjs",
-    "check:third-party": "node scripts/check-no-third-party.mjs"
+    "check:third-party": "node scripts/check-no-third-party.mjs",
+    "test:sim": "node scripts/test-sim.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.68.0",

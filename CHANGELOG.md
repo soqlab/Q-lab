@@ -7,6 +7,33 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Try a circuit in your browser, `/try`, open without an account (a button on the home page and
+  "Try" in Ctrl K). Paste OpenQASM 2 or 3, or pick Bell, GHZ, Grover (3 qubits), QFT, GHZ on 20
+  qubits or a 22-qubit QFT, and an exact state-vector simulation runs on this device: WebGPU compute
+  shaders (float32, up to 24 qubits) when the browser has WebGPU, JavaScript in a background thread
+  (float64, up to 20 qubits) otherwise, and the page says which one ran, on what, and how long it
+  took. Shows the exact probabilities and shots drawn from them (seeded), and how far float32
+  rounding moved the total. The reader is strict: the standard gates of qelib1.inc / stdgates.inc,
+  barrier and final measurements; gate definitions, if, reset, loops and modifiers are refused
+  with the line. "Open this circuit in Rewind" carries it to a replay on a past IBM calibration
+  (simulated, Rewind's own limits). Nothing is computed on the server. Tests check the browser
+  engines against the server's Qiskit simulation (`frontend/lib/sim/crosscheck.json`,
+  `npm run test:sim`, `backend/tests/test_browser_sim_crosscheck.py`).
+- Wall mode, `/wall`: Q-Lab on an office screen (a TV or a monitor), one sentence and one number
+  in huge type, updated every minute. An owner or admin (or, without an organisation, anyone for
+  their own runs) makes a display link in Settings, Display links and picks what it shows: how the
+  latest run matched the ideal ("Bell on ibm_fez: 91% of shots landed on the expected outcomes ..."),
+  runs in the last 7 days, or on how many machines the drift alarm says results moved. Nobody signs
+  in on the screen. The link can read the wall and nothing else; it is stored hashed, shown once,
+  can expire, can be revoked (the screen stops at its next poll), stops when its creator is no
+  longer an admin, and lists who made it and when it was last used. Creating, changing and revoking
+  one is audit-logged. The token stays in the URL fragment and goes to the API only as the
+  `X-Qlab-Display` header; the page is noindex with `Referrer-Policy: no-referrer` and makes no
+  outside requests. It polls with `If-None-Match` (304 when nothing changed), backs off on errors,
+  and when Q-Lab can't be reached keeps the last value dimmed with how old it is. Dark by default,
+  with a light theme; content drifts a few pixels every few minutes against burn-in unless the
+  screen asks for reduced motion. API: `GET/POST /api/v1/display-links`, `PATCH/DELETE
+  /api/v1/display-links/{id}`, `GET /api/v1/wall`. Migration `014_display_links`.
 - Your connection, right now: the sign-in pages and the app's footer say which key exchange this
   browser and Q-Lab agreed on, read in the browser from Cloudflare's same-origin `/cdn-cgi/trace`:
   "You're connected to Q-Lab with X25519MLKEM768 — quantum-safe key exchange." or "…with X25519 —

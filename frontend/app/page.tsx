@@ -122,6 +122,7 @@ export default function Landing() {
             {signedIn
               ? <Link href="/runs" className="button">Open your runs</Link>
               : <Link href="/login" className="button">Sign in or create an account</Link>}
+            <Link href="/try" className="button secondary">Try a circuit in your browser</Link>
             <Link href="/gallery" className="button secondary">See public runs</Link>
           </div>
         </section>

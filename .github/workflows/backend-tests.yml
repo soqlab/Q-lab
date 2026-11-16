@@ -2,9 +2,9 @@ name: Backend Tests
 
 on:
   push:
-    paths: ['backend/**', 'scripts/check_prices.py', '.github/workflows/backend-tests.yml']
+    paths: ['backend/**', 'scripts/check_prices.py', 'frontend/lib/sim/crosscheck.json', '.github/workflows/backend-tests.yml']
   pull_request:
-    paths: ['backend/**', 'scripts/check_prices.py', '.github/workflows/backend-tests.yml']
+    paths: ['backend/**', 'scripts/check_prices.py', 'frontend/lib/sim/crosscheck.json', '.github/workflows/backend-tests.yml']
 
 jobs:
   test:
