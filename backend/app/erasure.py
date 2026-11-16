@@ -48,7 +48,7 @@ NS_EXPORTS = "gdpr_exports"
 # Never copied into an export: secrets and their hashes.
 _SECRET_COLUMNS = {
     "password_hash", "key_hash", "code_hash", "public_key", "encrypted_key", "secret", "webhook_secret",
-    "challenge", "verify_token", "reset_token",
+    "challenge", "verify_token", "reset_token", "token_hash",
 }
 _SECRET_FIELDS = ("token", "secret", "password", "api_key", "apikey", "webhook_url", "private")
 

@@ -2,6 +2,8 @@
 
 Public, no sign-in:
     GET  /api/v1/rewind/machines           what is collected: machines, snapshot counts, first/last day
+    GET  /api/v1/rewind/pulse              the few facts soqlab.com shows: is it collecting, and each
+                                           machine's latest calibration time (CORS: soqlab.com, no cookies)
     GET  /api/v1/rewind/manifests/{date}   that UTC day's signed manifest (hashes, never contents)
     GET  /api/v1/rewind/public-key         the key manifests are signed with
     POST /api/v1/rewind/run                replay a circuit on a machine as calibrated on a date
@@ -23,17 +25,20 @@ from __future__ import annotations
 
 import hmac
 import os
-from datetime import date
+import threading
+import time
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import Identity, get_identity, log_audit, require_auth
 from ..rewind import harvest as hv
-from ..rate_limit import (rewind_compare_limiter, rewind_compare_user_limiter, rewind_run_limiter,
+from ..rate_limit import (rewind_compare_limiter, rewind_compare_user_limiter, rewind_pulse_limiter, rewind_run_limiter,
                           rewind_run_user_limiter)
 from ..rewind import compare as cmp
 from ..rewind import replay as rp
@@ -70,6 +75,42 @@ def machines(db: Session = Depends(get_db)):
         "note": "Calibration data is IBM's and is not republished here: only machine names, dates, hashes "
                 "and per-snapshot medians. Not affiliated with or endorsed by IBM.",
     }
+
+# soqlab.com shows one line from this. Real (harvested or backfilled) calibrations only, never the
+# simulated preview. Readable from those origins only, cached here and by the browser for 5 minutes.
+PULSE_ORIGINS = ("https://soqlab.com", "https://www.soqlab.com")
+PULSE_TTL_SECONDS = 300
+PULSE_MAX_MACHINES = 5
+_pulse_cache: dict[str, tuple[float, dict]] = {}
+_pulse_lock = threading.Lock()
+
+
+def _pulse_body(db: Session) -> dict:
+    rows = store.machines(db, include_simulated=False)
+    rows.sort(key=lambda m: m["last_calibrated_at"] or "", reverse=True)
+    return {
+        "collecting": hv.configured(),
+        "machines": [{"machine": m["machine"], "last_calibrated_at": m["last_calibrated_at"]}
+                     for m in rows[:PULSE_MAX_MACHINES]],
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "note": "Calibration times of IBM machines as stored by this server. Not affiliated with or endorsed by IBM.",
+    }
+
+
+@router.get("/api/v1/rewind/pulse", dependencies=[Depends(rewind_pulse_limiter)])
+def pulse(request: Request, db: Session = Depends(get_db)):
+    now = time.monotonic()
+    with _pulse_lock:
+        hit = _pulse_cache.get("body")
+    if hit is None or hit[0] <= now:
+        hit = (now + PULSE_TTL_SECONDS, _pulse_body(db))
+        with _pulse_lock:
+            _pulse_cache["body"] = hit
+    headers = {"Cache-Control": f"public, max-age={PULSE_TTL_SECONDS}", "Vary": "Origin"}
+    origin = request.headers.get("origin", "")
+    if origin in PULSE_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+    return JSONResponse(hit[1], headers=headers)
 
 
 @router.get("/api/v1/rewind/manifests/{day}")

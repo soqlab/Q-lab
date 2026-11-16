@@ -74,8 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const url = typeof args[0] === "string" ? args[0] : (args[0] as Request).url;
         // Don't intercept the sign-in endpoints themselves (a wrong passkey, or a SOQLAB sign-in
         // the server refused, is a 401 too)
+        // Wall mode's display link is not a sign-in: a revoked one must not sign anyone out (app/wall).
         if (!url.includes("/auth/login") && !url.includes("/auth/register") && !url.includes("/auth/passkeys/")
-          && !url.includes("/auth/soqlab/")) {
+          && !url.includes("/auth/soqlab/") && !url.includes("/api/v1/wall")) {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
           setToken(null);

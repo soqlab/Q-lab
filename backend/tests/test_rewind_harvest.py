@@ -475,3 +475,43 @@ def test_alembic_009_creates_and_drops_the_table(tmp_path):
     eng = create_engine(f"sqlite:///{db.as_posix()}")
     assert "machine_snapshots" not in inspect(eng).get_table_names()
     eng.dispose()
+
+
+# ---------------------------------------------------------------------------
+# The soqlab.com pulse line
+# ---------------------------------------------------------------------------
+
+def _pulse(origin="https://soqlab.com"):
+    from app.routers import rewind as rewind_router
+    rewind_router._pulse_cache.clear()
+    return client.get("/api/v1/rewind/pulse", headers={"Origin": origin} if origin else {})
+
+
+def test_pulse_says_nothing_is_collected_without_a_key():
+    r = _pulse()
+    assert r.status_code == 200
+    assert r.json()["collecting"] is False and r.json()["machines"] == []
+    assert r.headers["access-control-allow-origin"] == "https://soqlab.com"
+    assert "max-age=300" in r.headers["cache-control"] and "Origin" in r.headers["vary"]
+
+
+def test_pulse_lists_real_calibrations_newest_first_and_only_for_soqlab(monkeypatch):
+    _with_ibm(monkeypatch, FakeIBMBackend("ibm_a", cal=DAY), FakeIBMBackend("ibm_b", cal=DAY + timedelta(hours=3)))
+    with SessionLocal() as db:
+        hv.harvest(db, now=DAY + timedelta(hours=4))
+    body = _pulse().json()
+    assert body["collecting"] is True
+    assert body["machines"] == [{"machine": "ibm_b", "last_calibrated_at": "2026-11-14T08:41:12Z"},
+                                {"machine": "ibm_a", "last_calibrated_at": "2026-11-14T05:41:12Z"}]
+    assert set(body) == {"collecting", "machines", "generated_at", "note"}  # no medians, no files
+    assert "affiliated" in body["note"]
+    other = _pulse("https://evil.example")
+    assert other.status_code == 200 and other.headers.get("access-control-allow-origin") != "https://evil.example"
+
+
+def test_pulse_never_shows_the_simulated_preview(monkeypatch):
+    monkeypatch.setenv("QLAB_HARDWARE_BOARD_SIMULATE", "1")
+    hb.provider = FakeIBM([FakeIBMBackend("fake_a")])
+    with SessionLocal() as db:
+        assert len(hv.harvest(db, now=DAY)["stored"]) == 1
+    assert _pulse().json()["machines"] == []
