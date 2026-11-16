@@ -3,8 +3,8 @@
 Each check says what was compared with what, and passes, fails, or can't be made (with why).
 Nothing here trusts the dashboard: the record digest lets a downloaded copy be compared byte for
 byte, the circuit hash is recomputed from the stored QASM, the result is recomputed from the
-stored counts and circuit, and hardware-board runs are matched against the job table only this
-server writes.
+stored counts and circuit, hardware-board runs are matched against the job table only this
+server writes, and the stored data is compared with the signed receipt sealed when the run finished.
 """
 from __future__ import annotations
 
@@ -13,13 +13,14 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import HardwareBoardJob, Run
+from ..models import HardwareBoardJob, Receipt, Run
 from ..run_answer import measure
 from ..run_diff import counts_of
+from ..witness_service import receipt_status
 from .build_info import backend_commit
 
 router = APIRouter(tags=["verify"])
@@ -109,6 +110,9 @@ def verify_run(run_id: str, db: Session = Depends(get_db)):
                                  "This run looks like a hardware-board run, but no benchmark job this server submitted lists it. "
                                  "It was uploaded through the run API, not measured by the board."))
 
+    # 5. The signed receipt sealed when the run finished (SOQLAB Witness), against the data stored now.
+    receipt = _receipt_check(db, run, checks)
+
     commit = backend_commit()
     return {
         "run_id": run.run_id,
@@ -119,6 +123,41 @@ def verify_run(run_id: str, db: Session = Depends(get_db)):
                              "print(hashlib.sha256(json.dumps(r,sort_keys=True,separators=(',',':'),ensure_ascii=False)"
                              ".encode()).hexdigest())\" < verify.json"),
         "checks": checks,
+        "receipt": receipt,
         "checked_by": {"commit": commit, "source": "https://github.com/soqlab/Q-lab"},
         "passed": all(c["status"] != "fail" for c in checks),
     }
+
+
+_RECEIPT_TITLE = "The stored data matches the receipt sealed when the run finished"
+
+
+def _receipt_check(db: Session, run: Run, checks: list[dict[str, str]]) -> dict[str, Any] | None:
+    row = db.scalar(select(Receipt).where(Receipt.run_id == run.run_id).order_by(Receipt.seq.desc()).limit(1))
+    if row is None:
+        checks.append(_check("receipt", _RECEIPT_TITLE, "cant",
+                             "This run has no signed receipt. Q-Lab seals one when a run completes or fails; "
+                             "runs that finished before this server sealed receipts, or while signing was off, have none."))
+        return None
+    state = receipt_status(db, row, run)
+    body = state["receipt"]
+    versions = db.scalar(select(func.count()).select_from(Receipt).where(Receipt.run_id == run.run_id)) or 1
+    where = (f"Receipt {body['id']}, number {body['chain']['seq']} in this server's chain, sealed {body['issued_at']} "
+             f"and signed by {body['issuer']['name']} with ML-DSA-65 and Ed25519.")
+    if versions > 1:
+        where += f" It is version {versions}: the run's data was changed through the API after it first finished."
+    if state["status"] == "verified":
+        checks.append(_check("receipt", _RECEIPT_TITLE, "pass",
+                             f"{where} Both signatures are valid, and the circuit, results, calibration and package "
+                             "versions stored now hash to what it recorded."))
+    elif state["status"] == "modified":
+        changed = ", ".join(f.replace("_", " ") for f in state["changed_fields"]) or "the stored data"
+        checks.append(_check("receipt", _RECEIPT_TITLE, "fail",
+                             f"{where} The receipt is genuine, but {changed} no longer match what it recorded: "
+                             "the run was changed after it was sealed, without a new receipt being sealed."))
+    else:
+        failed = "; ".join(f"{c['name']}: {c['reason']}" for c in state["checks"] if c["status"] == "fail")
+        checks.append(_check("receipt", _RECEIPT_TITLE, "fail",
+                             f"{where} The receipt itself does not verify ({failed or 'unknown reason'})."))
+    return {"id": body["id"], "seq": body["chain"]["seq"], "issued_at": body["issued_at"],
+            "digest": state["digest"], "status": state["status"], "versions": versions}

@@ -10,13 +10,16 @@ import s from "../../landing.module.css";
  * Verify this run. Each check names what it compared, and passes, fails, or can't be made (and
  * why). Nothing on this page asks you to take the dashboard's word: the record's SHA-256 can be
  * recomputed from the downloaded record with the one-line command shown, and the server's commit
- * links to its source.
+ * links to its source. A run sealed when it finished also has a signed receipt (SOQLAB Witness):
+ * its check is one of the list, and the receipt itself can be downloaded and kept.
  */
 
 type Check = { id: string; title: string; status: "pass" | "fail" | "cant"; detail: string };
+type Receipt = { id: string; seq: number; issued_at: string; digest: string; status: string; versions: number };
 type Verify = {
   run_id: string; record_sha256: string; record: Record<string, unknown>; how_to_recompute: string;
   checks: Check[]; checked_by: { commit: string | null; source: string }; passed: boolean;
+  receipt?: Receipt | null;
 };
 
 const MARK: Record<Check["status"], { label: string; dot: string }> = {
@@ -113,6 +116,25 @@ export default function VerifyPage({ params }: { params: Promise<{ runId: string
                 </div>
               </div>
             </section>
+
+            {d.receipt && (
+              <section className="frame" aria-labelledby="receipt-h">
+                <div className="frame-head">
+                  <h2 id="receipt-h" className="inst-label">Signed receipt</h2>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>#{d.receipt.seq} in this server&apos;s chain</span>
+                </div>
+                <div className="frame-body" style={{ display: "grid", gap: 10 }}>
+                  <p className={s.p} style={{ margin: 0 }}>
+                    Q-Lab sealed this receipt when the run finished, at {d.receipt.issued_at}. It holds hashes of the circuit, results, calibration and package versions, never the data itself, and it is signed with ML-DSA-65 and Ed25519. Keep a copy with the public keys: if the run is changed later, the copy still shows what was recorded.
+                  </p>
+                  <code className="mono" style={{ fontSize: 13, overflowWrap: "anywhere", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 4 }}>{d.receipt.digest}</code>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <a className="button secondary" href={qlabApiPath(`/api/v1/runs/${encodeURIComponent(runId)}/receipt?download=1`)}>Download the receipt (.json)</a>
+                    <a className="button secondary" href="/.well-known/witness-keys.json">Public keys</a>
+                  </div>
+                </div>
+              </section>
+            )}
 
             <dl className="readouts">
               <div className="readout">

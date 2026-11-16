@@ -117,6 +117,11 @@ const nextConfig = {
         source: "/verified/:token/badge.svg",
         destination: `${apiUrl}/api/v1/public/verified/:token/badge.svg`,
       },
+      // Public keys for Witness receipts, at the address the receipt format names.
+      {
+        source: "/.well-known/witness-keys.json",
+        destination: `${apiUrl}/.well-known/witness-keys.json`,
+      },
     ];
     if (!backendHosts.length) return api;
     return {

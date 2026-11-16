@@ -9,6 +9,7 @@ psycopg2-binary==2.9.13
 psycopg[binary]==3.3.8
 PyJWT==2.15.1
 cryptography==50.0.2
+rfc8785==0.1.4
 bcrypt==5.0.0
 webauthn==3.0.1
 httpx==0.28.1

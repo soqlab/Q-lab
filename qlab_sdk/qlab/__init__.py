@@ -42,6 +42,7 @@ from .qiskit_hooks import (
     PolicyViolationError,
 )
 from .jupyter import display, watch, runs_table
+from .receipts import receipt, verify
 
 __all__ = [
     "auto_track",
@@ -60,10 +61,12 @@ __all__ = [
     "log_result",
     "optimize",
     "PolicyViolationError",
+    "receipt",
     "reproducing",
     "run",
     "RunContext",
     "runs_table",
     "track",
+    "verify",
     "watch",
 ]

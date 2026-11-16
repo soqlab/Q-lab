@@ -154,6 +154,11 @@ def process_due(db: Session, now: datetime | None = None) -> list[str]:
 
 # ── Erasure ───────────────────────────────────────────────────────────────────
 
+# Append-only tables, which the database itself refuses to change. Witness receipts hold
+# hashes, never the run's data, so an erased run's receipt stays: it then reads "run deleted".
+KEEP_FOREVER = frozenset({"receipts"})
+
+
 def _tables_with(column: str, skip: Iterable[str] = ()) -> list[Table]:
     return [t for t in reversed(Base.metadata.sorted_tables) if column in t.c and t.name not in set(skip)]
 
@@ -166,7 +171,7 @@ def _chunks(items: list[Any], n: int = 500) -> Iterable[list[Any]]:
 def _delete_runs(db: Session, run_ids: list[str]) -> None:
     """Runs and every row that refers to them by run_id."""
     for chunk in _chunks(run_ids):
-        for table in _tables_with("run_id", skip={"runs"}):
+        for table in _tables_with("run_id", skip={"runs", *KEEP_FOREVER}):
             db.execute(table.delete().where(table.c.run_id.in_(chunk)))
         db.execute(Run.__table__.delete().where(Run.run_id.in_(chunk)))
 
@@ -291,7 +296,7 @@ def erase(db: Session, user_id: int, notify: bool = True) -> str | None:
                .values(resource_id=code))
 
     if last_in_org:
-        for table in _tables_with("org_id", skip={"users", "audit_logs", "organizations"}):
+        for table in _tables_with("org_id", skip={"users", "audit_logs", "organizations", *KEEP_FOREVER}):
             db.execute(table.delete().where(table.c.org_id == org_id))
         db.execute(update(AuditLog).where(AuditLog.org_id == org_id).values(org_id=None))
 

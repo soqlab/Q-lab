@@ -1021,6 +1021,12 @@ class RunContext:
         self.run_id = run_id
         self._auto_step = 0
 
+    def receipt(self) -> dict[str, Any]:
+        """The signed SOQLAB Witness receipt for this run. Exists once the run has finished."""
+        from .receipts import receipt
+
+        return receipt(self.run_id)
+
     def log(self, name: str, value: float, step: Optional[int] = None) -> None:
         """Log a single metric. If step is omitted, auto-increments per call."""
         s = step if step is not None else self._auto_step

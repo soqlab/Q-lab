@@ -53,8 +53,33 @@ def _create_schema() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_compat_columns()
     _relax_users_email()
+    with engine.begin() as conn:
+        ensure_witness_schema(conn)
     _ensure_fts()
     _encrypt_existing_secrets()
+
+
+def ensure_witness_schema(conn) -> None:
+    """Database guards that keep the receipts table append-only (SOQLAB Witness)."""
+    if conn.dialect.name == "sqlite":
+        for operation in ("UPDATE", "DELETE"):
+            conn.execute(text(
+                f"CREATE TRIGGER IF NOT EXISTS receipts_no_{operation.lower()} BEFORE {operation} ON receipts "
+                "BEGIN SELECT RAISE(ABORT, 'receipts are append-only'); END"
+            ))
+        return
+    conn.execute(text("""
+        CREATE OR REPLACE FUNCTION qlab_append_only() RETURNS trigger AS $$
+        BEGIN
+            RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
+        END;
+        $$ LANGUAGE plpgsql
+    """))
+    conn.execute(text("DROP TRIGGER IF EXISTS receipts_append_only ON receipts"))
+    conn.execute(text(
+        "CREATE TRIGGER receipts_append_only BEFORE UPDATE OR DELETE ON receipts "
+        "FOR EACH ROW EXECUTE FUNCTION qlab_append_only()"
+    ))
 
 
 def _encrypt_existing_secrets() -> None:

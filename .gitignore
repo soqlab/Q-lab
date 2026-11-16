@@ -58,3 +58,6 @@ docker-volumes/
 # Installers and build caches
 *.exe
 *.tsbuildinfo
+
+# SOQLAB Witness private signing keys
+witness-keys/

@@ -73,6 +73,10 @@ The app is now running at `http://localhost:3000`.
 | `QLAB_REWIND_EVERY_HOURS` | No | Hours between harvests (default `20`). `QLAB_REWIND_SCHEDULER=off` stops the background harvest; `QLAB_REWIND_AUTO_BACKFILL=off` stops the automatic backfill |
 | `QLAB_REWIND_BENCH_MACHINES_PER_WEEK` | No | Rewind's accuracy benchmark ([docs/REWIND_METHOD.md](docs/REWIND_METHOD.md)): machines per weekly run on real hardware, round robin among those with a fresh calibration (default `3`; `0` turns it off). Also `QLAB_REWIND_BENCH_CIRCUITS` (`20`: circuits from the set per run), `QLAB_REWIND_BENCH_SHOTS` (`4000`). Runs on the hardware board's thread, so `QLAB_HARDWARE_BOARD_SCHEDULER=off` stops it too |
 | `QLAB_REWIND_BENCH_BUDGET_SECONDS_PER_28D` | No | QPU seconds per rolling 28 days that the hardware board and Rewind's benchmark may use together (default `480` of the open plan's 600). Each job is estimated before submission (2 s + 0.00035 s per shot of each circuit) and refused if it would go over; IBM's reported usage replaces the estimate once the job ends |
+| `QLAB_WITNESS_KEY_DIR` | No | Where the key that signs run receipts lives (default `backend/data/witness-keys`, on the data disk). Created on first start. Back it up, apart from the database backups |
+| `QLAB_WITNESS_KEY_PASSPHRASE` | No | Encrypts that private key at rest. The server then needs it at every start |
+| `QLAB_WITNESS_ISSUER` | No | The name on receipts (default: the host name of `QLAB_APP_URL`) |
+| `QLAB_WITNESS_TSA_URL`, `QLAB_WITNESS_ANCHOR_HOURS` | No | An RFC 3161 timestamp authority that anchors the newest receipt every `QLAB_WITNESS_ANCHOR_HOURS` (default `24`). Off unless set; sends one hash and nothing else |
 
 ## Provenance certificates and the Reproduced badge
 
@@ -122,6 +126,31 @@ one is at `https://qlab.soqlab.com/qlab-api/api/v1/certificates/public-key`. The
 the browser on `/verified/...` and `/certificate` (any saved certificate file), with
 @noble/post-quantum 0.7.1 and @noble/curves 2.4.0 served from the site itself
 (`frontend/public/vendor/qlab-pq-verify.js`, built by `tools/pq-verify-js`).
+
+## Run receipts (SOQLAB Witness)
+
+When a run completes or fails, Q-Lab seals a signed receipt for it, in the same transaction as the
+run: hashes of the stored circuit, results, calibration and package versions, the backend, shots
+and git commit, signed with ML-DSA-65 and Ed25519 and chained to the receipt before it. Receipts
+hold hashes, never the data. A provenance certificate describes a run as it is now; a receipt
+records what it was when it finished, so a later change shows up. If the run is changed through
+the API, a new receipt is sealed and the run has more than one version.
+
+- The run's Verify page (`/verify/<run id>`) checks the newest receipt against the data stored
+  now, and offers it as a file. API: `GET /api/v1/runs/{id}/receipt` (`?download=1` for the bare
+  receipt), `GET /api/v1/runs/public/{share token}/receipt`, `GET /api/v1/receipts/{id}`,
+  `GET /api/v1/runs/{id}/receipt/data/{field}` (the exact bytes a hash covers),
+  `GET /api/v1/receipts/chain/head`, and the public keys at `/.well-known/witness-keys.json`.
+  Same visibility as the run: the owner, or anyone once it is shared.
+- The `receipts` table is append-only: database triggers refuse updates and deletes. Deleting a
+  run or an account keeps its receipts (they then read "run deleted").
+- The key is created on first start in `QLAB_WITNESS_KEY_DIR`, outside the database. It is never
+  logged or returned by the API, and Q-Lab never contacts SOQLAB. **Back up that directory, apart
+  from your database backups.** If it is lost, new receipts get a new key and the old ones can only
+  be checked against a saved copy of `witness-keys.json`; keep one somewhere else. If signing can't
+  start, runs are saved without receipts and the log says why.
+- Runs that finished before this version have no receipt; one is sealed the next time such a run is
+  updated.
 
 ## Docker Compose (PostgreSQL)
 

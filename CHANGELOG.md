@@ -7,6 +7,23 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Signed run receipts (SOQLAB Witness). When a run completes or fails, Q-Lab seals a receipt in the
+  same transaction: hashes of the stored circuit, results, calibration and package versions, plus
+  the backend, shots and git commit, signed with ML-DSA-65 and Ed25519 and chained to the previous
+  receipt. Hashes only, never the data. The run's Verify page gains a check, "The stored data
+  matches the receipt sealed when the run finished", which fails and names the field when stored
+  data was changed afterwards, and offers the receipt as a file with the server's public keys
+  (`/.well-known/witness-keys.json`). Changing a run through the API seals a new version. The
+  `receipts` table is append-only (database triggers refuse updates and deletes); deleting a run or
+  an account keeps its receipts. API: `GET /api/v1/runs/{id}/receipt` (`?download=1`),
+  `/api/v1/runs/public/{share token}/receipt`, `/api/v1/receipts/{id}`, `/api/v1/receipts/chain/head`,
+  `/api/v1/runs/{id}/receipt/data/{field}`; same visibility as the run. The signing key is made on
+  first start in `QLAB_WITNESS_KEY_DIR` (back it up: SELF_HOSTING.md). Optional RFC 3161 anchoring
+  with `QLAB_WITNESS_TSA_URL`, off by default. Runs that finished earlier have no receipt.
+  Migration `015_witness_receipts`. SDK: `qlab.receipt(run_id)` and `RunContext.receipt()` fetch
+  it; `qlab.verify()` checks one offline once the `soqlab-witness` package is installed (not on
+  PyPI yet). The SDK now also records whether the git working tree had uncommitted changes
+  (`git_dirty`).
 - Try a circuit in your browser, `/try`, open without an account (a button on the home page and
   "Try" in Ctrl K). Paste OpenQASM 2 or 3, or pick Bell, GHZ, Grover (3 qubits), QFT, GHZ on 20
   qubits or a 22-qubit QFT, and an exact state-vector simulation runs on this device: WebGPU compute

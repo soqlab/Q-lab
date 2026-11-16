@@ -191,6 +191,24 @@ class AuditLog(Base):
 # Benchmarks (fan-out: same circuit → N backends)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# SOQLAB Witness receipts (append-only: database triggers refuse updates and deletes)
+# ---------------------------------------------------------------------------
+
+class Receipt(Base):
+    __tablename__ = "receipts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    seq: Mapped[int] = mapped_column(Integer, unique=True)
+    prev: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    body: Mapped[str] = mapped_column(Text)
+    # Copied from the run, not foreign keys: a receipt outlives a deleted run or account.
+    owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    org_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Benchmark(Base):
     __tablename__ = "benchmarks"
 

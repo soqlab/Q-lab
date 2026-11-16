@@ -74,6 +74,8 @@ from .routers import machine_pick as machine_pick_router
 from .routers import time_dial as time_dial_router
 from .routers import reproduce as reproduce_router
 from .routers import verify_run as verify_run_router
+from .routers import witness as witness_router
+from .witness_service import initialise as witness_initialise
 from .routers import pub_report as pub_report_router
 from .routers import paper_package as paper_package_router
 from .routers import campaigns as campaigns_router
@@ -235,6 +237,7 @@ API_URL = os.getenv("QLAB_API_URL", "")
 # Run DB init at import time — avoids the lifespan merging stack-depth issue
 # that occurs when 200+ routers are included with a lifespan= parameter set.
 init_db()
+witness_initialise()
 
 _ENV = os.getenv("ENVIRONMENT", "development").lower()
 _DOCS_URL = None if _ENV == "production" else "/docs"
@@ -320,6 +323,7 @@ app.include_router(machine_pick_router.router)
 app.include_router(time_dial_router.router)
 app.include_router(reproduce_router.router)
 app.include_router(verify_run_router.router)
+app.include_router(witness_router.router)
 app.include_router(pub_report_router.router)
 app.include_router(paper_package_router.router)
 app.include_router(campaigns_router.router)

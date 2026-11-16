@@ -5,10 +5,13 @@ starts with a fresh, empty database and never touches the production data file.
 """
 
 import os
+import tempfile
 
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Witness signing keys for the test run, never the data directory of a real install.
+os.environ.setdefault("QLAB_WITNESS_KEY_DIR", os.path.join(tempfile.mkdtemp(), "witness-keys"))
 
 
 @pytest.fixture(autouse=True)

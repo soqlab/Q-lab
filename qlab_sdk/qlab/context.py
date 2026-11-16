@@ -43,12 +43,18 @@ def _capture_library_versions() -> dict[str, str]:
         pass
     return versions
 
+def _git_dirty() -> bool | None:
+    """Whether the working tree had uncommitted changes. None outside a git repository."""
+    output = _safe_command(["git", "status", "--porcelain"])
+    return None if output is None else bool(output)
+
 def capture_context(include_pip_freeze: bool = False) -> Dict[str, Any]:
     context: Dict[str, Any] = {
         "python_version": sys.version,
         "platform": platform.platform(),
         "git_commit": _safe_command(["git", "rev-parse", "HEAD"]),
         "git_branch": _safe_command(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
+        "git_dirty": _git_dirty(),
         "library_versions": _capture_library_versions(),
     }
 
