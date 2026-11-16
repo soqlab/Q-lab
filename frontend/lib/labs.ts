@@ -13,6 +13,7 @@ import { useCallback, useSyncExternalStore } from "react";
 const CORE_EXACT = [
   "/",
   "/runs", "/projects", "/compare", "/hardware", "/rewind", "/papers", "/labs",
+  "/try",
   "/integrations", "/webhooks",
   "/team",
   "/settings", "/settings/policy", "/settings/rbac", "/settings/audit", "/settings/alerts",

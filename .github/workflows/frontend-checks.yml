@@ -31,6 +31,8 @@ jobs:
         run: npm run lint:ci
       - name: No third-party requests (CSP and source scan)
         run: npm run check:third-party
+      - name: In-browser simulator against the server's Qiskit numbers (lib/sim)
+        run: npm run test:sim
       - name: Production build
         run: npm run build
 

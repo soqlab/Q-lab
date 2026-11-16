@@ -7,6 +7,18 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Try a circuit in your browser, `/try`, open without an account (a button on the home page and
+  "Try" in Ctrl K). Paste OpenQASM 2 or 3, or pick Bell, GHZ, Grover (3 qubits), QFT, GHZ on 20
+  qubits or a 22-qubit QFT, and an exact state-vector simulation runs on this device: WebGPU compute
+  shaders (float32, up to 24 qubits) when the browser has WebGPU, JavaScript in a background thread
+  (float64, up to 20 qubits) otherwise, and the page says which one ran, on what, and how long it
+  took. Shows the exact probabilities and shots drawn from them (seeded), and how far float32
+  rounding moved the total. The reader is strict: the standard gates of qelib1.inc / stdgates.inc,
+  barrier and final measurements; gate definitions, if, reset, loops and modifiers are refused
+  with the line. "Open this circuit in Rewind" carries it to a replay on a past IBM calibration
+  (simulated, Rewind's own limits). Nothing is computed on the server. Tests check the browser
+  engines against the server's Qiskit simulation (`frontend/lib/sim/crosscheck.json`,
+  `npm run test:sim`, `backend/tests/test_browser_sim_crosscheck.py`).
 - Reproduce a paper, `/papers`, open without an account (a new Papers channel in the top bar and in
   Ctrl K). Paste an arXiv link or id: Q-Lab reads the paper's arXiv source and, if its abstract or
   comments link one, its GitHub repository, and lists the OpenQASM 2/3 circuits it finds (files,

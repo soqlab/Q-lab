@@ -141,7 +141,10 @@ function WarmupBanner() {
 }
 
 // Pages anyone can use without an account (each says what signing in adds).
-const PUBLIC_PATHS = ["/rewind", "/papers"];
+const PUBLIC_PATHS = [
+  "/rewind", "/papers",
+  "/try",
+];
 const isPublic = (p: string | null) => !!p && PUBLIC_PATHS.some((x) => p === x || p.startsWith(`${x}/`));
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
