@@ -7,6 +7,7 @@ the dashboard, the Docker images and the `qlab-sdk` Python package.
 ## [Unreleased]
 
 ### Added
+- Admin security overview: "Total logins" and the per-user IP counts now include passkey, recovery and SOQLAB ID sign-ins. They counted only password sign-ins (`auth.login`), so with passkey-only sign-in the number was close to zero. Enrolment steps are not counted, so nobody is counted twice.
 - Signed run receipts (SOQLAB Witness). When a run completes or fails, Q-Lab seals a receipt in the
   same transaction: hashes of the stored circuit, results, calibration and package versions, plus
   the backend, shots and git commit, signed with ML-DSA-65 and Ed25519 and chained to the previous

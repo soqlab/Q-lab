@@ -604,6 +604,15 @@ def sessions_stats(
     }
 
 
+#: A finished sign-in, whatever the method: password ("auth.login"), passkey, recovery and SOQLAB ID
+#: ("auth.login_*"). The "*_enrol" steps are not counted: a password or OAuth sign-in that must still
+#: add a passkey ends in "auth.login_passkey_enrolled", which is the sign-in, so counting both would
+#: count one person twice.
+def is_sign_in(action: str | None) -> bool:
+    action = action or ""
+    return action == "auth.login" or (action.startswith("auth.login_") and not action.endswith("_enrol"))
+
+
 @router.get("/security-stats")
 def security_stats(
     days: int = Query(default=30, ge=1, le=365),
@@ -614,7 +623,7 @@ def security_stats(
     since = datetime.now(timezone.utc) - timedelta(days=days)
     logs = db.scalars(select(AuditLog).where(AuditLog.created_at >= since)).all()
 
-    login_logs = [lg for lg in logs if lg.action == "auth.login"]
+    login_logs = [lg for lg in logs if is_sign_in(lg.action)]
     reg_logs = [lg for lg in logs if lg.action == "auth.register"]
 
     ip_users: defaultdict = defaultdict(set)
@@ -626,7 +635,7 @@ def security_stats(
             if lg.user_id:
                 ip_users[lg.ip_address].add(lg.user_id)
             ip_action_c[lg.ip_address] += 1
-        if lg.action == "auth.login" and lg.user_id and lg.ip_address:
+        if is_sign_in(lg.action) and lg.user_id and lg.ip_address:
             user_ips[lg.user_id].add(lg.ip_address)
 
     suspicious_ips = sorted(
